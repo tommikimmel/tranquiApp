@@ -126,3 +126,10 @@ El entorno local y el despliegue en VPS se unifican mediante **Docker Compose**,
 3.  `tranqui-frontend`: React 19 empaquetado bajo un servidor Nginx para producción, expuesto en el puerto `80` (redireccionado por SSL).
 
 Cada contenedor se comunicará a través de la red virtual de Docker y se configurará usando un archivo `.env` local que no se sube al repositorio de Git.
+
+---
+
+## 6. Aseguramiento de Calidad y Cobertura de Código
+Para garantizar la estabilidad y el correcto funcionamiento del software en cada incremento:
+*   **Cobertura Mínima Obligatoria:** Cada etapa o incremento de desarrollo debe contar con una cobertura de pruebas unitarias y de integración de **al menos el 90%** del código nuevo y modificado.
+*   **Aislamiento en Pruebas:** Las llamadas a servicios externos (como APIs de Google o Mercado Pago) deben mockearse obligatoriamente utilizando Mockito para no depender de la conectividad en el entorno de pruebas.
