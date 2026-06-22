@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  tranqui-db:
+    image: postgres:15-alpine
+    container_name: tranqui-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-tranqui_app}
+      POSTGRES_USER: ${DB_USER:-tomaskimmel}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-securepassword}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - tranqui-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  tranqui-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tranqui-backend
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://tranqui-db:5432/${DB_NAME:-tranqui_app}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-tomaskimmel}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-securepassword}
+      SPRING_PROFILES_ACTIVE: dev
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-masterdecryptionkey32charspart12}
+    depends_on:
+      tranqui-db:
+        condition: service_healthy
+    networks:
+      - tranqui-network
+
+  tranqui-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tranqui-frontend
+    restart: always
+    ports:
+      - "80:80"
+    networks:
+      - tranqui-network
+    depends_on:
+      - tranqui-backend
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  tranqui-network:
+    driver: bridge
