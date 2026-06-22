@@ -61,7 +61,7 @@ Cada commit debe describir de forma precisa el cambio implementado utilizando la
 ## 4. Convenciones de Testing y Calidad
 
 Para asegurar la robustez de Tranqui App antes del despliegue:
-*   **Pruebas Unitarias:** Cada servicio del backend debe contar con pruebas unitarias (`JUnit` + `Mockito`) que cubran las reglas de negocio críticas (ej. cálculo de bloques horarios, lógica de reembolso menor a 48 hs). Cobertura mínima deseable: 80%.
+*   **Pruebas Unitarias:** Cada servicio del backend debe contar con pruebas unitarias (`JUnit` + `Mockito`) que cubran las reglas de negocio críticas (ej. cálculo de bloques horarios, lógica de reembolso menor a 48 hs). Cobertura mínima obligatoria: 90%.
 *   **Pruebas de Integración:** Utilizar `@SpringBootTest` con bases de datos en memoria (`H2` o contenedores de prueba `Testcontainers` de Postgres) para verificar que las transacciones y persistencias JPA se realicen correctamente.
 *   **Frontend Testing:** Componentes complejos del flujo de reserva deben probarse usando `React Testing Library` o similar para verificar su comportamiento interactivo.
 *   **Verificación Automática:** Todo Pull Request hacia `develop` debe compilar la aplicación, correr las pruebas unitarias y pasar linter sin errores.
