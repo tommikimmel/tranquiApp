@@ -88,6 +88,12 @@
 			<artifactId>google-api-services-calendar</artifactId>
 			<version>v3-rev20220715-2.0.0</version>
 		</dependency>
+		<!-- Mercado Pago Java SDK -->
+		<dependency>
+			<groupId>com.mercadopago</groupId>
+			<artifactId>sdk-java</artifactId>
+			<version>2.1.0</version>
+		</dependency>
 		<!-- JJWT for Java JWT Token generation & parsing -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
