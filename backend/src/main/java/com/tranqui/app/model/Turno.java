@@ -55,6 +55,9 @@ public class Turno {
     @Column(name = "telemedicina_url", length = 500)
     private String telemedicinaUrl;
 
+    @OneToOne(mappedBy = "turno", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private Pago pago;
+
     @Builder.Default
     @Column(name = "fecha_creacion", nullable = false)
     private LocalDateTime fechaCreacion = LocalDateTime.now();
