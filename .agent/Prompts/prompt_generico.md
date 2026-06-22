@@ -36,4 +36,33 @@ Una vez finalizada la etapa correspondiente:
 
 En caso de encontrar inconsistencias en las especificaciones o tener dudas sobre la implementación:
 *   Realiza las preguntas aclaratorias que consideres necesarias al usuario.
-*   **Formato de las preguntas**: **NO** las realices en formato de lista. Redáctalas de forma tal que el usuario pueda ingresar y completar con la respuesta correspondiente para cada caso de manera simple.
+*   **Formato de las preguntas**: Realízalas en formato de lista con opciones claras para que el usuario pueda seleccionar las opciones que considere adecuadas de manera simple.
+
+---
+
+## 5. Workflow de Git y Gestión de Ramas (GitKraken y Origin)
+
+Para mantener una visualización limpia e ilustrativa del grafo de commits en herramientas como GitKraken, y conservar el servidor remoto limpio de ramas temporales, sigue estrictamente este workflow:
+
+1. **Creación de Ramas**:
+   - Trabaja siempre en ramas de funcionalidad específicas creadas a partir de `develop`.
+   - **Formato de rama**: `feat/be-fe/nombre-del-cambio` (ej. `feat/be-fe/arquitectura-inicial-docker`).
+   - Evita el uso de caracteres especiales prohibidos en Git (como `:`).
+
+2. **Integración con develop (Local)**:
+   - Una vez finalizados y validados los cambios en la rama local, realiza la integración a `develop` usando un merge sin avance rápido (**no-fast-forward**). Esto genera de forma obligatoria un commit de fusión para que la rama paralela y la integración se dibujen en el gráfico de GitKraken:
+     ```bash
+     git checkout develop
+     git merge --no-ff "feat/be-fe/nombre-del-cambio" -m "merge branch 'feat/be-fe/nombre-del-cambio' into develop"
+     ```
+
+3. **Subida de Cambios y Limpieza en Remoto (Origin)**:
+   - **Subir develop**: Sube la rama `develop` integrada a origin:
+     ```bash
+     git push origin develop
+     ```
+   - **Limpieza de ramas de feature**: Las ramas `feat/be-fe/...` no deben permanecer en el repositorio remoto (`origin`). Si fueron subidas, elimínalas del remoto para conservar el servidor limpio:
+     ```bash
+     git push origin --delete feat/be-fe/nombre-del-cambio
+     ```
+   - Esto mantendrá las ramas locales y el grafo visual intacto, mientras que en origin solo existirán las ramas de integración principal (`develop`) y producción (`main`).
