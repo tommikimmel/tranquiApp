@@ -59,6 +59,10 @@ public class Turno {
     private Pago pago;
 
     @Builder.Default
+    @Column(name = "recordatorio_enviado", nullable = false)
+    private Boolean recordatorioEnviado = false;
+
+    @Builder.Default
     @Column(name = "fecha_creacion", nullable = false)
     private LocalDateTime fechaCreacion = LocalDateTime.now();
 
