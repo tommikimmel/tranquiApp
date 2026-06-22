@@ -53,4 +53,35 @@ public class MercadoPagoService {
         Preference preference = client.create(request);
         return preference.getInitPoint();
     }
+
+    public String crearPreferenciaDocumento(com.tranqui.app.model.SolicitudDocumento solicitud) throws Exception {
+        Usuario medico = solicitud.getMedico();
+        String rawToken = "dummy-token";
+        if (medico.getMpAccessTokenEncrypted() != null) {
+            rawToken = encryptionUtil.decrypt(medico.getMpAccessTokenEncrypted());
+        }
+
+        if (!isEnabled || rawToken.startsWith("dummy") || rawToken.equals("test-token")) {
+            return "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-doc-preference-id";
+        }
+
+        MercadoPagoConfig.setAccessToken(rawToken);
+
+        PreferenceClient client = new PreferenceClient();
+
+        PreferenceItemRequest itemRequest = PreferenceItemRequest.builder()
+                .title(solicitud.getTipoConcepto().toString() + " - " + medico.getNombre())
+                .quantity(1)
+                .unitPrice(solicitud.getPrecio())
+                .build();
+
+        PreferenceRequest request = PreferenceRequest.builder()
+                .items(List.of(itemRequest))
+                .externalReference("doc-" + solicitud.getId().toString())
+                .notificationUrl("https://tranquiapp.com/api/payments/webhook")
+                .build();
+
+        Preference preference = client.create(request);
+        return preference.getInitPoint();
+    }
 }
