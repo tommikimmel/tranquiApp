@@ -20,6 +20,8 @@ Dentro del directorio `.agent/` (o `.agents/`), concéntrate en las siguientes c
 1.  **Ejecutar la Etapa Solicitada**: Realiza de manera completa y testeada la etapa número:
     👉 **Etapa Número: `***`** (Reemplazar por el número de etapa correspondiente).
 2.  **Uso Obligatorio de Skills**: Revisa la carpeta `skills/` y lee las directrices asociadas antes de programar la solución. Utilízalas como guía técnica y de buenas prácticas.
+3.  **Cobertura de Pruebas (Mínimo 90%)**: Cada etapa o incremento de desarrollo debe contar con una cobertura de pruebas unitarias y de integración de **al menos el 90%** del código nuevo y modificado. Las llamadas a servicios externos deben simularse o mockearse de forma obligatoria.
+
 
 ---
 
