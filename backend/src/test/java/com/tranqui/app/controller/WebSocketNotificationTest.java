@@ -4,6 +4,7 @@ import com.tranqui.app.model.*;
 import com.tranqui.app.model.dto.NotificacionDocDto;
 import com.tranqui.app.repository.SolicitudDocumentoRepository;
 import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.app.service.JwtService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.*;
 import org.springframework.messaging.converter.MappingJackson2MessageConverter;
 import org.springframework.messaging.simp.stomp.*;
+import org.springframework.web.socket.WebSocketHttpHeaders;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 import java.lang.reflect.Type;
@@ -38,6 +40,9 @@ class WebSocketNotificationTest {
 
     @Autowired
     private SolicitudDocumentoRepository solicitudRepository;
+
+    @Autowired
+    private JwtService jwtService;
 
     private WebSocketStompClient stompClient;
     private Usuario paciente;
@@ -84,8 +89,14 @@ class WebSocketNotificationTest {
     void shouldReceiveDocumentNotificationOnPaidWebhook() throws Exception {
         BlockingQueue<NotificacionDocDto> blockingQueue = new ArrayBlockingQueue<>(1);
 
+        String token = jwtService.generateToken(medico);
+        StompHeaders connectHeaders = new StompHeaders();
+        connectHeaders.add("Authorization", "Bearer " + token);
+
         StompSession session = stompClient.connectAsync(
                 "ws://localhost:" + port + "/ws-tranqui",
+                new WebSocketHttpHeaders(),
+                connectHeaders,
                 new StompSessionHandlerAdapter() {
                     @Override
                     public void handleException(StompSession session, StompCommand command, StompHeaders headers, byte[] payload, Throwable exception) {
