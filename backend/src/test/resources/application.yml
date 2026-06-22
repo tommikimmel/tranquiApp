@@ -8,3 +8,11 @@ spring:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: create-drop
+
+twilio:
+  account:
+    sid: ${TWILIO_ACCOUNT_SID:ACmockaccount}
+  auth:
+    token: ${TWILIO_AUTH_TOKEN:mocktoken}
+  whatsapp:
+    number: ${TWILIO_WHATSAPP_NUMBER:+14155238886}
