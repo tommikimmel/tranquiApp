@@ -3,11 +3,14 @@ package com.tranqui.app.service;
 import com.tranqui.app.model.EstadoTurno;
 import com.tranqui.app.model.TipoTurno;
 import com.tranqui.app.model.Turno;
+import com.tranqui.app.model.Usuario;
 import com.tranqui.app.repository.TurnoRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class TurnoService {
@@ -139,5 +142,42 @@ public class TurnoService {
         turno.setTelemedicinaUrl(meetUrl);
 
         return turnoRepository.save(turno);
+    }
+
+    @Transactional(readOnly = true)
+    public List<com.tranqui.app.model.dto.TurnoMedicoDto> obtenerTurnosDeHoy(String medicoEmail) {
+        Usuario medico = usuarioRepository.findByEmail(medicoEmail)
+                .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
+
+        java.time.LocalDate hoy = java.time.LocalDate.now();
+        List<Turno> turnos = turnoRepository.findByMedicoIdAndFechaAndEstadoNot(medico.getId(), hoy, EstadoTurno.CANCELADO);
+
+        // Sort by start time
+        turnos.sort(java.util.Comparator.comparing(Turno::getHoraInicio));
+
+        return turnos.stream()
+                .map(t -> {
+                    String status = "pending";
+                    if (t.getEstado() == EstadoTurno.CONFIRMADO) {
+                        status = "confirmed";
+                    }
+                    // If start time is past, could be completed
+                    if (t.getEstado() == EstadoTurno.CONFIRMADO && t.getHoraFin().isBefore(java.time.LocalTime.now())) {
+                        status = "completed";
+                    }
+
+                    String typeLabel = t.getTipo() == TipoTurno.OSDE ? "Copago OSDE" : "Consulta particular";
+
+                    return com.tranqui.app.model.dto.TurnoMedicoDto.builder()
+                            .id(t.getId())
+                            .patientName(t.getPaciente().getNombre())
+                            .hour(String.format("%02d", t.getHoraInicio().getHour()))
+                            .ampm("hs")
+                            .type(typeLabel)
+                            .status(status)
+                            .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
 }

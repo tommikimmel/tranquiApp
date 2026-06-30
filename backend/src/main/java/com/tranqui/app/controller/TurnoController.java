@@ -30,4 +30,10 @@ public class TurnoController {
     public ResponseEntity<TurnoResponseDto> reservarTurno(@RequestBody ReservaTurnoDto dto) {
         return ResponseEntity.ok(turnoService.reservarTurno(dto));
     }
+
+    @GetMapping("/medicos/turnos/hoy")
+    public ResponseEntity<List<com.tranqui.app.model.dto.TurnoMedicoDto>> obtenerTurnosDeHoy(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
+        return ResponseEntity.ok(turnoService.obtenerTurnosDeHoy(userDetails.getUsername()));
+    }
 }
