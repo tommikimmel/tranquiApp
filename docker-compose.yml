@@ -46,7 +46,7 @@ services:
     container_name: tranqui-frontend
     restart: always
     ports:
-      - "80:80"
+      - "3000:80"
     networks:
       - tranqui-network
     depends_on:
