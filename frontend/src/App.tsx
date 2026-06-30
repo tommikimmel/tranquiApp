@@ -38,35 +38,7 @@ interface DayAvailability {
 
 type NavSection = 'dashboard' | 'agenda' | 'patients' | 'prescriptions' | 'visitors' | 'payments' | 'settings'
 
-// ── Mock Data ───────────────────────────────────────────────────
-const TODAY_APPOINTMENTS: Appointment[] = [
-  { id: '1', patientName: 'Valentina Moreno', hour: '09', ampm: 'hs', type: 'Primera consulta', status: 'confirmed', meetLink: 'https://meet.google.com/abc-defg-hij' },
-  { id: '2', patientName: 'Matías Rodríguez', hour: '10', ampm: 'hs', type: 'Sesión de seguimiento', status: 'confirmed', meetLink: 'https://meet.google.com/klm-nopq-rst' },
-  { id: '3', patientName: 'Lucía Fernández', hour: '14', ampm: 'hs', type: 'Sesión de seguimiento', status: 'pending', meetLink: '' },
-  { id: '4', patientName: 'Santiago Torres', hour: '16', ampm: 'hs', type: 'Primera consulta', status: 'confirmed', meetLink: 'https://meet.google.com/uvw-xyz0-123' },
-]
-
-const AVAILABILITY: DayAvailability[] = [
-  { day: 'Lunes', abbr: 'Lun', active: true, slots: [
-    { time: '09:00', booked: true }, { time: '10:00', booked: false }, { time: '11:00', booked: false },
-    { time: '14:00', booked: true }, { time: '15:00', booked: false }, { time: '16:00', booked: false },
-  ]},
-  { day: 'Martes', abbr: 'Mar', active: true, slots: [
-    { time: '09:00', booked: false }, { time: '10:00', booked: false }, { time: '11:00', booked: true },
-    { time: '14:00', booked: false }, { time: '15:00', booked: true }, { time: '16:00', booked: false },
-  ]},
-  { day: 'Miércoles', abbr: 'Mié', active: false, slots: [] },
-  { day: 'Jueves', abbr: 'Jue', active: true, slots: [
-    { time: '09:00', booked: true }, { time: '10:00', booked: true }, { time: '11:00', booked: false },
-    { time: '14:00', booked: false }, { time: '15:00', booked: false }, { time: '16:00', booked: true },
-  ]},
-  { day: 'Viernes', abbr: 'Vie', active: true, slots: [
-    { time: '09:00', booked: false }, { time: '10:00', booked: false }, { time: '11:00', booked: false },
-    { time: '14:00', booked: true }, { time: '15:00', booked: false }, { time: '16:00', booked: false },
-  ]},
-  { day: 'Sábado', abbr: 'Sáb', active: false, slots: [] },
-  { day: 'Domingo', abbr: 'Dom', active: false, slots: [] },
-]
+// ── Mock Data (Removido ya que se usan APIs reales) ───────────────────────────────────
 
 // ── Icons (inline SVG) ─────────────────────────────────────────
 const Icon = {
@@ -955,22 +927,7 @@ function PrescriptionView({ onSend }: { onSend: (data: any) => Promise<void> }) 
 }
 
 // ── Settings: Tariff & Profile ─────────────────────────────────
-const DEFAULT_TARIFFS = [
-  { id: 'particular', label: 'Consulta particular', price: 60000, enabled: true },
-  { id: 'primera', label: 'Primera consulta (+30%)', price: 80000, enabled: true },
-  { id: 'sobreturno', label: 'Sobreturno', price: 90000, enabled: true },
-  { id: 'sobreturno-primera', label: 'Sobreturno primera consulta', price: 105000, enabled: true },
-  { id: 'osde', label: 'Copago OSDE', price: 10500, enabled: true },
-  { id: 'nocturna', label: 'Consulta nocturna', price: 0, enabled: false },
-  { id: 'domicilio', label: 'Consulta a domicilio', price: 0, enabled: false },
-  { id: 'receta-fuera', label: 'Receta fuera de turno', price: 45000, enabled: true },
-  { id: 'certificado', label: 'Certificado', price: 55000, enabled: true },
-  { id: 'certificado-laboral', label: 'Certificado laboral', price: 55000, enabled: true },
-  { id: 'informe-apto', label: 'Informe / Apto médico', price: 165000, enabled: true },
-  { id: 'apto-anmac', label: 'Apto ANMAC', price: 165000, enabled: false },
-  { id: 'consulta-bsas', label: 'Consulta Buenos Aires', price: 95000, enabled: false },
-  { id: 'consulta-intl', label: 'Consulta internacional (USD)', price: 130, enabled: false },
-]
+// DEFAULT_TARIFFS mock removed since values are loaded from API
 
 function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (updated: any) => Promise<void> }) {
   const [name, setName] = useState(medicoInfo?.name || '')

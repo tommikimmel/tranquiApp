@@ -30,32 +30,7 @@ type CheckoutStep = 'select' | 'review' | 'confirmed'
 type PaymentStatus = 'idle' | 'processing' | 'error'
 
 // ── Mock Data ──────────────────────────────────────────────────
-function generateDays(): DayOption[] {
-  const days: DayOption[] = []
-  const weekdays = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-  const now = new Date()
-
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(now)
-    d.setDate(d.getDate() + i)
-
-    if (d.getDay() === 0 || d.getDay() === 6) continue
-
-    const label = i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : weekdays[d.getDay()]
-    const sublabel = `${d.getDate()} ${months[d.getMonth()]}`
-
-    const baseSlots = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00']
-    const slots: TimeSlot[] = baseSlots.map((time) => ({
-      time,
-      available: Math.random() > 0.35,
-    }))
-
-    days.push({ date: d.toISOString().split('T')[0], label, sublabel, slots })
-  }
-
-  return days
-}
+// generateDays mock function removed since availability is loaded from API
 
 // ── Header ─────────────────────────────────────────────────────
 function CheckoutHeader({ step, onBack }: { step: CheckoutStep; onBack: () => void }) {
