@@ -29,12 +29,7 @@ interface Appointment {
   meetLink: string
 }
 
-interface DayAvailability {
-  day: string
-  abbr: string
-  active: boolean
-  slots: { time: string; booked: boolean }[]
-}
+
 
 type NavSection = 'dashboard' | 'agenda' | 'patients' | 'prescriptions' | 'visitors' | 'payments' | 'settings'
 
