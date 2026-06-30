@@ -87,7 +87,7 @@ public class PagoWebhookHandler {
 
         // Intentar notificar por WhatsApp
         try {
-            whatsAppService.enviarRecordatorioTurno(turno);
+            whatsAppService.enviarMensajeRecordatorio(turno);
         } catch (Exception e) {
             log.error("Error al enviar recordatorio de WhatsApp para el turno ID: {}", turnoId, e);
         }
