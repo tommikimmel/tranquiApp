@@ -46,6 +46,13 @@ public class WebhookController {
                 if (externalReference.startsWith("doc-")) {
                     Long solicitudId = Long.parseLong(externalReference.substring(4));
                     pagoWebhookHandler.procesarAprobacionConcepto(solicitudId, transactionId);
+                } else {
+                    try {
+                        Long turnoId = Long.parseLong(externalReference);
+                        pagoWebhookHandler.procesarAprobacionTurno(turnoId, transactionId);
+                    } catch (NumberFormatException e) {
+                        log.error("Referencia externa de webhook no válida: {}", externalReference);
+                    }
                 }
             }
         } catch (Exception e) {
