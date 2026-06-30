@@ -17,6 +17,9 @@ public class MedicoController {
     @Autowired
     private MedicoService medicoService;
 
+    @Autowired
+    private com.tranqui.app.service.DisponibilidadService disponibilidadService;
+
     @GetMapping
     public ResponseEntity<List<MedicoDto>> obtenerMedicos() {
         return ResponseEntity.ok(medicoService.obtenerMedicosActivos());
@@ -32,5 +35,18 @@ public class MedicoController {
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody MedicoDto dto) {
         return ResponseEntity.ok(medicoService.actualizarPerfil(userDetails.getUsername(), dto));
+    }
+
+    @GetMapping("/disponibilidad")
+    public ResponseEntity<List<com.tranqui.app.model.dto.DisponibilidadDto>> obtenerDisponibilidad(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return ResponseEntity.ok(disponibilidadService.obtenerDisponibilidades(userDetails.getUsername()));
+    }
+
+    @PutMapping("/disponibilidad")
+    public ResponseEntity<List<com.tranqui.app.model.dto.DisponibilidadDto>> actualizarDisponibilidad(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody List<com.tranqui.app.model.dto.DisponibilidadDto> dtos) {
+        return ResponseEntity.ok(disponibilidadService.guardarDisponibilidades(userDetails.getUsername(), dtos));
     }
 }
