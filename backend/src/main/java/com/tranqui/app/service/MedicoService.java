@@ -38,7 +38,7 @@ public class MedicoService {
     @Transactional(readOnly = true)
     public List<MedicoDto> obtenerMedicosActivos() {
         List<Usuario> medicos = usuarioRepository.findAll().stream()
-                .filter(u -> u.getRol() == Rol.MEDICO)
+                .filter(u -> u.getRol() == Rol.PSIQUIATRA)
                 .collect(Collectors.toList());
 
         List<MedicoDto> dtos = new ArrayList<>();
@@ -53,9 +53,9 @@ public class MedicoService {
         Usuario medico = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado con email: " + email));
         
-        // Ensure user is MEDICO
-        if (medico.getRol() != Rol.MEDICO) {
-            medico.setRol(Rol.MEDICO);
+        // Ensure user is PSIQUIATRA
+        if (medico.getRol() != Rol.PSIQUIATRA) {
+            medico.setRol(Rol.PSIQUIATRA);
             usuarioRepository.save(medico);
         }
 
