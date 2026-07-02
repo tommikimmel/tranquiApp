@@ -58,6 +58,8 @@ export const api = {
   // Doctor Dashboard
   getPerfil: () => apiFetch('/medicos/perfil'),
   
+  getStats: () => apiFetch('/medicos/stats'),
+  
   actualizarPerfil: (data: any) => 
     apiFetch('/medicos/perfil', { method: 'PUT', body: data }),
   
@@ -79,4 +81,9 @@ export const api = {
     diagnosis: string
     notes: string
   }) => apiFetch('/recetas/enviar', { method: 'POST', body: data as any }),
+
+  // Chat API
+  getChatHistorial: (destinatarioId: number | string) => apiFetch(`/chat/historial/${destinatarioId}`),
+  getChatCanales: () => apiFetch('/chat/canales'),
+  getChatCanalesVisitadores: () => apiFetch('/chat/canales/visitadores'),
 };
