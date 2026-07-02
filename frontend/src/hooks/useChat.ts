@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
-import { api } from './api'
+import { api } from '../api/api'
 
 export interface Message {
   id?: number

@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
-import './landing.css'
-import { api } from './api'
+import { useState, useMemo, useEffect } from 'react'
+import '../styles/landing.css'
+import { api } from '../api/api'
 
 // ── Types ──────────────────────────────────────────────────────
 interface Tariff {
@@ -154,11 +154,9 @@ function ProCard({ pro, onBook }: { pro: Professional; onBook: (p: Professional)
           id={`btn-book-${pro.id}`}
           onClick={(e) => { e.stopPropagation(); onBook(pro) }}
           aria-label={`Reservar turno con ${pro.name}`}
+          style={{ whiteSpace: 'nowrap' }}
         >
-          {pro.nextSlotDay === 'Hoy'
-            ? <><span style={{ fontSize: '0.65rem', opacity: 0.85, display: 'block', lineHeight: 1 }}>HOY</span>{pro.nextSlot} hs</>
-            : <><span style={{ fontSize: '0.65rem', opacity: 0.85, display: 'block', lineHeight: 1 }}>{pro.nextSlotDay.toUpperCase()}</span>{pro.nextSlot} hs</>
-          }
+          Pedir Turno
         </button>
       </div>
     </article>
@@ -166,7 +164,21 @@ function ProCard({ pro, onBook }: { pro: Professional; onBook: (p: Professional)
 }
 
 // ── Public Header ──────────────────────────────────────────────
-function PublicHeader({ onCrisis, onProLogin }: { onCrisis: () => void; onProLogin: () => void }) {
+function PublicHeader({ 
+  currentUser, 
+  onCrisis, 
+  onProLogin,
+  onLogout,
+  onGoToDashboard
+}: { 
+  currentUser: any; 
+  onCrisis: () => void; 
+  onProLogin: () => void;
+  onLogout: () => void;
+  onGoToDashboard: () => void;
+}) {
+  const isDoctor = currentUser?.rol === 'PSIQUIATRA' || currentUser?.rol === 'MEDICO'
+
   return (
     <header className="public-header" role="banner">
       <div className="public-header__inner">
@@ -179,22 +191,46 @@ function PublicHeader({ onCrisis, onProLogin }: { onCrisis: () => void; onProLog
           <button
             className="btn-crisis"
             onClick={onCrisis}
-            id="btn-crisis-header"
-            aria-label="Ayuda en crisis - líneas de emergencia"
+            id="btn-crisis-trigger"
           >
             <span className="btn-crisis__dot" aria-hidden="true" />
             Ayuda urgente
           </button>
-          <button
-            className="btn-pro-login"
-            onClick={onProLogin}
-            id="btn-pro-access"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 15, height: 15 }}>
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-            </svg>
-            Iniciar sesión
-          </button>
+
+          {currentUser ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>
+                {currentUser.nombre}
+              </span>
+              {isDoctor && (
+                <button 
+                  className="btn btn--secondary btn--sm" 
+                  onClick={onGoToDashboard}
+                  style={{ padding: 'var(--space-2) var(--space-4)', fontSize: 'var(--text-xs)' }}
+                >
+                  Panel Profesional
+                </button>
+              )}
+              <button 
+                className="btn btn--ghost btn--sm" 
+                onClick={onLogout}
+                style={{ padding: 'var(--space-2) var(--space-4)', fontSize: 'var(--text-xs)' }}
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          ) : (
+            <button
+              className="btn-pro-login"
+              onClick={onProLogin}
+              id="btn-pro-access"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 15, height: 15 }}>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+              </svg>
+              Iniciar sesión
+            </button>
+          )}
         </div>
       </div>
     </header>
@@ -204,45 +240,20 @@ function PublicHeader({ onCrisis, onProLogin }: { onCrisis: () => void; onProLog
 // ── Trust Strip (carousel) ─────────────────────────────────────
 const TRUST_ITEMS = [
   { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>, text: 'Profesionales con matrícula verificada' },
-  { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>, text: 'Pagos seguros con Mercado Pago' },
-  { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /><path d="M8 14l2 2 4-4" /></svg>, text: 'Cancelación gratuita hasta 24hs antes' },
-  { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>, text: 'Factura para reintegro de prepaga' },
+  { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>, text: 'Transacciones 100% encriptadas' },
+  { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>, text: 'Turnos disponibles en menos de 24hs' },
 ]
 
 function TrustStrip() {
-  const [active, setActive] = useState(0)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setActive(prev => (prev + 1) % TRUST_ITEMS.length)
-    }, 3000)
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [])
-
   return (
-    <div className="trust-strip" aria-label="Garantías de la plataforma">
-      <div className="trust-carousel" role="list">
-        <div className="trust-carousel__viewport">
-          <div className="trust-carousel__track" style={{ transform: `translateX(-${active * 100}%)` }}>
-            {TRUST_ITEMS.map((item, i) => (
-              <div className="trust-carousel__slide" key={i} role="listitem" aria-hidden={active !== i}>
-                <span className="trust-carousel__icon">{item.icon}</span>
-                {item.text}
-              </div>
-            ))}
+    <div className="trust-strip" aria-label="Garantías de servicio">
+      <div className="trust-strip__inner">
+        {TRUST_ITEMS.map((item, idx) => (
+          <div className="trust-item" key={idx} role="listitem">
+            <span className="trust-item__icon" aria-hidden="true">{item.icon}</span>
+            <span className="trust-item__text">{item.text}</span>
           </div>
-        </div>
-        <div className="trust-carousel__dots">
-          {TRUST_ITEMS.map((_, i) => (
-            <button
-              key={i}
-              className={`trust-carousel__dot ${active === i ? 'active' : ''}`}
-              onClick={() => setActive(i)}
-              aria-label={`Garantía ${i + 1}`}
-            />
-          ))}
-        </div>
+        ))}
       </div>
     </div>
   )
@@ -260,7 +271,19 @@ interface BookTarget {
   nextSlotDay: string
 }
 
-export default function LandingPage({ onNavigateToDashboard, onBook }: { onNavigateToDashboard: () => void; onBook?: (pro: BookTarget) => void }) {
+export default function LandingPage({ 
+  currentUser, 
+  onNavigateToDashboard, 
+  onBook,
+  onLogout,
+  onGoToDashboard
+}: { 
+  currentUser: any; 
+  onNavigateToDashboard: () => void; 
+  onBook?: (pro: BookTarget) => void;
+  onLogout: () => void;
+  onGoToDashboard: () => void;
+}) {
   const [query, setQuery] = useState('')
   const [activeSpecialty, setActiveSpecialty] = useState('Todos')
   const [professionals, setProfessionals] = useState<Professional[]>([])
@@ -268,6 +291,13 @@ export default function LandingPage({ onNavigateToDashboard, onBook }: { onNavig
   const [showCrisis, setShowCrisis] = useState(false)
 
   useEffect(() => {
+    // Only load professionals if authenticated
+    if (!currentUser) {
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
     api.getMedicos()
       .then((res: any) => {
         const mapped = res.map((m: any) => ({
@@ -285,7 +315,7 @@ export default function LandingPage({ onNavigateToDashboard, onBook }: { onNavig
       })
       .catch((err) => console.error("Error al cargar médicos:", err))
       .finally(() => setLoading(false))
-  }, [])
+  }, [currentUser])
 
   const filtered = useMemo(() => {
     return professionals.filter((pro) => {
@@ -322,15 +352,18 @@ export default function LandingPage({ onNavigateToDashboard, onBook }: { onNavig
       {showCrisis && <CrisisModal onClose={() => setShowCrisis(false)} />}
 
       <PublicHeader
+        currentUser={currentUser}
         onCrisis={() => setShowCrisis(true)}
         onProLogin={onNavigateToDashboard}
+        onLogout={onLogout}
+        onGoToDashboard={onGoToDashboard}
       />
 
       <TrustStrip />
 
       {/* Hero */}
       <section className="hero" aria-labelledby="hero-title">
-        <div className="hero__inner">
+        <div className="hero__inner" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div className="hero__eyebrow">
             Psicólogos y psiquiatras en Córdoba
           </div>
@@ -338,101 +371,172 @@ export default function LandingPage({ onNavigateToDashboard, onBook }: { onNavig
             Encontrá tu espacio<br />para estar <em>tranqui</em>
           </h1>
           <p className="hero__subtitle">
-            Sesiones online de 50 minutos con profesionales certificados.
-            Agenda, pagá y empezá hoy.
+            {currentUser 
+              ? `Hola, ${currentUser.nombre}. Buscá y agendá tu sesión online con profesionales certificados.`
+              : 'Sesiones online de 50 minutos con profesionales certificados. Agenda, pagá y empezá hoy.'
+            }
           </p>
 
-          {/* Search box */}
-          <div
-            className="search-box"
-            role="search"
-            aria-label="Buscar profesionales de salud mental"
-          >
-            <span className="search-box__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 20, height: 20 }}>
-                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </span>
-            <input
-              type="search"
-              className="search-box__input"
-              placeholder="¿Qué estás buscando? (ansiedad, depresión, pareja...)"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              aria-label="Buscar por especialidad o motivo de consulta"
-              id="search-professionals"
-              autoComplete="off"
-            />
-            <div className="search-box__divider" aria-hidden="true" />
-            <button className="search-box__filter" aria-label="Filtrar por disponibilidad">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" style={{ width: 16, height: 16 }}>
-                <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-              Disponibilidad
-            </button>
-          </div>
-
-          {/* Specialty chips */}
-          <div className="specialty-chips" role="group" aria-label="Filtrar por especialidad">
-            {SPECIALTIES.map((s) => (
-              <button
-                key={s}
-                className={`specialty-chip ${activeSpecialty === s ? 'active' : ''}`}
-                onClick={() => setActiveSpecialty(s)}
-                aria-pressed={activeSpecialty === s}
-                id={`chip-${s.toLowerCase().replace(/\s/g, '-')}`}
+          {currentUser ? (
+            <>
+              {/* Search box */}
+              <div
+                className="search-box"
+                role="search"
+                aria-label="Buscar profesionales de salud mental"
               >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
+                <span className="search-box__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 20, height: 20 }}>
+                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </span>
+                <input
+                  type="search"
+                  className="search-box__input"
+                  placeholder="¿Qué estás buscando? (ansiedad, depresión, pareja...)"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  aria-label="Buscar por especialidad o motivo de consulta"
+                  id="search-professionals"
+                  autoComplete="off"
+                />
+                <div className="search-box__divider" aria-hidden="true" />
+                <button className="search-box__filter" aria-label="Filtrar por disponibilidad">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" style={{ width: 16, height: 16 }}>
+                    <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                  Disponibilidad
+                </button>
+              </div>
 
-      {/* Results */}
-      <section className="results-section" aria-labelledby="results-heading">
-        <div className="results-header">
-          <h2 id="results-heading" className="results-count">
-            {loading ? 'Buscando profesionales...' : (
-              <><strong>{filtered.length} profesional{filtered.length !== 1 ? 'es' : ''}</strong> disponible{filtered.length !== 1 ? 's' : ''}</>
-            )}
-          </h2>
-          <div className="results-sort">
-            <span>Ordenar por:</span>
-            <button className="btn btn--ghost btn--sm" id="btn-sort">Próxima disponibilidad ↓</button>
-          </div>
-        </div>
-
-        <div className="results-grid" role="list" aria-label="Profesionales disponibles">
-          {loading
-            ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
-            : filtered.length === 0
-              ? (
-                <div className="empty-state" role="status" aria-live="polite">
-                  <div className="empty-state__emoji" aria-hidden="true">🌱</div>
-                  <h3 className="empty-state__title">No encontramos resultados</h3>
-                  <p className="empty-state__body">
-                    No hay profesionales con esa especialidad disponibles ahora.
-                    Probá con otro término o explorá todas las especialidades.
-                  </p>
+              {/* Specialty chips */}
+              <div className="specialty-chips" role="group" aria-label="Filtrar por especialidad">
+                {SPECIALTIES.map((s) => (
                   <button
-                    className="btn btn--secondary"
-                    onClick={() => { setQuery(''); setActiveSpecialty('Todos') }}
-                    id="btn-clear-filters"
+                    key={s}
+                    className={`specialty-chip ${activeSpecialty === s ? 'active' : ''}`}
+                    onClick={() => setActiveSpecialty(s)}
+                    aria-pressed={activeSpecialty === s}
+                    id={`chip-${s.toLowerCase().replace(/\s/g, '-')}`}
                   >
-                    Ver todos los profesionales
+                    {s}
                   </button>
-                </div>
-              )
-              : filtered.map((pro) => (
-                <div role="listitem" key={pro.id}>
-                  <ProCard pro={pro} onBook={handleBook} />
-                </div>
-              ))
-          }
+                ))}
+              </div>
+            </>
+          ) : (
+            /* Locked call to action card for unauthenticated users */
+            <div className="card" style={{
+              maxWidth: '520px',
+              width: '100%',
+              padding: 'var(--space-6) var(--space-8)',
+              marginTop: 'var(--space-6)',
+              background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+              border: '1px solid #bbf7d0',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-md)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 'var(--space-4)',
+              textAlign: 'center'
+            }}>
+              <div style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--color-primary)',
+                color: 'var(--color-text-on-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: 'var(--shadow-sm)'
+              }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 24, height: 24 }}>
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+              <h3 style={{
+                fontFamily: 'var(--font-heading)',
+                fontSize: 'var(--text-lg)',
+                fontWeight: 'var(--font-weight-bold)',
+                color: 'var(--green-900)',
+                margin: 0
+              }}>
+                Consultas y Turnos Protegidos
+              </h3>
+              <p style={{
+                fontSize: 'var(--text-sm)',
+                color: 'var(--green-800)',
+                lineHeight: 'var(--line-height-relaxed)',
+                margin: 0
+              }}>
+                Para ver el listado completo de profesionales certificados de salud mental, consultar horarios disponibles y agendar tu sesión de forma segura, primero iniciá sesión.
+              </p>
+              <button
+                className="btn btn--primary"
+                onClick={onNavigateToDashboard}
+                style={{
+                  padding: 'var(--space-3) var(--space-6)',
+                  fontWeight: 'var(--font-weight-semi)',
+                  boxShadow: 'var(--shadow-md)',
+                  marginTop: 'var(--space-2)'
+                }}
+              >
+                Iniciar sesión
+              </button>
+            </div>
+          )}
         </div>
       </section>
+
+      {/* Results (Only displayed if logged in) */}
+      {currentUser && (
+        <section className="results-section" aria-labelledby="results-heading">
+          <div className="results-header">
+            <h2 id="results-heading" className="results-count">
+              {loading ? 'Buscando profesionales...' : (
+                <><strong>{filtered.length} profesional{filtered.length !== 1 ? 'es' : ''}</strong> disponible{filtered.length !== 1 ? 's' : ''}</>
+              )}
+            </h2>
+            <div className="results-sort">
+              <span>Ordenar por:</span>
+              <button className="btn btn--ghost btn--sm" id="btn-sort">Próxima disponibilidad ↓</button>
+            </div>
+          </div>
+
+          <div className="results-grid" role="list" aria-label="Profesionales disponibles">
+            {loading
+              ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+              : filtered.length === 0
+                ? (
+                  <div className="empty-state" role="status" aria-live="polite">
+                    <div className="empty-state__emoji" aria-hidden="true">🌱</div>
+                    <h3 className="empty-state__title">No encontramos resultados</h3>
+                    <p className="empty-state__body">
+                      No hay profesionales con esa especialidad disponibles ahora.
+                      Probá con otro término o explorá todas las especialidades.
+                    </p>
+                    <button
+                      className="btn btn--secondary"
+                      onClick={() => { setQuery(''); setActiveSpecialty('Todos') }}
+                      id="btn-clear-filters"
+                    >
+                      Ver todos los profesionales
+                    </button>
+                  </div>
+                )
+                : filtered.map((pro) => (
+                  <div role="listitem" key={pro.id}>
+                    <ProCard pro={pro} onBook={handleBook} />
+                  </div>
+                ))
+            }
+          </div>
+        </section>
+      )}
     </>
   )
 }

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
-import './index.css'
-import './dashboard.css'
-import LandingPage from './LandingPage'
-import CheckoutFlow from './CheckoutFlow'
-import LoginPage from './LoginPage'
-import PatientsView from './PatientsView'
-import VisitorsView from './VisitorsView'
-import { api } from './api'
+import './styles/index.css'
+import './styles/dashboard.css'
+import LandingPage from './components/LandingPage'
+import CheckoutFlow from './components/CheckoutFlow'
+import LoginPage from './components/LoginPage'
+import PatientsView from './components/PatientsView'
+import VisitorsView from './components/VisitorsView'
+import { api } from './api/api'
 
 type AppView = 'landing' | 'checkout' | 'dashboard' | 'login'
 
@@ -953,11 +953,28 @@ export default function App() {
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null)
 
   // API states
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const [medicoInfo, setMedicoInfo] = useState<any>(null)
   const [todayAppointments, setTodayAppointments] = useState<any[]>([])
   const [availability, setAvailability] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
+
+  // Check user session on app load
+  useEffect(() => {
+    api.getMe()
+      .then((user) => {
+        setCurrentUser(user)
+        if (user && (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO')) {
+          setView('dashboard')
+        } else {
+          setView('landing')
+        }
+      })
+      .catch(() => {
+        setCurrentUser(null)
+      })
+  }, [])
 
   useEffect(() => {
     if (view === 'dashboard') {
@@ -1008,6 +1025,16 @@ export default function App() {
     setView('checkout')
   }
 
+  const handleLogout = async () => {
+    try {
+      await api.logout()
+    } catch (err) {
+      console.error("Error al cerrar sesión:", err)
+    }
+    setCurrentUser(null)
+    setView('landing')
+  }
+
   const pageTitle: Record<NavSection, string> = {
     dashboard: 'Inicio',
     agenda: 'Mi agenda',
@@ -1053,8 +1080,11 @@ export default function App() {
   if (view === 'landing') {
     return (
       <LandingPage
+        currentUser={currentUser}
         onNavigateToDashboard={() => setView('login')}
         onBook={handleBook}
+        onLogout={handleLogout}
+        onGoToDashboard={() => setView('dashboard')}
       />
     )
   }
@@ -1062,7 +1092,14 @@ export default function App() {
   if (view === 'login') {
     return (
       <LoginPage
-        onLoginSuccess={() => setView('dashboard')}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user)
+          if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO') {
+            setView('dashboard')
+          } else {
+            setView('landing')
+          }
+        }}
         onBack={() => setView('landing')}
       />
     )

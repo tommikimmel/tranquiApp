@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
-import './checkout.css'
-import { api } from './api'
+import '../styles/checkout.css'
+import { api } from '../api/api'
 
 // ── Types ──────────────────────────────────────────────────────
 interface Professional {
@@ -249,33 +249,42 @@ function StepReview({
   onPay,
   onBack,
   paymentStatus,
+  errorMessage,
 }: {
   professional: Professional
   selectedDay: DayOption
   selectedSlot: TimeSlot
-  onPay: (data: { name: string; email: string; phone: string; tipo: 'PARTICULAR' | 'OSDE'; afiliado?: string }) => void
+  onPay: (data: { name: string; email: string; phone: string; tipo: 'PARTICULAR' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'; afiliado?: string; customTime?: string }) => void
   onBack: () => void
   paymentStatus: PaymentStatus
+  errorMessage?: string | null
 }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
-  const [tipo, setTipo] = useState<'PARTICULAR' | 'OSDE'>('PARTICULAR')
+  const [tipo, setTipo] = useState<'PARTICULAR' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'>('PARTICULAR')
   const [afiliado, setAfiliado] = useState('')
+  const [customTime, setCustomTime] = useState(selectedSlot.time)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
 
-  // Find OSDE price from professional's tariffs if available
-  const osdePrice = useMemo(() => {
-    // In our backend/frontend structure, we can assume a default copago OSDE price if not explicit
-    return 10500;
-  }, []);
+  const services = [
+    { id: 'PARTICULAR', label: 'Consulta Particular', price: professional.price, desc: 'Consulta estándar de 50 minutos' },
+    { id: 'OSDE', label: 'Copago OSDE', price: 10500, desc: 'Requiere número de afiliado' },
+    { id: 'RECETA', label: 'Receta fuera de turno', price: 45000, desc: 'Solicitud de recetas o órdenes médicas' },
+    { id: 'CERTIFICADO', label: 'Certificado', price: 55000, desc: 'Emisión de certificados aptos y licencias' },
+    { id: 'SOBRETUNO', label: 'Sobre turno', price: 90000, desc: 'Horario personalizado fuera de agenda' }
+  ] as const
 
-  const currentPrice = tipo === 'OSDE' ? osdePrice : professional.price;
+  const currentPrice = useMemo(() => {
+    const s = services.find(x => x.id === tipo)
+    return s ? s.price : professional.price
+  }, [tipo, professional.price])
 
   const canPay = name.trim().length > 2 && 
                   email.includes('@') && 
                   phone.length >= 8 && 
-                  (tipo === 'PARTICULAR' || afiliado.trim().length > 4) &&
+                  (tipo !== 'OSDE' || afiliado.trim().length > 4) &&
+                  (tipo !== 'SOBRETUNO' || /^([01]\d|2[0-3]):[0-5]\d$/.test(customTime)) &&
                   acceptedTerms && 
                   paymentStatus !== 'processing';
 
@@ -286,7 +295,8 @@ function StepReview({
         email,
         phone,
         tipo,
-        afiliado: tipo === 'OSDE' ? afiliado : undefined
+        afiliado: tipo === 'OSDE' ? afiliado : undefined,
+        customTime: tipo === 'SOBRETUNO' ? customTime : undefined
       });
     }
   };
@@ -310,11 +320,15 @@ function StepReview({
         </div>
         <div className="checkout-summary-card__row">
           <span className="checkout-summary-card__label">Horario</span>
-          <span className="checkout-summary-card__value">{selectedSlot.time} hs — 50 min</span>
+          <span className="checkout-summary-card__value">
+            {tipo === 'SOBRETUNO' ? customTime : selectedSlot.time} hs — 50 min
+          </span>
         </div>
         <div className="checkout-summary-card__row">
           <span className="checkout-summary-card__label">Cobertura</span>
-          <span className="checkout-summary-card__value">{tipo === 'OSDE' ? 'Copago OSDE' : 'Particular'}</span>
+          <span className="checkout-summary-card__value">
+            {services.find(x => x.id === tipo)?.label || 'Particular'}
+          </span>
         </div>
         <div className="checkout-summary-card__divider" />
         <div className="checkout-summary-card__row checkout-summary-card__row--total">
@@ -326,22 +340,47 @@ function StepReview({
         </button>
       </div>
 
-      {/* Cobertura select */}
+      {/* Tipo de consulta select */}
       <div className="checkout-section">
-        <h2 className="checkout-section__title">Cobertura médica</h2>
-        <div style={{ display: 'flex', gap: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
-            <input type="radio" name="tipo-cobertura" checked={tipo === 'PARTICULAR'} onChange={() => setTipo('PARTICULAR')} />
-            Consulta Particular
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
-            <input type="radio" name="tipo-cobertura" checked={tipo === 'OSDE'} onChange={() => setTipo('OSDE')} />
-            Copago OSDE
-          </label>
+        <h2 className="checkout-section__title">Tipo de consulta</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+          {services.map((s) => {
+            const isSelected = tipo === s.id
+            return (
+              <div
+                key={s.id}
+                onClick={() => setTipo(s.id)}
+                style={{
+                  padding: 'var(--space-4)',
+                  border: isSelected ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: isSelected ? 'var(--green-50)' : 'var(--color-surface)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  transition: 'all 0.2s',
+                  boxShadow: 'var(--shadow-sm)'
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 'var(--font-weight-bold)', fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)' }}>
+                    {s.label}
+                  </div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                    {s.desc}
+                  </div>
+                </div>
+                <div style={{ fontWeight: 'var(--font-weight-semi)', fontSize: 'var(--text-sm)', color: 'var(--color-primary)' }}>
+                  ${s.price.toLocaleString('es-AR')}
+                </div>
+              </div>
+            )
+          })}
         </div>
 
         {tipo === 'OSDE' && (
-          <div className="form-group" style={{ animation: 'fadeIn 150ms ease-out' }}>
+          <div className="form-group" style={{ animation: 'fadeIn 150ms ease-out', marginTop: 'var(--space-4)' }}>
             <label className="form-label form-label--required" htmlFor="checkout-afiliado">Número de afiliado OSDE</label>
             <input
               id="checkout-afiliado"
@@ -351,6 +390,23 @@ function StepReview({
               value={afiliado}
               onChange={(e) => setAfiliado(e.target.value)}
             />
+          </div>
+        )}
+
+        {tipo === 'SOBRETUNO' && (
+          <div className="form-group" style={{ animation: 'fadeIn 150ms ease-out', marginTop: 'var(--space-4)' }}>
+            <label className="form-label form-label--required" htmlFor="checkout-customtime">Horario del sobreturno</label>
+            <input
+              id="checkout-customtime"
+              className="form-input"
+              type="time"
+              value={customTime}
+              onChange={(e) => setCustomTime(e.target.value)}
+              style={{ maxWidth: '150px' }}
+            />
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', display: 'block', marginTop: '4px' }}>
+              Especificá la hora exacta en la que querés realizar la consulta.
+            </span>
           </div>
         )}
       </div>
@@ -417,13 +473,13 @@ function StepReview({
             completo hasta 24hs antes).
           </span>
         </label>
-
+ 
         {paymentStatus === 'error' && (
           <div className="checkout-error" role="alert">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" style={{ width: 18, height: 18, flexShrink: 0 }}>
               <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            El pago no pudo procesarse. Revisá los datos de tu medio de pago e intentá de nuevo.
+            {errorMessage || "El pago no pudo procesarse. Revisá los datos de tu medio de pago e intentá de nuevo."}
           </div>
         )}
 
@@ -440,7 +496,7 @@ function StepReview({
             </>
           ) : (
             <>
-              Pagar ${professional.price.toLocaleString('es-AR')} con Mercado Pago
+              Pagar ${currentPrice.toLocaleString('es-AR')} con Mercado Pago
             </>
           )}
         </button>
@@ -471,12 +527,14 @@ function StepConfirmed({
   selectedSlot,
   onDone,
   meetLink,
+  createdTurn,
 }: {
   professional: Professional
   selectedDay: DayOption
   selectedSlot: TimeSlot
   onDone: () => void
   meetLink?: string
+  createdTurn?: any
 }) {
   const actualMeetLink = meetLink || `https://meet.google.com/${Math.random().toString(36).slice(2, 5)}-${Math.random().toString(36).slice(2, 6)}-${Math.random().toString(36).slice(2, 5)}`
 
@@ -510,7 +568,7 @@ function StepConfirmed({
         <div className="checkout-summary-card__row">
           <span className="checkout-summary-card__label">Pagado</span>
           <span className="checkout-summary-card__value checkout-summary-card__value--paid">
-            ${professional.price.toLocaleString('es-AR')} ✓
+            ${createdTurn?.precio ? createdTurn.precio.toLocaleString('es-AR') : professional.price.toLocaleString('es-AR')} ✓
           </span>
         </div>
       </div>
@@ -570,6 +628,7 @@ export default function CheckoutFlow({
   const [selectedDay, setSelectedDay] = useState<DayOption | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null)
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('idle')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [createdTurn, setCreatedTurn] = useState<any>(null)
 
   const handleSelectSlot = (day: DayOption, slot: TimeSlot) => {
@@ -579,12 +638,16 @@ export default function CheckoutFlow({
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const handlePay = (patientData: { name: string; email: string; phone: string; tipo: 'PARTICULAR' | 'OSDE'; afiliado?: string }) => {
+  const handlePay = (patientData: { name: string; email: string; phone: string; tipo: 'PARTICULAR' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'; afiliado?: string; customTime?: string }) => {
     setPaymentStatus('processing')
+    const finalTime = patientData.tipo === 'SOBRETUNO' && patientData.customTime 
+      ? patientData.customTime 
+      : selectedSlot!.time;
+
     api.reservarTurno({
       medicoId: Number(professional.id),
       fecha: selectedDay!.date,
-      hora: selectedSlot!.time + ":00",
+      hora: finalTime + ":00",
       tipo: patientData.tipo,
       metadataAfiliado: patientData.afiliado,
       nombrePaciente: patientData.name,
@@ -606,6 +669,7 @@ export default function CheckoutFlow({
     .catch((err) => {
       console.error("Error al procesar reserva de turno:", err)
       setPaymentStatus('error')
+      setErrorMessage(err.message || "El pago no pudo procesarse. Revisá los datos de tu medio de pago e intentá de nuevo.")
     })
   }
 
@@ -634,6 +698,7 @@ export default function CheckoutFlow({
           onPay={handlePay}
           onBack={() => setStep('select')}
           paymentStatus={paymentStatus}
+          errorMessage={errorMessage}
         />
       )}
 
@@ -644,6 +709,7 @@ export default function CheckoutFlow({
           selectedSlot={selectedSlot}
           onDone={onComplete}
           meetLink={createdTurn?.meetLink}
+          createdTurn={createdTurn}
         />
       )}
     </div>

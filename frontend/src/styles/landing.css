@@ -414,6 +414,7 @@
   box-shadow: var(--shadow-sm);
   transition: box-shadow var(--transition-normal), border-color var(--transition-normal), transform var(--transition-normal);
   cursor: pointer;
+  height: 100%;
 }
 
 .pro-card:hover {
@@ -543,6 +544,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-top: auto;
 }
 
 .pro-card__price {

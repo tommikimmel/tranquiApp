@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { api } from './api'
-import { useChat } from './useChat'
+import { api } from '../api/api'
+import { useChat } from '../hooks/useChat'
 
 export default function VisitorsView() {
   const [canales, setCanales] = useState<any[]>([])
