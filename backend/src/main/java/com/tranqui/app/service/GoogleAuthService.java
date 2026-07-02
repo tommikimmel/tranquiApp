@@ -37,8 +37,19 @@ public class GoogleAuthService {
     public GoogleIdToken.Payload verifyGoogleToken(String tokenString) {
         if ("mock-token".equals(tokenString) || (tokenString != null && tokenString.startsWith("mock-"))) {
             GoogleIdToken.Payload mockPayload = new GoogleIdToken.Payload();
-            mockPayload.setEmail("paula@tranqui.com");
-            mockPayload.set("name", "Lic. María Paula Rossi");
+            String email = "paula@tranqui.com";
+            String name = "Lic. María Paula Rossi";
+            if (tokenString.startsWith("mock-") && tokenString.contains("@")) {
+                email = tokenString.substring(5);
+                java.util.Optional<Usuario> existing = usuarioRepository.findByEmail(email);
+                if (existing.isPresent()) {
+                    name = existing.get().getNombre();
+                } else {
+                    name = email.split("@")[0];
+                }
+            }
+            mockPayload.setEmail(email);
+            mockPayload.set("name", name);
             return mockPayload;
         }
         try {

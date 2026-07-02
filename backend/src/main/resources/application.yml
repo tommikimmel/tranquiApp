@@ -21,3 +21,6 @@ twilio:
     token: ${TWILIO_AUTH_TOKEN:mocktoken}
   whatsapp:
     number: ${TWILIO_WHATSAPP_NUMBER:+14155238886}
+
+google:
+  client-id: ${GOOGLE_CLIENT_ID:dummy-client-id}
