@@ -81,7 +81,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
             color: 'var(--color-text-primary)',
             marginBottom: 'var(--space-1)'
           }}>
-            Ingreso de Profesionales
+            Iniciar sesión
           </h2>
           <p style={{ 
             fontSize: 'var(--text-sm)',
