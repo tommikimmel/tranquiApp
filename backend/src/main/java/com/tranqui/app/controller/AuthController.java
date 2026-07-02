@@ -27,6 +27,9 @@ public class AuthController {
     @Autowired
     private JwtService jwtService;
 
+    @org.springframework.beans.factory.annotation.Value("${google.client-id:dummy-client-id}")
+    private String clientId;
+
     @PostMapping("/google")
     public ResponseEntity<?> loginWithGoogle(@RequestBody GoogleLoginDto googleLoginDto, HttpServletResponse response) {
         GoogleIdToken.Payload payload = googleAuthService.verifyGoogleToken(googleLoginDto.getIdToken());
@@ -37,13 +40,22 @@ public class AuthController {
         Usuario usuario = googleAuthService.getOrCreateUsuario(payload);
         String jwtToken = jwtService.generateToken(usuario);
 
+        boolean secureCookie = true;
+        String sameSiteVal = "Strict";
+
+        // Disable secure cookie and set SameSite to Lax in development/simulation mode
+        if ("dummy-client-id".equals(clientId) || (googleLoginDto.getIdToken() != null && googleLoginDto.getIdToken().startsWith("mock-"))) {
+            secureCookie = false;
+            sameSiteVal = "Lax";
+        }
+
         // Configurar cookie de sesión HttpOnly
         ResponseCookie cookie = ResponseCookie.from("SESSION-TOKEN", jwtToken)
                 .httpOnly(true)
-                .secure(true) // true triggers Secure cookie (must be HTTPS or localhost bypass)
+                .secure(secureCookie)
                 .path("/")
                 .maxAge(7 * 24 * 60 * 60) // 7 days
-                .sameSite("Strict")
+                .sameSite(sameSiteVal)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
