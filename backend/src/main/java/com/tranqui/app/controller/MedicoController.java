@@ -37,6 +37,12 @@ public class MedicoController {
         return ResponseEntity.ok(medicoService.actualizarPerfil(userDetails.getUsername(), dto));
     }
 
+    @GetMapping("/stats")
+    public ResponseEntity<com.tranqui.app.model.dto.DashboardStatsDto> obtenerStats(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return ResponseEntity.ok(medicoService.obtenerStats(userDetails.getUsername()));
+    }
+
     @GetMapping("/disponibilidad")
     public ResponseEntity<List<com.tranqui.app.model.dto.DisponibilidadDto>> obtenerDisponibilidad(
             @AuthenticationPrincipal UserDetails userDetails) {

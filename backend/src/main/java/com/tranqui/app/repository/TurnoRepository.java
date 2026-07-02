@@ -16,4 +16,6 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
     List<Turno> findByEstadoAndFechaCreacionBefore(EstadoTurno estado, java.time.LocalDateTime limit);
 
     List<Turno> findByEstadoAndFechaAndRecordatorioEnviado(EstadoTurno estado, LocalDate fecha, Boolean recordatorioEnviado);
+
+    List<Turno> findByMedicoIdAndEstadoNot(Long medicoId, EstadoTurno estado);
 }
