@@ -51,6 +51,9 @@ export const api = {
     telefonoPaciente: string
   }) => apiFetch('/turnos/reservar', { method: 'POST', body: data as any }),
 
+  checkFirstConsultation: (email: string) => 
+    apiFetch(`/turnos/check-first-consultation?email=${encodeURIComponent(email)}`),
+
   // Auth / Login with Google
   loginGoogle: (idToken: string) => 
     apiFetch('/auth/google', { method: 'POST', body: { idToken } as any }),

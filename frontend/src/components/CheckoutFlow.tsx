@@ -267,6 +267,25 @@ function StepReview({
   const [customTime, setCustomTime] = useState(selectedSlot.time)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
 
+  const [isFirstTime, setIsFirstTime] = useState(false)
+  const [showFirstTimeAlert, setShowFirstTimeAlert] = useState(false)
+
+  const handleEmailBlur = async () => {
+    if (email.trim().includes('@')) {
+      try {
+        const isFirst = await api.checkFirstConsultation(email.trim())
+        if (isFirst) {
+          setIsFirstTime(true)
+          setShowFirstTimeAlert(true)
+        } else {
+          setIsFirstTime(false)
+        }
+      } catch (err) {
+        console.error("Error al verificar primera consulta:", err)
+      }
+    }
+  }
+
   const services = [
     { id: 'PARTICULAR', label: 'Consulta Particular', price: professional.price, desc: 'Consulta estándar de 50 minutos' },
     { id: 'OSDE', label: 'Copago OSDE', price: 10500, desc: 'Requiere número de afiliado' },
@@ -277,8 +296,12 @@ function StepReview({
 
   const currentPrice = useMemo(() => {
     const s = services.find(x => x.id === tipo)
-    return s ? s.price : professional.price
-  }, [tipo, professional.price])
+    let basePrice = s ? s.price : professional.price
+    if (isFirstTime) {
+      basePrice = Math.round(basePrice * 1.30)
+    }
+    return basePrice
+  }, [tipo, professional.price, isFirstTime])
 
   const canPay = name.trim().length > 2 && 
                   email.includes('@') && 
@@ -439,6 +462,7 @@ function StepReview({
                 placeholder="tu@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={handleEmailBlur}
                 autoComplete="email"
               />
             </div>
@@ -516,6 +540,74 @@ function StepReview({
           <li>Si el profesional cancela, se reprograma o reembolsa el 100%.</li>
         </ul>
       </div>
+
+      {showFirstTimeAlert && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div className="card" style={{
+            maxWidth: '400px',
+            width: '90%',
+            padding: 'var(--space-6)',
+            textAlign: 'center',
+            boxShadow: 'var(--shadow-lg)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--color-surface)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 'var(--space-4)'
+          }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              backgroundColor: '#fef3c7',
+              color: '#d97706',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 24, height: 24 }}>
+                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <h3 style={{
+              fontFamily: 'var(--font-heading)',
+              fontSize: 'var(--text-lg)',
+              fontWeight: 'var(--font-weight-bold)',
+              color: 'var(--color-text-primary)',
+              margin: 0
+            }}>
+              ¡Primera Consulta!
+            </h3>
+            <p style={{
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-text-secondary)',
+              lineHeight: 'var(--line-height-relaxed)',
+              margin: 0
+            }}>
+              Se aplicará un recargo único del 30% en tu primer turno. El monto ya fue actualizado en tu resumen.
+            </p>
+            <button
+              className="btn btn--primary"
+              onClick={() => setShowFirstTimeAlert(false)}
+              style={{ width: '100%', marginTop: 'var(--space-2)' }}
+            >
+              Aceptar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

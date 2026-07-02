@@ -31,6 +31,11 @@ public class TurnoController {
         return ResponseEntity.ok(turnoService.reservarTurno(dto));
     }
 
+    @GetMapping("/turnos/check-first-consultation")
+    public ResponseEntity<Boolean> isFirstConsultation(@RequestParam String email) {
+        return ResponseEntity.ok(turnoService.esPrimeraConsulta(email));
+    }
+
     @GetMapping("/medicos/turnos/hoy")
     public ResponseEntity<List<com.tranqui.app.model.dto.TurnoMedicoDto>> obtenerTurnosDeHoy(
             @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {

@@ -44,6 +44,11 @@ public class TurnoService {
         return agendaService.calcularBloquesDisponibles(disponibilidades, turnosExistentes, fecha);
     }
 
+    @Transactional(readOnly = true)
+    public boolean esPrimeraConsulta(String email) {
+        return !turnoRepository.existsByPacienteEmailAndEstadoNot(email, EstadoTurno.CANCELADO);
+    }
+
     @Transactional
     public com.tranqui.app.model.dto.TurnoResponseDto reservarTurno(com.tranqui.app.model.dto.ReservaTurnoDto dto) {
         Usuario medico = usuarioRepository.findById(dto.getMedicoId())
@@ -106,6 +111,12 @@ public class TurnoService {
             } else {
                 precio = medico.getPrecio() != null ? medico.getPrecio() : new java.math.BigDecimal("60000");
             }
+        }
+
+        // If it is the first consultation, apply a 30% surcharge and round to nearest whole number
+        if (esPrimeraConsulta(dto.getEmailPaciente())) {
+            java.math.BigDecimal surcharge = precio.multiply(new java.math.BigDecimal("0.30"));
+            precio = precio.add(surcharge).setScale(0, java.math.RoundingMode.HALF_UP);
         }
 
         Turno turno = Turno.builder()

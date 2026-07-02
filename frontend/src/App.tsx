@@ -114,12 +114,11 @@ const Icon = {
 }
 
 // ── Sidebar Component ──────────────────────────────────────────
-function Sidebar({ activeNav, onNavChange, onGoHome, medicoInfo }: { activeNav: NavSection; onNavChange: (s: NavSection) => void; onGoHome: () => void; medicoInfo: any }) {
+function Sidebar({ activeNav, onNavChange, medicoInfo }: { activeNav: NavSection; onNavChange: (s: NavSection) => void; medicoInfo: any }) {
   const navItems = [
     { id: 'dashboard' as NavSection, label: 'Inicio', Icon: Icon.Dashboard },
     { id: 'agenda' as NavSection, label: 'Agenda', Icon: Icon.Calendar, badge: 4 },
     { id: 'patients' as NavSection, label: 'Pacientes', Icon: Icon.Users },
-    { id: 'prescriptions' as NavSection, label: 'Recetas', Icon: Icon.Prescription },
     { id: 'visitors' as NavSection, label: 'Visitadores', Icon: Icon.Users },
     { id: 'payments' as NavSection, label: 'Cobros', Icon: Icon.CreditCard },
     { id: 'settings' as NavSection, label: 'Configuración', Icon: Icon.Settings },
@@ -128,10 +127,10 @@ function Sidebar({ activeNav, onNavChange, onGoHome, medicoInfo }: { activeNav: 
   return (
     <aside className="sidebar">
       <div className="sidebar__logo">
-        <button onClick={onGoHome} className="sidebar__logo-btn">
+        <div className="sidebar__logo-btn" style={{ cursor: 'default' }}>
           <img src="/logo-tranqui.png" alt="Tranqui" className="sidebar__logo-img" />
           <span className="sidebar__logo-text">tranqui</span>
-        </button>
+        </div>
       </div>
 
       <nav className="sidebar__nav" role="navigation" aria-label="Navegación principal">
@@ -179,7 +178,7 @@ function MPConnectBanner({ connected, onConnect }: { connected: boolean; onConne
           <h2 className="mp-connect-banner__title">Mercado Pago conectado ✓</h2>
           <p className="mp-connect-banner__body">
             Tu cuenta está vinculada. Los pagos se acreditan automáticamente en tu cuenta de Mercado Pago
-            al confirmarse cada sesión. La comisión de plataforma (20%) se retiene en el origen.
+            al confirmarse cada sesión. Tranqui es 100% libre de comisiones.
           </p>
         </div>
         <button className="btn btn--ghost btn--sm">Desconectar</button>
@@ -874,7 +873,7 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
             {saving ? 'Guardando...' : 'Guardar honorarios'}
           </button>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-            Tranqui retiene 20% de comisión sobre cada pago.
+            Tranqui es 100% libre de comisiones, por lo que recibís la totalidad de tus honorarios.
           </span>
         </div>
       </div>
@@ -976,6 +975,18 @@ export default function App() {
       })
   }, [])
 
+  // Route protection guard
+  useEffect(() => {
+    if (currentUser) {
+      const isPro = currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO'
+      if (isPro && (view === 'landing' || view === 'login')) {
+        setView('dashboard')
+      } else if (!isPro && view === 'dashboard') {
+        setView('landing')
+      }
+    }
+  }, [currentUser, view])
+
   useEffect(() => {
     if (view === 'dashboard') {
       setLoadingDashboard(true)
@@ -1069,7 +1080,7 @@ export default function App() {
       case 'payments': return (
         <div className="card">
           <div className="card__header"><h2 className="card__title">Cobros y liquidaciones</h2></div>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Próximamente — historial de pagos recibidos y comisiones retenidas.</p>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Próximamente — historial de pagos recibidos (Tranqui es 100% libre de comisiones).</p>
         </div>
       )
       case 'settings': 
@@ -1117,7 +1128,7 @@ export default function App() {
 
   return (
     <div className="dashboard-layout">
-      <Sidebar activeNav={activeNav} onNavChange={setActiveNav} onGoHome={() => setView('landing')} medicoInfo={medicoInfo} />
+      <Sidebar activeNav={activeNav} onNavChange={setActiveNav} medicoInfo={medicoInfo} />
 
       <header className="dashboard-header" role="banner">
         <h1 className="dashboard-header__title">{pageTitle[activeNav]}</h1>

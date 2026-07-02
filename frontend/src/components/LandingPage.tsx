@@ -146,7 +146,6 @@ function ProCard({ pro, onBook }: { pro: Professional; onBook: (p: Professional)
 
       <div className="pro-card__footer">
         <div className="pro-card__price">
-          <span className="pro-card__price-amount">Desde ${pro.price.toLocaleString('es-AR')}</span>
           <span className="pro-card__price-label">50 min · Online</span>
         </div>
         <button
