@@ -39,6 +39,24 @@ public class Usuario {
     @Column(name = "telefono", length = 30)
     private String telefono;
 
+    @Column(name = "titulo", length = 50)
+    private String titulo;
+
+    @Column(name = "especialidad", length = 100)
+    private String specialty; // maps to specialty in frontend
+
+    @Column(name = "cuit", length = 20)
+    private String cuit;
+
+    @Column(name = "precio", precision = 12, scale = 2)
+    private java.math.BigDecimal precio;
+
+    @Column(name = "tags", length = 255)
+    private String tags; // comma separated tags e.g. "Ansiedad,Estrés"
+
+    @Column(name = "color", length = 20)
+    private String color;
+
     @Builder.Default
     @Column(name = "fecha_registro", nullable = false)
     private LocalDateTime fechaRegistro = LocalDateTime.now();

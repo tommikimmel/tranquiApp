@@ -1,9 +1,10 @@
 package com.tranqui.app.service;
 
-import com.tranqui.app.model.EstadoPago;
-import com.tranqui.app.model.SolicitudDocumento;
+import com.tranqui.app.model.*;
 import com.tranqui.app.model.dto.NotificacionDocDto;
+import com.tranqui.app.repository.PagoRepository;
 import com.tranqui.app.repository.SolicitudDocumentoRepository;
+import com.tranqui.app.repository.TurnoRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +24,18 @@ public class PagoWebhookHandler {
 
     @Autowired
     private SolicitudDocumentoRepository solicitudRepository;
+
+    @Autowired
+    private TurnoRepository turnoRepository;
+
+    @Autowired
+    private PagoRepository pagoRepository;
+
+    @Autowired
+    private GoogleCalendarService calendarService;
+
+    @Autowired
+    private WhatsAppService whatsAppService;
 
     @Transactional
     public void procesarAprobacionConcepto(Long solicitudId, String transactionId) {
@@ -46,5 +59,37 @@ public class PagoWebhookHandler {
         // Publish to physician's private channel
         String destino = "/topic/notificaciones/" + solicitud.getMedico().getId();
         messagingTemplate.convertAndSend(destino, payload);
+    }
+
+    @Transactional
+    public void procesarAprobacionTurno(Long turnoId, String transactionId) {
+        Turno turno = turnoRepository.findById(turnoId)
+                .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado con ID: " + turnoId));
+
+        turno.setEstado(EstadoTurno.CONFIRMADO);
+        
+        // Crear evento de Google Meet
+        String meetUrl = calendarService.crearEventoReunion(turno);
+        turno.setTelemedicinaUrl(meetUrl);
+        turnoRepository.save(turno);
+
+        // Registrar el Pago
+        Pago pago = Pago.builder()
+                .turno(turno)
+                .transactionId(transactionId)
+                .estado(EstadoPago.APROBADO)
+                .monto(turno.getPrecio())
+                .fechaPago(LocalDateTime.now())
+                .build();
+        pagoRepository.save(pago);
+
+        log.info("Pago aprobado para turno ID: {}. Generado evento de Google Meet.", turnoId);
+
+        // Intentar notificar por WhatsApp
+        try {
+            whatsAppService.enviarMensajeRecordatorio(turno);
+        } catch (Exception e) {
+            log.error("Error al enviar recordatorio de WhatsApp para el turno ID: {}", turnoId, e);
+        }
     }
 }

@@ -83,6 +83,12 @@ public class WhatsAppService {
         );
     }
 
+    public void enviarMensajeWhatsApp(String telefono, String texto) {
+        String para = "whatsapp:" + telefono;
+        String de = "whatsapp:" + fromNumber;
+        createTwilioMessage(para, de, texto);
+    }
+
     protected void createTwilioMessage(String para, String de, String cuerpoMensaje) {
         if (accountSid == null || accountSid.isEmpty() || accountSid.equals("ACmockaccount")) {
             log.info("Mock/Offline mode: Message to {} from {}: {}", para, de, cuerpoMensaje);
