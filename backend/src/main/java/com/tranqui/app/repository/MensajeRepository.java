@@ -39,4 +39,15 @@ public interface MensajeRepository extends JpaRepository<Mensaje, Long> {
             @Param("horaActual") LocalTime horaActual,
             @Param("fechaLimite") LocalDate fechaLimite,
             @Param("horaLimite") LocalTime horaLimite);
+
+    @Query(value = "SELECT u.id AS id, u.nombre AS nombre, u.email AS email, " +
+           "'PRIORIDAD_BAJA' AS prioridadClinica, " +
+           "MAX(m.fecha_envio) AS ultimoMensaje " +
+           "FROM usuario u " +
+           "INNER JOIN mensaje m ON (m.remitente_id = u.id OR m.destinatario_id = u.id) " +
+           "WHERE (m.remitente_id = :medicoId OR m.destinatario_id = :medicoId) " +
+           "  AND u.rol = 'VISITADOR' " +
+           "GROUP BY u.id, u.nombre, u.email " +
+           "ORDER BY ultimoMensaje DESC", nativeQuery = true)
+    List<CanalPrioritarioDto> findVisitorChannels(@Param("medicoId") Long medicoId);
 }

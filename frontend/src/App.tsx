@@ -3,9 +3,12 @@ import './index.css'
 import './dashboard.css'
 import LandingPage from './LandingPage'
 import CheckoutFlow from './CheckoutFlow'
+import LoginPage from './LoginPage'
+import PatientsView from './PatientsView'
+import VisitorsView from './VisitorsView'
 import { api } from './api'
 
-type AppView = 'landing' | 'checkout' | 'dashboard'
+type AppView = 'landing' | 'checkout' | 'dashboard' | 'login'
 
 interface CheckoutTarget {
   id: string
@@ -73,6 +76,11 @@ const Icon = {
   ArrowUp: () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 12, height: 12 }}>
       <polyline points="18 15 12 9 6 15" />
+    </svg>
+  ),
+  ArrowDown: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 12, height: 12 }}>
+      <polyline points="6 9 12 15 18 9" />
     </svg>
   ),
   Check: () => (
@@ -199,7 +207,30 @@ function MPConnectBanner({ connected, onConnect }: { connected: boolean; onConne
 }
 
 // ── Stats Overview ─────────────────────────────────────────────
-function StatsOverview() {
+function StatsOverview({ stats }: { stats: any }) {
+  if (!stats) {
+    return (
+      <div className="stats-grid">
+        {[1, 2, 3, 4].map((i) => (
+          <article key={i} className="stat-card" style={{ opacity: 0.6 }}>
+            <div style={{ height: '24px', backgroundColor: 'var(--color-border)', width: '60%', borderRadius: '4px', marginBottom: '8px' }} />
+            <div style={{ height: '32px', backgroundColor: 'var(--color-border)', width: '40%', borderRadius: '4px' }} />
+          </article>
+        ))}
+      </div>
+    )
+  }
+
+  const getChangeCls = (changeStr: string) => {
+    return changeStr && changeStr.startsWith('-') ? 'stat-card__change--down' : 'stat-card__change--up'
+  }
+
+  const renderIcon = (changeStr: string) => {
+    if (!changeStr) return null
+    if (changeStr.includes('Política')) return <Icon.ArrowUp />
+    return changeStr.startsWith('-') ? <Icon.ArrowDown /> : <Icon.ArrowUp />
+  }
+
   return (
     <div className="stats-grid">
       <article className="stat-card">
@@ -209,10 +240,10 @@ function StatsOverview() {
             <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
           </svg>
         </div>
-        <div className="stat-card__value">4</div>
+        <div className="stat-card__value">{stats.sessionsToday}</div>
         <div className="stat-card__label">Sesiones hoy</div>
-        <div className="stat-card__change stat-card__change--up">
-          <Icon.ArrowUp /> +1 vs ayer
+        <div className={`stat-card__change ${getChangeCls(stats.sessionsTodayChange)}`}>
+          {renderIcon(stats.sessionsTodayChange)} {stats.sessionsTodayChange}
         </div>
       </article>
 
@@ -222,10 +253,10 @@ function StatsOverview() {
             <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
         </div>
-        <div className="stat-card__value">$72.000</div>
+        <div className="stat-card__value">${(stats.earningsThisWeek || 0).toLocaleString('es-AR')}</div>
         <div className="stat-card__label">Liquidado esta semana</div>
-        <div className="stat-card__change stat-card__change--up">
-          <Icon.ArrowUp /> +15% vs semana anterior
+        <div className={`stat-card__change ${getChangeCls(stats.earningsThisWeekChange)}`}>
+          {renderIcon(stats.earningsThisWeekChange)} {stats.earningsThisWeekChange}
         </div>
       </article>
 
@@ -235,10 +266,10 @@ function StatsOverview() {
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
           </svg>
         </div>
-        <div className="stat-card__value">23</div>
+        <div className="stat-card__value">{stats.activePatients}</div>
         <div className="stat-card__label">Pacientes activos</div>
         <div className="stat-card__change stat-card__change--up">
-          <Icon.ArrowUp /> +3 este mes
+          <Icon.ArrowUp /> {stats.activePatientsChange}
         </div>
       </article>
 
@@ -248,10 +279,10 @@ function StatsOverview() {
             <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
           </svg>
         </div>
-        <div className="stat-card__value">0</div>
+        <div className="stat-card__value">{stats.noShowsThisMonth}</div>
         <div className="stat-card__label">No-shows este mes</div>
         <div className="stat-card__change stat-card__change--up">
-          <Icon.ArrowUp /> Política 24hs activa
+          <Icon.ArrowUp /> {stats.noShowsChange}
         </div>
       </article>
     </div>
@@ -425,222 +456,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
   )
 }
 
-// ── Visitors View (Visitadores Médicos) ───────────────────────
-interface VisitorMessage {
-  id: string
-  lab: string
-  rep: string
-  subject: string
-  message: string
-  date: string
-  read: boolean
-}
 
-const MOCK_VISITOR_MESSAGES: VisitorMessage[] = [
-  {
-    id: '1', lab: 'Gador', rep: 'Martín Suárez',
-    subject: 'Nuevo Escitalopram — presentación 20mg',
-    message: 'Estimado/a, le escribo para presentarle la nueva presentación de Escitalopram 20mg de Gador. Tenemos muestras disponibles y me gustaría coordinar una visita breve de 10 minutos.',
-    date: '17 jun', read: false,
-  },
-  {
-    id: '2', lab: 'Roemmers', rep: 'Lucía Páez',
-    subject: 'Invitación — Congreso de Psiquiatría Córdoba 2026',
-    message: 'Desde Roemmers queremos invitarlo/a al XII Congreso de Psiquiatría de Córdoba. Podemos cubrir la inscripción. ¿Le interesaría recibir más información?',
-    date: '15 jun', read: false,
-  },
-  {
-    id: '3', lab: 'Bagó', rep: 'Federico Romero',
-    subject: 'Muestras de Quetiapina 25mg',
-    message: 'Buenas tardes, tenemos muestras de Quetiapina 25mg para su consultorio. ¿Puedo pasar esta semana?',
-    date: '12 jun', read: true,
-  },
-  {
-    id: '4', lab: 'Raffo', rep: 'Camila Vega',
-    subject: 'Nuevo estudio — Pregabalina en TAG',
-    message: 'Le comparto un estudio reciente sobre eficacia de Pregabalina en Trastorno de Ansiedad Generalizada. ¿Le interesa que coordine una presentación?',
-    date: '10 jun', read: true,
-  },
-]
-
-function VisitorsView() {
-  const [messages, setMessages] = useState(MOCK_VISITOR_MESSAGES)
-  const [selected, setSelected] = useState<VisitorMessage | null>(null)
-  const [reply, setReply] = useState('')
-  const [replySent, setReplySent] = useState(false)
-
-  const handleSelect = (msg: VisitorMessage) => {
-    setSelected(msg)
-    setReplySent(false)
-    setReply('')
-    if (!msg.read) {
-      setMessages(messages.map(m => m.id === msg.id ? { ...m, read: true } : m))
-    }
-  }
-
-  const handleReply = () => {
-    setReplySent(true)
-    setReply('')
-  }
-
-  const unreadCount = messages.filter(m => !m.read).length
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-      {/* Info banner */}
-      <div className="alert-banner alert-banner--success" role="status">
-        <span className="alert-banner__icon">
-          <Icon.Users />
-        </span>
-        <div className="alert-banner__content">
-          <div className="alert-banner__title">Canal de visitadores médicos</div>
-          <div className="alert-banner__body">
-            Los representantes de laboratorios te contactan acá, separado de tus pacientes.
-            Vos decidís a quién responder y cuándo.
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1.5fr' : '1fr', gap: 'var(--space-5)' }}>
-        {/* Message list */}
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{
-            padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-border)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <h2 className="card__title" style={{ margin: 0 }}>
-              Mensajes
-              {unreadCount > 0 && (
-                <span className="sidebar__badge" style={{ marginLeft: 'var(--space-2)', verticalAlign: 'middle' }}>
-                  {unreadCount}
-                </span>
-              )}
-            </h2>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {messages.map((msg) => (
-              <button
-                key={msg.id}
-                onClick={() => handleSelect(msg)}
-                style={{
-                  display: 'flex', flexDirection: 'column', gap: 'var(--space-1)',
-                  padding: 'var(--space-4) var(--space-5)',
-                  borderBottom: '1px solid var(--color-border)',
-                  background: selected?.id === msg.id ? 'var(--green-50)' : msg.read ? 'transparent' : 'var(--neutral-50)',
-                  textAlign: 'left', cursor: 'pointer', border: 'none', borderLeft: selected?.id === msg.id ? '3px solid var(--green-500)' : '3px solid transparent',
-                  width: '100%', fontFamily: 'var(--font-body)',
-                  transition: 'background var(--transition-fast)',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{
-                    fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semi)',
-                    color: 'var(--green-700)', background: 'var(--green-50)',
-                    border: '1px solid var(--green-200)', borderRadius: 'var(--radius-full)',
-                    padding: '1px 8px',
-                  }}>
-                    {msg.lab}
-                  </span>
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>{msg.date}</span>
-                </div>
-                <span style={{
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: msg.read ? 'var(--font-weight-regular)' : 'var(--font-weight-semi)',
-                  color: 'var(--color-text-primary)',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  {msg.subject}
-                </span>
-                <span style={{
-                  fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  {msg.rep} · {msg.message.slice(0, 60)}...
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Detail panel */}
-        {selected && (
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
-                <span style={{
-                  fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semi)',
-                  color: 'var(--green-700)', background: 'var(--green-50)',
-                  border: '1px solid var(--green-200)', borderRadius: 'var(--radius-full)',
-                  padding: '2px 10px',
-                }}>
-                  {selected.lab}
-                </span>
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
-                  {selected.rep}
-                </span>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginLeft: 'auto' }}>
-                  {selected.date}
-                </span>
-              </div>
-              <h3 style={{
-                fontFamily: 'var(--font-heading)', fontSize: 'var(--text-lg)',
-                fontWeight: 'var(--font-weight-semi)', marginBottom: 'var(--space-4)',
-              }}>
-                {selected.subject}
-              </h3>
-              <p style={{
-                fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)',
-                lineHeight: 'var(--line-height-relaxed)',
-              }}>
-                {selected.message}
-              </p>
-            </div>
-
-            <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-4)' }}>
-              {replySent ? (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-                  color: 'var(--green-600)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)',
-                }}>
-                  <Icon.Check /> Respuesta enviada a {selected.rep}
-                </div>
-              ) : (
-                <>
-                  <div className="form-group" style={{ marginBottom: 'var(--space-3)' }}>
-                    <label className="form-label" htmlFor="visitor-reply">Responder a {selected.rep}</label>
-                    <textarea
-                      id="visitor-reply"
-                      className="form-input"
-                      rows={3}
-                      placeholder={`Ej: Hola ${selected.rep.split(' ')[0]}, podés pasar el jueves a las 13hs...`}
-                      value={reply}
-                      onChange={(e) => setReply(e.target.value)}
-                      style={{ resize: 'vertical', fontFamily: 'var(--font-body)' }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                    <button
-                      className="btn btn--primary btn--sm"
-                      disabled={reply.trim().length === 0}
-                      onClick={handleReply}
-                      id="btn-reply-visitor"
-                    >
-                      Enviar respuesta
-                    </button>
-                    <button className="btn btn--ghost btn--sm" onClick={() => setSelected(null)}>
-                      Cerrar
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 // ── Prescription View ─────────────────────────────────────────
 const MOCK_PATIENTS = [
@@ -1091,7 +907,7 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
   )
 }
 
-function DashboardHome({ mpConnected, onConnect, appointments }: { mpConnected: boolean; onConnect: () => void; appointments: Appointment[] }) {
+function DashboardHome({ mpConnected, onConnect, appointments, stats }: { mpConnected: boolean; onConnect: () => void; appointments: Appointment[]; stats: any }) {
   const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
   const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
 
@@ -1099,7 +915,7 @@ function DashboardHome({ mpConnected, onConnect, appointments }: { mpConnected: 
     <>
       <MPConnectBanner connected={mpConnected} onConnect={onConnect} />
 
-      <StatsOverview />
+      <StatsOverview stats={stats} />
 
       <div className="card">
         <div className="card__header">
@@ -1140,28 +956,27 @@ export default function App() {
   const [medicoInfo, setMedicoInfo] = useState<any>(null)
   const [todayAppointments, setTodayAppointments] = useState<any[]>([])
   const [availability, setAvailability] = useState<any[]>([])
+  const [stats, setStats] = useState<any>(null)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
 
   useEffect(() => {
     if (view === 'dashboard') {
       setLoadingDashboard(true)
-      // Login with developer bypass mock-token
-      api.loginGoogle("mock-token")
-        .then(() => {
-          // Fetch real data
-          return Promise.all([
-            api.getPerfil(),
-            api.getTurnosHoy(),
-            api.getDisponibilidad()
-          ])
-        })
-        .then(([perfil, turnos, disp]) => {
+      Promise.all([
+        api.getPerfil(),
+        api.getTurnosHoy(),
+        api.getDisponibilidad(),
+        api.getStats()
+      ])
+        .then(([perfil, turnos, disp, statsData]) => {
           setMedicoInfo(perfil)
           setTodayAppointments(turnos || [])
           setAvailability(disp || [])
+          setStats(statsData)
         })
         .catch((err) => {
           console.error("Error al inicializar dashboard:", err)
+          setView('login')
         })
         .finally(() => {
           setLoadingDashboard(false)
@@ -1215,18 +1030,15 @@ export default function App() {
 
     switch (activeNav) {
       case 'dashboard': 
-        return <DashboardHome mpConnected={mpConnected} onConnect={handleConnect} appointments={todayAppointments} />
+        return <DashboardHome mpConnected={mpConnected} onConnect={handleConnect} appointments={todayAppointments} stats={stats} />
       case 'agenda': 
         return <AgendaView initialAvailability={availability} onSave={handleSaveAvailability} />
-      case 'patients': return (
-        <div className="card">
-          <div className="card__header"><h2 className="card__title">Pacientes</h2></div>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Próximamente — listado de pacientes activos con historial de sesiones.</p>
-        </div>
-      )
+      case 'patients': 
+        return <PatientsView />
       case 'prescriptions': 
         return <PrescriptionView onSend={handleSendPrescription} />
-      case 'visitors': return <VisitorsView />
+      case 'visitors': 
+        return <VisitorsView />
       case 'payments': return (
         <div className="card">
           <div className="card__header"><h2 className="card__title">Cobros y liquidaciones</h2></div>
@@ -1241,8 +1053,17 @@ export default function App() {
   if (view === 'landing') {
     return (
       <LandingPage
-        onNavigateToDashboard={() => setView('dashboard')}
+        onNavigateToDashboard={() => setView('login')}
         onBook={handleBook}
+      />
+    )
+  }
+
+  if (view === 'login') {
+    return (
+      <LoginPage
+        onLoginSuccess={() => setView('dashboard')}
+        onBack={() => setView('landing')}
       />
     )
   }

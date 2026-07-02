@@ -73,4 +73,13 @@ public class ChatController {
         List<CanalPrioritarioDto> canales = mensajeService.obtenerCanalesPrioritarios(userDetails.getUsername());
         return ResponseEntity.ok(canales);
     }
+
+    @GetMapping("/api/chat/canales/visitadores")
+    @ResponseBody
+    public ResponseEntity<List<CanalPrioritarioDto>> obtenerCanalesVisitadores(
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        List<CanalPrioritarioDto> canales = mensajeService.obtenerCanalesVisitadores(userDetails.getUsername());
+        return ResponseEntity.ok(canales);
+    }
 }

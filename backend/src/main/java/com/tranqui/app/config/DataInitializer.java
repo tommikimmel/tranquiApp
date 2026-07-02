@@ -3,8 +3,10 @@ package com.tranqui.app.config;
 import com.tranqui.app.model.Disponibilidad;
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.Usuario;
+import com.tranqui.app.model.Mensaje;
 import com.tranqui.app.repository.DisponibilidadRepository;
 import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.app.repository.MensajeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +27,9 @@ public class DataInitializer implements CommandLineRunner {
 
     @Autowired
     private DisponibilidadRepository disponibilidadRepository;
+
+    @Autowired
+    private MensajeRepository mensajeRepository;
 
     @Override
     public void run(String... args) throws Exception {
@@ -74,6 +79,39 @@ public class DataInitializer implements CommandLineRunner {
                         .build());
             }
             log.info("Disponibilidades demo creadas para la médica.");
+
+            // 4. Crear Visitadores Demo
+            List<Usuario> visitadores = Arrays.asList(
+                    Usuario.builder().nombre("Martín Suárez").email("martin@gador.com").rol(Rol.VISITADOR).specialty("Gador").build(),
+                    Usuario.builder().nombre("Lucía Páez").email("lucia@roemmers.com").rol(Rol.VISITADOR).specialty("Roemmers").build(),
+                    Usuario.builder().nombre("Federico Romero").email("federico@bago.com").rol(Rol.VISITADOR).specialty("Bagó").build(),
+                    Usuario.builder().nombre("Camila Vega").email("camila@raffo.com").rol(Rol.VISITADOR).specialty("Raffo").build()
+            );
+            visitadores = usuarioRepository.saveAll(visitadores);
+            log.info("Visitadores demo creados.");
+
+            // 5. Crear Mensajes de prueba de visitadores
+            mensajeRepository.save(Mensaje.builder()
+                    .remitente(visitadores.get(0))
+                    .destinatario(medica)
+                    .contenido("Estimado/a, le escribo para presentarle la nueva presentación de Escitalopram 20mg de Gador. Tenemos muestras disponibles y me gustaría coordinar una visita breve de 10 minutos.")
+                    .build());
+            mensajeRepository.save(Mensaje.builder()
+                    .remitente(visitadores.get(1))
+                    .destinatario(medica)
+                    .contenido("Desde Roemmers queremos invitarlo/a al XII Congreso de Psiquiatría de Córdoba. Podemos cubrir la inscripción. ¿Le interesaría recibir más información?")
+                    .build());
+            mensajeRepository.save(Mensaje.builder()
+                    .remitente(visitadores.get(2))
+                    .destinatario(medica)
+                    .contenido("Buenas tardes, tenemos muestras de Quetiapina 25mg para su consultorio. ¿Puedo pasar esta semana?")
+                    .build());
+            mensajeRepository.save(Mensaje.builder()
+                    .remitente(visitadores.get(3))
+                    .destinatario(medica)
+                    .contenido("Le comparto un estudio reciente sobre eficacia de Pregabalina en Trastorno de Ansiedad Generalizada. ¿Le interesa que coordine una presentación?")
+                    .build());
+            log.info("Mensajes de visitadores creados.");
         }
     }
 }
