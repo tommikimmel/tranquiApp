@@ -49,10 +49,20 @@ public class TurnoService {
         Usuario medico = usuarioRepository.findById(dto.getMedicoId())
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
-        // Check if slot is still available
-        List<java.time.LocalTime> disponibles = obtenerHorariosDisponibles(medico.getId(), dto.getFecha());
-        if (!disponibles.contains(dto.getHora())) {
-            throw new IllegalStateException("El horario seleccionado ya no está disponible");
+        // Check if slot is still available (only for standard/non-sobreturno appointments)
+        if (dto.getTipo() != TipoTurno.SOBRETUNO) {
+            List<java.time.LocalTime> disponibles = obtenerHorariosDisponibles(medico.getId(), dto.getFecha());
+            if (!disponibles.contains(dto.getHora())) {
+                throw new IllegalStateException("El horario seleccionado ya no está disponible");
+            }
+        } else {
+            // For SOBRETUNO, verify the doctor has no other active appointment at the requested hour
+            List<Turno> turnosExistentes = turnoRepository.findByMedicoIdAndFechaAndEstadoNot(medico.getId(), dto.getFecha(), EstadoTurno.CANCELADO);
+            boolean yaOcupado = turnosExistentes.stream()
+                    .anyMatch(t -> t.getHoraInicio().equals(dto.getHora()));
+            if (yaOcupado) {
+                throw new IllegalStateException("El horario del sobreturno seleccionado ya se encuentra ocupado por otro turno");
+            }
         }
 
         // Find or create patient
@@ -69,14 +79,33 @@ public class TurnoService {
 
         // Determine price based on selected service
         java.math.BigDecimal precio = java.math.BigDecimal.ZERO;
-        String servicioId = dto.getTipo() == TipoTurno.OSDE ? "osde" : "particular";
+        String servicioId = "particular";
+        if (dto.getTipo() == TipoTurno.OSDE) {
+            servicioId = "osde";
+        } else if (dto.getTipo() == TipoTurno.RECETA) {
+            servicioId = "receta-fuera";
+        } else if (dto.getTipo() == TipoTurno.CERTIFICADO) {
+            servicioId = "certificado";
+        } else if (dto.getTipo() == TipoTurno.SOBRETUNO) {
+            servicioId = "sobreturno";
+        }
         
         Optional<com.tranqui.app.model.TarifaMedico> tarifaOpt = tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), servicioId);
         if (tarifaOpt.isPresent() && tarifaOpt.get().isHabilitado()) {
             precio = tarifaOpt.get().getPrecio();
         } else {
-            // Fallback to doctor's base price or default
-            precio = medico.getPrecio() != null ? medico.getPrecio() : new java.math.BigDecimal(dto.getTipo() == TipoTurno.OSDE ? "10500" : "60000");
+            // Fallback to defaults
+            if (dto.getTipo() == TipoTurno.OSDE) {
+                precio = new java.math.BigDecimal("10500");
+            } else if (dto.getTipo() == TipoTurno.RECETA) {
+                precio = new java.math.BigDecimal("45000");
+            } else if (dto.getTipo() == TipoTurno.CERTIFICADO) {
+                precio = new java.math.BigDecimal("55000");
+            } else if (dto.getTipo() == TipoTurno.SOBRETUNO) {
+                precio = new java.math.BigDecimal("90000");
+            } else {
+                precio = medico.getPrecio() != null ? medico.getPrecio() : new java.math.BigDecimal("60000");
+            }
         }
 
         Turno turno = Turno.builder()

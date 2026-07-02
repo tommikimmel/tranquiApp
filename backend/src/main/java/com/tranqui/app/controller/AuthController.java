@@ -13,9 +13,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import com.tranqui.app.repository.UsuarioRepository;
+import jakarta.persistence.EntityNotFoundException;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -23,6 +28,9 @@ public class AuthController {
 
     @Autowired
     private GoogleAuthService googleAuthService;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
     @Autowired
     private JwtService jwtService;
@@ -60,5 +68,27 @@ public class AuthController {
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
         return ResponseEntity.ok(new UserResponseDto(usuario.getNombre(), usuario.getEmail(), usuario.getRol()));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getMe(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        Usuario usuario = usuarioRepository.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+        return ResponseEntity.ok(new UserResponseDto(usuario.getNombre(), usuario.getEmail(), usuario.getRol()));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletResponse response) {
+        ResponseCookie cookie = ResponseCookie.from("SESSION-TOKEN", "")
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(0)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        return ResponseEntity.ok("Sesión cerrada");
     }
 }
