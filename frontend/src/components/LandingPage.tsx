@@ -332,6 +332,17 @@ export default function LandingPage({
   const [filterAvailableOnly, setFilterAvailableOnly] = useState(false)
   const [showFloatingChat, setShowFloatingChat] = useState(false)
   const [chatSubView, setChatSubView] = useState<'list' | 'chat'>('list')
+  const [chatChannels, setChatChannels] = useState<any[]>([])
+
+  useEffect(() => {
+    if (currentUser && currentUser.rol === 'PACIENTE' && showFloatingChat) {
+      api.getChatCanales()
+        .then((res: any) => {
+          setChatChannels(res || []);
+        })
+        .catch(err => console.error("Error loading chat channels:", err));
+    }
+  }, [currentUser, showFloatingChat])
 
   // Set default doctor ID (1 - Lic. Maria Paula Rossi) for patient demo chat
   useEffect(() => {
@@ -575,6 +586,16 @@ export default function LandingPage({
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 10, height: 10 }}><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
                       Unirse
                     </a>
+                  ) : appt.checkoutUrl ? (
+                    <a 
+                      href={appt.checkoutUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="btn btn--warning btn--sm" 
+                      style={{ fontSize: '9px', padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '3px', color: '#1e293b', fontWeight: 'bold' }}
+                    >
+                      💳 Pagar
+                    </a>
                   ) : (
                     <span style={{ fontSize: '9px', color: 'var(--color-warning)', fontWeight: 'bold' }}>Esperando pago</span>
                   )}
@@ -629,6 +650,17 @@ export default function LandingPage({
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
                           Unirse a la llamada
+                        </a>
+                      )}
+                      {!isConfirmed && appt.checkoutUrl && (
+                        <a 
+                          href={appt.checkoutUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="btn btn--warning" 
+                          style={{ fontSize: '11px', padding: 'var(--space-2) var(--space-4)', width: 'fit-content', display: 'flex', gap: '4px', alignItems: 'center', marginTop: 'var(--space-1)', textDecoration: 'none', color: '#1e293b', fontWeight: 'bold' }}
+                        >
+                          💳 Pagar Turno
                         </a>
                       )}
                     </div>
@@ -1154,19 +1186,19 @@ export default function LandingPage({
               {chatSubView === 'list' ? (
                 // Chat List View
                 <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#ffffff' }}>
-                  {professionals.length === 0 ? (
+                  {chatChannels.length === 0 ? (
                     <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--space-8)', fontSize: '12px' }}>
-                      No hay profesionales disponibles para chatear.
+                      No tenés chats activos aún. ¡Iniciá un chat desde el perfil de un profesional!
                     </p>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      {professionals.map((pro) => {
-                        const initials = pro.name.split(' ').map(n => n[0]).join('').slice(0, 2);
+                      {chatChannels.map((chan) => {
+                        const initials = chan.nombre.split(' ').map((n: string) => n[0]).join('').slice(0, 2);
                         return (
                           <div
-                            key={pro.id}
+                            key={chan.id}
                             onClick={() => {
-                              setActiveDoctorId(Number(pro.id));
+                              setActiveDoctorId(Number(chan.id));
                               setChatSubView('chat');
                             }}
                             style={{
@@ -1197,8 +1229,8 @@ export default function LandingPage({
                               {initials}
                             </div>
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                              <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>{pro.name}</span>
-                              <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>{pro.specialty}</span>
+                              <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>{chan.nombre}</span>
+                              <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>{chan.email}</span>
                             </div>
                             <span style={{ fontSize: '10px', color: 'var(--color-primary)', fontWeight: 'bold' }}>Chat →</span>
                           </div>

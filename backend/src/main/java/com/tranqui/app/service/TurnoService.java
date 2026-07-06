@@ -283,6 +283,15 @@ public class TurnoService {
 
                     String typeLabel = t.getTipo() == TipoTurno.OSDE ? "Copago OSDE" : "Consulta particular";
 
+                    String checkoutUrl = "";
+                    if ("pending".equals(status)) {
+                        try {
+                            checkoutUrl = mercadoPagoService.crearPreferenciaPago(t, t.getMedico());
+                        } catch (Exception e) {
+                            // keep empty
+                        }
+                    }
+
                     return com.tranqui.app.model.dto.TurnoMedicoDto.builder()
                             .id(t.getId())
                             .patientName(t.getMedico().getNombre()) // Show doctor name to patient
@@ -292,6 +301,7 @@ public class TurnoService {
                             .status(status)
                             .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
                             .fecha(t.getFecha().toString())
+                            .checkoutUrl(checkoutUrl)
                             .build();
                 })
                 .collect(Collectors.toList());

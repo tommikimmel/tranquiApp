@@ -16,4 +16,5 @@ public class TurnoMedicoDto {
     private String status; // confirmed, pending, completed
     private String meetLink;
     private String fecha;
+    private String checkoutUrl;
 }

@@ -263,7 +263,8 @@ export default function PatientsView() {
       padding: 0, 
       display: 'grid', 
       gridTemplateColumns: '320px 1fr', 
-      height: 'calc(100vh - var(--header-height) - var(--space-12))',
+      height: '100%',
+      minHeight: 0,
       overflow: 'hidden'
     }}>
       {/* Sidebar: Patient Directory */}

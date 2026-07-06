@@ -373,7 +373,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
     { name: 'Jueves', abbr: 'Jue', num: 4 },
     { name: 'Viernes', abbr: 'Vie', num: 5 },
   ]
-  const baseSlots = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00']
+  const baseSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00']
 
   // Internal state of active slots per day
   const [activeSlots, setActiveSlots] = useState<{ [key: number]: { [key: string]: boolean } }>(() => {
@@ -961,7 +961,7 @@ function DashboardHome({
     { name: 'Jueves', abbr: 'Jue', num: 4 },
     { name: 'Viernes', abbr: 'Vie', num: 5 },
   ]
-  const baseSlots = ['09:00', '10:00', '11:00', '12:00', '14:00', '15:00', '16:00', '17:00']
+  const baseSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00']
 
   // Parse date YYYY-MM-DD to get local day of week (1 = Monday, 5 = Friday)
   const getDayOfWeek = (dateStr: string) => {
@@ -1651,7 +1651,19 @@ export default function App() {
         </div>
       </header>
 
-      <main className="dashboard-main" role="main" id="main-content">
+      <main 
+        className="dashboard-main" 
+        role="main" 
+        id="main-content"
+        style={activeNav === 'patients' ? { 
+          overflow: 'hidden', 
+          height: 'calc(100vh - var(--header-height))', 
+          maxHeight: 'calc(100vh - var(--header-height))', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          padding: 'var(--space-6)' 
+        } : {}}
+      >
         {renderContent()}
       </main>
 
