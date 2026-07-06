@@ -32,19 +32,33 @@ public class ClinicalService {
     @Autowired
     private NotificacionService notificacionService;
 
+    @Autowired
+    private MensajeRepository mensajeRepository;
+
     @Transactional(readOnly = true)
     public List<PacienteDto> obtenerPacientesAtendidos(String medicoEmail) {
         Usuario medico = usuarioRepository.findByEmail(medicoEmail)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
-        List<Usuario> pacientes = turnoRepository.findDistinctPacientesByMedicoId(medico.getId());
+        List<Usuario> pacientesConTurno = turnoRepository.findDistinctPacientesByMedicoId(medico.getId());
+        List<Usuario> pacientesConChat = mensajeRepository.findPacientesConMensajesConMedico(medico.getId());
+
+        java.util.Map<Long, Usuario> pacientesMap = new java.util.LinkedHashMap<>();
+        for (Usuario p : pacientesConTurno) {
+            pacientesMap.put(p.getId(), p);
+        }
+        for (Usuario p : pacientesConChat) {
+            pacientesMap.put(p.getId(), p);
+        }
+
+        java.util.List<Usuario> todosLosPacientes = new java.util.ArrayList<>(pacientesMap.values());
 
         // For priority checking, check if there are confirmed appointments in the next 3 days
         LocalDate hoy = LocalDate.now();
         LocalDate limite = hoy.plusDays(3);
 
         List<PacienteDto> dtos = new ArrayList<>();
-        for (Usuario p : pacientes) {
+        for (Usuario p : todosLosPacientes) {
             // Find all confirmed appointments for this patient and doctor
             List<Turno> turnos = turnoRepository.findByMedicoIdAndEstadoNot(medico.getId(), EstadoTurno.CANCELADO);
             
@@ -66,6 +80,8 @@ public class ClinicalService {
                     .max(String::compareTo)
                     .orElse("Ninguna");
 
+            boolean sinTurno = patientTurnos.isEmpty();
+
             dtos.add(PacienteDto.builder()
                     .id(p.getId())
                     .nombre(p.getNombre())
@@ -75,8 +91,9 @@ public class ClinicalService {
                     .direccion(p.getDireccion())
                     .obraSocial(p.getObraSocial())
                     .numAfiliado(p.getNumAfiliado())
-                    .ultimaVisita(ultimaVisita)
+                    .ultimaVisita(sinTurno ? "Sin turnos registrados" : ultimaVisita)
                     .prioridadClinica(highPriority ? "PRIORIDAD_ALTA" : "PRIORIDAD_BAJA")
+                    .sinTurno(sinTurno)
                     .build());
         }
 

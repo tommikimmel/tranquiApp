@@ -13,6 +13,7 @@ interface Patient {
   numAfiliado: string
   ultimaVisita: string
   prioridadClinica: string
+  sinTurno?: boolean
 }
 
 interface TrackingEntry {
@@ -364,7 +365,14 @@ export default function PatientsView() {
                       alignItems: 'center',
                       justifyContent: 'space-between'
                     }}>
-                      {patient.nombre}
+                      <span>
+                        {patient.nombre}
+                        {patient.sinTurno && (
+                          <span className="badge badge--neutral" style={{ fontSize: '9px', padding: '1px 4px', backgroundColor: '#e2e8f0', color: '#475569', marginLeft: 'var(--space-2)' }}>
+                            💬 Sin Turno
+                          </span>
+                        )}
+                      </span>
                       {isHighPriority && (
                         <span className="badge badge--warning" style={{ fontSize: '9px', padding: '1px 4px' }}>
                           Urgente
@@ -456,7 +464,7 @@ export default function PatientsView() {
 
             {/* Content Switch */}
             {activeTab === 'chat' ? (
-              <>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
                 {/* Chat Messages */}
                 <div style={{ 
                   flex: 1, 
@@ -531,7 +539,7 @@ export default function PatientsView() {
                   />
                   <button type="submit" className="btn btn--primary">Enviar</button>
                 </form>
-              </>
+              </div>
             ) : (
               /* Clinical History Tab */
               <div style={{ flex: 1, padding: 'var(--space-6)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>

@@ -20,4 +20,5 @@ public class PacienteDto {
     private String numAfiliado;
     private String ultimaVisita;
     private String prioridadClinica;
+    private boolean sinTurno;
 }
