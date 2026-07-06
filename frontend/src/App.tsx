@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react'
-import './index.css'
-import './dashboard.css'
-import LandingPage from './LandingPage'
-import CheckoutFlow from './CheckoutFlow'
-import { api } from './api'
+import './styles/index.css'
+import './styles/dashboard.css'
+import LandingPage from './components/LandingPage'
+import CheckoutFlow from './components/CheckoutFlow'
+import LoginPage from './components/LoginPage'
+import PatientsView from './components/PatientsView'
+import VisitorsView from './components/VisitorsView'
+import { api } from './api/api'
+import { Client } from '@stomp/stompjs'
+import SockJS from 'sockjs-client'
 
-type AppView = 'landing' | 'checkout' | 'dashboard'
+type AppView = 'landing' | 'checkout' | 'dashboard' | 'login'
 
 interface CheckoutTarget {
   id: string
@@ -75,6 +80,11 @@ const Icon = {
       <polyline points="18 15 12 9 6 15" />
     </svg>
   ),
+  ArrowDown: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 12, height: 12 }}>
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  ),
   Check: () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 18, height: 18 }}>
       <polyline points="20 6 9 17 4 12" />
@@ -91,10 +101,24 @@ const Icon = {
       <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   ),
-  Bell: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ width: 20, height: 20 }}>
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
-    </svg>
+  Bell: ({ hasUnread }: { hasUnread?: boolean }) => (
+    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ width: 20, height: 20 }}>
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      </svg>
+      {hasUnread && (
+        <span style={{
+          position: 'absolute',
+          top: '0px',
+          right: '0px',
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          backgroundColor: '#ef4444',
+          border: '1px solid white'
+        }} />
+      )}
+    </div>
   ),
   Prescription: () => (
     <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -106,12 +130,11 @@ const Icon = {
 }
 
 // ── Sidebar Component ──────────────────────────────────────────
-function Sidebar({ activeNav, onNavChange, onGoHome, medicoInfo }: { activeNav: NavSection; onNavChange: (s: NavSection) => void; onGoHome: () => void; medicoInfo: any }) {
+function Sidebar({ activeNav, onNavChange, medicoInfo }: { activeNav: NavSection; onNavChange: (s: NavSection) => void; medicoInfo: any }) {
   const navItems = [
     { id: 'dashboard' as NavSection, label: 'Inicio', Icon: Icon.Dashboard },
     { id: 'agenda' as NavSection, label: 'Agenda', Icon: Icon.Calendar, badge: 4 },
     { id: 'patients' as NavSection, label: 'Pacientes', Icon: Icon.Users },
-    { id: 'prescriptions' as NavSection, label: 'Recetas', Icon: Icon.Prescription },
     { id: 'visitors' as NavSection, label: 'Visitadores', Icon: Icon.Users },
     { id: 'payments' as NavSection, label: 'Cobros', Icon: Icon.CreditCard },
     { id: 'settings' as NavSection, label: 'Configuración', Icon: Icon.Settings },
@@ -120,10 +143,10 @@ function Sidebar({ activeNav, onNavChange, onGoHome, medicoInfo }: { activeNav: 
   return (
     <aside className="sidebar">
       <div className="sidebar__logo">
-        <button onClick={onGoHome} className="sidebar__logo-btn">
+        <div className="sidebar__logo-btn" style={{ cursor: 'default' }}>
           <img src="/logo-tranqui.png" alt="Tranqui" className="sidebar__logo-img" />
           <span className="sidebar__logo-text">tranqui</span>
-        </button>
+        </div>
       </div>
 
       <nav className="sidebar__nav" role="navigation" aria-label="Navegación principal">
@@ -171,7 +194,7 @@ function MPConnectBanner({ connected, onConnect }: { connected: boolean; onConne
           <h2 className="mp-connect-banner__title">Mercado Pago conectado ✓</h2>
           <p className="mp-connect-banner__body">
             Tu cuenta está vinculada. Los pagos se acreditan automáticamente en tu cuenta de Mercado Pago
-            al confirmarse cada sesión. La comisión de plataforma (20%) se retiene en el origen.
+            al confirmarse cada sesión. Tranqui es 100% libre de comisiones.
           </p>
         </div>
         <button className="btn btn--ghost btn--sm">Desconectar</button>
@@ -199,7 +222,30 @@ function MPConnectBanner({ connected, onConnect }: { connected: boolean; onConne
 }
 
 // ── Stats Overview ─────────────────────────────────────────────
-function StatsOverview() {
+function StatsOverview({ stats }: { stats: any }) {
+  if (!stats) {
+    return (
+      <div className="stats-grid">
+        {[1, 2, 3, 4].map((i) => (
+          <article key={i} className="stat-card" style={{ opacity: 0.6 }}>
+            <div style={{ height: '24px', backgroundColor: 'var(--color-border)', width: '60%', borderRadius: '4px', marginBottom: '8px' }} />
+            <div style={{ height: '32px', backgroundColor: 'var(--color-border)', width: '40%', borderRadius: '4px' }} />
+          </article>
+        ))}
+      </div>
+    )
+  }
+
+  const getChangeCls = (changeStr: string) => {
+    return changeStr && changeStr.startsWith('-') ? 'stat-card__change--down' : 'stat-card__change--up'
+  }
+
+  const renderIcon = (changeStr: string) => {
+    if (!changeStr) return null
+    if (changeStr.includes('Política')) return <Icon.ArrowUp />
+    return changeStr.startsWith('-') ? <Icon.ArrowDown /> : <Icon.ArrowUp />
+  }
+
   return (
     <div className="stats-grid">
       <article className="stat-card">
@@ -209,10 +255,10 @@ function StatsOverview() {
             <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
           </svg>
         </div>
-        <div className="stat-card__value">4</div>
+        <div className="stat-card__value">{stats.sessionsToday}</div>
         <div className="stat-card__label">Sesiones hoy</div>
-        <div className="stat-card__change stat-card__change--up">
-          <Icon.ArrowUp /> +1 vs ayer
+        <div className={`stat-card__change ${getChangeCls(stats.sessionsTodayChange)}`}>
+          {renderIcon(stats.sessionsTodayChange)} {stats.sessionsTodayChange}
         </div>
       </article>
 
@@ -222,10 +268,10 @@ function StatsOverview() {
             <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
         </div>
-        <div className="stat-card__value">$72.000</div>
+        <div className="stat-card__value">${(stats.earningsThisWeek || 0).toLocaleString('es-AR')}</div>
         <div className="stat-card__label">Liquidado esta semana</div>
-        <div className="stat-card__change stat-card__change--up">
-          <Icon.ArrowUp /> +15% vs semana anterior
+        <div className={`stat-card__change ${getChangeCls(stats.earningsThisWeekChange)}`}>
+          {renderIcon(stats.earningsThisWeekChange)} {stats.earningsThisWeekChange}
         </div>
       </article>
 
@@ -235,10 +281,10 @@ function StatsOverview() {
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
           </svg>
         </div>
-        <div className="stat-card__value">23</div>
+        <div className="stat-card__value">{stats.activePatients}</div>
         <div className="stat-card__label">Pacientes activos</div>
         <div className="stat-card__change stat-card__change--up">
-          <Icon.ArrowUp /> +3 este mes
+          <Icon.ArrowUp /> {stats.activePatientsChange}
         </div>
       </article>
 
@@ -248,10 +294,10 @@ function StatsOverview() {
             <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
           </svg>
         </div>
-        <div className="stat-card__value">0</div>
+        <div className="stat-card__value">{stats.noShowsThisMonth}</div>
         <div className="stat-card__label">No-shows este mes</div>
         <div className="stat-card__change stat-card__change--up">
-          <Icon.ArrowUp /> Política 24hs activa
+          <Icon.ArrowUp /> {stats.noShowsChange}
         </div>
       </article>
     </div>
@@ -384,7 +430,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
   }
 
   return (
-    <div className="card">
+    <div className="card" style={{ width: '100%', maxWidth: 'none' }}>
       <div className="card__header">
         <div>
           <h2 className="card__title">Disponibilidad semanal</h2>
@@ -395,7 +441,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
         </button>
       </div>
 
-      <div className="availability-grid">
+      <div className="availability-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', width: '100%' }}>
         {weekdays.map((day) => {
           const isActive = baseSlots.some(slot => activeSlots[day.num][slot])
           return (
@@ -425,226 +471,11 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
   )
 }
 
-// ── Visitors View (Visitadores Médicos) ───────────────────────
-interface VisitorMessage {
-  id: string
-  lab: string
-  rep: string
-  subject: string
-  message: string
-  date: string
-  read: boolean
-}
 
-const MOCK_VISITOR_MESSAGES: VisitorMessage[] = [
-  {
-    id: '1', lab: 'Gador', rep: 'Martín Suárez',
-    subject: 'Nuevo Escitalopram — presentación 20mg',
-    message: 'Estimado/a, le escribo para presentarle la nueva presentación de Escitalopram 20mg de Gador. Tenemos muestras disponibles y me gustaría coordinar una visita breve de 10 minutos.',
-    date: '17 jun', read: false,
-  },
-  {
-    id: '2', lab: 'Roemmers', rep: 'Lucía Páez',
-    subject: 'Invitación — Congreso de Psiquiatría Córdoba 2026',
-    message: 'Desde Roemmers queremos invitarlo/a al XII Congreso de Psiquiatría de Córdoba. Podemos cubrir la inscripción. ¿Le interesaría recibir más información?',
-    date: '15 jun', read: false,
-  },
-  {
-    id: '3', lab: 'Bagó', rep: 'Federico Romero',
-    subject: 'Muestras de Quetiapina 25mg',
-    message: 'Buenas tardes, tenemos muestras de Quetiapina 25mg para su consultorio. ¿Puedo pasar esta semana?',
-    date: '12 jun', read: true,
-  },
-  {
-    id: '4', lab: 'Raffo', rep: 'Camila Vega',
-    subject: 'Nuevo estudio — Pregabalina en TAG',
-    message: 'Le comparto un estudio reciente sobre eficacia de Pregabalina en Trastorno de Ansiedad Generalizada. ¿Le interesa que coordine una presentación?',
-    date: '10 jun', read: true,
-  },
-]
-
-function VisitorsView() {
-  const [messages, setMessages] = useState(MOCK_VISITOR_MESSAGES)
-  const [selected, setSelected] = useState<VisitorMessage | null>(null)
-  const [reply, setReply] = useState('')
-  const [replySent, setReplySent] = useState(false)
-
-  const handleSelect = (msg: VisitorMessage) => {
-    setSelected(msg)
-    setReplySent(false)
-    setReply('')
-    if (!msg.read) {
-      setMessages(messages.map(m => m.id === msg.id ? { ...m, read: true } : m))
-    }
-  }
-
-  const handleReply = () => {
-    setReplySent(true)
-    setReply('')
-  }
-
-  const unreadCount = messages.filter(m => !m.read).length
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-      {/* Info banner */}
-      <div className="alert-banner alert-banner--success" role="status">
-        <span className="alert-banner__icon">
-          <Icon.Users />
-        </span>
-        <div className="alert-banner__content">
-          <div className="alert-banner__title">Canal de visitadores médicos</div>
-          <div className="alert-banner__body">
-            Los representantes de laboratorios te contactan acá, separado de tus pacientes.
-            Vos decidís a quién responder y cuándo.
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 1.5fr' : '1fr', gap: 'var(--space-5)' }}>
-        {/* Message list */}
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{
-            padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--color-border)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <h2 className="card__title" style={{ margin: 0 }}>
-              Mensajes
-              {unreadCount > 0 && (
-                <span className="sidebar__badge" style={{ marginLeft: 'var(--space-2)', verticalAlign: 'middle' }}>
-                  {unreadCount}
-                </span>
-              )}
-            </h2>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {messages.map((msg) => (
-              <button
-                key={msg.id}
-                onClick={() => handleSelect(msg)}
-                style={{
-                  display: 'flex', flexDirection: 'column', gap: 'var(--space-1)',
-                  padding: 'var(--space-4) var(--space-5)',
-                  borderBottom: '1px solid var(--color-border)',
-                  background: selected?.id === msg.id ? 'var(--green-50)' : msg.read ? 'transparent' : 'var(--neutral-50)',
-                  textAlign: 'left', cursor: 'pointer', border: 'none', borderLeft: selected?.id === msg.id ? '3px solid var(--green-500)' : '3px solid transparent',
-                  width: '100%', fontFamily: 'var(--font-body)',
-                  transition: 'background var(--transition-fast)',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{
-                    fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semi)',
-                    color: 'var(--green-700)', background: 'var(--green-50)',
-                    border: '1px solid var(--green-200)', borderRadius: 'var(--radius-full)',
-                    padding: '1px 8px',
-                  }}>
-                    {msg.lab}
-                  </span>
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>{msg.date}</span>
-                </div>
-                <span style={{
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: msg.read ? 'var(--font-weight-regular)' : 'var(--font-weight-semi)',
-                  color: 'var(--color-text-primary)',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  {msg.subject}
-                </span>
-                <span style={{
-                  fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-                  {msg.rep} · {msg.message.slice(0, 60)}...
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Detail panel */}
-        {selected && (
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
-                <span style={{
-                  fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semi)',
-                  color: 'var(--green-700)', background: 'var(--green-50)',
-                  border: '1px solid var(--green-200)', borderRadius: 'var(--radius-full)',
-                  padding: '2px 10px',
-                }}>
-                  {selected.lab}
-                </span>
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
-                  {selected.rep}
-                </span>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginLeft: 'auto' }}>
-                  {selected.date}
-                </span>
-              </div>
-              <h3 style={{
-                fontFamily: 'var(--font-heading)', fontSize: 'var(--text-lg)',
-                fontWeight: 'var(--font-weight-semi)', marginBottom: 'var(--space-4)',
-              }}>
-                {selected.subject}
-              </h3>
-              <p style={{
-                fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)',
-                lineHeight: 'var(--line-height-relaxed)',
-              }}>
-                {selected.message}
-              </p>
-            </div>
-
-            <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-4)' }}>
-              {replySent ? (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-                  color: 'var(--green-600)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)',
-                }}>
-                  <Icon.Check /> Respuesta enviada a {selected.rep}
-                </div>
-              ) : (
-                <>
-                  <div className="form-group" style={{ marginBottom: 'var(--space-3)' }}>
-                    <label className="form-label" htmlFor="visitor-reply">Responder a {selected.rep}</label>
-                    <textarea
-                      id="visitor-reply"
-                      className="form-input"
-                      rows={3}
-                      placeholder={`Ej: Hola ${selected.rep.split(' ')[0]}, podés pasar el jueves a las 13hs...`}
-                      value={reply}
-                      onChange={(e) => setReply(e.target.value)}
-                      style={{ resize: 'vertical', fontFamily: 'var(--font-body)' }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                    <button
-                      className="btn btn--primary btn--sm"
-                      disabled={reply.trim().length === 0}
-                      onClick={handleReply}
-                      id="btn-reply-visitor"
-                    >
-                      Enviar respuesta
-                    </button>
-                    <button className="btn btn--ghost btn--sm" onClick={() => setSelected(null)}>
-                      Cerrar
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 // ── Prescription View ─────────────────────────────────────────
 const MOCK_PATIENTS = [
-  { id: '1', name: 'Valentina Moreno', email: 'valentina.m@gmail.com' },
+  { id: '1', name: 'Mateo Benítez', email: 'mateo.b@gmail.com' },
   { id: '2', name: 'Matías Rodríguez', email: 'matias.r@gmail.com' },
   { id: '3', name: 'Lucía Fernández', email: 'lucia.f@gmail.com' },
   { id: '4', name: 'Santiago Torres', email: 'santiago.t@gmail.com' },
@@ -1058,7 +889,7 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
             {saving ? 'Guardando...' : 'Guardar honorarios'}
           </button>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-            Tranqui retiene 20% de comisión sobre cada pago.
+            Tranqui es 100% libre de comisiones, por lo que recibís la totalidad de tus honorarios.
           </span>
         </div>
       </div>
@@ -1091,38 +922,203 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
   )
 }
 
-function DashboardHome({ mpConnected, onConnect, appointments }: { mpConnected: boolean; onConnect: () => void; appointments: Appointment[] }) {
+function DashboardHome({ 
+  mpConnected, 
+  onConnect, 
+  appointments, 
+  allAppointments, 
+  stats 
+}: { 
+  mpConnected: boolean; 
+  onConnect: () => void; 
+  appointments: Appointment[]; 
+  allAppointments: any[]; 
+  stats: any 
+}) {
   const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
   const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+  const [calendarView, setCalendarView] = useState<'weekly' | 'today'>('weekly');
+
+  const weekdays = [
+    { name: 'Lunes', abbr: 'Lun', num: 1 },
+    { name: 'Martes', abbr: 'Mar', num: 2 },
+    { name: 'Miércoles', abbr: 'Mié', num: 3 },
+    { name: 'Jueves', abbr: 'Jue', num: 4 },
+    { name: 'Viernes', abbr: 'Vie', num: 5 },
+  ]
+  const baseSlots = ['09:00', '10:00', '11:00', '12:00', '14:00', '15:00', '16:00', '17:00']
+
+  // Parse date YYYY-MM-DD to get local day of week (1 = Monday, 5 = Friday)
+  const getDayOfWeek = (dateStr: string) => {
+    if (!dateStr) return -1
+    const parts = dateStr.split('-')
+    if (parts.length !== 3) return -1
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
+    const day = d.getDay()
+    return day === 0 ? 7 : day // Map Sunday to 7, Mon-Sat to 1-6
+  }
 
   return (
     <>
       <MPConnectBanner connected={mpConnected} onConnect={onConnect} />
 
-      <StatsOverview />
+      <StatsOverview stats={stats} />
 
-      <div className="card">
-        <div className="card__header">
+      <div className="card" style={{ width: '100%', maxWidth: 'none' }}>
+        <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h2 className="card__title">Sesiones de hoy</h2>
-            <p className="card__subtitle">{capitalizedDate} · {appointments.length} sesion{appointments.length !== 1 ? 'es' : ''} programada{appointments.length !== 1 ? 's' : ''}</p>
+            <h2 className="card__title">
+              {calendarView === 'weekly' ? 'Calendario Semanal' : 'Sesiones de Hoy'}
+            </h2>
+            <p className="card__subtitle">
+              {calendarView === 'weekly' 
+                ? 'Cronograma de turnos reservados por día y horario' 
+                : `${capitalizedDate} · ${appointments.length} sesiones programadas`
+              }
+            </p>
           </div>
-          <button className="btn btn--secondary btn--sm" id="btn-add-slot">
-            <Icon.Plus />
-            Agregar horario
-          </button>
+
+          <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+              <button 
+                onClick={() => setCalendarView('weekly')} 
+                className={`btn btn--sm`} 
+                style={{ 
+                  borderRadius: 0, 
+                  backgroundColor: calendarView === 'weekly' ? 'var(--color-primary)' : 'transparent',
+                  color: calendarView === 'weekly' ? 'white' : 'var(--color-text-primary)'
+                }}
+              >
+                Semanal
+              </button>
+              <button 
+                onClick={() => setCalendarView('today')} 
+                className={`btn btn--sm`}
+                style={{ 
+                  borderRadius: 0, 
+                  backgroundColor: calendarView === 'today' ? 'var(--color-primary)' : 'transparent',
+                  color: calendarView === 'today' ? 'white' : 'var(--color-text-primary)'
+                }}
+              >
+                Hoy
+              </button>
+            </div>
+            <button className="btn btn--secondary btn--sm" id="btn-add-slot">
+              <Icon.Plus />
+              Agregar horario
+            </button>
+          </div>
         </div>
 
-        {appointments.length === 0 ? (
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', padding: 'var(--space-6)', textAlign: 'center' }}>
-            No tenés sesiones programadas para el día de hoy.
-          </p>
+        {calendarView === 'today' ? (
+          appointments.length === 0 ? (
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', padding: 'var(--space-6)', textAlign: 'center' }}>
+              No tenés sesiones programadas para el día de hoy.
+            </p>
+          ) : (
+            <ul className="appointment-list" role="list" aria-label="Sesiones de hoy">
+              {appointments.map((appt) => (
+                <AppointmentCard key={appt.id} appt={appt} />
+              ))}
+            </ul>
+          )
         ) : (
-          <ul className="appointment-list" role="list" aria-label="Sesiones de hoy">
-            {appointments.map((appt) => (
-              <AppointmentCard key={appt.id} appt={appt} />
-            ))}
-          </ul>
+          /* Weekly Calendar Layout */
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(5, 1fr)', 
+            gap: 'var(--space-4)', 
+            width: '100%',
+            marginTop: 'var(--space-4)'
+          }}>
+            {weekdays.map((day) => {
+              return (
+                <div key={day.num} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                  <div style={{
+                    textAlign: 'center',
+                    padding: 'var(--space-2)',
+                    fontSize: 'var(--text-xs)',
+                    fontWeight: 'var(--font-weight-bold)',
+                    color: 'var(--color-primary)',
+                    backgroundColor: 'var(--green-50)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--green-100)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    {day.name}
+                  </div>
+                  
+                  {baseSlots.map((slot) => {
+                    const slotHour = parseInt(slot.split(':')[0]);
+                    // Find matching appointment
+                    const appt = allAppointments.find(a => {
+                      const apptDay = getDayOfWeek(a.fecha);
+                      const apptHour = parseInt(a.hour);
+                      return apptDay === day.num && apptHour === slotHour;
+                    });
+
+                    if (appt) {
+                      const isConfirmed = appt.status === 'confirmed';
+                      const isCompleted = appt.status === 'completed';
+                      
+                      return (
+                        <div key={slot} style={{
+                          padding: 'var(--space-3)',
+                          borderRadius: 'var(--radius-md)',
+                          backgroundColor: isConfirmed ? '#ecfdf5' : isCompleted ? 'var(--neutral-100)' : '#fffbeb',
+                          border: isConfirmed ? '1px solid #a7f3d0' : isCompleted ? '1px solid var(--color-border)' : '1px solid #fef3c7',
+                          borderLeftWidth: '4px',
+                          borderLeftColor: isConfirmed ? 'var(--color-primary)' : isCompleted ? 'var(--color-text-secondary)' : 'var(--color-warning)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 'var(--space-2)'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>
+                              {slot} hs
+                            </span>
+                            <span className={`badge ${isConfirmed ? 'badge--success' : isCompleted ? 'badge--neutral' : 'badge--warning'}`} style={{ fontSize: '8px', padding: '1px 3px' }}>
+                              {isConfirmed ? 'Confirmado' : isCompleted ? 'Completado' : 'Pendiente'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semi)', color: 'var(--color-text-primary)' }}>
+                            {appt.patientName}
+                          </div>
+                          {appt.meetLink && isConfirmed && (
+                            <a 
+                              href={appt.meetLink} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="btn btn--primary" 
+                              style={{ fontSize: '9px', padding: '2px 6px', width: 'fit-content', display: 'flex', gap: '3px', alignItems: 'center' }}
+                            >
+                              <Icon.Video /> Unirse
+                            </a>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={slot} style={{
+                        padding: 'var(--space-2)',
+                        textAlign: 'center',
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--color-text-secondary)',
+                        border: '1px dashed var(--color-border)',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: 'var(--neutral-0)',
+                        opacity: 0.6
+                      }}>
+                        {slot} — Libre
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </>
@@ -1137,37 +1133,177 @@ export default function App() {
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null)
 
   // API states
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const [medicoInfo, setMedicoInfo] = useState<any>(null)
   const [todayAppointments, setTodayAppointments] = useState<any[]>([])
+  const [allAppointments, setAllAppointments] = useState<any[]>([])
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [newPatientAlert, setNewPatientAlert] = useState<{ nombre: string; fecha: string; hora: string } | null>(null)
   const [availability, setAvailability] = useState<any[]>([])
+  const [stats, setStats] = useState<any>(null)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
+  const [loadingSession, setLoadingSession] = useState(true)
 
+  // Check user session on app load (Recovery from localStorage)
   useEffect(() => {
+    const cachedUser = localStorage.getItem('tranqui_user')
+    if (cachedUser) {
+      try {
+        const user = JSON.parse(cachedUser)
+        setCurrentUser(user)
+        if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO') {
+          setView('dashboard')
+        } else {
+          setView('landing')
+        }
+      } catch (e) {
+        localStorage.removeItem('tranqui_user')
+      }
+    }
+
+    api.getMe()
+      .then((user) => {
+        if (user) {
+          setCurrentUser(user)
+          localStorage.setItem('tranqui_user', JSON.stringify(user))
+          if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO') {
+            setView('dashboard')
+          } else {
+            setView('landing')
+          }
+        } else {
+          setCurrentUser(null)
+          localStorage.removeItem('tranqui_user')
+          setView('landing')
+        }
+      })
+      .catch(() => {
+        setCurrentUser(null)
+        localStorage.removeItem('tranqui_user')
+        setView('landing')
+      })
+      .finally(() => {
+        setLoadingSession(false)
+      })
+  }, [])
+
+  // Route protection guard
+  useEffect(() => {
+    if (loadingSession) return
+
+    if (currentUser) {
+      const isPro = currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO'
+      if (isPro && (view === 'landing' || view === 'login')) {
+        setView('dashboard')
+      } else if (!isPro && view === 'dashboard') {
+        setView('landing')
+      }
+    }
+  }, [currentUser, view, loadingSession])
+
+  // Fetch Dashboard details
+  useEffect(() => {
+    if (loadingSession) return
+
     if (view === 'dashboard') {
+      const isPro = currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')
+      if (!isPro) {
+        setView('landing')
+        return
+      }
       setLoadingDashboard(true)
-      // Login with developer bypass mock-token
-      api.loginGoogle("mock-token")
-        .then(() => {
-          // Fetch real data
-          return Promise.all([
-            api.getPerfil(),
-            api.getTurnosHoy(),
-            api.getDisponibilidad()
-          ])
-        })
-        .then(([perfil, turnos, disp]) => {
+      Promise.all([
+        api.getPerfil(),
+        api.getTurnosHoy(),
+        api.getDisponibilidad(),
+        api.getStats(),
+        api.getTurnos(),
+        api.getNotificaciones()
+      ])
+        .then(([perfil, turnos, disp, statsData, allTurnos, notifData]) => {
           setMedicoInfo(perfil)
           setTodayAppointments(turnos || [])
           setAvailability(disp || [])
+          setStats(statsData)
+          setAllAppointments(allTurnos || [])
+          setNotifications(notifData || [])
         })
         .catch((err) => {
           console.error("Error al inicializar dashboard:", err)
+          setView('login')
         })
         .finally(() => {
           setLoadingDashboard(false)
         })
     }
-  }, [view])
+  }, [view, currentUser, loadingSession])
+
+  // WebSocket Live Notifications Handler
+  useEffect(() => {
+    if (loadingSession) return
+
+    if (currentUser && view === 'dashboard') {
+      let client: Client | null = null;
+      api.getPerfil().then((perfil) => {
+        if (perfil && perfil.id) {
+          const socket = new SockJS('http://localhost:8081/ws-tranqui')
+          client = new Client({
+            webSocketFactory: () => socket,
+            reconnectDelay: 5000,
+            onConnect: () => {
+              console.log("WebSocket de Notificaciones conectado para ID:", perfil.id)
+              client?.subscribe(`/topic/notificaciones/${perfil.id}`, (stompMsg) => {
+                try {
+                  const data = JSON.parse(stompMsg.body)
+                  console.log("WebSocket notification received:", data)
+                  
+                  // Refresh notification list from API to get full history
+                  api.getNotificaciones().then((res) => {
+                    setNotifications(res || [])
+                  })
+
+                  if (data.tipo === 'TURNO_RESERVADO') {
+                    // Refresh appointments list too so calendar updates immediately
+                    api.getTurnos().then((turnos) => {
+                      setAllAppointments(turnos || [])
+                    })
+                    api.getTurnosHoy().then((turnosHoy) => {
+                      setTodayAppointments(turnosHoy || [])
+                    })
+
+                    // Parse patient name from message
+                    let name = "Paciente"
+                    let msg = data.mensaje || ""
+                    if (msg.includes("El paciente ")) {
+                      const nameMatch = msg.match(/El paciente (.*?) (?:ha|reservó)/)
+                      if (nameMatch) {
+                        name = nameMatch[1]
+                      }
+                    }
+                    setNewPatientAlert({
+                      nombre: name,
+                      fecha: new Date().toLocaleDateString('es-AR'),
+                      hora: "10:00"
+                    })
+                  }
+                } catch (e) {
+                  console.error("Error parsing WebSocket notification:", e)
+                }
+              })
+            }
+          })
+          client.activate()
+        }
+      }).catch(err => console.error("Error fetching profile for WebSocket initialization:", err))
+
+      return () => {
+        if (client) {
+          client.deactivate()
+        }
+      }
+    }
+  }, [currentUser, view, loadingSession])
 
   const handleSaveAvailability = async (data: any[]) => {
     const updated = await api.actualizarDisponibilidad(data)
@@ -1193,6 +1329,25 @@ export default function App() {
     setView('checkout')
   }
 
+  const handleLogout = async () => {
+    try {
+      await api.logout()
+    } catch (err) {
+      console.error("Error al cerrar sesión:", err)
+    }
+    setCurrentUser(null)
+    localStorage.removeItem('tranqui_user')
+    setView('landing')
+  }
+
+  const handleMarkNotificationsRead = () => {
+    api.marcarNotificacionesLeidas()
+      .then(() => {
+        setNotifications(notifications.map(n => ({ ...n, leido: true })))
+      })
+      .catch((err) => console.error("Error al marcar notificaciones como leídas:", err))
+  }
+
   const pageTitle: Record<NavSection, string> = {
     dashboard: 'Inicio',
     agenda: 'Mi agenda',
@@ -1215,22 +1370,27 @@ export default function App() {
 
     switch (activeNav) {
       case 'dashboard': 
-        return <DashboardHome mpConnected={mpConnected} onConnect={handleConnect} appointments={todayAppointments} />
+        return (
+          <DashboardHome 
+            mpConnected={mpConnected} 
+            onConnect={handleConnect} 
+            appointments={todayAppointments} 
+            allAppointments={allAppointments}
+            stats={stats} 
+          />
+        )
       case 'agenda': 
         return <AgendaView initialAvailability={availability} onSave={handleSaveAvailability} />
-      case 'patients': return (
-        <div className="card">
-          <div className="card__header"><h2 className="card__title">Pacientes</h2></div>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Próximamente — listado de pacientes activos con historial de sesiones.</p>
-        </div>
-      )
+      case 'patients': 
+        return <PatientsView />
       case 'prescriptions': 
         return <PrescriptionView onSend={handleSendPrescription} />
-      case 'visitors': return <VisitorsView />
+      case 'visitors': 
+        return <VisitorsView />
       case 'payments': return (
         <div className="card">
           <div className="card__header"><h2 className="card__title">Cobros y liquidaciones</h2></div>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Próximamente — historial de pagos recibidos y comisiones retenidas.</p>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Próximamente — historial de pagos recibidos (Tranqui es 100% libre de comisiones).</p>
         </div>
       )
       case 'settings': 
@@ -1241,8 +1401,27 @@ export default function App() {
   if (view === 'landing') {
     return (
       <LandingPage
-        onNavigateToDashboard={() => setView('dashboard')}
+        currentUser={currentUser}
+        onNavigateToDashboard={() => setView('login')}
         onBook={handleBook}
+        onLogout={handleLogout}
+        onGoToDashboard={() => setView('dashboard')}
+      />
+    )
+  }
+
+  if (view === 'login') {
+    return (
+      <LoginPage
+        onLoginSuccess={(user) => {
+          setCurrentUser(user)
+          if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO') {
+            setView('dashboard')
+          } else {
+            setView('landing')
+          }
+        }}
+        onBack={() => setView('landing')}
       />
     )
   }
@@ -1257,18 +1436,125 @@ export default function App() {
     )
   }
 
+  const isPro = currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')
+  if (view === 'dashboard' && !isPro) {
+    return (
+      <LandingPage
+        currentUser={currentUser}
+        onNavigateToDashboard={() => setView('login')}
+        onBook={handleBook}
+        onLogout={handleLogout}
+        onGoToDashboard={() => setView('dashboard')}
+      />
+    )
+  }
+
+  const unreadCount = notifications.filter(n => !n.leido).length
+
   return (
     <div className="dashboard-layout">
-      <Sidebar activeNav={activeNav} onNavChange={setActiveNav} onGoHome={() => setView('landing')} medicoInfo={medicoInfo} />
+      <Sidebar activeNav={activeNav} onNavChange={setActiveNav} medicoInfo={medicoInfo} />
 
-      <header className="dashboard-header" role="banner">
+      <header className="dashboard-header" role="banner" style={{ position: 'relative' }}>
         <h1 className="dashboard-header__title">{pageTitle[activeNav]}</h1>
-        <div className="dashboard-header__actions">
-          <button className="btn btn--icon btn--ghost" aria-label="Notificaciones">
-            <Icon.Bell />
-          </button>
-          <div className="sidebar__avatar" aria-label="Menú de perfil" role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
-            {medicoInfo?.initials || 'LP'}
+        <div className="dashboard-header__actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+          
+          {/* Interactive Notifications Bell */}
+          <div style={{ position: 'relative' }}>
+            <button 
+              className="btn btn--icon btn--ghost" 
+              onClick={() => setShowNotifications(!showNotifications)}
+              aria-label="Notificaciones"
+              style={{ position: 'relative' }}
+            >
+              <Icon.Bell hasUnread={unreadCount > 0} />
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  backgroundColor: 'var(--color-error)',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '16px',
+                  height: '16px',
+                  fontSize: '9px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold'
+                }}>
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="card" style={{
+                position: 'absolute',
+                top: '48px',
+                right: '0',
+                width: '320px',
+                maxHeight: '400px',
+                overflowY: 'auto',
+                zIndex: 1000,
+                boxShadow: 'var(--shadow-lg)',
+                border: '1px solid var(--color-border)',
+                padding: 'var(--space-3)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--space-2)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-2)' }}>
+                  <strong style={{ fontSize: 'var(--text-sm)' }}>Historial de Notificaciones</strong>
+                  {unreadCount > 0 && (
+                    <button 
+                      onClick={handleMarkNotificationsRead}
+                      className="btn btn--ghost" 
+                      style={{ fontSize: '10px', padding: '2px 6px', height: 'auto' }}
+                    >
+                      Marcar leídas
+                    </button>
+                  )}
+                </div>
+
+                {notifications.length === 0 ? (
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textAlign: 'center', padding: 'var(--space-4)' }}>
+                    No tenés notificaciones.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    {notifications.map((n) => (
+                      <div key={n.id} style={{
+                        padding: 'var(--space-2) var(--space-3)',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: n.leido ? 'transparent' : '#ecfdf5',
+                        borderLeft: n.leido ? '3px solid var(--color-border)' : '3px solid var(--color-primary)',
+                        fontSize: '11px',
+                        transition: 'background-color 0.2s',
+                        color: n.leido ? 'var(--color-text-secondary)' : 'var(--color-text-primary)'
+                      }}>
+                        <div style={{ fontWeight: 'bold' }}>{n.titulo}</div>
+                        <div style={{ marginTop: '2px', fontSize: '10px' }}>{n.mensaje}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <div className="sidebar__avatar" aria-label="Menú de perfil" role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
+              {medicoInfo?.initials || 'LP'}
+            </div>
+            <button 
+              onClick={handleLogout}
+              className="btn btn--ghost btn--sm"
+              style={{ fontSize: '11px', padding: 'var(--space-1) var(--space-3)' }}
+            >
+              Cerrar sesión
+            </button>
           </div>
         </div>
       </header>
@@ -1276,6 +1562,74 @@ export default function App() {
       <main className="dashboard-main" role="main" id="main-content">
         {renderContent()}
       </main>
+
+      {newPatientAlert && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div className="card" style={{
+            maxWidth: '400px',
+            width: '90%',
+            padding: 'var(--space-6)',
+            textAlign: 'center',
+            boxShadow: 'var(--shadow-lg)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--color-surface)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 'var(--space-4)'
+          }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              backgroundColor: '#d1fae5',
+              color: 'var(--color-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 24, height: 24 }}>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+              </svg>
+            </div>
+            <h3 style={{
+              fontFamily: 'var(--font-heading)',
+              fontSize: 'var(--text-lg)',
+              fontWeight: 'var(--font-weight-bold)',
+              color: 'var(--color-text-primary)',
+              margin: 0
+            }}>
+              ¡Nuevo Paciente Registrado!
+            </h3>
+            <p style={{
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-text-secondary)',
+              lineHeight: 'var(--line-height-relaxed)',
+              margin: 0
+            }}>
+              El paciente <strong>{newPatientAlert.nombre}</strong> ha reservado un nuevo turno y el pago ha sido aprobado correctamente.
+            </p>
+            <button
+              className="btn btn--primary"
+              onClick={() => setNewPatientAlert(null)}
+              style={{ width: '100%', marginTop: 'var(--space-2)' }}
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

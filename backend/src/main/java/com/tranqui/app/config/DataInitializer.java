@@ -3,8 +3,10 @@ package com.tranqui.app.config;
 import com.tranqui.app.model.Disponibilidad;
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.Usuario;
+import com.tranqui.app.model.Mensaje;
 import com.tranqui.app.repository.DisponibilidadRepository;
 import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.app.repository.MensajeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +27,9 @@ public class DataInitializer implements CommandLineRunner {
 
     @Autowired
     private DisponibilidadRepository disponibilidadRepository;
+
+    @Autowired
+    private MensajeRepository mensajeRepository;
 
     @Override
     public void run(String... args) throws Exception {
@@ -48,15 +53,19 @@ public class DataInitializer implements CommandLineRunner {
             medica = usuarioRepository.save(medica);
             log.info("Médica demo creada con ID: {}", medica.getId());
 
-            // 2. Crear Pacientes Demo
-            List<Usuario> pacientes = Arrays.asList(
-                    Usuario.builder().nombre("Valentina Moreno").email("valentina.m@gmail.com").telefono("+5493512345678").rol(Rol.PACIENTE).build(),
-                    Usuario.builder().nombre("Matías Rodríguez").email("matias.r@gmail.com").telefono("+5493512345679").rol(Rol.PACIENTE).build(),
-                    Usuario.builder().nombre("Lucía Fernández").email("lucia.f@gmail.com").telefono("+5493512345680").rol(Rol.PACIENTE).build(),
-                    Usuario.builder().nombre("Santiago Torres").email("santiago.t@gmail.com").telefono("+5493512345681").rol(Rol.PACIENTE).build()
-            );
-            usuarioRepository.saveAll(pacientes);
-            log.info("Pacientes demo creados.");
+            // 2. Crear Paciente Demo Único
+            Usuario paciente = Usuario.builder()
+                    .nombre("Mateo Benítez")
+                    .email("mateo.b@gmail.com")
+                    .telefono("+5493517654321")
+                    .rol(Rol.PACIENTE)
+                    .dni("41.234.567")
+                    .direccion("Av. General Paz 456, Córdoba")
+                    .obraSocial("OSDE 410")
+                    .numAfiliado("1-987654-3")
+                    .build();
+            usuarioRepository.save(paciente);
+            log.info("Paciente demo creado.");
 
             // 3. Crear Disponibilidades por Defecto (Mon-Fri 09:00-12:00, 14:00-17:00)
             for (int i = 1; i <= 5; i++) {

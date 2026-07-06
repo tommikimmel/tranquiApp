@@ -2,5 +2,8 @@ package com.tranqui.app.model;
 
 public enum TipoTurno {
     PARTICULAR,
-    OSDE
+    OSDE,
+    RECETA,
+    CERTIFICADO,
+    SOBRETUNO
 }

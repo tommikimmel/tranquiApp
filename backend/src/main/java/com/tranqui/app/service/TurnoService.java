@@ -44,15 +44,30 @@ public class TurnoService {
         return agendaService.calcularBloquesDisponibles(disponibilidades, turnosExistentes, fecha);
     }
 
+    @Transactional(readOnly = true)
+    public boolean esPrimeraConsulta(String email) {
+        return !turnoRepository.existsByPacienteEmailAndEstadoNot(email, EstadoTurno.CANCELADO);
+    }
+
     @Transactional
     public com.tranqui.app.model.dto.TurnoResponseDto reservarTurno(com.tranqui.app.model.dto.ReservaTurnoDto dto) {
         Usuario medico = usuarioRepository.findById(dto.getMedicoId())
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
-        // Check if slot is still available
-        List<java.time.LocalTime> disponibles = obtenerHorariosDisponibles(medico.getId(), dto.getFecha());
-        if (!disponibles.contains(dto.getHora())) {
-            throw new IllegalStateException("El horario seleccionado ya no está disponible");
+        // Check if slot is still available (only for standard/non-sobreturno appointments)
+        if (dto.getTipo() != TipoTurno.SOBRETUNO) {
+            List<java.time.LocalTime> disponibles = obtenerHorariosDisponibles(medico.getId(), dto.getFecha());
+            if (!disponibles.contains(dto.getHora())) {
+                throw new IllegalStateException("El horario seleccionado ya no está disponible");
+            }
+        } else {
+            // For SOBRETUNO, verify the doctor has no other active appointment at the requested hour
+            List<Turno> turnosExistentes = turnoRepository.findByMedicoIdAndFechaAndEstadoNot(medico.getId(), dto.getFecha(), EstadoTurno.CANCELADO);
+            boolean yaOcupado = turnosExistentes.stream()
+                    .anyMatch(t -> t.getHoraInicio().equals(dto.getHora()));
+            if (yaOcupado) {
+                throw new IllegalStateException("El horario del sobreturno seleccionado ya se encuentra ocupado por otro turno");
+            }
         }
 
         // Find or create patient
@@ -69,14 +84,39 @@ public class TurnoService {
 
         // Determine price based on selected service
         java.math.BigDecimal precio = java.math.BigDecimal.ZERO;
-        String servicioId = dto.getTipo() == TipoTurno.OSDE ? "osde" : "particular";
+        String servicioId = "particular";
+        if (dto.getTipo() == TipoTurno.OSDE) {
+            servicioId = "osde";
+        } else if (dto.getTipo() == TipoTurno.RECETA) {
+            servicioId = "receta-fuera";
+        } else if (dto.getTipo() == TipoTurno.CERTIFICADO) {
+            servicioId = "certificado";
+        } else if (dto.getTipo() == TipoTurno.SOBRETUNO) {
+            servicioId = "sobreturno";
+        }
         
         Optional<com.tranqui.app.model.TarifaMedico> tarifaOpt = tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), servicioId);
         if (tarifaOpt.isPresent() && tarifaOpt.get().isHabilitado()) {
             precio = tarifaOpt.get().getPrecio();
         } else {
-            // Fallback to doctor's base price or default
-            precio = medico.getPrecio() != null ? medico.getPrecio() : new java.math.BigDecimal(dto.getTipo() == TipoTurno.OSDE ? "10500" : "60000");
+            // Fallback to defaults
+            if (dto.getTipo() == TipoTurno.OSDE) {
+                precio = new java.math.BigDecimal("10500");
+            } else if (dto.getTipo() == TipoTurno.RECETA) {
+                precio = new java.math.BigDecimal("45000");
+            } else if (dto.getTipo() == TipoTurno.CERTIFICADO) {
+                precio = new java.math.BigDecimal("55000");
+            } else if (dto.getTipo() == TipoTurno.SOBRETUNO) {
+                precio = new java.math.BigDecimal("90000");
+            } else {
+                precio = medico.getPrecio() != null ? medico.getPrecio() : new java.math.BigDecimal("60000");
+            }
+        }
+
+        // If it is the first consultation, apply a 30% surcharge and round to nearest whole number
+        if (esPrimeraConsulta(dto.getEmailPaciente())) {
+            java.math.BigDecimal surcharge = precio.multiply(new java.math.BigDecimal("0.30"));
+            precio = precio.add(surcharge).setScale(0, java.math.RoundingMode.HALF_UP);
         }
 
         Turno turno = Turno.builder()
@@ -177,6 +217,81 @@ public class TurnoService {
                             .type(typeLabel)
                             .status(status)
                             .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
+                            .fecha(t.getFecha().toString())
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<com.tranqui.app.model.dto.TurnoMedicoDto> obtenerTodosTurnos(String medicoEmail) {
+        Usuario medico = usuarioRepository.findByEmail(medicoEmail)
+                .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
+
+        List<Turno> turnos = turnoRepository.findByMedicoIdAndEstadoNot(medico.getId(), EstadoTurno.CANCELADO);
+
+        turnos.sort(java.util.Comparator.comparing(Turno::getFecha).thenComparing(Turno::getHoraInicio));
+
+        return turnos.stream()
+                .map(t -> {
+                    String status = "pending";
+                    if (t.getEstado() == EstadoTurno.CONFIRMADO) {
+                        status = "confirmed";
+                    }
+                    if (t.getEstado() == EstadoTurno.CONFIRMADO && t.getHoraFin().isBefore(java.time.LocalTime.now()) && t.getFecha().isEqual(java.time.LocalDate.now())) {
+                        status = "completed";
+                    } else if (t.getEstado() == EstadoTurno.CONFIRMADO && t.getFecha().isBefore(java.time.LocalDate.now())) {
+                        status = "completed";
+                    }
+
+                    String typeLabel = t.getTipo() == TipoTurno.OSDE ? "Copago OSDE" : "Consulta particular";
+
+                    return com.tranqui.app.model.dto.TurnoMedicoDto.builder()
+                            .id(t.getId())
+                            .patientName(t.getPaciente().getNombre())
+                            .hour(String.format("%02d", t.getHoraInicio().getHour()))
+                            .ampm("hs")
+                            .type(typeLabel)
+                            .status(status)
+                            .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
+                            .fecha(t.getFecha().toString())
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<com.tranqui.app.model.dto.TurnoMedicoDto> obtenerTurnosPaciente(String pacienteEmail) {
+        Usuario paciente = usuarioRepository.findByEmail(pacienteEmail)
+                .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
+
+        List<Turno> turnos = turnoRepository.findByPacienteIdAndEstadoNot(paciente.getId(), EstadoTurno.CANCELADO);
+
+        turnos.sort(java.util.Comparator.comparing(Turno::getFecha).thenComparing(Turno::getHoraInicio));
+
+        return turnos.stream()
+                .map(t -> {
+                    String status = "pending";
+                    if (t.getEstado() == EstadoTurno.CONFIRMADO) {
+                        status = "confirmed";
+                    }
+                    if (t.getEstado() == EstadoTurno.CONFIRMADO && t.getHoraFin().isBefore(java.time.LocalTime.now()) && t.getFecha().isEqual(java.time.LocalDate.now())) {
+                        status = "completed";
+                    } else if (t.getEstado() == EstadoTurno.CONFIRMADO && t.getFecha().isBefore(java.time.LocalDate.now())) {
+                        status = "completed";
+                    }
+
+                    String typeLabel = t.getTipo() == TipoTurno.OSDE ? "Copago OSDE" : "Consulta particular";
+
+                    return com.tranqui.app.model.dto.TurnoMedicoDto.builder()
+                            .id(t.getId())
+                            .patientName(t.getMedico().getNombre()) // Show doctor name to patient
+                            .hour(String.format("%02d", t.getHoraInicio().getHour()))
+                            .ampm("hs")
+                            .type(typeLabel)
+                            .status(status)
+                            .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
+                            .fecha(t.getFecha().toString())
                             .build();
                 })
                 .collect(Collectors.toList());

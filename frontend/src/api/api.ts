@@ -44,19 +44,27 @@ export const api = {
     medicoId: number
     fecha: string
     hora: string
-    tipo: 'PARTICULAR' | 'OSDE'
+    tipo: 'PARTICULAR' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'
     metadataAfiliado?: string
     nombrePaciente: string
     emailPaciente: string
     telefonoPaciente: string
   }) => apiFetch('/turnos/reservar', { method: 'POST', body: data as any }),
 
+  checkFirstConsultation: (email: string) => 
+    apiFetch(`/turnos/check-first-consultation?email=${encodeURIComponent(email)}`),
+
   // Auth / Login with Google
   loginGoogle: (idToken: string) => 
     apiFetch('/auth/google', { method: 'POST', body: { idToken } as any }),
 
+  getMe: () => apiFetch('/auth/me'),
+  logout: () => apiFetch('/auth/logout', { method: 'POST' }),
+
   // Doctor Dashboard
   getPerfil: () => apiFetch('/medicos/perfil'),
+  
+  getStats: () => apiFetch('/medicos/stats'),
   
   actualizarPerfil: (data: any) => 
     apiFetch('/medicos/perfil', { method: 'PUT', body: data }),
@@ -67,6 +75,7 @@ export const api = {
     apiFetch('/medicos/disponibilidad', { method: 'PUT', body: data as any }),
   
   getTurnosHoy: () => apiFetch('/medicos/turnos/hoy'),
+  getTurnos: () => apiFetch('/medicos/turnos'),
   
   enviarReceta: (data: {
     pacienteId: number
@@ -79,4 +88,33 @@ export const api = {
     diagnosis: string
     notes: string
   }) => apiFetch('/recetas/enviar', { method: 'POST', body: data as any }),
+
+  // Chat API
+  getChatHistorial: (destinatarioId: number | string) => apiFetch(`/chat/historial/${destinatarioId}`),
+  getChatCanales: () => apiFetch('/chat/canales'),
+  getChatCanalesVisitadores: () => apiFetch('/chat/canales/visitadores'),
+
+  // Clinical & Notification API
+  getNotificaciones: () => apiFetch('/notificaciones'),
+  marcarNotificacionesLeidas: () => apiFetch('/notificaciones/marcar-leidas', { method: 'POST' }),
+  getPacientesAtendidos: () => apiFetch('/pacientes/atendidos'),
+  getSeguimientos: (pacienteId: number | string) => apiFetch(`/pacientes/${pacienteId}/seguimientos`),
+  crearSeguimiento: (pacienteId: number | string, data: { estadoAnimo: string; sintomas: string; notas: string; fecha?: string }) => 
+    apiFetch(`/pacientes/${pacienteId}/seguimientos`, { method: 'POST', body: data as any }),
+  getInformes: (pacienteId: number | string) => apiFetch(`/pacientes/${pacienteId}/informes`),
+  crearInforme: (pacienteId: number | string, data: { tipoInforme: string; planTrabajo?: string; contenido?: string; nombreArchivo?: string }) => {
+    const q = new URLSearchParams();
+    q.append('tipoInforme', data.tipoInforme);
+    if (data.planTrabajo) q.append('planTrabajo', data.planTrabajo);
+    if (data.contenido) q.append('contenido', data.contenido);
+    if (data.nombreArchivo) q.append('nombreArchivo', data.nombreArchivo);
+    return apiFetch(`/pacientes/${pacienteId}/informes?${q.toString()}`, { method: 'POST' });
+  },
+
+  // Patient Portal APIs
+  getMisTurnos: () => apiFetch('/pacientes/me/turnos'),
+  getMisSeguimientos: () => apiFetch('/pacientes/me/seguimientos'),
+  crearMiSeguimiento: (data: { estadoAnimo: string; sintomas: string; notas: string }) => 
+    apiFetch('/pacientes/me/seguimientos', { method: 'POST', body: data as any }),
+  getMisInformes: () => apiFetch('/pacientes/me/informes')
 };

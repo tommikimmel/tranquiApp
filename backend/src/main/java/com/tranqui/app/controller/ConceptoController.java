@@ -11,6 +11,7 @@ import com.tranqui.app.service.ConceptoService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +31,7 @@ public class ConceptoController {
     private SolicitudDocumentoRepository solicitudRepository;
 
     @PostMapping("/solicitar")
+    @PreAuthorize("hasRole('PACIENTE')")
     public ResponseEntity<?> solicitarDocumento(
             @RequestBody SolicitarConceptoDto dto,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -41,6 +43,7 @@ public class ConceptoController {
     }
 
     @GetMapping("/pendientes")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<?> obtenerDocumentosPendientes(
             @AuthenticationPrincipal UserDetails userDetails) {
         
@@ -52,6 +55,7 @@ public class ConceptoController {
     }
 
     @PostMapping("/{id}/emitir")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<?> emitirDocumento(
             @PathVariable Long id,
             @RequestParam String urlDescarga,

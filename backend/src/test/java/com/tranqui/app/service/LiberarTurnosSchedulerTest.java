@@ -19,6 +19,7 @@ import java.time.LocalTime;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
+@org.springframework.transaction.annotation.Transactional
 class LiberarTurnosSchedulerTest {
 
     @Autowired
@@ -50,11 +51,7 @@ class LiberarTurnosSchedulerTest {
         usuarioRepository.save(medico);
     }
 
-    @AfterEach
-    void tearDown() {
-        turnoRepository.deleteAll();
-        usuarioRepository.deleteAll();
-    }
+
 
     @Test
     void shouldCancelOnlyExpiredPendingPayments() {

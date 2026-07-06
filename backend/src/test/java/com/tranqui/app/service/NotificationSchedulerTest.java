@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @SpringBootTest
+@org.springframework.transaction.annotation.Transactional
 class NotificationSchedulerTest {
 
     @Autowired
@@ -53,11 +54,7 @@ class NotificationSchedulerTest {
         usuarioRepository.save(medico);
     }
 
-    @AfterEach
-    void tearDown() {
-        turnoRepository.deleteAll();
-        usuarioRepository.deleteAll();
-    }
+
 
     @Test
     void whenConfirmedTurnoForTomorrowNotSent_shouldSendAndSetFlagTrue() {

@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import './landing.css'
-import { api } from './api'
 
 // ── Types ──────────────────────────────────────────────────────
 interface Tariff {
@@ -24,7 +23,75 @@ interface Professional {
   color: string
 }
 
-// PROFESSIONALS mock array removed since values are loaded from API
+// ── Mock Data ───────────────────────────────────────────────────
+const PROFESSIONALS: Professional[] = [
+  {
+    id: '1', initials: 'PR', name: 'Lic. María Paula Rossi', degree: 'Psicóloga',
+    specialty: 'Terapia Cognitivo Conductual (TCC)', matricula: 'MN 49.281',
+    tags: ['Ansiedad', 'Estrés', 'Burnout', 'Ataques de pánico'],
+    price: 35000, nextSlot: '17:00', nextSlotDay: 'Hoy', online: true, color: '#E8F5EE',
+    tariffs: [
+      { label: 'Sesión particular', price: 35000 },
+      { label: 'Primera consulta', price: 45000 },
+    ],
+  },
+  {
+    id: '2', initials: 'AG', name: 'Dr. Alejandro González', degree: 'Médico Psiquiatra',
+    specialty: 'Psiquiatría adultos', matricula: 'MP 12.534',
+    tags: ['Depresión', 'Trastornos del sueño', 'Medicación', 'Bipolaridad'],
+    price: 60000, nextSlot: '09:00', nextSlotDay: 'Mañana', online: false, color: '#EEF2FF',
+    tariffs: [
+      { label: 'Consulta particular', price: 60000 },
+      { label: 'Primera consulta (+30%)', price: 80000 },
+      { label: 'Sobreturno', price: 90000 },
+      { label: 'Copago OSDE', price: 10500 },
+      { label: 'Receta fuera de turno', price: 45000 },
+      { label: 'Certificado', price: 55000 },
+    ],
+  },
+  {
+    id: '3', initials: 'LC', name: 'Lic. Fernanda Castro', degree: 'Psicóloga',
+    specialty: 'Psicología Sistémica — Pareja y Familia', matricula: 'MN 61.892',
+    tags: ['Terapia de pareja', 'Familia', 'Conflictos relacionales', 'Divorcio'],
+    price: 40000, nextSlot: '10:00', nextSlotDay: 'Hoy', online: true, color: '#FFF7ED',
+    tariffs: [
+      { label: 'Sesión particular', price: 40000 },
+      { label: 'Primera consulta', price: 52000 },
+      { label: 'Sesión de pareja', price: 55000 },
+    ],
+  },
+  {
+    id: '4', initials: 'MT', name: 'Lic. Martín Torres', degree: 'Psicólogo',
+    specialty: 'Psicoanálisis — Clínica de adultos', matricula: 'MN 55.123',
+    tags: ['Duelo', 'Identidad', 'Relaciones', 'Trauma'],
+    price: 35000, nextSlot: '14:00', nextSlotDay: 'Miércoles', online: true, color: '#F0FDF4',
+    tariffs: [
+      { label: 'Sesión particular', price: 35000 },
+      { label: 'Primera consulta', price: 45000 },
+    ],
+  },
+  {
+    id: '5', initials: 'SV', name: 'Lic. Sofía Varela', degree: 'Psicóloga',
+    specialty: 'Psicología Adolescente y Jóvenes adultos', matricula: 'MN 72.440',
+    tags: ['Adolescentes', 'Ansiedad social', 'FOMO', 'Identidad'],
+    price: 35000, nextSlot: '16:00', nextSlotDay: 'Hoy', online: true, color: '#FFF1F2',
+    tariffs: [
+      { label: 'Sesión particular', price: 35000 },
+      { label: 'Primera consulta', price: 45000 },
+    ],
+  },
+  {
+    id: '6', initials: 'RM', name: 'Lic. Ricardo Molina', degree: 'Psicólogo',
+    specialty: 'EMDR — Trauma y PTSD', matricula: 'MN 44.780',
+    tags: ['Trauma', 'PTSD', 'EMDR', 'Abuso'],
+    price: 50000, nextSlot: '11:00', nextSlotDay: 'Jueves', online: false, color: '#F5F3FF',
+    tariffs: [
+      { label: 'Sesión particular', price: 50000 },
+      { label: 'Primera consulta', price: 65000 },
+      { label: 'Sobreturno', price: 70000 },
+    ],
+  },
+]
 
 const SPECIALTIES = ['Todos', 'Ansiedad', 'Depresión', 'Trauma', 'Pareja', 'Psiquiatría', 'Adolescentes']
 
@@ -263,32 +330,11 @@ interface BookTarget {
 export default function LandingPage({ onNavigateToDashboard, onBook }: { onNavigateToDashboard: () => void; onBook?: (pro: BookTarget) => void }) {
   const [query, setQuery] = useState('')
   const [activeSpecialty, setActiveSpecialty] = useState('Todos')
-  const [professionals, setProfessionals] = useState<Professional[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading] = useState(false)
   const [showCrisis, setShowCrisis] = useState(false)
 
-  useEffect(() => {
-    api.getMedicos()
-      .then((res: any) => {
-        const mapped = res.map((m: any) => ({
-          ...m,
-          id: String(m.id),
-          nextSlot: m.nextSlot || "16:00",
-          nextSlotDay: m.nextSlotDay || "Hoy",
-          online: m.online !== undefined ? m.online : true,
-          tariffs: m.tariffs.map((t: any) => ({
-            label: t.label,
-            price: t.price,
-          })),
-        }))
-        setProfessionals(mapped)
-      })
-      .catch((err) => console.error("Error al cargar médicos:", err))
-      .finally(() => setLoading(false))
-  }, [])
-
   const filtered = useMemo(() => {
-    return professionals.filter((pro) => {
+    return PROFESSIONALS.filter((pro) => {
       const matchesQuery = query === '' ||
         pro.name.toLowerCase().includes(query.toLowerCase()) ||
         pro.tags.some((t) => t.toLowerCase().includes(query.toLowerCase())) ||
@@ -300,7 +346,7 @@ export default function LandingPage({ onNavigateToDashboard, onBook }: { onNavig
 
       return matchesQuery && matchesSpecialty
     })
-  }, [query, activeSpecialty, professionals])
+  }, [query, activeSpecialty])
 
   const handleBook = (pro: Professional) => {
     if (onBook) {

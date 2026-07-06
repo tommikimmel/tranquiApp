@@ -23,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(SecurityRbacTest.TestRbacController.class)
+@org.springframework.transaction.annotation.Transactional
 class SecurityRbacTest {
 
     @Autowired
@@ -70,10 +71,7 @@ class SecurityRbacTest {
         usuarioRepository.save(psiquiatra);
     }
 
-    @AfterEach
-    void tearDown() {
-        usuarioRepository.deleteAll();
-    }
+
 
     @Test
     void whenAccessAdminEndpointAsPaciente_thenForbidden() throws Exception {

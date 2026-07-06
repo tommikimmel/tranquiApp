@@ -47,4 +47,30 @@ class MercadoPagoServiceTest {
         assertNotNull(initPoint);
         assertTrue(initPoint.contains("mercadopago"));
     }
+
+    @Test
+    void whenCreatePreferenceDocumento_shouldReturnInitPoint() throws Exception {
+        ReflectionTestUtils.setField(mercadoPagoService, "isEnabled", false);
+
+        Usuario medico = Usuario.builder()
+                .nombre("Dr. Carlos")
+                .email("carlos@gmail.com")
+                .rol(Rol.PSIQUIATRA)
+                .mpAccessTokenEncrypted("encrypted-token")
+                .build();
+
+        com.tranqui.app.model.SolicitudDocumento solicitud = com.tranqui.app.model.SolicitudDocumento.builder()
+                .id(1L)
+                .medico(medico)
+                .tipoConcepto(com.tranqui.app.model.TipoConcepto.CERTIFICADO)
+                .precio(BigDecimal.valueOf(15000.00))
+                .build();
+
+        when(encryptionUtil.decrypt("encrypted-token")).thenReturn("dummy-token");
+
+        String initPoint = mercadoPagoService.crearPreferenciaDocumento(solicitud);
+
+        assertNotNull(initPoint);
+        assertTrue(initPoint.contains("mercadopago"));
+    }
 }

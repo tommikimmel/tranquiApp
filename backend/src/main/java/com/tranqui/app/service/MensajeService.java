@@ -66,4 +66,12 @@ public class MensajeService {
                 horaLimite
         );
     }
+
+    @Transactional(readOnly = true)
+    public List<CanalPrioritarioDto> obtenerCanalesVisitadores(String medicoEmail) {
+        Usuario medico = usuarioRepository.findByEmail(medicoEmail)
+                .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
+
+        return mensajeRepository.findVisitorChannels(medico.getId());
+    }
 }

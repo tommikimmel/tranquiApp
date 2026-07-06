@@ -16,6 +16,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
+@org.springframework.transaction.annotation.Transactional
 class ChatPriorizacionRepositoryTest {
 
     @Autowired
@@ -107,12 +108,7 @@ class ChatPriorizacionRepositoryTest {
         mensajeRepository.save(msgC);
     }
 
-    @AfterEach
-    void tearDown() {
-        mensajeRepository.deleteAll();
-        turnoRepository.deleteAll();
-        usuarioRepository.deleteAll();
-    }
+
 
     @Test
     void shouldPrioritizeChannelsCorrectly() {
