@@ -398,7 +398,7 @@ export default function PatientsView() {
       </div>
 
       {/* Main Clinical & Chat Workspace */}
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', backgroundColor: '#fcfcfc' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', backgroundColor: '#fcfcfc' }}>
         {selectedPatient ? (
           <>
             {/* Header: Patient Bio Details */}
@@ -472,7 +472,8 @@ export default function PatientsView() {
                   overflowY: 'auto',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 'var(--space-4)'
+                  gap: 'var(--space-4)',
+                  minHeight: 0
                 }}>
                   {messages.length === 0 ? (
                     <div style={{ 
