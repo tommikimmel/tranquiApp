@@ -591,8 +591,21 @@ export default function LandingPage({
                       href={appt.checkoutUrl} 
                       target="_blank" 
                       rel="noopener noreferrer" 
-                      className="btn btn--warning btn--sm" 
-                      style={{ fontSize: '9px', padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '3px', color: '#1e293b', fontWeight: 'bold' }}
+                      className="btn" 
+                      style={{ 
+                        fontSize: '9px', 
+                        padding: '4px 10px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '3px', 
+                        backgroundColor: '#009fe3', 
+                        color: 'white', 
+                        borderColor: '#009fe3', 
+                        fontWeight: 'bold',
+                        textDecoration: 'none',
+                        borderRadius: 'var(--radius-md)',
+                        boxShadow: '0 2px 4px rgba(0,158,227,0.15)'
+                      }}
                     >
                       💳 Pagar
                     </a>
@@ -657,8 +670,23 @@ export default function LandingPage({
                           href={appt.checkoutUrl} 
                           target="_blank" 
                           rel="noopener noreferrer" 
-                          className="btn btn--warning" 
-                          style={{ fontSize: '11px', padding: 'var(--space-2) var(--space-4)', width: 'fit-content', display: 'flex', gap: '4px', alignItems: 'center', marginTop: 'var(--space-1)', textDecoration: 'none', color: '#1e293b', fontWeight: 'bold' }}
+                          className="btn" 
+                          style={{ 
+                            fontSize: '11px', 
+                            padding: 'var(--space-2) var(--space-5)', 
+                            width: 'fit-content', 
+                            display: 'flex', 
+                            gap: '6px', 
+                            alignItems: 'center', 
+                            marginTop: 'var(--space-1)', 
+                            textDecoration: 'none', 
+                            backgroundColor: '#009fe3', 
+                            color: 'white', 
+                            borderColor: '#009fe3', 
+                            fontWeight: 'bold',
+                            borderRadius: 'var(--radius-md)',
+                            boxShadow: '0 2px 4px rgba(0,158,227,0.15)'
+                          }}
                         >
                           💳 Pagar Turno
                         </a>
