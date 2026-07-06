@@ -722,6 +722,8 @@ export default function CheckoutFlow({
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [createdTurn, setCreatedTurn] = useState<any>(null)
+  const [showMockPaymentGateway, setShowMockPaymentGateway] = useState(false)
+  const [simulatingWebhook, setSimulatingWebhook] = useState(false)
 
   const handleSelectSlot = (day: DayOption, slot: TimeSlot) => {
     setSelectedDay(day)
@@ -750,8 +752,9 @@ export default function CheckoutFlow({
       setPaymentStatus('idle')
       setCreatedTurn(res)
       if (res.checkoutUrl) {
-        // Redirigir a Mercado Pago para realizar el pago real
-        window.location.href = res.checkoutUrl;
+        // En entorno local/desarrollo, abrimos la simulación de Mercado Pago
+        // para poder probar el flujo completo (incluyendo el webhook).
+        setShowMockPaymentGateway(true)
       } else {
         // Copago OSDE o pre-confirmado, pasar a pantalla de confirmado
         setStep('confirmed')
@@ -803,6 +806,157 @@ export default function CheckoutFlow({
           meetLink={createdTurn?.meetLink}
           createdTurn={createdTurn}
         />
+      )}
+      {showMockPaymentGateway && createdTurn && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1100,
+          padding: 'var(--space-4)'
+        }}>
+          <div className="card" style={{
+            maxWidth: '480px',
+            width: '100%',
+            padding: 'var(--space-6)',
+            boxShadow: 'var(--shadow-xl)',
+            backgroundColor: '#ffffff',
+            borderRadius: 'var(--radius-lg)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-4)'
+          }}>
+            {/* Header style like Mercado Pago */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '2px solid #009EE3', // Mercado Pago blue
+              paddingBottom: 'var(--space-3)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span style={{ fontSize: '20px' }}>💳</span>
+                <span style={{ fontWeight: 'bold', color: '#009EE3', fontSize: 'var(--text-lg)' }}>Mercado Pago</span>
+                <span className="badge badge--neutral" style={{ fontSize: '9px', backgroundColor: '#e5e7eb', color: '#4b5563' }}>SANDBOX / TEST</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+              <h4 style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 'bold' }}>Simulador de Pago de Turno</h4>
+              <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
+                Estás en modo de desarrollo local. Para facilitar las pruebas sin configurar cuentas reales ni túneles SSL (como ngrok), podés aprobar o rechazar el pago simulando la llamada del webhook de Mercado Pago de forma directa.
+              </p>
+            </div>
+
+            {/* Turn details */}
+            <div style={{
+              backgroundColor: 'var(--neutral-50)',
+              padding: 'var(--space-4)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-border)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-2)',
+              fontSize: 'var(--text-xs)'
+            }}>
+              <div><strong>Turno ID:</strong> #{createdTurn.turnoId}</div>
+              <div><strong>Profesional:</strong> {professional.name}</div>
+              <div><strong>Fecha:</strong> {createdTurn.fecha} a las {createdTurn.horaInicio} hs</div>
+              <div><strong>Monto a abonar:</strong> ${createdTurn.precio}</div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
+              <button
+                disabled={simulatingWebhook}
+                onClick={async () => {
+                  setSimulatingWebhook(true);
+                  try {
+                    // Send request to webhook controller directly
+                    const response = await fetch('http://localhost:8081/api/payments/webhook', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'x-signature': 'test-signature'
+                      },
+                      body: JSON.stringify({
+                        external_reference: String(createdTurn.turnoId),
+                        transaction_id: "mock-tx-" + Math.floor(Math.random() * 1000000)
+                      })
+                    });
+
+                    if (response.ok) {
+                      // Fetch updated details so we get the meetLink if generated
+                      try {
+                        const updatedTurn = await api.getTurnos();
+                        const matching = updatedTurn.find((t: any) => t.id === createdTurn.turnoId);
+                        if (matching) {
+                          setCreatedTurn((prev: any) => ({
+                            ...prev,
+                            meetLink: matching.meetLink || prev.meetLink
+                          }));
+                        }
+                      } catch (e) {
+                        console.error("Error fetching updated turn:", e);
+                      }
+                      
+                      alert("Pago acreditado ✓ Webhook simulado con éxito.");
+                      setShowMockPaymentGateway(false);
+                      setStep('confirmed');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    } else {
+                      alert("Error al simular la aprobación en el backend.");
+                    }
+                  } catch (err) {
+                    console.error("Error sending mock webhook request:", err);
+                    alert("Error de conexión al simular el pago.");
+                  } finally {
+                    setSimulatingWebhook(false);
+                  }
+                }}
+                className="btn btn--primary"
+                style={{ backgroundColor: 'var(--color-primary)', border: 'none', justifyContent: 'center' }}
+              >
+                {simulatingWebhook ? 'Simulando acreditación...' : '✓ Simular Pago Exitoso (Aprobar)'}
+              </button>
+
+              <button
+                disabled={simulatingWebhook}
+                onClick={() => {
+                  setShowMockPaymentGateway(false);
+                  setPaymentStatus('error');
+                  setErrorMessage("Pago rechazado por el usuario en la simulación.");
+                }}
+                className="btn btn--ghost"
+                style={{ color: 'var(--color-danger)', border: '1px solid var(--color-danger)', justifyContent: 'center' }}
+              >
+                ✗ Simular Pago Rechazado (Cancelar)
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', margin: 'var(--space-2) 0' }}>
+                <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }}></div>
+                <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>O bien</span>
+                <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }}></div>
+              </div>
+
+              <a
+                href={createdTurn.checkoutUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn--secondary"
+                style={{ justifyContent: 'center' }}
+              >
+                Abrir URL oficial de Mercado Pago
+              </a>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
