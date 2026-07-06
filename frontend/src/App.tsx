@@ -101,6 +101,18 @@ const Icon = {
       <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   ),
+  Eye: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ),
+  EyeOff: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  ),
   Bell: ({ hasUnread }: { hasUnread?: boolean }) => (
     <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ width: 20, height: 20 }}>
@@ -927,17 +939,20 @@ function DashboardHome({
   onConnect, 
   appointments, 
   allAppointments, 
+  availability,
   stats 
 }: { 
   mpConnected: boolean; 
   onConnect: () => void; 
   appointments: Appointment[]; 
   allAppointments: any[]; 
+  availability: any[];
   stats: any 
 }) {
   const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
   const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
   const [calendarView, setCalendarView] = useState<'weekly' | 'today'>('weekly');
+  const [showInactiveSlots, setShowInactiveSlots] = useState(false);
 
   const weekdays = [
     { name: 'Lunes', abbr: 'Lun', num: 1 },
@@ -956,6 +971,17 @@ function DashboardHome({
     const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
     const day = d.getDay()
     return day === 0 ? 7 : day // Map Sunday to 7, Mon-Sat to 1-6
+  }
+
+  // Check if a slot is active in availability for a specific day
+  const isSlotAvailable = (dayNum: number, slot: string) => {
+    const hour = parseInt(slot.split(':')[0])
+    return availability.some((disp) => {
+      if (disp.diaSemana !== dayNum) return false
+      const start = parseInt(disp.horaInicio.split(':')[0])
+      const end = parseInt(disp.horaFin.split(':')[0])
+      return hour >= start && hour < end
+    })
   }
 
   return (
@@ -978,7 +1004,24 @@ function DashboardHome({
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+            {calendarView === 'weekly' && (
+              <button 
+                onClick={() => setShowInactiveSlots(!showInactiveSlots)} 
+                className="btn btn--secondary btn--sm"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 'var(--space-2)',
+                  borderColor: showInactiveSlots ? 'var(--color-primary)' : 'var(--color-border)',
+                  backgroundColor: showInactiveSlots ? 'var(--green-50)' : 'transparent',
+                  color: showInactiveSlots ? 'var(--color-primary)' : 'var(--color-text-primary)'
+                }}
+              >
+                {showInactiveSlots ? <Icon.EyeOff /> : <Icon.Eye />}
+                {showInactiveSlots ? 'Ocultar no laborables' : 'Ver inactivos'}
+              </button>
+            )}
             <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
               <button 
                 onClick={() => setCalendarView('weekly')} 
@@ -1032,6 +1075,19 @@ function DashboardHome({
             marginTop: 'var(--space-4)'
           }}>
             {weekdays.map((day) => {
+              const daySlots = baseSlots.map((slot) => {
+                const slotHour = parseInt(slot.split(':')[0]);
+                const appt = allAppointments.find(a => {
+                  const apptDay = getDayOfWeek(a.fecha);
+                  const apptHour = parseInt(a.hour);
+                  return apptDay === day.num && apptHour === slotHour;
+                });
+                const isActive = isSlotAvailable(day.num, slot);
+                return { slot, appt, isActive };
+              });
+
+              const visibleSlots = daySlots.filter(item => item.appt || item.isActive || showInactiveSlots);
+
               return (
                 <div key={day.num} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   <div style={{
@@ -1049,72 +1105,107 @@ function DashboardHome({
                     {day.name}
                   </div>
                   
-                  {baseSlots.map((slot) => {
-                    const slotHour = parseInt(slot.split(':')[0]);
-                    // Find matching appointment
-                    const appt = allAppointments.find(a => {
-                      const apptDay = getDayOfWeek(a.fecha);
-                      const apptHour = parseInt(a.hour);
-                      return apptDay === day.num && apptHour === slotHour;
-                    });
+                  {visibleSlots.length === 0 ? (
+                    <div style={{
+                      padding: 'var(--space-4) var(--space-2)',
+                      textAlign: 'center',
+                      fontSize: '11px',
+                      color: 'var(--color-text-secondary)',
+                      fontStyle: 'italic',
+                      backgroundColor: 'var(--neutral-50)',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px dashed var(--color-border)',
+                      opacity: 0.7
+                    }}>
+                      No laborable
+                    </div>
+                  ) : (
+                    visibleSlots.map(({ slot, appt, isActive }) => {
+                      if (appt) {
+                        const isConfirmed = appt.status === 'confirmed';
+                        const isCompleted = appt.status === 'completed';
+                        
+                        return (
+                          <div key={slot} style={{
+                            padding: 'var(--space-3)',
+                            borderRadius: 'var(--radius-md)',
+                            backgroundColor: isConfirmed ? '#ecfdf5' : isCompleted ? 'var(--neutral-100)' : '#fffbeb',
+                            border: isConfirmed ? '1px solid #a7f3d0' : isCompleted ? '1px solid var(--color-border)' : '1px solid #fef3c7',
+                            borderLeftWidth: '4px',
+                            borderLeftColor: isConfirmed ? 'var(--color-primary)' : isCompleted ? 'var(--color-text-secondary)' : 'var(--color-warning)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 'var(--space-2)'
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>
+                                {slot} hs
+                              </span>
+                              <span className={`badge ${isConfirmed ? 'badge--success' : isCompleted ? 'badge--neutral' : 'badge--warning'}`} style={{ fontSize: '8px', padding: '1px 3px' }}>
+                                {isConfirmed ? 'Confirmado' : isCompleted ? 'Completado' : 'Pendiente'}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semi)', color: 'var(--color-text-primary)' }}>
+                              {appt.patientName}
+                            </div>
+                            {appt.meetLink && isConfirmed && (
+                              <a 
+                                href={appt.meetLink} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="btn btn--primary" 
+                                style={{ fontSize: '9px', padding: '2px 6px', width: 'fit-content', display: 'flex', gap: '3px', alignItems: 'center' }}
+                              >
+                                <Icon.Video /> Unirse
+                              </a>
+                            )}
+                          </div>
+                        );
+                      }
 
-                    if (appt) {
-                      const isConfirmed = appt.status === 'confirmed';
-                      const isCompleted = appt.status === 'completed';
-                      
+                      if (isActive) {
+                        return (
+                          <div key={slot} style={{
+                            padding: 'var(--space-2)',
+                            textAlign: 'center',
+                            fontSize: 'var(--text-xs)',
+                            color: 'var(--color-primary)',
+                            border: '1px dashed var(--color-primary)',
+                            borderRadius: 'var(--radius-sm)',
+                            backgroundColor: 'var(--green-50)',
+                            opacity: 0.8,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '4px'
+                          }}>
+                            <span style={{ display: 'inline-block', width: '6px', height: '6px', backgroundColor: 'var(--color-primary)', borderRadius: '50%' }}></span>
+                            {slot} — Libre
+                          </div>
+                        );
+                      }
+
                       return (
                         <div key={slot} style={{
-                          padding: 'var(--space-3)',
-                          borderRadius: 'var(--radius-md)',
-                          backgroundColor: isConfirmed ? '#ecfdf5' : isCompleted ? 'var(--neutral-100)' : '#fffbeb',
-                          border: isConfirmed ? '1px solid #a7f3d0' : isCompleted ? '1px solid var(--color-border)' : '1px solid #fef3c7',
-                          borderLeftWidth: '4px',
-                          borderLeftColor: isConfirmed ? 'var(--color-primary)' : isCompleted ? 'var(--color-text-secondary)' : 'var(--color-warning)',
+                          padding: 'var(--space-2)',
+                          textAlign: 'center',
+                          fontSize: 'var(--text-xs)',
+                          color: 'var(--neutral-400)',
+                          border: '1px solid var(--neutral-200)',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: 'var(--neutral-50)',
+                          opacity: 0.5,
                           display: 'flex',
-                          flexDirection: 'column',
-                          gap: 'var(--space-2)'
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px'
                         }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>
-                              {slot} hs
-                            </span>
-                            <span className={`badge ${isConfirmed ? 'badge--success' : isCompleted ? 'badge--neutral' : 'badge--warning'}`} style={{ fontSize: '8px', padding: '1px 3px' }}>
-                              {isConfirmed ? 'Confirmado' : isCompleted ? 'Completado' : 'Pendiente'}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semi)', color: 'var(--color-text-primary)' }}>
-                            {appt.patientName}
-                          </div>
-                          {appt.meetLink && isConfirmed && (
-                            <a 
-                              href={appt.meetLink} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              className="btn btn--primary" 
-                              style={{ fontSize: '9px', padding: '2px 6px', width: 'fit-content', display: 'flex', gap: '3px', alignItems: 'center' }}
-                            >
-                              <Icon.Video /> Unirse
-                            </a>
-                          )}
+                          <span style={{ fontSize: '10px' }}>🔒</span>
+                          {slot} — Inactivo
                         </div>
                       );
-                    }
-
-                    return (
-                      <div key={slot} style={{
-                        padding: 'var(--space-2)',
-                        textAlign: 'center',
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--color-text-secondary)',
-                        border: '1px dashed var(--color-border)',
-                        borderRadius: 'var(--radius-sm)',
-                        backgroundColor: 'var(--neutral-0)',
-                        opacity: 0.6
-                      }}>
-                        {slot} — Libre
-                      </div>
-                    );
-                  })}
+                    })
+                  )}
                 </div>
               );
             })}
@@ -1376,6 +1467,7 @@ export default function App() {
             onConnect={handleConnect} 
             appointments={todayAppointments} 
             allAppointments={allAppointments}
+            availability={availability}
             stats={stats} 
           />
         )
