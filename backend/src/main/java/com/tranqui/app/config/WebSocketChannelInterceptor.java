@@ -35,19 +35,25 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
 
         if (accessor != null) {
             if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-                String authHeader = accessor.getFirstNativeHeader("Authorization");
-                if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                    String jwt = authHeader.substring(7);
-                    if (jwtService.validateToken(jwt)) {
-                        String userEmail = jwtService.extractEmail(jwt);
-                        if (userEmail != null && accessor.getUser() == null) {
-                            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
-                            UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                                    userDetails, null, userDetails.getAuthorities()
-                            );
-                            accessor.setUser(authToken);
-                            SecurityContextHolder.getContext().setAuthentication(authToken);
-                        }
+                String jwt = null;
+                if (accessor.getSessionAttributes() != null) {
+                    jwt = (String) accessor.getSessionAttributes().get("SESSION-TOKEN");
+                }
+                if (jwt == null) {
+                    String authHeader = accessor.getFirstNativeHeader("Authorization");
+                    if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                        jwt = authHeader.substring(7);
+                    }
+                }
+                if (jwt != null && jwtService.validateToken(jwt)) {
+                    String userEmail = jwtService.extractEmail(jwt);
+                    if (userEmail != null && accessor.getUser() == null) {
+                        UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities()
+                        );
+                        accessor.setUser(authToken);
+                        SecurityContextHolder.getContext().setAuthentication(authToken);
                     }
                 }
             } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {

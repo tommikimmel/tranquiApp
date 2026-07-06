@@ -73,7 +73,7 @@ public class AuthController {
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
-        return ResponseEntity.ok(new UserResponseDto(usuario.getNombre(), usuario.getEmail(), usuario.getRol()));
+        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol()));
     }
 
     @GetMapping("/me")
@@ -83,7 +83,7 @@ public class AuthController {
         }
         Usuario usuario = usuarioRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
-        return ResponseEntity.ok(new UserResponseDto(usuario.getNombre(), usuario.getEmail(), usuario.getRol()));
+        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol()));
     }
 
     @PostMapping("/logout")

@@ -149,6 +149,13 @@ public class ClinicalService {
                 "INFORME"
         );
 
+        notificacionService.crearNotificacion(
+                paciente,
+                "Nuevo Informe Clínico disponible",
+                "El profesional " + medico.getNombre() + " ha emitido un informe de tipo " + tipoInforme + ".",
+                "INFORME"
+        );
+
         return saved;
     }
 

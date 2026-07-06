@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import '../styles/landing.css'
 import { api } from '../api/api'
 import { useChat } from '../hooks/useChat'
+import { Client } from '@stomp/stompjs'
+import SockJS from 'sockjs-client'
 
 // ── Types ──────────────────────────────────────────────────────
 interface Tariff {
@@ -355,6 +357,52 @@ export default function LandingPage({
   const [symptoms, setSymptoms] = useState('')
   const [notes, setNotes] = useState('')
   const [savingTracking, setSavingTracking] = useState(false)
+
+  // Patient WebSocket Live Notifications Handler
+  useEffect(() => {
+    if (loading || !currentUser || currentUser.rol !== 'PACIENTE') return
+
+    let client: Client | null = null;
+    
+    if (currentUser.id) {
+      const socket = new SockJS('http://localhost:8081/ws-tranqui')
+      client = new Client({
+        webSocketFactory: () => socket,
+        reconnectDelay: 5000,
+        onConnect: () => {
+          console.log("WebSocket de Notificaciones conectado para Paciente ID:", currentUser.id)
+          client?.subscribe(`/topic/notificaciones/${currentUser.id}`, (stompMsg) => {
+            try {
+              const data = JSON.parse(stompMsg.body)
+              console.log("Paciente WebSocket notification received:", data)
+              
+              // Refresh patient portal data in real time
+              Promise.all([
+                api.getMisTurnos(),
+                api.getMisSeguimientos(),
+                api.getMisInformes()
+              ]).then(([turnos, seguimientos, informes]) => {
+                setMyAppointments(turnos || [])
+                setMyTrackings(seguimientos || [])
+                setMyReports(informes || [])
+              }).catch((err) => console.error("Error refreshing patient portal data via WS:", err))
+
+            } catch (e) {
+              console.error("Error processing websocket notification for patient:", e)
+            }
+          })
+        },
+        debug: (str) => {
+          console.log('Patient WS Debug:', str)
+        }
+      })
+      client.activate()
+    }
+
+    return () => {
+      client?.deactivate()
+    }
+  }, [currentUser, loading])
 
   useEffect(() => {
     // Only load professionals if authenticated
