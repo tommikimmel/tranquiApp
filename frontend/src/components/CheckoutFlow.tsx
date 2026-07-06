@@ -259,9 +259,20 @@ function StepReview({
   paymentStatus: PaymentStatus
   errorMessage?: string | null
 }) {
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
+  const getCachedUserData = () => {
+    try {
+      const cached = localStorage.getItem('tranqui_user')
+      if (cached) {
+        return JSON.parse(cached)
+      }
+    } catch (e) {}
+    return null
+  }
+  const cachedUser = getCachedUserData()
+
+  const [name, setName] = useState(cachedUser?.nombre || '')
+  const [email, setEmail] = useState(cachedUser?.email || '')
+  const [phone, setPhone] = useState(cachedUser?.telefono || '')
   const [tipo, setTipo] = useState<'PARTICULAR' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'>('PARTICULAR')
   const [afiliado, setAfiliado] = useState('')
   const [customTime, setCustomTime] = useState(selectedSlot.time)
@@ -285,6 +296,12 @@ function StepReview({
       }
     }
   }
+
+  useEffect(() => {
+    if (email) {
+      handleEmailBlur()
+    }
+  }, [])
 
   const services = [
     { id: 'PARTICULAR', label: 'Consulta Particular', price: professional.price, desc: 'Consulta estándar de 50 minutos' },
@@ -464,6 +481,8 @@ function StepReview({
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={handleEmailBlur}
                 autoComplete="email"
+                readOnly={!!cachedUser}
+                style={cachedUser ? { backgroundColor: '#f3f4f6', cursor: 'not-allowed' } : {}}
               />
             </div>
             <div className="form-group">

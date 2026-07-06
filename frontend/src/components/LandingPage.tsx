@@ -322,12 +322,10 @@ export default function LandingPage({
   // Patient Portal states
   const [patientTab, setPatientTab] = useState<'search' | 'portal'>('search')
   const [myAppointments, setMyAppointments] = useState<any[]>([])
-  const [myTrackings, setMyTrackings] = useState<any[]>([])
   const [myReports, setMyReports] = useState<any[]>([])
   const [loadingPortal, setLoadingPortal] = useState(false)
 
   // Portal inner tabs
-  const [portalTab, setPortalTab] = useState<'appointments' | 'tracking' | 'chat'>('appointments')
   const [activeDoctorId, setActiveDoctorId] = useState<number | null>(null)
   
   // Custom states for availability filter and WhatsApp chat
@@ -352,11 +350,7 @@ export default function LandingPage({
     }
   }, [chatMessages, showFloatingChat, chatSubView])
 
-  // Tracking form states
-  const [mood, setMood] = useState('Bueno')
-  const [symptoms, setSymptoms] = useState('')
-  const [notes, setNotes] = useState('')
-  const [savingTracking, setSavingTracking] = useState(false)
+
 
   // Patient WebSocket Live Notifications Handler
   useEffect(() => {
@@ -379,11 +373,9 @@ export default function LandingPage({
               // Refresh patient portal data in real time
               Promise.all([
                 api.getMisTurnos(),
-                api.getMisSeguimientos(),
                 api.getMisInformes()
-              ]).then(([turnos, seguimientos, informes]) => {
+              ]).then(([turnos, informes]) => {
                 setMyAppointments(turnos || [])
-                setMyTrackings(seguimientos || [])
                 setMyReports(informes || [])
               }).catch((err) => console.error("Error refreshing patient portal data via WS:", err))
 
@@ -437,12 +429,10 @@ export default function LandingPage({
       setLoadingPortal(true)
       Promise.all([
         api.getMisTurnos(),
-        api.getMisSeguimientos(),
         api.getMisInformes()
       ])
-        .then(([turnos, seguimientos, informes]) => {
+        .then(([turnos, informes]) => {
           setMyAppointments(turnos || [])
-          setMyTrackings(seguimientos || [])
           setMyReports(informes || [])
         })
         .catch((err) => console.error("Error loading patient portal data:", err))
@@ -450,23 +440,7 @@ export default function LandingPage({
     }
   }, [currentUser, patientTab])
 
-  const handleAddTracking = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSavingTracking(true)
-    try {
-      const saved = await api.crearMiSeguimiento({ estadoAnimo: mood, sintomas: symptoms, notas: notes })
-      setMyTrackings([saved, ...myTrackings])
-      setMood('Bueno')
-      setSymptoms('')
-      setNotes('')
-      alert("Seguimiento diario registrado correctamente ✓")
-    } catch (err) {
-      console.error("Error al registrar seguimiento:", err)
-      alert("Error al registrar seguimiento")
-    } finally {
-      setSavingTracking(false)
-    }
-  }
+
 
   const filtered = useMemo(() => {
     return professionals.filter((pro) => {
@@ -559,294 +533,155 @@ export default function LandingPage({
         gap: 'var(--space-4)',
         textAlign: 'left'
       }}>
-        {/* Portal Inner Navigation */}
-        <div style={{
-          display: 'flex',
-          borderBottom: '1px solid var(--color-border)',
-          gap: 'var(--space-1)',
-          paddingBottom: '2px'
-        }}>
-          <button
-            onClick={() => setPortalTab('appointments')}
-            style={{
-              padding: 'var(--space-2) var(--space-4)',
-              fontSize: 'var(--text-sm)',
-              fontWeight: 'bold',
-              border: 'none',
-              borderBottom: portalTab === 'appointments' ? '3px solid var(--color-primary)' : '3px solid transparent',
-              backgroundColor: 'transparent',
-              color: portalTab === 'appointments' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              cursor: 'pointer'
-            }}
-          >
-            🗓️ Turnos e Informes
-          </button>
-          <button
-            onClick={() => setPortalTab('tracking')}
-            style={{
-              padding: 'var(--space-2) var(--space-4)',
-              fontSize: 'var(--text-sm)',
-              fontWeight: 'bold',
-              border: 'none',
-              borderBottom: portalTab === 'tracking' ? '3px solid var(--color-primary)' : '3px solid transparent',
-              backgroundColor: 'transparent',
-              color: portalTab === 'tracking' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              cursor: 'pointer'
-            }}
-          >
-            📈 Seguimiento Diario
-          </button>
-        </div>
-
-        {/* Tab 1: Appointments & Reports */}
-        {portalTab === 'appointments' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-            {/* Today's Appointments Card */}
-            {todayAppointments.length > 0 && (
-              <div className="card" style={{
-                padding: 'var(--space-5) var(--space-6)',
-                backgroundColor: '#ecfdf5',
-                border: '1px solid var(--color-primary)',
-                borderLeft: '5px solid var(--color-primary)',
-                borderRadius: 'var(--radius-lg)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 'var(--space-4)',
-                boxShadow: 'var(--shadow-md)'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-                  <span style={{ fontSize: '24px' }}>⏰</span>
-                  <div style={{ textAlign: 'left' }}>
-                    <h4 style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'bold', color: 'var(--color-primary)' }}>
-                      TURNOS DE HOY
-                    </h4>
-                    <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                      Recordatorio: Tenés turno programado para hoy. Podés unirte directamente a la llamada usando el botón.
-                    </p>
-                  </div>
+        {/* Today's Appointments Card */}
+        {todayAppointments.length > 0 && (
+          <div className="card" style={{
+            padding: 'var(--space-5) var(--space-6)',
+            backgroundColor: '#ecfdf5',
+            border: '1px solid var(--color-primary)',
+            borderLeft: '5px solid var(--color-primary)',
+            borderRadius: 'var(--radius-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 'var(--space-4)',
+            boxShadow: 'var(--shadow-md)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+              <span style={{ fontSize: '24px' }}>⏰</span>
+              <div style={{ textAlign: 'left' }}>
+                <h4 style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'bold', color: 'var(--color-primary)' }}>
+                  TURNOS DE HOY
+                </h4>
+                <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                  Recordatorio: Tenés turno programado para hoy. Podés unirte directamente a la llamada usando el botón.
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', minWidth: '220px' }}>
+              {todayAppointments.map(appt => (
+                <div key={appt.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)', backgroundColor: '#ffffff', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid #a7f3d0' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                    {appt.hour} hs
+                  </span>
+                  {appt.meetLink && appt.status === 'confirmed' ? (
+                    <a 
+                      href={appt.meetLink} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="btn btn--primary btn--sm" 
+                      style={{ fontSize: '9px', padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '3px' }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 10, height: 10 }}><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
+                      Unirse
+                    </a>
+                  ) : (
+                    <span style={{ fontSize: '9px', color: 'var(--color-warning)', fontWeight: 'bold' }}>Esperando pago</span>
+                  )}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', minWidth: '220px' }}>
-                  {todayAppointments.map(appt => (
-                    <div key={appt.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)', backgroundColor: '#ffffff', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid #a7f3d0' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                        {appt.hour} hs
-                      </span>
-                      {appt.meetLink && appt.status === 'confirmed' ? (
-                        <a 
-                          href={appt.meetLink} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="btn btn--primary btn--sm" 
-                          style={{ fontSize: '9px', padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '3px' }}
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 10, height: 10 }}><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
-                          Unirse
-                        </a>
-                      ) : (
-                        <span style={{ fontSize: '9px', color: 'var(--color-warning)', fontWeight: 'bold' }}>Esperando pago</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)' }}>
-              <div className="card" style={{ padding: 'var(--space-6)' }}>
-                <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--space-4)', marginTop: 0 }}>Mis Turnos Agendados</h3>
-                {myAppointments.length === 0 ? (
-                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
-                    No tenés turnos programados.
-                  </p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    {myAppointments.map((appt) => {
-                      const isConfirmed = appt.status === 'confirmed';
-                      return (
-                        <div key={appt.id} style={{
-                          padding: 'var(--space-3)',
-                          borderRadius: 'var(--radius-md)',
-                          backgroundColor: isConfirmed ? '#ecfdf5' : '#fffbeb',
-                          border: isConfirmed ? '1px solid #a7f3d0' : '1px solid #fef3c7',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 'var(--space-2)'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>
-                              {appt.fecha} · {appt.hour} hs
-                            </span>
-                            <span className={`badge ${isConfirmed ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '9px' }}>
-                              {isConfirmed ? 'Confirmado' : 'Pendiente'}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'bold' }}>
-                            Profesional: {appt.patientName}
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                            Modalidad: {appt.type}
-                          </div>
-                          {appt.meetLink && isConfirmed && (
-                            <a 
-                              href={appt.meetLink} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              className="btn btn--primary" 
-                              style={{ fontSize: '11px', padding: 'var(--space-2) var(--space-4)', width: 'fit-content', display: 'flex', gap: '4px', alignItems: 'center', marginTop: 'var(--space-1)' }}
-                            >
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
-                              Unirse a la llamada
-                            </a>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div className="card" style={{ padding: 'var(--space-6)' }}>
-                <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--space-4)', marginTop: 0 }}>Mis Informes Clínicos Emitidos</h3>
-                {myReports.length === 0 ? (
-                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
-                    No tenés informes clínicos emitidos aún.
-                  </p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                    {myReports.map((r) => (
-                      <div key={r.id} style={{
-                        padding: 'var(--space-3)',
-                        borderRadius: 'var(--radius-sm)',
-                        border: '1px solid var(--color-border)',
-                        backgroundColor: 'var(--neutral-50)'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-primary)' }}>
-                            Informe {r.tipoInforme}
-                          </span>
-                          <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>
-                            {r.fecha}
-                          </span>
-                        </div>
-                        {r.planTrabajo && (
-                          <div style={{ fontSize: '11px', marginBottom: 'var(--space-2)' }}>
-                            <strong>Plan de Trabajo:</strong> {r.planTrabajo}
-                          </div>
-                        )}
-                        {r.contenido && (
-                          <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-2)', whiteSpace: 'pre-wrap' }}>
-                            {r.contenido}
-                          </div>
-                        )}
-                        {r.nombreArchivo && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginTop: 'var(--space-2)', fontSize: '11px', color: 'var(--color-primary)' }}>
-                            📄 Adjunto: <em>{r.nombreArchivo}</em>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Tab 2: Daily Tracking */}
-        {portalTab === 'tracking' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)' }}>
-            <div className="card" style={{ padding: 'var(--space-6)' }}>
-              <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--space-1)', marginTop: 0 }}>Cargar mi Estado de Hoy</h3>
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)' }}>
-                Registrá cómo te sentís hoy para compartirlo con tu profesional.
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)' }}>
+          <div className="card" style={{ padding: 'var(--space-6)' }}>
+            <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--space-4)', marginTop: 0 }}>Mis Turnos Agendados</h3>
+            {myAppointments.length === 0 ? (
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
+                No tenés turnos programados.
               </p>
-
-              <form onSubmit={handleAddTracking} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-                  <div className="form-group">
-                    <label className="form-label form-label--required">Estado de Ánimo</label>
-                    <select 
-                      value={mood} 
-                      onChange={(e) => setMood(e.target.value)}
-                      className="form-input"
-                    >
-                      <option value="Excelente">Excelente 😀</option>
-                      <option value="Bueno">Bueno 🙂</option>
-                      <option value="Regular">Regular 😐</option>
-                      <option value="Malo">Malo 🙁</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Síntomas clave</label>
-                    <input 
-                      type="text" 
-                      placeholder="Ej: Insomnio, palpitaciones..." 
-                      value={symptoms}
-                      onChange={(e) => setSymptoms(e.target.value)}
-                      className="form-input"
-                    />
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Notas o reflexiones de hoy</label>
-                  <textarea 
-                    rows={3} 
-                    placeholder="Escribí notas sobre tu día..." 
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="form-input"
-                  />
-                </div>
-                <button type="submit" className="btn btn--primary" disabled={savingTracking}>
-                  {savingTracking ? 'Guardando...' : 'Registrar mi estado'}
-                </button>
-              </form>
-            </div>
-
-            <div className="card" style={{ padding: 'var(--space-6)' }}>
-              <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--space-4)', marginTop: 0 }}>Historial de Seguimiento Diario</h3>
-              {myTrackings.length === 0 ? (
-                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
-                  No registraste seguimientos diarios aún.
-                </p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxHeight: '300px', overflowY: 'auto' }}>
-                  {myTrackings.map((t) => (
-                    <div key={t.id} style={{
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                {myAppointments.map((appt) => {
+                  const isConfirmed = appt.status === 'confirmed';
+                  return (
+                    <div key={appt.id} style={{
                       padding: 'var(--space-3)',
-                      borderRadius: 'var(--radius-sm)',
-                      border: '1px solid var(--color-border)',
-                      backgroundColor: 'var(--neutral-50)',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: isConfirmed ? '#ecfdf5' : '#fffbeb',
+                      border: isConfirmed ? '1px solid #a7f3d0' : '1px solid #fef3c7',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 'var(--space-2)'
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)', fontWeight: 'bold' }}>
-                          {t.fecha}
+                        <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>
+                          {appt.fecha} · {appt.hour} hs
                         </span>
-                        <span className="badge badge--success" style={{ fontSize: '10px', textTransform: 'capitalize' }}>
-                          Animo: {t.estadoAnimo}
+                        <span className={`badge ${isConfirmed ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '9px' }}>
+                          {isConfirmed ? 'Confirmado' : 'Pendiente'}
                         </span>
                       </div>
-                      {t.sintomas && (
-                        <div style={{ fontSize: '11px' }}>
-                          <strong>Síntomas:</strong> {t.sintomas}
-                        </div>
-                      )}
-                      {t.notes && (
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontStyle: 'italic' }}>
-                          "{t.notes}"
-                        </div>
+                      <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'bold' }}>
+                        Profesional: {appt.patientName}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                        Modalidad: {appt.type}
+                      </div>
+                      {appt.meetLink && isConfirmed && (
+                        <a 
+                          href={appt.meetLink} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="btn btn--primary" 
+                          style={{ fontSize: '11px', padding: 'var(--space-2) var(--space-4)', width: 'fit-content', display: 'flex', gap: '4px', alignItems: 'center', marginTop: 'var(--space-1)' }}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
+                          Unirse a la llamada
+                        </a>
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
-        )}
+
+          <div className="card" style={{ padding: 'var(--space-6)' }}>
+            <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--space-4)', marginTop: 0 }}>Mis Informes Clínicos Emitidos</h3>
+            {myReports.length === 0 ? (
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
+                No tenés informes clínicos emitidos aún.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                {myReports.map((r) => (
+                  <div key={r.id} style={{
+                    padding: 'var(--space-3)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)',
+                    backgroundColor: 'var(--neutral-50)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-primary)' }}>
+                        Informe {r.tipoInforme}
+                      </span>
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>
+                        {r.fecha}
+                      </span>
+                    </div>
+                    {r.planTrabajo && (
+                      <div style={{ fontSize: '11px', marginBottom: 'var(--space-2)' }}>
+                        <strong>Plan de Trabajo:</strong> {r.planTrabajo}
+                      </div>
+                    )}
+                    {r.contenido && (
+                      <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-2)', whiteSpace: 'pre-wrap' }}>
+                        {r.contenido}
+                      </div>
+                    )}
+                    {r.nombreArchivo && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginTop: 'var(--space-2)', fontSize: '11px', color: 'var(--color-primary)' }}>
+                        📄 Adjunto: <em>{r.nombreArchivo}</em>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     )
   }
