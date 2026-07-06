@@ -42,13 +42,13 @@ public class ChatController {
         mensajeDto.setRemitenteId(mensaje.getRemitente().getId());
         mensajeDto.setFechaEnvio(mensaje.getFechaEnvio().toString());
 
-        // Dispatch to recipient's private WebSocket queue (/user/{destinatarioId}/queue/mensajes)
-        String destinatarioId = mensaje.getDestinatario().getId().toString();
-        messagingTemplate.convertAndSendToUser(destinatarioId, "/queue/mensajes", mensajeDto);
+        // Dispatch to recipient's private WebSocket queue (/user/{destinatarioEmail}/queue/mensajes)
+        String destinatarioEmail = mensaje.getDestinatario().getEmail();
+        messagingTemplate.convertAndSendToUser(destinatarioEmail, "/queue/mensajes", mensajeDto);
 
         // Also dispatch to sender's own queue for delivery confirmation
-        String remitenteId = mensaje.getRemitente().getId().toString();
-        messagingTemplate.convertAndSendToUser(remitenteId, "/queue/mensajes", mensajeDto);
+        String remitenteEmail = mensaje.getRemitente().getEmail();
+        messagingTemplate.convertAndSendToUser(remitenteEmail, "/queue/mensajes", mensajeDto);
     }
 
     @GetMapping("/api/chat/historial/{destinatarioId}")
