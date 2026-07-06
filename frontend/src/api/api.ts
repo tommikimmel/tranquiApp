@@ -98,6 +98,8 @@ export const api = {
   getNotificaciones: () => apiFetch('/notificaciones'),
   marcarNotificacionesLeidas: () => apiFetch('/notificaciones/marcar-leidas', { method: 'POST' }),
   getPacientesAtendidos: () => apiFetch('/pacientes/atendidos'),
+  actualizarPaciente: (pacienteId: number | string, data: any) => 
+    apiFetch(`/pacientes/${pacienteId}`, { method: 'PUT', body: data }),
   getSeguimientos: (pacienteId: number | string) => apiFetch(`/pacientes/${pacienteId}/seguimientos`),
   crearSeguimiento: (pacienteId: number | string, data: { estadoAnimo: string; sintomas: string; notas: string; fecha?: string }) => 
     apiFetch(`/pacientes/${pacienteId}/seguimientos`, { method: 'POST', body: data as any }),

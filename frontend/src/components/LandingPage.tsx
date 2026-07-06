@@ -1407,7 +1407,7 @@ export default function LandingPage({
                             style={{
                               alignSelf: isMe ? 'flex-end' : 'flex-start',
                               maxWidth: '75%',
-                              backgroundColor: isMe ? '#d9fdd3' : '#ffffff', // WhatsApp bubbles
+                              backgroundColor: isMe ? '#d9fdd3' : '#f0f2f5', // WhatsApp bubbles
                               color: 'black',
                               padding: '6px 10px',
                               borderRadius: isMe ? '8px 8px 0 8px' : '8px 8px 8px 0',

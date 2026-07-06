@@ -62,6 +62,74 @@ export default function PatientsView() {
   const [reportContent, setReportContent] = useState('')
   const [uploadFilename, setUploadFilename] = useState('')
 
+  // Edit Patient Details states
+  const [isEditingPatient, setIsEditingPatient] = useState(false)
+  const [editDni, setEditDni] = useState('')
+  const [editObraSocial, setEditObraSocial] = useState('')
+  const [editNumAfiliado, setEditNumAfiliado] = useState('')
+  const [editDireccion, setEditDireccion] = useState('')
+  const [editTelefono, setEditTelefono] = useState('')
+  const [savingPatientDetails, setSavingPatientDetails] = useState(false)
+
+  useEffect(() => {
+    if (selectedPatient) {
+      setEditDni(selectedPatient.dni || '')
+      setEditObraSocial(selectedPatient.obraSocial || '')
+      setEditNumAfiliado(selectedPatient.numAfiliado || '')
+      setEditDireccion(selectedPatient.direccion || '')
+      setEditTelefono(selectedPatient.telefono || '')
+      setIsEditingPatient(false)
+    }
+  }, [selectedPatient])
+
+  const handleSavePatientDetails = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedPatient) return
+    setSavingPatientDetails(true)
+    try {
+      await api.actualizarPaciente(selectedPatient.id, {
+        dni: editDni,
+        obraSocial: editObraSocial,
+        numAfiliado: editNumAfiliado,
+        direccion: editDireccion,
+        telefono: editTelefono
+      })
+      // Update selectedPatient local state
+      setSelectedPatient((prev: any) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          dni: editDni,
+          obraSocial: editObraSocial,
+          numAfiliado: editNumAfiliado,
+          direccion: editDireccion,
+          telefono: editTelefono
+        }
+      })
+      // Update in patients list as well
+      setPatients(prevList => prevList.map(p => {
+        if (p.id === selectedPatient.id) {
+          return {
+            ...p,
+            dni: editDni,
+            obraSocial: editObraSocial,
+            numAfiliado: editNumAfiliado,
+            direccion: editDireccion,
+            telefono: editTelefono
+          }
+        }
+        return p
+      }))
+      setIsEditingPatient(false)
+      alert("Datos del paciente actualizados correctamente ✓")
+    } catch (err) {
+      console.error("Error al actualizar datos del paciente:", err)
+      alert("Error al actualizar datos del paciente")
+    } finally {
+      setSavingPatientDetails(false)
+    }
+  }
+
   // Fetch patients on mount
   useEffect(() => {
     fetchPatients()
@@ -366,22 +434,24 @@ export default function PatientsView() {
                 </div>
               </div>
 
-              {/* Patient metadata ribbon */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: 'var(--space-4)',
-                backgroundColor: 'var(--neutral-50)',
-                padding: 'var(--space-2) var(--space-4)',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--color-border)',
-                fontSize: 'var(--text-xs)'
-              }}>
-                <div><strong>DNI:</strong> {selectedPatient.dni || 'No cargado'}</div>
-                <div><strong>Obra Social:</strong> {selectedPatient.obraSocial || 'Particular'}</div>
-                <div><strong>N° Afiliado:</strong> {selectedPatient.numAfiliado || 'N/A'}</div>
-                <div><strong>Dirección:</strong> {selectedPatient.direccion || 'No cargada'}</div>
-              </div>
+              {/* Patient metadata ribbon - only in Chat tab */}
+              {activeTab === 'chat' && (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, 1fr)',
+                  gap: 'var(--space-4)',
+                  backgroundColor: 'var(--neutral-50)',
+                  padding: 'var(--space-2) var(--space-4)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--color-border)',
+                  fontSize: 'var(--text-xs)'
+                }}>
+                  <div><strong>DNI:</strong> {selectedPatient.dni || 'No cargado'}</div>
+                  <div><strong>Obra Social:</strong> {selectedPatient.obraSocial || 'Particular'}</div>
+                  <div><strong>N° Afiliado:</strong> {selectedPatient.numAfiliado || 'N/A'}</div>
+                  <div><strong>Dirección:</strong> {selectedPatient.direccion || 'No cargada'}</div>
+                </div>
+              )}
             </div>
 
             {/* Content Switch */}
@@ -414,12 +484,12 @@ export default function PatientsView() {
                           style={{
                             alignSelf: isMe ? 'flex-end' : 'flex-start',
                             maxWidth: '70%',
-                            backgroundColor: isMe ? 'var(--color-primary)' : 'var(--color-surface)',
-                            color: isMe ? 'var(--color-text-on-primary)' : 'var(--color-text-primary)',
+                            backgroundColor: isMe ? '#d9fdd3' : '#f0f2f5',
+                            color: 'black',
                             padding: 'var(--space-3) var(--space-4)',
                             borderRadius: isMe ? '12px 12px 0 12px' : '12px 12px 12px 0',
                             boxShadow: 'var(--shadow-sm)',
-                            border: isMe ? 'none' : '1px solid var(--color-border)',
+                            border: 'none',
                             fontSize: 'var(--text-sm)',
                             lineHeight: 'var(--line-height-normal)',
                             wordBreak: 'break-word'
@@ -466,6 +536,149 @@ export default function PatientsView() {
               /* Clinical History Tab */
               <div style={{ flex: 1, padding: 'var(--space-6)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
                 
+                {/* Section: Ficha de Datos del Paciente (Editable) */}
+                <div className="card" style={{ padding: 'var(--space-5)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isEditingPatient ? 'var(--space-4)' : 'var(--space-2)' }}>
+                    <div>
+                      <h4 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-bold)', margin: 0 }}>Ficha de Datos del Paciente</h4>
+                      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', margin: 0 }}>Consultá y editá la información administrativa y de cobertura</p>
+                    </div>
+                    {!isEditingPatient && (
+                      <button 
+                        onClick={() => setIsEditingPatient(true)} 
+                        className="btn btn--secondary btn--sm"
+                      >
+                        ✏️ Editar Datos
+                      </button>
+                    )}
+                  </div>
+
+                  {isEditingPatient ? (
+                    <form onSubmit={handleSavePatientDetails} style={{
+                      backgroundColor: 'var(--neutral-50)',
+                      padding: 'var(--space-4)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--color-border)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 'var(--space-3)'
+                    }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)' }}>
+                        <div className="form-group">
+                          <label className="form-label">DNI</label>
+                          <input 
+                            type="text" 
+                            value={editDni} 
+                            onChange={(e) => setEditDni(e.target.value)}
+                            className="form-input"
+                            placeholder="DNI del paciente"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Obra Social</label>
+                          <input 
+                            type="text" 
+                            value={editObraSocial} 
+                            onChange={(e) => setEditObraSocial(e.target.value)}
+                            className="form-input"
+                            placeholder="Nombre de Obra Social"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">N° Afiliado</label>
+                          <input 
+                            type="text" 
+                            value={editNumAfiliado} 
+                            onChange={(e) => setEditNumAfiliado(e.target.value)}
+                            className="form-input"
+                            placeholder="Número de afiliado"
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-3)' }}>
+                        <div className="form-group">
+                          <label className="form-label">Dirección</label>
+                          <input 
+                            type="text" 
+                            value={editDireccion} 
+                            onChange={(e) => setEditDireccion(e.target.value)}
+                            className="form-input"
+                            placeholder="Calle, Número, Localidad"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Teléfono</label>
+                          <input 
+                            type="text" 
+                            value={editTelefono} 
+                            onChange={(e) => setEditTelefono(e.target.value)}
+                            className="form-input"
+                            placeholder="Contacto del paciente"
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 'var(--space-2)', alignSelf: 'flex-end', marginTop: 'var(--space-2)' }}>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setIsEditingPatient(false);
+                            setEditDni(selectedPatient.dni || '');
+                            setEditObraSocial(selectedPatient.obraSocial || '');
+                            setEditNumAfiliado(selectedPatient.numAfiliado || '');
+                            setEditDireccion(selectedPatient.direccion || '');
+                            setEditTelefono(selectedPatient.telefono || '');
+                          }} 
+                          className="btn btn--secondary btn--sm"
+                        >
+                          Cancelar
+                        </button>
+                        <button 
+                          type="submit" 
+                          disabled={savingPatientDetails}
+                          className="btn btn--primary btn--sm"
+                        >
+                          {savingPatientDetails ? 'Guardando...' : '✓ Guardar Cambios'}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(5, 1fr)',
+                      gap: 'var(--space-4)',
+                      backgroundColor: 'var(--neutral-50)',
+                      padding: 'var(--space-3) var(--space-4)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--color-border)',
+                      fontSize: 'var(--text-xs)',
+                      textAlign: 'left'
+                    }}>
+                      <div>
+                        <div style={{ color: 'var(--color-text-secondary)', fontWeight: 'bold', marginBottom: '2px' }}>DNI</div>
+                        <div style={{ fontSize: 'var(--text-sm)' }}>{selectedPatient.dni || 'No cargado'}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: 'var(--color-text-secondary)', fontWeight: 'bold', marginBottom: '2px' }}>Obra Social</div>
+                        <div style={{ fontSize: 'var(--text-sm)' }}>{selectedPatient.obraSocial || 'Particular'}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: 'var(--color-text-secondary)', fontWeight: 'bold', marginBottom: '2px' }}>N° Afiliado</div>
+                        <div style={{ fontSize: 'var(--text-sm)' }}>{selectedPatient.numAfiliado || 'N/A'}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: 'var(--color-text-secondary)', fontWeight: 'bold', marginBottom: '2px' }}>Dirección</div>
+                        <div style={{ fontSize: 'var(--text-sm)' }}>{selectedPatient.direccion || 'No cargada'}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: 'var(--color-text-secondary)', fontWeight: 'bold', marginBottom: '2px' }}>Teléfono</div>
+                        <div style={{ fontSize: 'var(--text-sm)' }}>{selectedPatient.telefono || 'Sin teléfono'}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Section: Seguimiento Diario */}
                 <div className="card" style={{ padding: 'var(--space-5)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>

@@ -200,4 +200,32 @@ public class ClinicalService {
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
         return informeClinicoRepository.findByPacienteIdOrderByFechaDesc(paciente.getId());
     }
+
+    @Transactional
+    public PacienteDto actualizarPaciente(Long pacienteId, String medicoEmail, PacienteDto dto) {
+        Usuario medico = usuarioRepository.findByEmail(medicoEmail)
+                .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
+
+        Usuario paciente = usuarioRepository.findById(pacienteId)
+                .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
+
+        paciente.setNumAfiliado(dto.getNumAfiliado());
+        paciente.setDni(dto.getDni());
+        paciente.setObraSocial(dto.getObraSocial());
+        paciente.setDireccion(dto.getDireccion());
+        paciente.setTelefono(dto.getTelefono());
+        
+        Usuario saved = usuarioRepository.save(paciente);
+
+        return PacienteDto.builder()
+                .id(saved.getId())
+                .nombre(saved.getNombre())
+                .email(saved.getEmail())
+                .telefono(saved.getTelefono())
+                .dni(saved.getDni())
+                .direccion(saved.getDireccion())
+                .obraSocial(saved.getObraSocial())
+                .numAfiliado(saved.getNumAfiliado())
+                .build();
+    }
 }

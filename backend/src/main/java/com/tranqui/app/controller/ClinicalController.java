@@ -162,4 +162,16 @@ public class ClinicalController {
         }
         return ResponseEntity.ok(clinicalService.obtenerInformesPaciente(userDetails.getUsername()));
     }
+
+    @PutMapping("/pacientes/{pacienteId}")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<PacienteDto> actualizarPaciente(
+            @PathVariable Long pacienteId,
+            @RequestBody PacienteDto dto,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(clinicalService.actualizarPaciente(pacienteId, userDetails.getUsername(), dto));
+    }
 }
