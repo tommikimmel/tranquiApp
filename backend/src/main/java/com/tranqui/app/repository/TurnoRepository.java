@@ -2,6 +2,7 @@ package com.tranqui.app.repository;
 
 import com.tranqui.app.model.EstadoTurno;
 import com.tranqui.app.model.Turno;
+import com.tranqui.app.model.Usuario;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
@@ -20,4 +21,9 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
     List<Turno> findByMedicoIdAndEstadoNot(Long medicoId, EstadoTurno estado);
 
     boolean existsByPacienteEmailAndEstadoNot(String email, EstadoTurno estado);
+
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT t.paciente FROM Turno t WHERE t.medico.id = :medicoId AND t.estado != 'CANCELADO'")
+    List<Usuario> findDistinctPacientesByMedicoId(@org.springframework.data.repository.query.Param("medicoId") Long medicoId);
+
+    List<Turno> findByPacienteIdAndEstadoNot(Long pacienteId, EstadoTurno estado);
 }

@@ -29,9 +29,13 @@ class TurnoServiceTest {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
+    @Autowired
+    private com.tranqui.app.repository.DisponibilidadRepository disponibilidadRepository;
+
     private Usuario paciente;
     private Usuario medico;
     private Turno turno;
+    private com.tranqui.app.model.Disponibilidad disponibilidad;
 
     @BeforeEach
     void setUp() {
@@ -50,6 +54,14 @@ class TurnoServiceTest {
         usuarioRepository.save(paciente);
         usuarioRepository.save(medico);
 
+        disponibilidad = com.tranqui.app.model.Disponibilidad.builder()
+                .medico(medico)
+                .diaSemana(LocalDate.now().plusDays(2).getDayOfWeek().getValue())
+                .horaInicio(LocalTime.of(9, 0))
+                .horaFin(LocalTime.of(12, 0))
+                .build();
+        disponibilidadRepository.save(disponibilidad);
+
         turno = Turno.builder()
                 .paciente(paciente)
                 .medico(medico)
@@ -65,8 +77,18 @@ class TurnoServiceTest {
 
     @AfterEach
     void tearDown() {
-        turnoRepository.deleteAll();
-        usuarioRepository.deleteAll();
+        if (turno != null && turno.getId() != null) {
+            try { turnoRepository.delete(turno); } catch (Exception e) {}
+        }
+        if (disponibilidad != null && disponibilidad.getId() != null) {
+            try { disponibilidadRepository.delete(disponibilidad); } catch (Exception e) {}
+        }
+        if (paciente != null && paciente.getId() != null) {
+            try { usuarioRepository.delete(paciente); } catch (Exception e) {}
+        }
+        if (medico != null && medico.getId() != null) {
+            try { usuarioRepository.delete(medico); } catch (Exception e) {}
+        }
     }
 
     @Test
@@ -98,5 +120,94 @@ class TurnoServiceTest {
         assertNotNull(dbTurno);
         assertEquals(EstadoTurno.PENDIENTE_PAGO, dbTurno.getEstado());
         assertNull(dbTurno.getMetadataAfiliado());
+    }
+
+    @Test
+    void testReservarTurnoOsde() {
+        com.tranqui.app.model.dto.ReservaTurnoDto dto = com.tranqui.app.model.dto.ReservaTurnoDto.builder()
+                .medicoId(medico.getId())
+                .fecha(LocalDate.now().plusDays(2))
+                .hora(LocalTime.of(9, 0))
+                .tipo(TipoTurno.OSDE)
+                .metadataAfiliado("OSDE-777")
+                .nombrePaciente("Mateo B")
+                .emailPaciente("mateo.b@gmail.com")
+                .telefonoPaciente("+543510000000")
+                .build();
+
+        com.tranqui.app.model.dto.TurnoResponseDto response = turnoService.reservarTurno(dto);
+        assertNotNull(response);
+        assertEquals("CONFIRMADO", response.getEstado());
+        
+        // Clean up created turno & patient if created
+        if (response.getTurnoId() != null) {
+            try { turnoRepository.deleteById(response.getTurnoId()); } catch (Exception e) {}
+        }
+    }
+
+    @Test
+    void testReservarTurnoParticular() {
+        com.tranqui.app.model.dto.ReservaTurnoDto dto = com.tranqui.app.model.dto.ReservaTurnoDto.builder()
+                .medicoId(medico.getId())
+                .fecha(LocalDate.now().plusDays(2))
+                .hora(LocalTime.of(9, 0))
+                .tipo(TipoTurno.PARTICULAR)
+                .nombrePaciente("Juan Perez")
+                .emailPaciente("juan.perez@gmail.com")
+                .build();
+
+        com.tranqui.app.model.dto.TurnoResponseDto response = turnoService.reservarTurno(dto);
+        assertNotNull(response);
+        assertEquals("PENDIENTE_PAGO", response.getEstado());
+        assertNotNull(response.getCheckoutUrl());
+        
+        // Clean up created turno & patient
+        if (response.getTurnoId() != null) {
+            try { turnoRepository.deleteById(response.getTurnoId()); } catch (Exception e) {}
+        }
+        usuarioRepository.findByEmail("juan.perez@gmail.com").ifPresent(u -> {
+            try { usuarioRepository.delete(u); } catch (Exception e) {}
+        });
+    }
+
+    @Test
+    void testReservarTurnoSobretuno() {
+        com.tranqui.app.model.dto.ReservaTurnoDto dto = com.tranqui.app.model.dto.ReservaTurnoDto.builder()
+                .medicoId(medico.getId())
+                .fecha(LocalDate.now().plusDays(2))
+                .hora(LocalTime.of(9, 0))
+                .tipo(TipoTurno.SOBRETUNO)
+                .nombrePaciente("Juan Perez")
+                .emailPaciente("juan.perez@gmail.com")
+                .build();
+
+        com.tranqui.app.model.dto.TurnoResponseDto response = turnoService.reservarTurno(dto);
+        assertNotNull(response);
+        assertEquals("PENDIENTE_PAGO", response.getEstado());
+        
+        // Try double booking the same sobreturno -> should fail
+        assertThrows(IllegalStateException.class, () -> {
+            turnoService.reservarTurno(dto);
+        });
+
+        // Clean up
+        if (response.getTurnoId() != null) {
+            try { turnoRepository.deleteById(response.getTurnoId()); } catch (Exception e) {}
+        }
+        usuarioRepository.findByEmail("juan.perez@gmail.com").ifPresent(u -> {
+            try { usuarioRepository.delete(u); } catch (Exception e) {}
+        });
+    }
+
+    @Test
+    void testObtenerHorariosDisponibles() {
+        java.util.List<LocalTime> result = turnoService.obtenerHorariosDisponibles(medico.getId(), LocalDate.now());
+        assertNotNull(result);
+    }
+
+    @Test
+    void testObtenerTurnosDeHoy() {
+        java.util.List<com.tranqui.app.model.dto.TurnoMedicoDto> result = turnoService.obtenerTurnosDeHoy(medico.getEmail());
+        assertNotNull(result);
     }
 }

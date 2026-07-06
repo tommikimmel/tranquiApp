@@ -61,7 +61,12 @@ class WebSocketAuthorizationTest {
 
     @AfterEach
     void tearDown() {
-        usuarioRepository.deleteAll();
+        if (medico1 != null && medico1.getId() != null) {
+            try { usuarioRepository.delete(medico1); } catch (Exception e) {}
+        }
+        if (medico2 != null && medico2.getId() != null) {
+            try { usuarioRepository.delete(medico2); } catch (Exception e) {}
+        }
     }
 
     @Test

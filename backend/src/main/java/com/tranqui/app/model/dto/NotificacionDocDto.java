@@ -12,4 +12,6 @@ public class NotificacionDocDto {
     private String pacienteNombre;
     private String tipo;
     private String fecha;
+    private String titulo;
+    private String mensaje;
 }

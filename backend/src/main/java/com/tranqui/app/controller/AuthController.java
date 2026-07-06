@@ -35,6 +35,9 @@ public class AuthController {
     @Autowired
     private JwtService jwtService;
 
+    @Autowired
+    private org.springframework.core.env.Environment env;
+
     @org.springframework.beans.factory.annotation.Value("${google.client-id:dummy-client-id}")
     private String clientId;
 
@@ -51,8 +54,11 @@ public class AuthController {
         boolean secureCookie = true;
         String sameSiteVal = "Strict";
 
+        // Check if dev profile is active
+        boolean isDev = java.util.Arrays.asList(env.getActiveProfiles()).contains("dev");
+
         // Disable secure cookie and set SameSite to Lax in development/simulation mode
-        if ("dummy-client-id".equals(clientId) || (googleLoginDto.getIdToken() != null && googleLoginDto.getIdToken().startsWith("mock-"))) {
+        if (isDev || "dummy-client-id".equals(clientId) || (googleLoginDto.getIdToken() != null && googleLoginDto.getIdToken().startsWith("mock-"))) {
             secureCookie = false;
             sameSiteVal = "Lax";
         }
@@ -82,11 +88,21 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletResponse response) {
+        boolean secureCookie = true;
+        String sameSiteVal = "Strict";
+
+        boolean isDev = java.util.Arrays.asList(env.getActiveProfiles()).contains("dev");
+        if (isDev || "dummy-client-id".equals(clientId)) {
+            secureCookie = false;
+            sameSiteVal = "Lax";
+        }
+
         ResponseCookie cookie = ResponseCookie.from("SESSION-TOKEN", "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(secureCookie)
                 .path("/")
                 .maxAge(0)
+                .sameSite(sameSiteVal)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
         return ResponseEntity.ok("Sesión cerrada");

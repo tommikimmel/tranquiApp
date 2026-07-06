@@ -20,6 +20,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
     setError(null)
     try {
       const user = await api.loginGoogle(token)
+      localStorage.setItem('tranqui_user', JSON.stringify(user));
       onLoginSuccess(user)
     } catch (err: any) {
       console.error('Error de autenticación:', err)
@@ -29,9 +30,39 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
     }
   }
 
-  const triggerRealGoogleLogin = () => {
-    setError('La integración con Google OAuth requiere configurar CLIENT_ID de producción. Usá el selector de desarrollo a continuación para probar la aplicación localmente.')
-  }
+  // Load Google Identity Services dynamically
+  useState(() => {
+    const scriptId = 'google-gsi-client'
+    const initGoogle = () => {
+      // @ts-ignore
+      if (window.google) {
+        // @ts-ignore
+        window.google.accounts.id.initialize({
+          client_id: "224301140079-2pa672f7sqcner9nut04j0g99md88n3p.apps.googleusercontent.com",
+          callback: (response: any) => {
+            handleGoogleLogin(response.credential)
+          }
+        })
+        // @ts-ignore
+        window.google.accounts.id.renderButton(
+          document.getElementById("google-signin-btn"),
+          { theme: "outline", size: "large", width: 376 }
+        )
+      }
+    }
+
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement('script')
+      script.id = scriptId
+      script.src = 'https://accounts.google.com/gsi/client'
+      script.async = true;
+      script.defer = true;
+      script.onload = initGoogle
+      document.body.appendChild(script)
+    } else {
+      setTimeout(initGoogle, 100)
+    }
+  })
 
   const handleSimulatedLogin = () => {
     const emailToUse = devEmail === 'custom' ? customEmail : devEmail
@@ -106,37 +137,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
         )}
 
         {/* Real Google Button */}
-        <button
-          onClick={triggerRealGoogleLogin}
-          disabled={loading}
-          className="btn"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 'var(--space-3)',
-            backgroundColor: 'var(--neutral-0)',
-            color: 'var(--neutral-700)',
-            border: '1px solid var(--neutral-300)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-3)',
-            fontSize: 'var(--text-base)',
-            fontWeight: 'var(--font-weight-medium)',
-            cursor: 'pointer',
-            transition: 'background-color 0.2s',
-            boxShadow: 'var(--shadow-sm)'
-          }}
-          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = 'var(--neutral-50)')}
-          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'var(--neutral-0)')}
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18">
-            <path fill="#4285F4" d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.5h4.84c-.21 1.12-.84 2.07-1.79 2.7l2.8 2.17c1.63-1.51 2.58-3.73 2.58-6.39z"/>
-            <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.8-2.17c-.78.52-1.78.83-3.16.83-2.43 0-4.49-1.64-5.22-3.85l-2.9 2.24C2.35 15.52 5.4 18 9 18z"/>
-            <path fill="#FBBC05" d="M3.78 10.63c-.19-.58-.3-1.2-.3-1.83s.11-1.25.3-1.83l-2.9-2.24C.31 5.96 0 7.45 0 9s.31 3.04.88 4.27l2.9-2.24z"/>
-            <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.47.9 11.43 0 9 0 5.4 0 2.35 2.48.88 5.13l2.9 2.24c.73-2.21 2.79-3.85 5.22-3.85z"/>
-          </svg>
-          {loading ? 'Iniciando sesión...' : 'Iniciar sesión con Google'}
-        </button>
+        <div id="google-signin-btn" style={{ display: 'flex', justifyContent: 'center' }}></div>
 
         {/* Development Bypass Card */}
         {showDevOptions && (
@@ -178,8 +179,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                 }}
               >
                 <option value="paula@tranqui.com">Lic. María Paula Rossi (Profesional / Psiquiatra)</option>
-                <option value="valentina.m@gmail.com">Valentina Moreno (Paciente Demo)</option>
-                <option value="matias.r@gmail.com">Matías Rodríguez (Paciente Demo)</option>
+                <option value="mateo.b@gmail.com">Mateo Benítez (Paciente Demo)</option>
                 <option value="custom">Ingresar otro email...</option>
               </select>
             </div>

@@ -37,6 +37,9 @@ public class PagoWebhookHandler {
     @Autowired
     private WhatsAppService whatsAppService;
 
+    @Autowired
+    private NotificacionService notificacionService;
+
     @Transactional
     public void procesarAprobacionConcepto(Long solicitudId, String transactionId) {
         SolicitudDocumento solicitud = solicitudRepository.findById(solicitudId)
@@ -84,6 +87,17 @@ public class PagoWebhookHandler {
         pagoRepository.save(pago);
 
         log.info("Pago aprobado para turno ID: {}. Generado evento de Google Meet.", turnoId);
+
+        // Crear notificación para el médico
+        try {
+            String titulo = "Nuevo Turno Reservado";
+            String mensaje = "El paciente " + turno.getPaciente().getNombre() + 
+                             " ha reservado un turno para el día " + turno.getFecha() + 
+                             " a las " + turno.getHoraInicio() + "hs.";
+            notificacionService.crearNotificacion(turno.getMedico(), titulo, mensaje, "TURNO_RESERVADO");
+        } catch (Exception e) {
+            log.error("Error al crear notificación para el turno ID: {}", turnoId, e);
+        }
 
         // Intentar notificar por WhatsApp
         try {

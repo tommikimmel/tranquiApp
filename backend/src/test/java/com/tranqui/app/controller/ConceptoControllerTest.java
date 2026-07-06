@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@org.springframework.transaction.annotation.Transactional
 class ConceptoControllerTest {
 
     @Autowired
@@ -61,14 +62,10 @@ class ConceptoControllerTest {
         usuarioRepository.save(medico);
     }
 
-    @AfterEach
-    void tearDown() {
-        solicitudRepository.deleteAll();
-        usuarioRepository.deleteAll();
-    }
+
 
     @Test
-    @WithMockUser(username = "pac@test.com")
+    @WithMockUser(username = "pac@test.com", roles = "PACIENTE")
     void whenSolicitarDocumento_shouldReturnCheckoutUrl() throws Exception {
         SolicitarConceptoDto dto = SolicitarConceptoDto.builder()
                 .medicoId(medico.getId())
@@ -85,7 +82,7 @@ class ConceptoControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "med@test.com")
+    @WithMockUser(username = "med@test.com", roles = "PSIQUIATRA")
     void whenGetPendientes_shouldReturnApprovedList() throws Exception {
         SolicitudDocumento doc = SolicitudDocumento.builder()
                 .paciente(paciente)
@@ -106,7 +103,7 @@ class ConceptoControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "med@test.com")
+    @WithMockUser(username = "med@test.com", roles = "PSIQUIATRA")
     void whenEmitirDocumento_shouldUpdateStatusAndReturn() throws Exception {
         SolicitudDocumento doc = SolicitudDocumento.builder()
                 .paciente(paciente)

@@ -1,39 +1,86 @@
 package com.tranqui.app.service;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.tranqui.app.model.Rol;
+import com.tranqui.app.model.Usuario;
+import com.tranqui.app.repository.UsuarioRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.*;
 
-@ExtendWith(MockitoExtension.class)
+@SpringBootTest
 class GoogleAuthServiceTest {
 
-    @Mock
-    private GoogleIdTokenVerifier verifier;
-
-    @InjectMocks
+    @Autowired
     private GoogleAuthService googleAuthService;
 
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+
+    private Usuario existingUser;
+
+    @BeforeEach
+    void setUp() {
+        existingUser = Usuario.builder()
+                .nombre("Marta Test")
+                .email("marta.test@gmail.com")
+                .rol(Rol.PACIENTE)
+                .build();
+        usuarioRepository.save(existingUser);
+    }
+
+    @AfterEach
+    void tearDown() {
+        usuarioRepository.delete(existingUser);
+        usuarioRepository.findByEmail("new.user@gmail.com").ifPresent(usuarioRepository::delete);
+    }
+
     @Test
-    void shouldReturnPayloadWhenTokenIsValid() throws Exception {
-        GoogleIdToken mockToken = mock(GoogleIdToken.class);
-        GoogleIdToken.Payload mockPayload = new GoogleIdToken.Payload();
-        mockPayload.setEmail("paciente@gmail.com");
-        mockPayload.set("name", "Juan Pérez");
-
-        when(verifier.verify("valido-google-token")).thenReturn(mockToken);
-        when(mockToken.getPayload()).thenReturn(mockPayload);
-
-        GoogleIdToken.Payload payload = googleAuthService.verifyGoogleToken("valido-google-token");
+    void testVerifyGoogleTokenMock() {
+        GoogleIdToken.Payload payload = googleAuthService.verifyGoogleToken("mock-token");
         assertNotNull(payload);
-        assertEquals("paciente@gmail.com", payload.getEmail());
+        assertEquals("paula@tranqui.com", payload.getEmail());
+    }
+
+    @Test
+    void testVerifyGoogleTokenMockWithEmail() {
+        GoogleIdToken.Payload payload = googleAuthService.verifyGoogleToken("mock-marta.test@gmail.com");
+        assertNotNull(payload);
+        assertEquals("marta.test@gmail.com", payload.getEmail());
+        assertEquals("Marta Test", payload.get("name"));
+    }
+
+    @Test
+    void testVerifyGoogleTokenMockNewEmail() {
+        GoogleIdToken.Payload payload = googleAuthService.verifyGoogleToken("mock-new.user@gmail.com");
+        assertNotNull(payload);
+        assertEquals("new.user@gmail.com", payload.getEmail());
+        assertEquals("new.user", payload.get("name"));
+    }
+
+    @Test
+    void testGetOrCreateUsuarioExisting() {
+        GoogleIdToken.Payload payload = new GoogleIdToken.Payload();
+        payload.setEmail("marta.test@gmail.com");
+        payload.set("name", "Marta Test");
+
+        Usuario user = googleAuthService.getOrCreateUsuario(payload);
+        assertNotNull(user);
+        assertEquals(existingUser.getId(), user.getId());
+    }
+
+    @Test
+    void testGetOrCreateUsuarioNew() {
+        GoogleIdToken.Payload payload = new GoogleIdToken.Payload();
+        payload.setEmail("new.user@gmail.com");
+
+        Usuario user = googleAuthService.getOrCreateUsuario(payload);
+        assertNotNull(user);
+        assertEquals("new.user@gmail.com", user.getEmail());
+        assertEquals("new.user", user.getNombre());
     }
 }

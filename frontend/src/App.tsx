@@ -7,6 +7,8 @@ import LoginPage from './components/LoginPage'
 import PatientsView from './components/PatientsView'
 import VisitorsView from './components/VisitorsView'
 import { api } from './api/api'
+import { Client } from '@stomp/stompjs'
+import SockJS from 'sockjs-client'
 
 type AppView = 'landing' | 'checkout' | 'dashboard' | 'login'
 
@@ -99,10 +101,24 @@ const Icon = {
       <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   ),
-  Bell: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ width: 20, height: 20 }}>
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
-    </svg>
+  Bell: ({ hasUnread }: { hasUnread?: boolean }) => (
+    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ width: 20, height: 20 }}>
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      </svg>
+      {hasUnread && (
+        <span style={{
+          position: 'absolute',
+          top: '0px',
+          right: '0px',
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          backgroundColor: '#ef4444',
+          border: '1px solid white'
+        }} />
+      )}
+    </div>
   ),
   Prescription: () => (
     <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -414,7 +430,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
   }
 
   return (
-    <div className="card">
+    <div className="card" style={{ width: '100%', maxWidth: 'none' }}>
       <div className="card__header">
         <div>
           <h2 className="card__title">Disponibilidad semanal</h2>
@@ -425,7 +441,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
         </button>
       </div>
 
-      <div className="availability-grid">
+      <div className="availability-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', width: '100%' }}>
         {weekdays.map((day) => {
           const isActive = baseSlots.some(slot => activeSlots[day.num][slot])
           return (
@@ -459,7 +475,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
 
 // ── Prescription View ─────────────────────────────────────────
 const MOCK_PATIENTS = [
-  { id: '1', name: 'Valentina Moreno', email: 'valentina.m@gmail.com' },
+  { id: '1', name: 'Mateo Benítez', email: 'mateo.b@gmail.com' },
   { id: '2', name: 'Matías Rodríguez', email: 'matias.r@gmail.com' },
   { id: '3', name: 'Lucía Fernández', email: 'lucia.f@gmail.com' },
   { id: '4', name: 'Santiago Torres', email: 'santiago.t@gmail.com' },
@@ -906,9 +922,41 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
   )
 }
 
-function DashboardHome({ mpConnected, onConnect, appointments, stats }: { mpConnected: boolean; onConnect: () => void; appointments: Appointment[]; stats: any }) {
+function DashboardHome({ 
+  mpConnected, 
+  onConnect, 
+  appointments, 
+  allAppointments, 
+  stats 
+}: { 
+  mpConnected: boolean; 
+  onConnect: () => void; 
+  appointments: Appointment[]; 
+  allAppointments: any[]; 
+  stats: any 
+}) {
   const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
   const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+  const [calendarView, setCalendarView] = useState<'weekly' | 'today'>('weekly');
+
+  const weekdays = [
+    { name: 'Lunes', abbr: 'Lun', num: 1 },
+    { name: 'Martes', abbr: 'Mar', num: 2 },
+    { name: 'Miércoles', abbr: 'Mié', num: 3 },
+    { name: 'Jueves', abbr: 'Jue', num: 4 },
+    { name: 'Viernes', abbr: 'Vie', num: 5 },
+  ]
+  const baseSlots = ['09:00', '10:00', '11:00', '12:00', '14:00', '15:00', '16:00', '17:00']
+
+  // Parse date YYYY-MM-DD to get local day of week (1 = Monday, 5 = Friday)
+  const getDayOfWeek = (dateStr: string) => {
+    if (!dateStr) return -1
+    const parts = dateStr.split('-')
+    if (parts.length !== 3) return -1
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
+    const day = d.getDay()
+    return day === 0 ? 7 : day // Map Sunday to 7, Mon-Sat to 1-6
+  }
 
   return (
     <>
@@ -916,28 +964,161 @@ function DashboardHome({ mpConnected, onConnect, appointments, stats }: { mpConn
 
       <StatsOverview stats={stats} />
 
-      <div className="card">
-        <div className="card__header">
+      <div className="card" style={{ width: '100%', maxWidth: 'none' }}>
+        <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h2 className="card__title">Sesiones de hoy</h2>
-            <p className="card__subtitle">{capitalizedDate} · {appointments.length} sesion{appointments.length !== 1 ? 'es' : ''} programada{appointments.length !== 1 ? 's' : ''}</p>
+            <h2 className="card__title">
+              {calendarView === 'weekly' ? 'Calendario Semanal' : 'Sesiones de Hoy'}
+            </h2>
+            <p className="card__subtitle">
+              {calendarView === 'weekly' 
+                ? 'Cronograma de turnos reservados por día y horario' 
+                : `${capitalizedDate} · ${appointments.length} sesiones programadas`
+              }
+            </p>
           </div>
-          <button className="btn btn--secondary btn--sm" id="btn-add-slot">
-            <Icon.Plus />
-            Agregar horario
-          </button>
+
+          <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+              <button 
+                onClick={() => setCalendarView('weekly')} 
+                className={`btn btn--sm`} 
+                style={{ 
+                  borderRadius: 0, 
+                  backgroundColor: calendarView === 'weekly' ? 'var(--color-primary)' : 'transparent',
+                  color: calendarView === 'weekly' ? 'white' : 'var(--color-text-primary)'
+                }}
+              >
+                Semanal
+              </button>
+              <button 
+                onClick={() => setCalendarView('today')} 
+                className={`btn btn--sm`}
+                style={{ 
+                  borderRadius: 0, 
+                  backgroundColor: calendarView === 'today' ? 'var(--color-primary)' : 'transparent',
+                  color: calendarView === 'today' ? 'white' : 'var(--color-text-primary)'
+                }}
+              >
+                Hoy
+              </button>
+            </div>
+            <button className="btn btn--secondary btn--sm" id="btn-add-slot">
+              <Icon.Plus />
+              Agregar horario
+            </button>
+          </div>
         </div>
 
-        {appointments.length === 0 ? (
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', padding: 'var(--space-6)', textAlign: 'center' }}>
-            No tenés sesiones programadas para el día de hoy.
-          </p>
+        {calendarView === 'today' ? (
+          appointments.length === 0 ? (
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', padding: 'var(--space-6)', textAlign: 'center' }}>
+              No tenés sesiones programadas para el día de hoy.
+            </p>
+          ) : (
+            <ul className="appointment-list" role="list" aria-label="Sesiones de hoy">
+              {appointments.map((appt) => (
+                <AppointmentCard key={appt.id} appt={appt} />
+              ))}
+            </ul>
+          )
         ) : (
-          <ul className="appointment-list" role="list" aria-label="Sesiones de hoy">
-            {appointments.map((appt) => (
-              <AppointmentCard key={appt.id} appt={appt} />
-            ))}
-          </ul>
+          /* Weekly Calendar Layout */
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(5, 1fr)', 
+            gap: 'var(--space-4)', 
+            width: '100%',
+            marginTop: 'var(--space-4)'
+          }}>
+            {weekdays.map((day) => {
+              return (
+                <div key={day.num} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                  <div style={{
+                    textAlign: 'center',
+                    padding: 'var(--space-2)',
+                    fontSize: 'var(--text-xs)',
+                    fontWeight: 'var(--font-weight-bold)',
+                    color: 'var(--color-primary)',
+                    backgroundColor: 'var(--green-50)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--green-100)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em'
+                  }}>
+                    {day.name}
+                  </div>
+                  
+                  {baseSlots.map((slot) => {
+                    const slotHour = parseInt(slot.split(':')[0]);
+                    // Find matching appointment
+                    const appt = allAppointments.find(a => {
+                      const apptDay = getDayOfWeek(a.fecha);
+                      const apptHour = parseInt(a.hour);
+                      return apptDay === day.num && apptHour === slotHour;
+                    });
+
+                    if (appt) {
+                      const isConfirmed = appt.status === 'confirmed';
+                      const isCompleted = appt.status === 'completed';
+                      
+                      return (
+                        <div key={slot} style={{
+                          padding: 'var(--space-3)',
+                          borderRadius: 'var(--radius-md)',
+                          backgroundColor: isConfirmed ? '#ecfdf5' : isCompleted ? 'var(--neutral-100)' : '#fffbeb',
+                          border: isConfirmed ? '1px solid #a7f3d0' : isCompleted ? '1px solid var(--color-border)' : '1px solid #fef3c7',
+                          borderLeftWidth: '4px',
+                          borderLeftColor: isConfirmed ? 'var(--color-primary)' : isCompleted ? 'var(--color-text-secondary)' : 'var(--color-warning)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 'var(--space-2)'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>
+                              {slot} hs
+                            </span>
+                            <span className={`badge ${isConfirmed ? 'badge--success' : isCompleted ? 'badge--neutral' : 'badge--warning'}`} style={{ fontSize: '8px', padding: '1px 3px' }}>
+                              {isConfirmed ? 'Confirmado' : isCompleted ? 'Completado' : 'Pendiente'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semi)', color: 'var(--color-text-primary)' }}>
+                            {appt.patientName}
+                          </div>
+                          {appt.meetLink && isConfirmed && (
+                            <a 
+                              href={appt.meetLink} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="btn btn--primary" 
+                              style={{ fontSize: '9px', padding: '2px 6px', width: 'fit-content', display: 'flex', gap: '3px', alignItems: 'center' }}
+                            >
+                              <Icon.Video /> Unirse
+                            </a>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={slot} style={{
+                        padding: 'var(--space-2)',
+                        textAlign: 'center',
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--color-text-secondary)',
+                        border: '1px dashed var(--color-border)',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: 'var(--neutral-0)',
+                        opacity: 0.6
+                      }}>
+                        {slot} — Libre
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </>
@@ -955,28 +1136,62 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [medicoInfo, setMedicoInfo] = useState<any>(null)
   const [todayAppointments, setTodayAppointments] = useState<any[]>([])
+  const [allAppointments, setAllAppointments] = useState<any[]>([])
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [newPatientAlert, setNewPatientAlert] = useState<{ nombre: string; fecha: string; hora: string } | null>(null)
   const [availability, setAvailability] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
+  const [loadingSession, setLoadingSession] = useState(true)
 
-  // Check user session on app load
+  // Check user session on app load (Recovery from localStorage)
   useEffect(() => {
-    api.getMe()
-      .then((user) => {
+    const cachedUser = localStorage.getItem('tranqui_user')
+    if (cachedUser) {
+      try {
+        const user = JSON.parse(cachedUser)
         setCurrentUser(user)
-        if (user && (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO')) {
+        if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO') {
           setView('dashboard')
         } else {
+          setView('landing')
+        }
+      } catch (e) {
+        localStorage.removeItem('tranqui_user')
+      }
+    }
+
+    api.getMe()
+      .then((user) => {
+        if (user) {
+          setCurrentUser(user)
+          localStorage.setItem('tranqui_user', JSON.stringify(user))
+          if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO') {
+            setView('dashboard')
+          } else {
+            setView('landing')
+          }
+        } else {
+          setCurrentUser(null)
+          localStorage.removeItem('tranqui_user')
           setView('landing')
         }
       })
       .catch(() => {
         setCurrentUser(null)
+        localStorage.removeItem('tranqui_user')
+        setView('landing')
+      })
+      .finally(() => {
+        setLoadingSession(false)
       })
   }, [])
 
   // Route protection guard
   useEffect(() => {
+    if (loadingSession) return
+
     if (currentUser) {
       const isPro = currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO'
       if (isPro && (view === 'landing' || view === 'login')) {
@@ -985,22 +1200,34 @@ export default function App() {
         setView('landing')
       }
     }
-  }, [currentUser, view])
+  }, [currentUser, view, loadingSession])
 
+  // Fetch Dashboard details
   useEffect(() => {
+    if (loadingSession) return
+
     if (view === 'dashboard') {
+      const isPro = currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')
+      if (!isPro) {
+        setView('landing')
+        return
+      }
       setLoadingDashboard(true)
       Promise.all([
         api.getPerfil(),
         api.getTurnosHoy(),
         api.getDisponibilidad(),
-        api.getStats()
+        api.getStats(),
+        api.getTurnos(),
+        api.getNotificaciones()
       ])
-        .then(([perfil, turnos, disp, statsData]) => {
+        .then(([perfil, turnos, disp, statsData, allTurnos, notifData]) => {
           setMedicoInfo(perfil)
           setTodayAppointments(turnos || [])
           setAvailability(disp || [])
           setStats(statsData)
+          setAllAppointments(allTurnos || [])
+          setNotifications(notifData || [])
         })
         .catch((err) => {
           console.error("Error al inicializar dashboard:", err)
@@ -1010,7 +1237,73 @@ export default function App() {
           setLoadingDashboard(false)
         })
     }
-  }, [view])
+  }, [view, currentUser, loadingSession])
+
+  // WebSocket Live Notifications Handler
+  useEffect(() => {
+    if (loadingSession) return
+
+    if (currentUser && view === 'dashboard') {
+      let client: Client | null = null;
+      api.getPerfil().then((perfil) => {
+        if (perfil && perfil.id) {
+          const socket = new SockJS('http://localhost:8081/ws-tranqui')
+          client = new Client({
+            webSocketFactory: () => socket,
+            reconnectDelay: 5000,
+            onConnect: () => {
+              console.log("WebSocket de Notificaciones conectado para ID:", perfil.id)
+              client?.subscribe(`/topic/notificaciones/${perfil.id}`, (stompMsg) => {
+                try {
+                  const data = JSON.parse(stompMsg.body)
+                  console.log("WebSocket notification received:", data)
+                  
+                  // Refresh notification list from API to get full history
+                  api.getNotificaciones().then((res) => {
+                    setNotifications(res || [])
+                  })
+
+                  if (data.tipo === 'TURNO_RESERVADO') {
+                    // Refresh appointments list too so calendar updates immediately
+                    api.getTurnos().then((turnos) => {
+                      setAllAppointments(turnos || [])
+                    })
+                    api.getTurnosHoy().then((turnosHoy) => {
+                      setTodayAppointments(turnosHoy || [])
+                    })
+
+                    // Parse patient name from message
+                    let name = "Paciente"
+                    let msg = data.mensaje || ""
+                    if (msg.includes("El paciente ")) {
+                      const nameMatch = msg.match(/El paciente (.*?) (?:ha|reservó)/)
+                      if (nameMatch) {
+                        name = nameMatch[1]
+                      }
+                    }
+                    setNewPatientAlert({
+                      nombre: name,
+                      fecha: new Date().toLocaleDateString('es-AR'),
+                      hora: "10:00"
+                    })
+                  }
+                } catch (e) {
+                  console.error("Error parsing WebSocket notification:", e)
+                }
+              })
+            }
+          })
+          client.activate()
+        }
+      }).catch(err => console.error("Error fetching profile for WebSocket initialization:", err))
+
+      return () => {
+        if (client) {
+          client.deactivate()
+        }
+      }
+    }
+  }, [currentUser, view, loadingSession])
 
   const handleSaveAvailability = async (data: any[]) => {
     const updated = await api.actualizarDisponibilidad(data)
@@ -1043,7 +1336,16 @@ export default function App() {
       console.error("Error al cerrar sesión:", err)
     }
     setCurrentUser(null)
+    localStorage.removeItem('tranqui_user')
     setView('landing')
+  }
+
+  const handleMarkNotificationsRead = () => {
+    api.marcarNotificacionesLeidas()
+      .then(() => {
+        setNotifications(notifications.map(n => ({ ...n, leido: true })))
+      })
+      .catch((err) => console.error("Error al marcar notificaciones como leídas:", err))
   }
 
   const pageTitle: Record<NavSection, string> = {
@@ -1068,7 +1370,15 @@ export default function App() {
 
     switch (activeNav) {
       case 'dashboard': 
-        return <DashboardHome mpConnected={mpConnected} onConnect={handleConnect} appointments={todayAppointments} stats={stats} />
+        return (
+          <DashboardHome 
+            mpConnected={mpConnected} 
+            onConnect={handleConnect} 
+            appointments={todayAppointments} 
+            allAppointments={allAppointments}
+            stats={stats} 
+          />
+        )
       case 'agenda': 
         return <AgendaView initialAvailability={availability} onSave={handleSaveAvailability} />
       case 'patients': 
@@ -1126,18 +1436,125 @@ export default function App() {
     )
   }
 
+  const isPro = currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')
+  if (view === 'dashboard' && !isPro) {
+    return (
+      <LandingPage
+        currentUser={currentUser}
+        onNavigateToDashboard={() => setView('login')}
+        onBook={handleBook}
+        onLogout={handleLogout}
+        onGoToDashboard={() => setView('dashboard')}
+      />
+    )
+  }
+
+  const unreadCount = notifications.filter(n => !n.leido).length
+
   return (
     <div className="dashboard-layout">
       <Sidebar activeNav={activeNav} onNavChange={setActiveNav} medicoInfo={medicoInfo} />
 
-      <header className="dashboard-header" role="banner">
+      <header className="dashboard-header" role="banner" style={{ position: 'relative' }}>
         <h1 className="dashboard-header__title">{pageTitle[activeNav]}</h1>
-        <div className="dashboard-header__actions">
-          <button className="btn btn--icon btn--ghost" aria-label="Notificaciones">
-            <Icon.Bell />
-          </button>
-          <div className="sidebar__avatar" aria-label="Menú de perfil" role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
-            {medicoInfo?.initials || 'LP'}
+        <div className="dashboard-header__actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+          
+          {/* Interactive Notifications Bell */}
+          <div style={{ position: 'relative' }}>
+            <button 
+              className="btn btn--icon btn--ghost" 
+              onClick={() => setShowNotifications(!showNotifications)}
+              aria-label="Notificaciones"
+              style={{ position: 'relative' }}
+            >
+              <Icon.Bell hasUnread={unreadCount > 0} />
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  backgroundColor: 'var(--color-error)',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '16px',
+                  height: '16px',
+                  fontSize: '9px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold'
+                }}>
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="card" style={{
+                position: 'absolute',
+                top: '48px',
+                right: '0',
+                width: '320px',
+                maxHeight: '400px',
+                overflowY: 'auto',
+                zIndex: 1000,
+                boxShadow: 'var(--shadow-lg)',
+                border: '1px solid var(--color-border)',
+                padding: 'var(--space-3)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--space-2)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-2)' }}>
+                  <strong style={{ fontSize: 'var(--text-sm)' }}>Historial de Notificaciones</strong>
+                  {unreadCount > 0 && (
+                    <button 
+                      onClick={handleMarkNotificationsRead}
+                      className="btn btn--ghost" 
+                      style={{ fontSize: '10px', padding: '2px 6px', height: 'auto' }}
+                    >
+                      Marcar leídas
+                    </button>
+                  )}
+                </div>
+
+                {notifications.length === 0 ? (
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textAlign: 'center', padding: 'var(--space-4)' }}>
+                    No tenés notificaciones.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    {notifications.map((n) => (
+                      <div key={n.id} style={{
+                        padding: 'var(--space-2) var(--space-3)',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: n.leido ? 'transparent' : '#ecfdf5',
+                        borderLeft: n.leido ? '3px solid var(--color-border)' : '3px solid var(--color-primary)',
+                        fontSize: '11px',
+                        transition: 'background-color 0.2s',
+                        color: n.leido ? 'var(--color-text-secondary)' : 'var(--color-text-primary)'
+                      }}>
+                        <div style={{ fontWeight: 'bold' }}>{n.titulo}</div>
+                        <div style={{ marginTop: '2px', fontSize: '10px' }}>{n.mensaje}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <div className="sidebar__avatar" aria-label="Menú de perfil" role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
+              {medicoInfo?.initials || 'LP'}
+            </div>
+            <button 
+              onClick={handleLogout}
+              className="btn btn--ghost btn--sm"
+              style={{ fontSize: '11px', padding: 'var(--space-1) var(--space-3)' }}
+            >
+              Cerrar sesión
+            </button>
           </div>
         </div>
       </header>
@@ -1145,6 +1562,74 @@ export default function App() {
       <main className="dashboard-main" role="main" id="main-content">
         {renderContent()}
       </main>
+
+      {newPatientAlert && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div className="card" style={{
+            maxWidth: '400px',
+            width: '90%',
+            padding: 'var(--space-6)',
+            textAlign: 'center',
+            boxShadow: 'var(--shadow-lg)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--color-surface)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 'var(--space-4)'
+          }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              backgroundColor: '#d1fae5',
+              color: 'var(--color-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 24, height: 24 }}>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+              </svg>
+            </div>
+            <h3 style={{
+              fontFamily: 'var(--font-heading)',
+              fontSize: 'var(--text-lg)',
+              fontWeight: 'var(--font-weight-bold)',
+              color: 'var(--color-text-primary)',
+              margin: 0
+            }}>
+              ¡Nuevo Paciente Registrado!
+            </h3>
+            <p style={{
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-text-secondary)',
+              lineHeight: 'var(--line-height-relaxed)',
+              margin: 0
+            }}>
+              El paciente <strong>{newPatientAlert.nombre}</strong> ha reservado un nuevo turno y el pago ha sido aprobado correctamente.
+            </p>
+            <button
+              className="btn btn--primary"
+              onClick={() => setNewPatientAlert(null)}
+              style={{ width: '100%', marginTop: 'var(--space-2)' }}
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

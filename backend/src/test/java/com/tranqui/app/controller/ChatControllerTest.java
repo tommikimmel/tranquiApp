@@ -22,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@org.springframework.transaction.annotation.Transactional
 class ChatControllerTest {
 
     @Autowired
@@ -53,14 +54,10 @@ class ChatControllerTest {
         usuarioRepository.save(medico);
     }
 
-    @AfterEach
-    void tearDown() {
-        mensajeRepository.deleteAll();
-        usuarioRepository.deleteAll();
-    }
+
 
     @Test
-    @WithMockUser(username = "carlos@gmail.com")
+    @WithMockUser(username = "carlos@gmail.com", roles = "PSIQUIATRA")
     void whenGetCanales_shouldReturnList() throws Exception {
         // Create at least one message so that a channel is active
         Mensaje mensaje = Mensaje.builder()
@@ -79,7 +76,7 @@ class ChatControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "pepito@gmail.com")
+    @WithMockUser(username = "pepito@gmail.com", roles = "PACIENTE")
     void whenGetHistorial_shouldReturnPageableMessages() throws Exception {
         Mensaje msg1 = Mensaje.builder()
                 .remitente(paciente)

@@ -81,8 +81,15 @@ class WebSocketNotificationTest {
 
     @AfterEach
     void tearDown() {
-        solicitudRepository.deleteAll();
-        usuarioRepository.deleteAll();
+        if (solicitud != null && solicitud.getId() != null) {
+            try { solicitudRepository.delete(solicitud); } catch (Exception e) {}
+        }
+        if (paciente != null && paciente.getId() != null) {
+            try { usuarioRepository.delete(paciente); } catch (Exception e) {}
+        }
+        if (medico != null && medico.getId() != null) {
+            try { usuarioRepository.delete(medico); } catch (Exception e) {}
+        }
     }
 
     @Test

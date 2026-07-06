@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
@@ -52,6 +53,7 @@ public class ChatController {
 
     @GetMapping("/api/chat/historial/{destinatarioId}")
     @ResponseBody
+    @PreAuthorize("hasAnyRole('PACIENTE', 'PSIQUIATRA', 'VISITADOR')")
     public ResponseEntity<Page<Mensaje>> obtenerHistorial(
             @PathVariable Long destinatarioId,
             @RequestParam(defaultValue = "0") int page,
@@ -67,6 +69,7 @@ public class ChatController {
 
     @GetMapping("/api/chat/canales")
     @ResponseBody
+    @PreAuthorize("hasAnyRole('PACIENTE', 'PSIQUIATRA', 'VISITADOR')")
     public ResponseEntity<List<CanalPrioritarioDto>> obtenerCanales(
             @AuthenticationPrincipal UserDetails userDetails) {
 
@@ -76,6 +79,7 @@ public class ChatController {
 
     @GetMapping("/api/chat/canales/visitadores")
     @ResponseBody
+    @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<List<CanalPrioritarioDto>> obtenerCanalesVisitadores(
             @AuthenticationPrincipal UserDetails userDetails) {
 

@@ -6,6 +6,7 @@ import com.tranqui.app.service.TurnoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -20,6 +21,7 @@ public class TurnoController {
     private TurnoService turnoService;
 
     @GetMapping("/medicos/{medicoId}/turnos-disponibles")
+    @PreAuthorize("hasAnyRole('PACIENTE', 'PSIQUIATRA')")
     public ResponseEntity<List<LocalTime>> obtenerTurnosDisponibles(
             @PathVariable Long medicoId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
@@ -27,18 +29,28 @@ public class TurnoController {
     }
 
     @PostMapping("/turnos/reservar")
+    @PreAuthorize("hasRole('PACIENTE')")
     public ResponseEntity<TurnoResponseDto> reservarTurno(@RequestBody ReservaTurnoDto dto) {
         return ResponseEntity.ok(turnoService.reservarTurno(dto));
     }
 
     @GetMapping("/turnos/check-first-consultation")
+    @PreAuthorize("hasRole('PACIENTE')")
     public ResponseEntity<Boolean> isFirstConsultation(@RequestParam String email) {
         return ResponseEntity.ok(turnoService.esPrimeraConsulta(email));
     }
 
     @GetMapping("/medicos/turnos/hoy")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<List<com.tranqui.app.model.dto.TurnoMedicoDto>> obtenerTurnosDeHoy(
             @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
         return ResponseEntity.ok(turnoService.obtenerTurnosDeHoy(userDetails.getUsername()));
+    }
+
+    @GetMapping("/medicos/turnos")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<List<com.tranqui.app.model.dto.TurnoMedicoDto>> obtenerTodosTurnos(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
+        return ResponseEntity.ok(turnoService.obtenerTodosTurnos(userDetails.getUsername()));
     }
 }

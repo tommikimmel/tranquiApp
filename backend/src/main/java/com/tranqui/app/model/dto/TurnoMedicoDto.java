@@ -15,4 +15,5 @@ public class TurnoMedicoDto {
     private String type;
     private String status; // confirmed, pending, completed
     private String meetLink;
+    private String fecha;
 }

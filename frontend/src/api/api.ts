@@ -75,6 +75,7 @@ export const api = {
     apiFetch('/medicos/disponibilidad', { method: 'PUT', body: data as any }),
   
   getTurnosHoy: () => apiFetch('/medicos/turnos/hoy'),
+  getTurnos: () => apiFetch('/medicos/turnos'),
   
   enviarReceta: (data: {
     pacienteId: number
@@ -92,4 +93,28 @@ export const api = {
   getChatHistorial: (destinatarioId: number | string) => apiFetch(`/chat/historial/${destinatarioId}`),
   getChatCanales: () => apiFetch('/chat/canales'),
   getChatCanalesVisitadores: () => apiFetch('/chat/canales/visitadores'),
+
+  // Clinical & Notification API
+  getNotificaciones: () => apiFetch('/notificaciones'),
+  marcarNotificacionesLeidas: () => apiFetch('/notificaciones/marcar-leidas', { method: 'POST' }),
+  getPacientesAtendidos: () => apiFetch('/pacientes/atendidos'),
+  getSeguimientos: (pacienteId: number | string) => apiFetch(`/pacientes/${pacienteId}/seguimientos`),
+  crearSeguimiento: (pacienteId: number | string, data: { estadoAnimo: string; sintomas: string; notas: string; fecha?: string }) => 
+    apiFetch(`/pacientes/${pacienteId}/seguimientos`, { method: 'POST', body: data as any }),
+  getInformes: (pacienteId: number | string) => apiFetch(`/pacientes/${pacienteId}/informes`),
+  crearInforme: (pacienteId: number | string, data: { tipoInforme: string; planTrabajo?: string; contenido?: string; nombreArchivo?: string }) => {
+    const q = new URLSearchParams();
+    q.append('tipoInforme', data.tipoInforme);
+    if (data.planTrabajo) q.append('planTrabajo', data.planTrabajo);
+    if (data.contenido) q.append('contenido', data.contenido);
+    if (data.nombreArchivo) q.append('nombreArchivo', data.nombreArchivo);
+    return apiFetch(`/pacientes/${pacienteId}/informes?${q.toString()}`, { method: 'POST' });
+  },
+
+  // Patient Portal APIs
+  getMisTurnos: () => apiFetch('/pacientes/me/turnos'),
+  getMisSeguimientos: () => apiFetch('/pacientes/me/seguimientos'),
+  crearMiSeguimiento: (data: { estadoAnimo: string; sintomas: string; notas: string }) => 
+    apiFetch('/pacientes/me/seguimientos', { method: 'POST', body: data as any }),
+  getMisInformes: () => apiFetch('/pacientes/me/informes')
 };

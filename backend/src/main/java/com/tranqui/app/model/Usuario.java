@@ -48,6 +48,18 @@ public class Usuario {
     @Column(name = "cuit", length = 20)
     private String cuit;
 
+    @Column(name = "dni", length = 20)
+    private String dni;
+
+    @Column(name = "direccion", length = 255)
+    private String direccion;
+
+    @Column(name = "obra_social", length = 100)
+    private String obraSocial;
+
+    @Column(name = "num_afiliado", length = 50)
+    private String numAfiliado;
+
     @Column(name = "precio", precision = 12, scale = 2)
     private java.math.BigDecimal precio;
 

@@ -217,6 +217,81 @@ public class TurnoService {
                             .type(typeLabel)
                             .status(status)
                             .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
+                            .fecha(t.getFecha().toString())
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<com.tranqui.app.model.dto.TurnoMedicoDto> obtenerTodosTurnos(String medicoEmail) {
+        Usuario medico = usuarioRepository.findByEmail(medicoEmail)
+                .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
+
+        List<Turno> turnos = turnoRepository.findByMedicoIdAndEstadoNot(medico.getId(), EstadoTurno.CANCELADO);
+
+        turnos.sort(java.util.Comparator.comparing(Turno::getFecha).thenComparing(Turno::getHoraInicio));
+
+        return turnos.stream()
+                .map(t -> {
+                    String status = "pending";
+                    if (t.getEstado() == EstadoTurno.CONFIRMADO) {
+                        status = "confirmed";
+                    }
+                    if (t.getEstado() == EstadoTurno.CONFIRMADO && t.getHoraFin().isBefore(java.time.LocalTime.now()) && t.getFecha().isEqual(java.time.LocalDate.now())) {
+                        status = "completed";
+                    } else if (t.getEstado() == EstadoTurno.CONFIRMADO && t.getFecha().isBefore(java.time.LocalDate.now())) {
+                        status = "completed";
+                    }
+
+                    String typeLabel = t.getTipo() == TipoTurno.OSDE ? "Copago OSDE" : "Consulta particular";
+
+                    return com.tranqui.app.model.dto.TurnoMedicoDto.builder()
+                            .id(t.getId())
+                            .patientName(t.getPaciente().getNombre())
+                            .hour(String.format("%02d", t.getHoraInicio().getHour()))
+                            .ampm("hs")
+                            .type(typeLabel)
+                            .status(status)
+                            .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
+                            .fecha(t.getFecha().toString())
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<com.tranqui.app.model.dto.TurnoMedicoDto> obtenerTurnosPaciente(String pacienteEmail) {
+        Usuario paciente = usuarioRepository.findByEmail(pacienteEmail)
+                .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
+
+        List<Turno> turnos = turnoRepository.findByPacienteIdAndEstadoNot(paciente.getId(), EstadoTurno.CANCELADO);
+
+        turnos.sort(java.util.Comparator.comparing(Turno::getFecha).thenComparing(Turno::getHoraInicio));
+
+        return turnos.stream()
+                .map(t -> {
+                    String status = "pending";
+                    if (t.getEstado() == EstadoTurno.CONFIRMADO) {
+                        status = "confirmed";
+                    }
+                    if (t.getEstado() == EstadoTurno.CONFIRMADO && t.getHoraFin().isBefore(java.time.LocalTime.now()) && t.getFecha().isEqual(java.time.LocalDate.now())) {
+                        status = "completed";
+                    } else if (t.getEstado() == EstadoTurno.CONFIRMADO && t.getFecha().isBefore(java.time.LocalDate.now())) {
+                        status = "completed";
+                    }
+
+                    String typeLabel = t.getTipo() == TipoTurno.OSDE ? "Copago OSDE" : "Consulta particular";
+
+                    return com.tranqui.app.model.dto.TurnoMedicoDto.builder()
+                            .id(t.getId())
+                            .patientName(t.getMedico().getNombre()) // Show doctor name to patient
+                            .hour(String.format("%02d", t.getHoraInicio().getHour()))
+                            .ampm("hs")
+                            .type(typeLabel)
+                            .status(status)
+                            .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
+                            .fecha(t.getFecha().toString())
                             .build();
                 })
                 .collect(Collectors.toList());
