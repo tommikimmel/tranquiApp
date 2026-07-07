@@ -2274,6 +2274,14 @@ export default function App() {
   const [stats, setStats] = useState<any>(null)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
   const [loadingSession, setLoadingSession] = useState(true)
+  const [showUnverifiedAlert, setShowUnverifiedAlert] = useState(true)
+
+  const handleCloseUnverifiedAlert = () => {
+    setShowUnverifiedAlert(false)
+    setTimeout(() => {
+      setShowUnverifiedAlert(true)
+    }, 120000) // 2 minutes
+  }
 
   // Check user session on app load (Recovery from localStorage)
   useEffect(() => {
@@ -2639,8 +2647,74 @@ export default function App() {
 
   const unreadCount = notifications.filter(n => !n.leido).length
 
+  const showBanner = view === 'dashboard' && medicoInfo && !medicoInfo.verificado && showUnverifiedAlert;
+
   return (
     <div className="dashboard-layout">
+      {showBanner && (
+        <>
+          <style>{`
+            @keyframes slideDownAlert {
+              from {
+                transform: translate(-50%, -100%);
+                opacity: 0;
+              }
+              to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+              }
+            }
+          `}</style>
+          <div style={{
+            position: 'fixed',
+            top: '16px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10000,
+            backgroundColor: '#fffbeb',
+            border: '1px solid #fef3c7',
+            borderLeft: '5px solid #d97706',
+            borderRadius: 'var(--radius-lg)',
+            padding: 'var(--space-4) var(--space-5)',
+            color: '#b45309',
+            fontSize: 'var(--text-sm)',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+            maxWidth: '600px',
+            width: '90%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 'var(--space-4)',
+            animation: 'slideDownAlert 0.3s ease-out'
+          }}>
+            <div style={{ flex: 1, lineHeight: 'var(--line-height-relaxed)' }}>
+              <strong>⚠️ Cuenta No Verificada:</strong> Para aparecer en la lista de profesionales disponibles de la aplicación y que los pacientes puedan agendar turnos, debés completar todos tus datos demográficos, ReFeps, matrícula y subir una foto de perfil.
+            </div>
+            <button 
+              onClick={handleCloseUnverifiedAlert}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#b45309',
+                fontSize: '18px',
+                cursor: 'pointer',
+                padding: '0 var(--space-1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 'bold',
+                opacity: 0.7,
+                transition: 'opacity 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+              aria-label="Cerrar alerta"
+            >
+              ✕
+            </button>
+          </div>
+        </>
+      )}
       <Sidebar activeNav={activeNav} onNavChange={setActiveNav} medicoInfo={medicoInfo} />
 
       <header className="dashboard-header" role="banner" style={{ position: 'relative' }}>
