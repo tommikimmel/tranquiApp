@@ -1112,27 +1112,27 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
   // MatriculaInfo
   const [matTipo, setMatTipo] = useState(medicoInfo?.matriculaInfo?.tipo || 'MN')
   const [matProvincia, setMatProvincia] = useState(medicoInfo?.matriculaInfo?.provincia || '')
-  const [matNumero, setMatNumero] = useState(medicoInfo?.matriculaInfo?.numero || '')
-  const [matEspecialidad, setMatEspecialidad] = useState(medicoInfo?.matriculaInfo?.especialidad?.textoLibre || '')
   const [matAsocTipo, setMatAsocTipo] = useState(medicoInfo?.matriculaInfo?.asociada?.tipo || 'MN')
   const [matAsocProvincia, setMatAsocProvincia] = useState(medicoInfo?.matriculaInfo?.asociada?.provincia || '')
   const [matAsocNumero, setMatAsocNumero] = useState(medicoInfo?.matriculaInfo?.asociada?.numero || '')
 
   const [degree, setDegree] = useState(medicoInfo?.degree || '')
 
+  const initialSpecialty = medicoInfo?.specialty || medicoInfo?.matriculaInfo?.especialidad?.textoLibre || '';
+
   const initialGroup = ESPECIALIDADES_GRUPOS.find(g => 
-    g.especialidades.some(esp => esp.nombre === (medicoInfo?.specialty || ''))
+    g.especialidades.some(esp => esp.nombre === initialSpecialty)
   )?.id || '';
 
   const [selectedGroup, setSelectedGroup] = useState(initialGroup);
-  const [specialty, setSpecialty] = useState(medicoInfo?.specialty || '')
+  const [specialty, setSpecialty] = useState(initialSpecialty)
 
   const handleGroupChange = (groupId: string) => {
     setSelectedGroup(groupId);
     setSpecialty('');
   }
 
-  const [matricula, setMatricula] = useState(medicoInfo?.matricula || '')
+  const [matricula, setMatricula] = useState(medicoInfo?.matricula || (medicoInfo?.matriculaInfo?.numero ? String(medicoInfo.matriculaInfo.numero) : ''))
   const [cuit, setCuit] = useState(medicoInfo?.cuit || '')
   const [tariffs, setTariffs] = useState<any[]>(medicoInfo?.tariffs || [])
   const [fotoUrl, setFotoUrl] = useState(medicoInfo?.fotoUrl || '')
@@ -1165,9 +1165,9 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
         matriculaInfo: {
           tipo: matTipo,
           provincia: matProvincia,
-          numero: matNumero ? Number(matNumero) : null,
+          numero: matricula ? Number(matricula) : null,
           especialidad: {
-            textoLibre: matEspecialidad
+            textoLibre: specialty
           },
           asociada: {
             tipo: matAsocTipo,
@@ -1177,7 +1177,7 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
         },
         degree,
         specialty,
-        matricula: matNumero ? String(matNumero) : matricula,
+        matricula,
         cuit,
         tariffs,
         fotoUrl,
@@ -1360,14 +1360,7 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
               ))}
             </select>
           </div>
-          <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-mat-numero">Número de Matrícula</label>
-            <input id="input-mat-numero" className="form-input" type="number" value={matNumero} onChange={(e) => setMatNumero(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-mat-esp">Especialidad Matrícula</label>
-            <input id="input-mat-esp" className="form-input" type="text" placeholder="Ej. MedicoClinico" value={matEspecialidad} onChange={(e) => setMatEspecialidad(e.target.value)} />
-          </div>
+
 
           <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
             Matrícula Asociada
