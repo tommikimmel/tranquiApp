@@ -1029,6 +1029,74 @@ function PrescriptionView({ onSend }: { onSend: (data: any) => Promise<void> }) 
 // ── Settings: Tariff & Profile ─────────────────────────────────
 // DEFAULT_TARIFFS mock removed since values are loaded from API
 
+const PROVINCIAS_ARGENTINA = [
+  "Buenos Aires",
+  "CABA",
+  "Catamarca",
+  "Chaco",
+  "Chubut",
+  "Córdoba",
+  "Corrientes",
+  "Entre Ríos",
+  "Formosa",
+  "Jujuy",
+  "La Pampa",
+  "La Rioja",
+  "Mendoza",
+  "Misiones",
+  "Neuquén",
+  "Río Negro",
+  "Salta",
+  "San Juan",
+  "San Luis",
+  "Santa Cruz",
+  "Santa Fe",
+  "Santiago del Estero",
+  "Tierra del Fuego",
+  "Tucumán"
+];
+
+const ESPECIALIDADES_GRUPOS = [
+  {
+    "id": "clinicas",
+    "nombreGrupo": "Especialidades Clínicas",
+    "especialidades": [
+      {"id": "cardio", "nombre": "Cardiología"},
+      {"id": "derma", "nombre": "Dermatología"},
+      {"id": "endocrino", "nombre": "Endocrinología y Nutrición"},
+      {"id": "gastro", "nombre": "Gastroenterología"}
+    ]
+  },
+  {
+    "id": "quirurgicas",
+    "nombreGrupo": "Especialidades Quirúrgicas",
+    "especialidades": [
+      {"id": "cirugia_gen", "nombre": "Cirugía General"},
+      {"id": "traumato", "nombre": "Cirugía Ortopédica y Traumatología"},
+      {"id": "neurocirugia", "nombre": "Neurocirugía"}
+    ]
+  },
+  {
+    "id": "mixtas",
+    "nombreGrupo": "Especialidades Médico-Quirúrgicas",
+    "especialidades": [
+      {"id": "ginea_obs", "nombre": "Ginecología y Obstetricia"},
+      {"id": "oftalmo", "nombre": "Oftalmología"},
+      {"id": "orl", "nombre": "Otorrinolaringología"},
+      {"id": "uro", "nombre": "Urología"}
+    ]
+  },
+  {
+    "id": "diagnostico_soporte",
+    "nombreGrupo": "Diagnóstico y Soporte",
+    "especialidades": [
+      {"id": "anestesia", "nombre": "Anestesiología y Reanimación"},
+      {"id": "imagenes", "nombre": "Diagnóstico por Imágenes / Radiología"},
+      {"id": "terapia_intensiva", "nombre": "Medicina Intensiva"}
+    ]
+  }
+];
+
 function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (updated: any) => Promise<void> }) {
   const { showAlert } = useAlert();
   const [name, setName] = useState(medicoInfo?.name || '')
@@ -1036,7 +1104,7 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
   const [sexo, setSexo] = useState(medicoInfo?.sexo || 'M')
   const [fechaNacimiento, setFechaNacimiento] = useState(medicoInfo?.fechaNacimiento || '')
   const [cuil, setCuil] = useState(medicoInfo?.cuil || '')
-  const [tipoDocumento, setTipoDocumento] = useState(medicoInfo?.tipoDocumento || 'DN')
+  const [tipoDocumento, setTipoDocumento] = useState(medicoInfo?.tipoDocumento || 'DNI')
   const [numeroDocumento, setNumeroDocumento] = useState(medicoInfo?.numeroDocumento || '')
   const [domicilioAtencion, setDomicilioAtencion] = useState(medicoInfo?.domicilioAtencion || '')
   const [codigoReFeps, setCodigoReFeps] = useState(medicoInfo?.codigoReFeps || '')
@@ -1051,7 +1119,19 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
   const [matAsocNumero, setMatAsocNumero] = useState(medicoInfo?.matriculaInfo?.asociada?.numero || '')
 
   const [degree, setDegree] = useState(medicoInfo?.degree || '')
+
+  const initialGroup = ESPECIALIDADES_GRUPOS.find(g => 
+    g.especialidades.some(esp => esp.nombre === (medicoInfo?.specialty || ''))
+  )?.id || '';
+
+  const [selectedGroup, setSelectedGroup] = useState(initialGroup);
   const [specialty, setSpecialty] = useState(medicoInfo?.specialty || '')
+
+  const handleGroupChange = (groupId: string) => {
+    setSelectedGroup(groupId);
+    setSpecialty('');
+  }
+
   const [matricula, setMatricula] = useState(medicoInfo?.matricula || '')
   const [cuit, setCuit] = useState(medicoInfo?.cuit || '')
   const [tariffs, setTariffs] = useState<any[]>(medicoInfo?.tariffs || [])
@@ -1238,9 +1318,9 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-tipo-doc">Tipo Documento</label>
             <select id="input-tipo-doc" className="form-input" value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
-              <option value="DN">DNI (DN)</option>
-              <option value="LE">LE</option>
-              <option value="LC">LC</option>
+              <option value="DNI">DNI</option>
+              <option value="LC">Libreta Cívica (LC)</option>
+              <option value="LE">Libreta de Enrolamiento (LE)</option>
             </select>
           </div>
           <div className="form-group">
@@ -1273,7 +1353,12 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-mat-provincia">Provincia</label>
-            <input id="input-mat-provincia" className="form-input" type="text" placeholder="Ej. S, C, B" value={matProvincia} onChange={(e) => setMatProvincia(e.target.value)} />
+            <select id="input-mat-provincia" className="form-input" value={matProvincia} onChange={(e) => setMatProvincia(e.target.value)}>
+              <option value="">Seleccioná una provincia</option>
+              {PROVINCIAS_ARGENTINA.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-mat-numero">Número de Matrícula</label>
@@ -1293,7 +1378,12 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
           </div>
           <div className="form-group">
             <label className="form-label" htmlFor="input-mat-asoc-prov">Provincia Asociada</label>
-            <input id="input-mat-asoc-prov" className="form-input" type="text" value={matAsocProvincia} onChange={(e) => setMatAsocProvincia(e.target.value)} />
+            <select id="input-mat-asoc-prov" className="form-input" value={matAsocProvincia} onChange={(e) => setMatAsocProvincia(e.target.value)}>
+              <option value="">Ninguna / Seleccioná una provincia</option>
+              {PROVINCIAS_ARGENTINA.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label className="form-label" htmlFor="input-mat-asoc-num">Número Matrícula Asociada</label>
@@ -1308,8 +1398,33 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
             <input id="input-degree" className="form-input" type="text" value={degree} onChange={(e) => setDegree(e.target.value)} />
           </div>
           <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-specialty-group">Grupo de Especialidad</label>
+            <select 
+              id="input-specialty-group" 
+              className="form-input" 
+              value={selectedGroup} 
+              onChange={(e) => handleGroupChange(e.target.value)}
+            >
+              <option value="">Seleccioná un grupo</option>
+              {ESPECIALIDADES_GRUPOS.map(g => (
+                <option key={g.id} value={g.id}>{g.nombreGrupo}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-specialty">Especialidad</label>
-            <input id="input-specialty" className="form-input" type="text" value={specialty} onChange={(e) => setSpecialty(e.target.value)} />
+            <select 
+              id="input-specialty" 
+              className="form-input" 
+              value={specialty} 
+              onChange={(e) => setSpecialty(e.target.value)}
+              disabled={!selectedGroup}
+            >
+              <option value="">{selectedGroup ? 'Seleccioná una especialidad' : 'Primero seleccioná un grupo'}</option>
+              {selectedGroup && ESPECIALIDADES_GRUPOS.find(g => g.id === selectedGroup)?.especialidades.map(esp => (
+                <option key={esp.id} value={esp.nombre}>{esp.nombre}</option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-matricula">Matrícula Nacional</label>
