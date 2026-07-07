@@ -35,6 +35,28 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        log.info("Data initialization skipped: clean slate mode enabled.");
+        log.info("Initializing clean simulation accounts...");
+
+        // Unverified Doctor
+        if (usuarioRepository.findByEmail("medico.sinverificar@gmail.com").isEmpty()) {
+            Usuario medicoUnverified = Usuario.builder()
+                    .nombre("Medico")
+                    .email("medico.sinverificar@gmail.com")
+                    .rol(Rol.PSIQUIATRA)
+                    .build();
+            usuarioRepository.save(medicoUnverified);
+            log.info("Unverified doctor account created: medico.sinverificar@gmail.com");
+        }
+
+        // Data-less Patient
+        if (usuarioRepository.findByEmail("paciente.sindatos@gmail.com").isEmpty()) {
+            Usuario pacienteSinDatos = Usuario.builder()
+                    .nombre("Paciente")
+                    .email("paciente.sindatos@gmail.com")
+                    .rol(Rol.PACIENTE)
+                    .build();
+            usuarioRepository.save(pacienteSinDatos);
+            log.info("Data-less patient account created: paciente.sindatos@gmail.com");
+        }
     }
 }
