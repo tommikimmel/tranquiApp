@@ -1112,9 +1112,6 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
   // MatriculaInfo
   const [matTipo, setMatTipo] = useState(medicoInfo?.matriculaInfo?.tipo || 'MN')
   const [matProvincia, setMatProvincia] = useState(medicoInfo?.matriculaInfo?.provincia || '')
-  const [matAsocTipo, setMatAsocTipo] = useState(medicoInfo?.matriculaInfo?.asociada?.tipo || 'MN')
-  const [matAsocProvincia, setMatAsocProvincia] = useState(medicoInfo?.matriculaInfo?.asociada?.provincia || '')
-  const [matAsocNumero, setMatAsocNumero] = useState(medicoInfo?.matriculaInfo?.asociada?.numero || '')
 
   const [degree, setDegree] = useState(medicoInfo?.degree || '')
 
@@ -1133,7 +1130,6 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
   }
 
   const [matricula, setMatricula] = useState(medicoInfo?.matricula || (medicoInfo?.matriculaInfo?.numero ? String(medicoInfo.matriculaInfo.numero) : ''))
-  const [cuit, setCuit] = useState(medicoInfo?.cuit || '')
   const [tariffs, setTariffs] = useState<any[]>(medicoInfo?.tariffs || [])
   const [fotoUrl, setFotoUrl] = useState(medicoInfo?.fotoUrl || '')
   const [tags, setTags] = useState<string[]>(medicoInfo?.tags || [])
@@ -1170,15 +1166,15 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
             textoLibre: specialty
           },
           asociada: {
-            tipo: matAsocTipo,
-            provincia: matAsocProvincia,
-            numero: matAsocNumero ? Number(matAsocNumero) : null
+            tipo: medicoInfo?.matriculaInfo?.asociada?.tipo || 'MN',
+            provincia: medicoInfo?.matriculaInfo?.asociada?.provincia || '',
+            numero: medicoInfo?.matriculaInfo?.asociada?.numero || null
           }
         },
         degree,
         specialty,
         matricula,
-        cuit,
+        cuit: cuil ? String(cuil) : '',
         tariffs,
         fotoUrl,
         tags,
@@ -1328,12 +1324,16 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
             <input id="input-num-doc" className="form-input" type="number" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-cuil">CUIL</label>
+            <label className="form-label form-label--required" htmlFor="input-cuil">CUIL/CUIT</label>
             <input id="input-cuil" className="form-input" type="number" placeholder="Ej. 27123456780" value={cuil} onChange={(e) => setCuil(e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-domicilio">Domicilio de Atención</label>
             <input id="input-domicilio" className="form-input" type="text" placeholder="Ej. Consultorio 12" value={domicilioAtencion} onChange={(e) => setDomicilioAtencion(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-degree">Título profesional</label>
+            <input id="input-degree" className="form-input" type="text" value={degree} onChange={(e) => setDegree(e.target.value)} />
           </div>
 
           <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', marginTop: 'var(--space-2)' }}>
@@ -1345,7 +1345,7 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
           </div>
 
           <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', marginTop: 'var(--space-2)' }}>
-            Matrícula Profesional
+            Matrícula
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-mat-tipo">Tipo de Matrícula</label>
@@ -1359,36 +1359,6 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
-          </div>
-
-
-          <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
-            Matrícula Asociada
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="input-mat-asoc-tipo">Tipo Matrícula Asociada</label>
-            <input id="input-mat-asoc-tipo" className="form-input" type="text" value={matAsocTipo} onChange={(e) => setMatAsocTipo(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="input-mat-asoc-prov">Provincia Asociada</label>
-            <select id="input-mat-asoc-prov" className="form-input" value={matAsocProvincia} onChange={(e) => setMatAsocProvincia(e.target.value)}>
-              <option value="">Ninguna / Seleccioná una provincia</option>
-              {PROVINCIAS_ARGENTINA.map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="input-mat-asoc-num">Número Matrícula Asociada</label>
-            <input id="input-mat-asoc-num" className="form-input" type="number" value={matAsocNumero} onChange={(e) => setMatAsocNumero(e.target.value)} />
-          </div>
-
-          <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', marginTop: 'var(--space-2)' }}>
-            Datos Visuales y de Filtro
-          </div>
-          <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-degree">Título profesional</label>
-            <input id="input-degree" className="form-input" type="text" value={degree} onChange={(e) => setDegree(e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-specialty-group">Grupo de Especialidad</label>
@@ -1420,13 +1390,9 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-matricula">Matrícula Nacional</label>
+            <label className="form-label form-label--required" htmlFor="input-matricula">Número de Matrícula</label>
             <input id="input-matricula" className="form-input" type="text" value={matricula} onChange={(e) => setMatricula(e.target.value)} />
             <span className="form-helper">Verificada ✓</span>
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="input-cuit">CUIT</label>
-            <input id="input-cuit" className="form-input" type="text" value={cuit} onChange={(e) => setCuit(e.target.value)} />
           </div>
 
           {/* Professions selector */}
