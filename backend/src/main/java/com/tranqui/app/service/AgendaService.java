@@ -17,6 +17,9 @@ public class AgendaService {
         List<LocalTime> bloquesDisponibles = new ArrayList<>();
         int dayOfWeek = fecha.getDayOfWeek().getValue();
 
+        LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires"));
+        LocalTime ahora = LocalTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires"));
+
         for (Disponibilidad disp : disponibilidades) {
             // Only calculate slots for availability that matches the target date's day of week
             if (disp.getDiaSemana() != dayOfWeek) {
@@ -29,9 +32,12 @@ public class AgendaService {
             while (inicio.plusMinutes(DURACION_TURNO_MINUTOS).isBefore(fin) || inicio.plusMinutes(DURACION_TURNO_MINUTOS).equals(fin)) {
                 LocalTime finalBloque = inicio.plusMinutes(DURACION_TURNO_MINUTOS);
                 
+                // If the target date is today, ensure the slot starts in the future
+                boolean enElPasado = fecha.equals(hoy) && inicio.isBefore(ahora);
+
                 // Verify if it overlaps with an existing booking
                 boolean ocupado = comprobarChoqueTurno(inicio, finalBloque, turnosExistentes);
-                if (!ocupado) {
+                if (!ocupado && !enElPasado) {
                     bloquesDisponibles.add(inicio);
                 }
                 inicio = finalBloque;
