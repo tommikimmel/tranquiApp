@@ -1061,18 +1061,37 @@ const ESPECIALIDADES_GRUPOS = [
     "id": "clinicas",
     "nombreGrupo": "Especialidades Clínicas",
     "especialidades": [
-      {"id": "cardio", "nombre": "Cardiología"},
-      {"id": "derma", "nombre": "Dermatología"},
-      {"id": "endocrino", "nombre": "Endocrinología y Nutrición"},
-      {"id": "gastro", "nombre": "Gastroenterología"}
+      {"id": "alergia_inmuno", "nombre": "Alergia e Inmunología"},
+      {"id": "cardiologia", "nombre": "Cardiología"},
+      {"id": "dermatologia", "nombre": "Dermatología"},
+      {"id": "endocrinologia", "nombre": "Endocrinología y Nutrición"},
+      {"id": "gastroenterologia", "nombre": "Gastroenterología / Hepatología"},
+      {"id": "geriatria", "nombre": "Geriatria"},
+      {"id": "hematologia", "nombre": "Hematología"},
+      {"id": "infectologia", "nombre": "Infectología"},
+      {"id": "medicina_interna", "nombre": "Medicina Interna (Clínica Médica)"},
+      {"id": "nefrologia", "nombre": "Nefrología"},
+      {"id": "neumonologia", "nombre": "Neumonología"},
+      {"id": "neurologia", "nombre": "Neurología"},
+      {"id": "oncologia_medica", "nombre": "Oncología Médica"},
+      {"id": "pediatria", "nombre": "Pediatría"},
+      {"id": "psiquiatria", "nombre": "Psiquiatría"},
+      {"id": "psiquiatria_infantil", "nombre": "Psiquiatría Infanto-Juvenil"},
+      {"id": "reumatologia", "nombre": "Reumatología"}
     ]
   },
   {
     "id": "quirurgicas",
     "nombreGrupo": "Especialidades Quirúrgicas",
     "especialidades": [
-      {"id": "cirugia_gen", "nombre": "Cirugía General"},
-      {"id": "traumato", "nombre": "Cirugía Ortopédica y Traumatología"},
+      {"id": "cirugia_cardiovascular", "nombre": "Cirugía Cardiovascular"},
+      {"id": "cirugia_general", "nombre": "Cirugía General y del Aparato Digestivo"},
+      {"id": "cirugia_maxilofacial", "nombre": "Cirugía Oral y Maxilofacial"},
+      {"id": "cirugia_traumatologia", "nombre": "Cirugía Ortopédica y Traumatología"},
+      {"id": "cirugia_pediatrica", "nombre": "Cirugía Pediátrica"},
+      {"id": "cirugia_plastica", "nombre": "Cirugía Plástica, Estética y Reparadora"},
+      {"id": "cirugia_toracica", "nombre": "Cirugía Torácica"},
+      {"id": "cirugia_vascular", "nombre": "Cirugía Vascular / Angiología"},
       {"id": "neurocirugia", "nombre": "Neurocirugía"}
     ]
   },
@@ -1080,19 +1099,35 @@ const ESPECIALIDADES_GRUPOS = [
     "id": "mixtas",
     "nombreGrupo": "Especialidades Médico-Quirúrgicas",
     "especialidades": [
-      {"id": "ginea_obs", "nombre": "Ginecología y Obstetricia"},
-      {"id": "oftalmo", "nombre": "Oftalmología"},
-      {"id": "orl", "nombre": "Otorrinolaringología"},
-      {"id": "uro", "nombre": "Urología"}
+      {"id": "ginecologia_obstetricia", "nombre": "Ginecología y Obstetricia (Tocoginecología)"},
+      {"id": "oftalmologia", "nombre": "Oftalmología"},
+      {"id": "otorrinolaringologia", "nombre": "Otorrinolaringología"},
+      {"id": "urologia", "nombre": "Urología"}
     ]
   },
   {
     "id": "diagnostico_soporte",
-    "nombreGrupo": "Diagnóstico y Soporte",
+    "nombreGrupo": "Diagnóstico, Soporte y Emergencias",
     "especialidades": [
-      {"id": "anestesia", "nombre": "Anestesiología y Reanimación"},
-      {"id": "imagenes", "nombre": "Diagnóstico por Imágenes / Radiología"},
-      {"id": "terapia_intensiva", "nombre": "Medicina Intensiva"}
+      {"id": "anestesiologia", "nombre": "Anestesiología, Reanimación y Dolor"},
+      {"id": "anatomia_patologica", "nombre": "Anatomía Patológica"},
+      {"id": "diagnostico_imagenes", "nombre": "Diagnóstico por Imágenes / Radiología"},
+      {"id": "medicina_deporte", "nombre": "Medicina del Deporte"},
+      {"id": "medicina_emergencias", "nombre": "Medicina de Emergencias / Urgencias"},
+      {"id": "medicina_intensiva", "nombre": "Medicina Intensiva / Terapia Intensiva"},
+      {"id": "medicina_legal", "nombre": "Medicina Legal y Forense"},
+      {"id": "medicina_nuclear", "nombre": "Medicina Nuclear"},
+      {"id": "medicina_fisica_rehab", "nombre": "Medicina Física y Rehabilitación (Fisiatría)"},
+      {"id": "toxicologia", "nombre": "Toxicología Médica"}
+    ]
+  },
+  {
+    "id": "salud_publica_comunitaria",
+    "nombreGrupo": "Salud Pública y Atención Comunitaria",
+    "especialidades": [
+      {"id": "medicina_familiar", "nombre": "Medicina Familiar y General"},
+      {"id": "medicina_trabajo", "nombre": "Medicina del Trabajo / Laboral"},
+      {"id": "salud_publica", "nombre": "Salud Pública y Administración Sanitaria"}
     ]
   }
 ];
@@ -1132,11 +1167,8 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
   const [matricula, setMatricula] = useState(medicoInfo?.matricula || (medicoInfo?.matriculaInfo?.numero ? String(medicoInfo.matriculaInfo.numero) : ''))
   const [tariffs, setTariffs] = useState<any[]>(medicoInfo?.tariffs || [])
   const [fotoUrl, setFotoUrl] = useState(medicoInfo?.fotoUrl || '')
-  const [tags, setTags] = useState<string[]>(medicoInfo?.tags || [])
   const [ofreceOnline, setOfreceOnline] = useState(medicoInfo?.ofreceOnline !== undefined ? medicoInfo.ofreceOnline : true)
   const [ofrecePresencial, setOfrecePresencial] = useState(medicoInfo?.ofrecePresencial !== undefined ? medicoInfo.ofrecePresencial : false)
-
-  const availableProfessions = ['Psiquiatría', 'Psicología', 'Neurología', 'Terapia Familiar']
 
   const updateTariff = (id: string, field: 'price' | 'enabled', value: number | boolean) => {
     setTariffs(tariffs.map(t => t.id === id ? { ...t, [field]: value } : t))
@@ -1177,7 +1209,7 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
         cuit: cuil ? String(cuil) : '',
         tariffs,
         fotoUrl,
-        tags,
+        tags: specialty ? [specialty] : [],
         ofreceOnline,
         ofrecePresencial
       })
@@ -1393,32 +1425,6 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
             <label className="form-label form-label--required" htmlFor="input-matricula">Número de Matrícula</label>
             <input id="input-matricula" className="form-input" type="text" value={matricula} onChange={(e) => setMatricula(e.target.value)} />
             <span className="form-helper">Verificada ✓</span>
-          </div>
-
-          {/* Professions selector */}
-          <div className="form-group" style={{ gridColumn: 'span 2' }}>
-            <label className="form-label form-label--required">Mis Especialidades / Profesiones (para Filtros)</label>
-            <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
-              {availableProfessions.map((prof) => {
-                const isChecked = tags.includes(prof);
-                return (
-                  <label key={prof} style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={isChecked} 
-                      onChange={() => {
-                        if (isChecked) {
-                          setTags(tags.filter(t => t !== prof));
-                        } else {
-                          setTags([...tags, prof]);
-                        }
-                      }}
-                    />
-                    {prof}
-                  </label>
-                );
-              })}
-            </div>
           </div>
 
           {/* Modalities selector */}
