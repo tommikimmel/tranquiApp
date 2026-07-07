@@ -45,6 +45,11 @@ public class Turno {
     @Column(name = "estado", nullable = false, length = 30)
     private EstadoTurno estado;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "asistencia", nullable = false, length = 30)
+    @Builder.Default
+    private EstadoAsistencia asistencia = EstadoAsistencia.ESPERANDO;
+
     @Builder.Default
     @Column(name = "precio", nullable = false, precision = 12, scale = 2)
     private BigDecimal precio = BigDecimal.ZERO;

@@ -69,6 +69,83 @@ public class Usuario {
     @Column(name = "color", length = 20)
     private String color;
 
+    @Column(name = "foto_url", columnDefinition = "TEXT")
+    private String fotoUrl;
+
+    @Column(name = "apellido", length = 100)
+    private String apellido;
+
+    @Column(name = "sexo", length = 10)
+    private String sexo;
+
+    @Column(name = "fecha_nacimiento")
+    private java.time.LocalDate fechaNacimiento;
+
+    @Column(name = "cuil")
+    private Long cuil;
+
+    @Column(name = "tipo_documento", length = 20)
+    private String tipoDocumento;
+
+    @Column(name = "numero_documento")
+    private Integer numeroDocumento;
+
+    @Column(name = "domicilio_atencion", length = 255)
+    private String domicilioAtencion;
+
+    @Column(name = "codigo_refeps")
+    private Long codigoReFeps;
+
+    @Column(name = "matricula_tipo", length = 20)
+    private String matriculaTipo;
+
+    @Column(name = "matricula_provincia", length = 20)
+    private String matriculaProvincia;
+
+    @Column(name = "matricula_numero")
+    private Integer matriculaNumero;
+
+    @Column(name = "matricula_especialidad", length = 100)
+    private String matriculaEspecialidad;
+
+    @Column(name = "matricula_asoc_tipo", length = 20)
+    private String matriculaAsocTipo;
+
+    @Column(name = "matricula_asoc_provincia", length = 20)
+    private String matriculaAsocProvincia;
+
+    @Column(name = "matricula_asoc_numero")
+    private Integer matriculaAsocNumero;
+
+    @Column(name = "datos_ofuscado", length = 10)
+    private String datosOfuscado;
+
+    @Column(name = "credencial_cod_entidad")
+    private Integer credencialCodEntidad;
+
+    @Column(name = "credencial_pan", length = 50)
+    private String credencialPan;
+
+    @Column(name = "credencial_plan", length = 50)
+    private String credencialPlan;
+
+    @Column(name = "credencial_token", length = 50)
+    private String credencialToken;
+
+    @Column(name = "ofrece_online")
+    private Boolean ofreceOnline;
+
+    @Column(name = "ofrece_presencial")
+    private Boolean ofrecePresencial;
+
+    public boolean isOfreceOnline() {
+        return ofreceOnline == null || ofreceOnline;
+    }
+
+    public boolean isOfrecePresencial() {
+        return ofrecePresencial != null && ofrecePresencial;
+    }
+
     @Builder.Default
     @Column(name = "fecha_registro", nullable = false)
     private LocalDateTime fechaRegistro = LocalDateTime.now();

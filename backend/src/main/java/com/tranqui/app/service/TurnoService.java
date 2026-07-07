@@ -37,6 +37,9 @@ public class TurnoService {
     @Autowired
     private MercadoPagoService mercadoPagoService;
 
+    @Autowired
+    private WhatsAppService whatsappService;
+
     @Transactional(readOnly = true)
     public List<java.time.LocalTime> obtenerHorariosDisponibles(Long medicoId, java.time.LocalDate fecha) {
         List<com.tranqui.app.model.Disponibilidad> disponibilidades = disponibilidadRepository.findByMedicoId(medicoId);
@@ -140,6 +143,7 @@ public class TurnoService {
             return com.tranqui.app.model.dto.TurnoResponseDto.builder()
                     .turnoId(turno.getId())
                     .estado(turno.getEstado().name())
+                    .attendanceStatus(turno.getAsistencia() != null ? turno.getAsistencia().name() : null)
                     .fecha(turno.getFecha())
                     .horaInicio(turno.getHoraInicio())
                     .precio(turno.getPrecio())
@@ -159,6 +163,7 @@ public class TurnoService {
             return com.tranqui.app.model.dto.TurnoResponseDto.builder()
                     .turnoId(turno.getId())
                     .estado(turno.getEstado().name())
+                    .attendanceStatus(turno.getAsistencia() != null ? turno.getAsistencia().name() : null)
                     .fecha(turno.getFecha())
                     .horaInicio(turno.getHoraInicio())
                     .precio(turno.getPrecio())
@@ -216,8 +221,11 @@ public class TurnoService {
                             .ampm("hs")
                             .type(typeLabel)
                             .status(status)
+                            .attendanceStatus(t.getAsistencia() != null ? t.getAsistencia().name() : "ESPERANDO")
                             .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
                             .fecha(t.getFecha().toString())
+                            .firstConsultation(esPrimeraConsulta(t.getPaciente().getEmail()))
+                            .patientInfo(construirPacienteDto(t.getPaciente()))
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -253,8 +261,11 @@ public class TurnoService {
                             .ampm("hs")
                             .type(typeLabel)
                             .status(status)
+                            .attendanceStatus(t.getAsistencia() != null ? t.getAsistencia().name() : "ESPERANDO")
                             .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
                             .fecha(t.getFecha().toString())
+                            .firstConsultation(esPrimeraConsulta(t.getPaciente().getEmail()))
+                            .patientInfo(construirPacienteDto(t.getPaciente()))
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -283,6 +294,15 @@ public class TurnoService {
 
                     String typeLabel = t.getTipo() == TipoTurno.OSDE ? "Copago OSDE" : "Consulta particular";
 
+                    String checkoutUrl = "";
+                    if ("pending".equals(status)) {
+                        try {
+                            checkoutUrl = mercadoPagoService.crearPreferenciaPago(t, t.getMedico());
+                        } catch (Exception e) {
+                            // keep empty
+                        }
+                    }
+
                     return com.tranqui.app.model.dto.TurnoMedicoDto.builder()
                             .id(t.getId())
                             .patientName(t.getMedico().getNombre()) // Show doctor name to patient
@@ -290,10 +310,98 @@ public class TurnoService {
                             .ampm("hs")
                             .type(typeLabel)
                             .status(status)
+                            .attendanceStatus(t.getAsistencia() != null ? t.getAsistencia().name() : "ESPERANDO")
                             .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
                             .fecha(t.getFecha().toString())
+                            .checkoutUrl(checkoutUrl)
                             .build();
                 })
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void cancelarTurno(Long turnoId) {
+        Turno turno = turnoRepository.findById(turnoId)
+                .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
+        turno.setEstado(EstadoTurno.CANCELADO);
+        turnoRepository.save(turno);
+    }
+
+    @Transactional
+    public void actualizarAsistencia(Long turnoId, String asistenciaStr) {
+        Turno turno = turnoRepository.findById(turnoId)
+                .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
+        try {
+            com.tranqui.app.model.EstadoAsistencia estado = com.tranqui.app.model.EstadoAsistencia.valueOf(asistenciaStr.toUpperCase());
+            turno.setAsistencia(estado);
+            turnoRepository.save(turno);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Estado de asistencia inválido: " + asistenciaStr);
+        }
+    }
+
+    @Transactional
+    public void reprogramarTurno(Long turnoId, String fechaStr, String horaStr) {
+        Turno turno = turnoRepository.findById(turnoId)
+                .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
+
+        java.time.LocalDate nuevaFecha = java.time.LocalDate.parse(fechaStr);
+        java.time.LocalTime nuevaHoraInicio = java.time.LocalTime.parse(horaStr);
+        java.time.LocalTime nuevaHoraFin = nuevaHoraInicio.plusMinutes(45);
+
+        turno.setFecha(nuevaFecha);
+        turno.setHoraInicio(nuevaHoraInicio);
+        turno.setHoraFin(nuevaHoraFin);
+        turnoRepository.save(turno);
+
+        try {
+            String linkInfo = (turno.getTelemedicinaUrl() != null && !turno.getTelemedicinaUrl().isEmpty()) 
+                    ? " Enlace de videollamada: " + turno.getTelemedicinaUrl() 
+                    : "";
+            String body = String.format(
+                "Hola %s, tu turno con el Dr. %s ha sido reprogramado para el día %s a las %s hs.%s",
+                turno.getPaciente().getNombre(),
+                turno.getMedico().getNombre(),
+                fechaStr,
+                horaStr,
+                linkInfo
+            );
+            whatsappService.enviarMensajeWhatsApp(turno.getPaciente().getTelefono(), body);
+        } catch (Exception e) {
+            System.err.println("Fallo al enviar notificación de reprogramación: " + e.getMessage());
+        }
+    }
+
+    private com.tranqui.app.model.dto.PacienteDto construirPacienteDto(Usuario p) {
+        if (p == null) return null;
+        com.tranqui.app.model.dto.PacienteDto.CredencialInfoDto cred = null;
+        if (p.getCredencialCodEntidad() != null || p.getCredencialPan() != null) {
+            cred = com.tranqui.app.model.dto.PacienteDto.CredencialInfoDto.builder()
+                    .codEntidad(p.getCredencialCodEntidad())
+                    .pan(p.getCredencialPan())
+                    .plan(p.getCredencialPlan())
+                    .token(p.getCredencialToken())
+                    .build();
+        }
+
+        return com.tranqui.app.model.dto.PacienteDto.builder()
+                .id(p.getId())
+                .nombre(p.getNombre())
+                .email(p.getEmail())
+                .telefono(p.getTelefono())
+                .dni(p.getDni())
+                .direccion(p.getDireccion())
+                .obraSocial(p.getObraSocial())
+                .numAfiliado(p.getNumAfiliado())
+                .apellido(p.getApellido())
+                .sexo(p.getSexo())
+                .fechaNacimiento(p.getFechaNacimiento() != null ? p.getFechaNacimiento().toString() : null)
+                .cuil(p.getCuil())
+                .mail(p.getEmail())
+                .tipoDocumento(p.getTipoDocumento())
+                .numeroDocumento(p.getNumeroDocumento())
+                .datosOfuscado(p.getDatosOfuscado() != null ? p.getDatosOfuscado() : "N")
+                .credencial(cred)
+                .build();
     }
 }

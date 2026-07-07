@@ -32,19 +32,33 @@ public class ClinicalService {
     @Autowired
     private NotificacionService notificacionService;
 
+    @Autowired
+    private MensajeRepository mensajeRepository;
+
     @Transactional(readOnly = true)
     public List<PacienteDto> obtenerPacientesAtendidos(String medicoEmail) {
         Usuario medico = usuarioRepository.findByEmail(medicoEmail)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
-        List<Usuario> pacientes = turnoRepository.findDistinctPacientesByMedicoId(medico.getId());
+        List<Usuario> pacientesConTurno = turnoRepository.findDistinctPacientesByMedicoId(medico.getId());
+        List<Usuario> pacientesConChat = mensajeRepository.findPacientesConMensajesConMedico(medico.getId());
+
+        java.util.Map<Long, Usuario> pacientesMap = new java.util.LinkedHashMap<>();
+        for (Usuario p : pacientesConTurno) {
+            pacientesMap.put(p.getId(), p);
+        }
+        for (Usuario p : pacientesConChat) {
+            pacientesMap.put(p.getId(), p);
+        }
+
+        java.util.List<Usuario> todosLosPacientes = new java.util.ArrayList<>(pacientesMap.values());
 
         // For priority checking, check if there are confirmed appointments in the next 3 days
         LocalDate hoy = LocalDate.now();
         LocalDate limite = hoy.plusDays(3);
 
         List<PacienteDto> dtos = new ArrayList<>();
-        for (Usuario p : pacientes) {
+        for (Usuario p : todosLosPacientes) {
             // Find all confirmed appointments for this patient and doctor
             List<Turno> turnos = turnoRepository.findByMedicoIdAndEstadoNot(medico.getId(), EstadoTurno.CANCELADO);
             
@@ -66,21 +80,46 @@ public class ClinicalService {
                     .max(String::compareTo)
                     .orElse("Ninguna");
 
-            dtos.add(PacienteDto.builder()
-                    .id(p.getId())
-                    .nombre(p.getNombre())
-                    .email(p.getEmail())
-                    .telefono(p.getTelefono())
-                    .dni(p.getDni())
-                    .direccion(p.getDireccion())
-                    .obraSocial(p.getObraSocial())
-                    .numAfiliado(p.getNumAfiliado())
-                    .ultimaVisita(ultimaVisita)
-                    .prioridadClinica(highPriority ? "PRIORIDAD_ALTA" : "PRIORIDAD_BAJA")
-                    .build());
+            boolean sinTurno = patientTurnos.isEmpty();
+            dtos.add(construirPacienteDto(p, sinTurno ? "Sin turnos registrados" : ultimaVisita, sinTurno, highPriority));
         }
 
         return dtos;
+    }
+
+    private PacienteDto construirPacienteDto(Usuario p, String ultimaVisita, boolean sinTurno, boolean highPriority) {
+        PacienteDto.CredencialInfoDto cred = null;
+        if (p.getCredencialCodEntidad() != null || p.getCredencialPan() != null) {
+            cred = PacienteDto.CredencialInfoDto.builder()
+                    .codEntidad(p.getCredencialCodEntidad())
+                    .pan(p.getCredencialPan())
+                    .plan(p.getCredencialPlan())
+                    .token(p.getCredencialToken())
+                    .build();
+        }
+
+        return PacienteDto.builder()
+                .id(p.getId())
+                .nombre(p.getNombre())
+                .email(p.getEmail())
+                .telefono(p.getTelefono())
+                .dni(p.getDni())
+                .direccion(p.getDireccion())
+                .obraSocial(p.getObraSocial())
+                .numAfiliado(p.getNumAfiliado())
+                .ultimaVisita(ultimaVisita)
+                .prioridadClinica(highPriority ? "PRIORIDAD_ALTA" : "PRIORIDAD_BAJA")
+                .sinTurno(sinTurno)
+                .apellido(p.getApellido())
+                .sexo(p.getSexo())
+                .fechaNacimiento(p.getFechaNacimiento() != null ? p.getFechaNacimiento().toString() : null)
+                .cuil(p.getCuil())
+                .mail(p.getEmail())
+                .tipoDocumento(p.getTipoDocumento())
+                .numeroDocumento(p.getNumeroDocumento())
+                .datosOfuscado(p.getDatosOfuscado() != null ? p.getDatosOfuscado() : "N")
+                .credencial(cred)
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -149,6 +188,13 @@ public class ClinicalService {
                 "INFORME"
         );
 
+        notificacionService.crearNotificacion(
+                paciente,
+                "Nuevo Informe Clínico disponible",
+                "El profesional " + medico.getNombre() + " ha emitido un informe de tipo " + tipoInforme + ".",
+                "INFORME"
+        );
+
         return saved;
     }
 
@@ -192,5 +238,44 @@ public class ClinicalService {
         Usuario paciente = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
         return informeClinicoRepository.findByPacienteIdOrderByFechaDesc(paciente.getId());
+    }
+
+    @Transactional
+    public PacienteDto actualizarPaciente(Long pacienteId, String medicoEmail, PacienteDto dto) {
+        Usuario medico = usuarioRepository.findByEmail(medicoEmail)
+                .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
+
+        Usuario paciente = usuarioRepository.findById(pacienteId)
+                .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
+
+        paciente.setNombre(dto.getNombre());
+        paciente.setApellido(dto.getApellido());
+        paciente.setNumAfiliado(dto.getNumAfiliado());
+        paciente.setDni(dto.getDni());
+        paciente.setObraSocial(dto.getObraSocial());
+        paciente.setDireccion(dto.getDireccion());
+        paciente.setTelefono(dto.getTelefono());
+        paciente.setSexo(dto.getSexo());
+        if (dto.getFechaNacimiento() != null && !dto.getFechaNacimiento().trim().isEmpty()) {
+            paciente.setFechaNacimiento(java.time.LocalDate.parse(dto.getFechaNacimiento().trim()));
+        }
+        paciente.setCuil(dto.getCuil());
+        paciente.setTipoDocumento(dto.getTipoDocumento());
+        paciente.setNumeroDocumento(dto.getNumeroDocumento());
+        paciente.setDatosOfuscado(dto.getDatosOfuscado());
+
+        if (dto.getCredencial() != null) {
+            paciente.setCredencialCodEntidad(dto.getCredencial().getCodEntidad());
+            paciente.setCredencialPan(dto.getCredencial().getPan());
+            paciente.setCredencialPlan(dto.getCredencial().getPlan());
+            paciente.setCredencialToken(dto.getCredencial().getToken());
+            if (dto.getCredencial().getPlan() != null) {
+                paciente.setObraSocial("OSDE " + dto.getCredencial().getPlan());
+            }
+        }
+        
+        Usuario saved = usuarioRepository.save(paciente);
+
+        return construirPacienteDto(saved, "Hoy", false, false);
     }
 }

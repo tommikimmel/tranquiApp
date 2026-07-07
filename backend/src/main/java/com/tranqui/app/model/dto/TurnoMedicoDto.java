@@ -14,6 +14,10 @@ public class TurnoMedicoDto {
     private String ampm;
     private String type;
     private String status; // confirmed, pending, completed
+    private String attendanceStatus; // ESPERANDO, LLEGO, AUSENTE, COMPLETADA
     private String meetLink;
     private String fecha;
+    private String checkoutUrl;
+    private boolean firstConsultation;
+    private PacienteDto patientInfo;
 }

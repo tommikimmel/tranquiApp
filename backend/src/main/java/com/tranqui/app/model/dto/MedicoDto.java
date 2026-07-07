@@ -21,7 +21,54 @@ public class MedicoDto {
     private BigDecimal price; // maps to price in frontend
     private List<String> tags;
     private String color;
+    private String fotoUrl;
+    private boolean ofreceOnline;
+    private boolean ofrecePresencial;
     private List<TarifaDto> tariffs;
+
+    private String apellido;
+    private String sexo;
+    private java.time.LocalDate fechaNacimiento;
+    private Long cuil;
+    private String tipoDocumento;
+    private Integer numeroDocumento;
+    private String domicilioAtencion;
+    private Long codigoReFeps;
+    private MatriculaInfoDto matriculaInfo;
+    private boolean verificado;
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class MatriculaInfoDto {
+        private String tipo;
+        private String provincia;
+        private Integer numero;
+        private EspecialidadDto especialidad;
+        private AsociadaDto asociada;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class EspecialidadDto {
+        private String textoLibre;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class AsociadaDto {
+        private String tipo;
+        private String provincia;
+        private Integer numero;
+    }
 
     @Getter
     @Setter

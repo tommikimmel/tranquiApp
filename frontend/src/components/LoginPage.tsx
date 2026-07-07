@@ -97,7 +97,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
         {/* Header / Logo */}
         <div style={{ textAlign: 'center' }}>
           <img 
-            src="/logo-tranqui.png" 
+            src="/logoTranquiApp.webp" 
             alt="Tranqui Logo" 
             style={{ 
               height: '48px', 
@@ -139,6 +139,17 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
         {/* Real Google Button */}
         <div id="google-signin-btn" style={{ display: 'flex', justifyContent: 'center' }}></div>
 
+        {/* Localhost notice */}
+        <p style={{
+          fontSize: 'var(--text-xs)',
+          color: 'var(--color-text-secondary)',
+          textAlign: 'center',
+          marginTop: '-var(--space-2)',
+          lineHeight: 'var(--line-height-normal)'
+        }}>
+          💡 <strong>Nota:</strong> Si el botón de Google muestra error de origen ("origin not allowed") en localhost, utilizá la herramienta de simulación de abajo para ingresar de inmediato.
+        </p>
+
         {/* Development Bypass Card */}
         {showDevOptions && (
           <div style={{
@@ -179,6 +190,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                 }}
               >
                 <option value="paula@tranqui.com">Lic. María Paula Rossi (Profesional / Psiquiatra)</option>
+                <option value="Demo@gmail.com">Dr. Demo Demo (Profesional Verificado)</option>
                 <option value="mateo.b@gmail.com">Mateo Benítez (Paciente Demo)</option>
                 <option value="custom">Ingresar otro email...</option>
               </select>

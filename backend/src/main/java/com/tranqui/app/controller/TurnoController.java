@@ -21,7 +21,6 @@ public class TurnoController {
     private TurnoService turnoService;
 
     @GetMapping("/medicos/{medicoId}/turnos-disponibles")
-    @PreAuthorize("hasAnyRole('PACIENTE', 'PSIQUIATRA')")
     public ResponseEntity<List<LocalTime>> obtenerTurnosDisponibles(
             @PathVariable Long medicoId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
@@ -52,5 +51,31 @@ public class TurnoController {
     public ResponseEntity<List<com.tranqui.app.model.dto.TurnoMedicoDto>> obtenerTodosTurnos(
             @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
         return ResponseEntity.ok(turnoService.obtenerTodosTurnos(userDetails.getUsername()));
+    }
+
+    @PostMapping("/turnos/{turnoId}/cancelar")
+    @PreAuthorize("hasAnyRole('PACIENTE', 'PSIQUIATRA')")
+    public ResponseEntity<Void> cancelarTurno(@PathVariable Long turnoId) {
+        turnoService.cancelarTurno(turnoId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/turnos/{turnoId}/asistencia")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<Void> actualizarAsistencia(
+            @PathVariable Long turnoId,
+            @RequestParam String asistencia) {
+        turnoService.actualizarAsistencia(turnoId, asistencia);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/turnos/{turnoId}/reprogramar")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<Void> reprogramarTurno(
+            @PathVariable Long turnoId,
+            @RequestParam String fecha,
+            @RequestParam String hora) {
+        turnoService.reprogramarTurno(turnoId, fecha, hora);
+        return ResponseEntity.ok().build();
     }
 }

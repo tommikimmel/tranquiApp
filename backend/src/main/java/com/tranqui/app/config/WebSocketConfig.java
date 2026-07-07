@@ -24,8 +24,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws-tranqui").setAllowedOriginPatterns("*");
-        registry.addEndpoint("/ws-tranqui").setAllowedOriginPatterns("*").withSockJS();
+        registry.addEndpoint("/ws-tranqui")
+                .setAllowedOriginPatterns("*")
+                .addInterceptors(new WebSocketHandshakeInterceptor());
+        registry.addEndpoint("/ws-tranqui")
+                .setAllowedOriginPatterns("*")
+                .addInterceptors(new WebSocketHandshakeInterceptor())
+                .withSockJS();
     }
 
     @Override

@@ -13,6 +13,7 @@ import java.time.LocalTime;
 public class TurnoResponseDto {
     private Long turnoId;
     private String estado; // CONFIRMADO, PENDIENTE_PAGO, etc.
+    private String attendanceStatus; // ESPERANDO, LLEGO, AUSENTE, COMPLETADA
     private LocalDate fecha;
     private LocalTime horaInicio;
     private BigDecimal precio;

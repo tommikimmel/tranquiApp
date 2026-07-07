@@ -49,6 +49,7 @@ public class MedicoService {
     public List<MedicoDto> obtenerMedicosActivos() {
         List<Usuario> medicos = usuarioRepository.findAll().stream()
                 .filter(u -> u.getRol() == Rol.PSIQUIATRA)
+                .filter(this::isMedicoVerificado)
                 .collect(Collectors.toList());
 
         List<MedicoDto> dtos = new ArrayList<>();
@@ -78,12 +79,42 @@ public class MedicoService {
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
         medico.setNombre(dto.getName());
-        medico.setMatricula(dto.getMatricula());
+        medico.setApellido(dto.getApellido());
+        medico.setSexo(dto.getSexo());
+        medico.setFechaNacimiento(dto.getFechaNacimiento());
+        medico.setCuil(dto.getCuil());
+        medico.setTipoDocumento(dto.getTipoDocumento());
+        medico.setNumeroDocumento(dto.getNumeroDocumento());
+        medico.setDomicilioAtencion(dto.getDomicilioAtencion());
+        medico.setCodigoReFeps(dto.getCodigoReFeps());
+
+        if (dto.getMatriculaInfo() != null) {
+            medico.setMatriculaTipo(dto.getMatriculaInfo().getTipo());
+            medico.setMatriculaProvincia(dto.getMatriculaInfo().getProvincia());
+            medico.setMatriculaNumero(dto.getMatriculaInfo().getNumero());
+            if (dto.getMatriculaInfo().getEspecialidad() != null) {
+                medico.setMatriculaEspecialidad(dto.getMatriculaInfo().getEspecialidad().getTextoLibre());
+            }
+            if (dto.getMatriculaInfo().getAsociada() != null) {
+                medico.setMatriculaAsocTipo(dto.getMatriculaInfo().getAsociada().getTipo());
+                medico.setMatriculaAsocProvincia(dto.getMatriculaInfo().getAsociada().getProvincia());
+                medico.setMatriculaAsocNumero(dto.getMatriculaInfo().getAsociada().getNumero());
+            }
+            if (dto.getMatriculaInfo().getNumero() != null) {
+                medico.setMatricula(String.valueOf(dto.getMatriculaInfo().getNumero()));
+            }
+        } else {
+            medico.setMatricula(dto.getMatricula());
+        }
+
         medico.setTitulo(dto.getDegree());
         medico.setSpecialty(dto.getSpecialty());
         medico.setCuit(dto.getCuit());
         medico.setPrecio(dto.getPrice());
         medico.setColor(dto.getColor());
+        medico.setFotoUrl(dto.getFotoUrl());
+        medico.setOfreceOnline(dto.isOfreceOnline());
+        medico.setOfrecePresencial(dto.isOfrecePresencial());
 
         if (dto.getTags() != null) {
             medico.setTags(String.join(",", dto.getTags()));
@@ -162,9 +193,29 @@ public class MedicoService {
             }
         }
 
+        MedicoDto.MatriculaInfoDto matInfo = null;
+        if (m.getMatriculaTipo() != null || m.getMatriculaNumero() != null) {
+            matInfo = MedicoDto.MatriculaInfoDto.builder()
+                    .tipo(m.getMatriculaTipo())
+                    .provincia(m.getMatriculaProvincia())
+                    .numero(m.getMatriculaNumero())
+                    .especialidad(MedicoDto.EspecialidadDto.builder().textoLibre(m.getMatriculaEspecialidad()).build())
+                    .asociada(MedicoDto.AsociadaDto.builder()
+                            .tipo(m.getMatriculaAsocTipo())
+                            .provincia(m.getMatriculaAsocProvincia())
+                            .numero(m.getMatriculaAsocNumero())
+                            .build())
+                    .build();
+        }
+
+        String nombreCompleto = m.getNombre();
+        if (m.getApellido() != null && !m.getApellido().trim().isEmpty()) {
+            nombreCompleto = nombreCompleto + " " + m.getApellido();
+        }
+
         return MedicoDto.builder()
                 .id(m.getId())
-                .name(m.getNombre())
+                .name(nombreCompleto)
                 .email(m.getEmail())
                 .initials(initials)
                 .degree(m.getTitulo() != null ? m.getTitulo() : "Médico/a")
@@ -174,7 +225,20 @@ public class MedicoService {
                 .price(m.getPrecio() != null ? m.getPrecio() : new BigDecimal("60000"))
                 .tags(tagsList)
                 .color(m.getColor() != null ? m.getColor() : "#E8F5EE")
+                .fotoUrl(m.getFotoUrl())
+                .ofreceOnline(m.isOfreceOnline())
+                .ofrecePresencial(m.isOfrecePresencial())
                 .tariffs(tarifasDto)
+                .apellido(m.getApellido())
+                .sexo(m.getSexo())
+                .fechaNacimiento(m.getFechaNacimiento())
+                .cuil(m.getCuil())
+                .tipoDocumento(m.getTipoDocumento())
+                .numeroDocumento(m.getNumeroDocumento())
+                .domicilioAtencion(m.getDomicilioAtencion())
+                .codigoReFeps(m.getCodigoReFeps())
+                .matriculaInfo(matInfo)
+                .verificado(isMedicoVerificado(m))
                 .build();
     }
 
@@ -280,5 +344,22 @@ public class MedicoService {
                 .noShowsThisMonth(noShowsThisMonth)
                 .noShowsChange(noShowsChange)
                 .build();
+    }
+
+    public boolean isMedicoVerificado(Usuario u) {
+        return u.getNombre() != null && !u.getNombre().trim().isEmpty()
+                && u.getApellido() != null && !u.getApellido().trim().isEmpty()
+                && u.getSexo() != null && !u.getSexo().trim().isEmpty()
+                && u.getFechaNacimiento() != null
+                && u.getCuil() != null
+                && u.getEmail() != null && !u.getEmail().trim().isEmpty()
+                && u.getTipoDocumento() != null && !u.getTipoDocumento().trim().isEmpty()
+                && u.getNumeroDocumento() != null
+                && u.getDomicilioAtencion() != null && !u.getDomicilioAtencion().trim().isEmpty()
+                && u.getCodigoReFeps() != null
+                && u.getMatriculaTipo() != null && !u.getMatriculaTipo().trim().isEmpty()
+                && u.getMatriculaProvincia() != null && !u.getMatriculaProvincia().trim().isEmpty()
+                && u.getMatriculaNumero() != null
+                && u.getFotoUrl() != null && !u.getFotoUrl().trim().isEmpty();
     }
 }

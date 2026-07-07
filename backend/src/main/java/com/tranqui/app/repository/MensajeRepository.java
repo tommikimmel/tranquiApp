@@ -1,6 +1,7 @@
 package com.tranqui.app.repository;
 
 import com.tranqui.app.model.Mensaje;
+import com.tranqui.app.model.Usuario;
 import com.tranqui.app.model.dto.CanalPrioritarioDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,6 +15,13 @@ import java.util.List;
 
 @Repository
 public interface MensajeRepository extends JpaRepository<Mensaje, Long> {
+
+    @Query("SELECT DISTINCT u FROM Usuario u WHERE u.rol = 'PACIENTE' AND EXISTS (" +
+           "  SELECT 1 FROM Mensaje m WHERE " +
+           "  (m.remitente.id = u.id AND m.destinatario.id = :medicoId) OR " +
+           "  (m.remitente.id = :medicoId AND m.destinatario.id = u.id)" +
+           ")")
+    List<Usuario> findPacientesConMensajesConMedico(@Param("medicoId") Long medicoId);
 
     @Query("SELECT m FROM Mensaje m WHERE (m.remitente.id = :u1 AND m.destinatario.id = :u2) " +
            "OR (m.remitente.id = :u2 AND m.destinatario.id = :u1) ORDER BY m.fechaEnvio DESC")

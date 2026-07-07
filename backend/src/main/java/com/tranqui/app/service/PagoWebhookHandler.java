@@ -88,15 +88,20 @@ public class PagoWebhookHandler {
 
         log.info("Pago aprobado para turno ID: {}. Generado evento de Google Meet.", turnoId);
 
-        // Crear notificación para el médico
+        // Crear notificación para el médico y el paciente
         try {
-            String titulo = "Nuevo Turno Reservado";
-            String mensaje = "El paciente " + turno.getPaciente().getNombre() + 
+            String tituloMed = "Nuevo Turno Reservado";
+            String mensajeMed = "El paciente " + turno.getPaciente().getNombre() + 
                              " ha reservado un turno para el día " + turno.getFecha() + 
                              " a las " + turno.getHoraInicio() + "hs.";
-            notificacionService.crearNotificacion(turno.getMedico(), titulo, mensaje, "TURNO_RESERVADO");
+            notificacionService.crearNotificacion(turno.getMedico(), tituloMed, mensajeMed, "TURNO_RESERVADO");
+
+            String tituloPac = "Turno Confirmado ✓";
+            String mensajePac = "Tu turno con el profesional " + turno.getMedico().getNombre() + 
+                                " para el día " + turno.getFecha() + " a las " + turno.getHoraInicio() + "hs ha sido confirmado.";
+            notificacionService.crearNotificacion(turno.getPaciente(), tituloPac, mensajePac, "TURNO_CONFIRMADO");
         } catch (Exception e) {
-            log.error("Error al crear notificación para el turno ID: {}", turnoId, e);
+            log.error("Error al crear notificaciones de confirmación para el turno ID: {}", turnoId, e);
         }
 
         // Intentar notificar por WhatsApp

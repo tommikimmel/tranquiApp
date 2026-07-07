@@ -20,4 +20,26 @@ public class PacienteDto {
     private String numAfiliado;
     private String ultimaVisita;
     private String prioridadClinica;
+    private boolean sinTurno;
+
+    private String apellido;
+    private String sexo;
+    private String fechaNacimiento; // "YYYY-MM-DD"
+    private Long cuil;
+    private String mail;
+    private String tipoDocumento;
+    private Integer numeroDocumento;
+    private String datosOfuscado;
+    private CredencialInfoDto credencial;
+
+    @lombok.Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CredencialInfoDto {
+        private Integer codEntidad;
+        private String pan;
+        private String plan;
+        private String token;
+    }
 }

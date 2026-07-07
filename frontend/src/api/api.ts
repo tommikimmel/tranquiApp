@@ -98,6 +98,8 @@ export const api = {
   getNotificaciones: () => apiFetch('/notificaciones'),
   marcarNotificacionesLeidas: () => apiFetch('/notificaciones/marcar-leidas', { method: 'POST' }),
   getPacientesAtendidos: () => apiFetch('/pacientes/atendidos'),
+  actualizarPaciente: (pacienteId: number | string, data: any) => 
+    apiFetch(`/pacientes/${pacienteId}`, { method: 'PUT', body: data }),
   getSeguimientos: (pacienteId: number | string) => apiFetch(`/pacientes/${pacienteId}/seguimientos`),
   crearSeguimiento: (pacienteId: number | string, data: { estadoAnimo: string; sintomas: string; notas: string; fecha?: string }) => 
     apiFetch(`/pacientes/${pacienteId}/seguimientos`, { method: 'POST', body: data as any }),
@@ -116,5 +118,10 @@ export const api = {
   getMisSeguimientos: () => apiFetch('/pacientes/me/seguimientos'),
   crearMiSeguimiento: (data: { estadoAnimo: string; sintomas: string; notas: string }) => 
     apiFetch('/pacientes/me/seguimientos', { method: 'POST', body: data as any }),
-  getMisInformes: () => apiFetch('/pacientes/me/informes')
+  getMisInformes: () => apiFetch('/pacientes/me/informes'),
+  cancelarTurno: (turnoId: number | string) => apiFetch(`/turnos/${turnoId}/cancelar`, { method: 'POST' }),
+  actualizarAsistencia: (turnoId: number | string, asistencia: string) => 
+    apiFetch(`/turnos/${turnoId}/asistencia?asistencia=${encodeURIComponent(asistencia)}`, { method: 'PUT' }),
+  reprogramarTurno: (turnoId: number | string, fecha: string, hora: string) => 
+    apiFetch(`/turnos/${turnoId}/reprogramar?fecha=${encodeURIComponent(fecha)}&hora=${encodeURIComponent(hora)}`, { method: 'PUT' })
 };
