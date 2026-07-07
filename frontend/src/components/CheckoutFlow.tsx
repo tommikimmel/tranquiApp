@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import '../styles/checkout.css'
 import { api } from '../api/api'
+import { useAlert } from '../context/AlertContext'
 
 // ── Types ──────────────────────────────────────────────────────
 interface Professional {
@@ -735,6 +736,7 @@ export default function CheckoutFlow({
   onBack: () => void
   onComplete: () => void
 }) {
+  const { showAlert } = useAlert()
   const [step, setStep] = useState<CheckoutStep>('select')
   const [selectedDay, setSelectedDay] = useState<DayOption | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null)
@@ -925,16 +927,16 @@ export default function CheckoutFlow({
                         console.error("Error fetching updated turn:", e);
                       }
                       
-                      alert("Pago acreditado ✓ Webhook simulado con éxito.");
+                      showAlert("Pago acreditado ✓ Webhook simulado con éxito.", "success");
                       setShowMockPaymentGateway(false);
                       setStep('confirmed');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     } else {
-                      alert("Error al simular la aprobación en el backend.");
+                      showAlert("Error al simular la aprobación en el backend.", "error");
                     }
                   } catch (err) {
                     console.error("Error sending mock webhook request:", err);
-                    alert("Error de conexión al simular el pago.");
+                    showAlert("Error de conexión al simular el pago.", "error");
                   } finally {
                     setSimulatingWebhook(false);
                   }

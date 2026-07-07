@@ -22,7 +22,6 @@ public class MedicoController {
     private com.tranqui.app.service.DisponibilidadService disponibilidadService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('PACIENTE', 'PSIQUIATRA')")
     public ResponseEntity<List<MedicoDto>> obtenerMedicos() {
         return ResponseEntity.ok(medicoService.obtenerMedicosActivos());
     }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import './styles/index.css'
 import './styles/dashboard.css'
 import LandingPage from './components/LandingPage'
@@ -7,6 +7,7 @@ import LoginPage from './components/LoginPage'
 import PatientsView from './components/PatientsView'
 import VisitorsView from './components/VisitorsView'
 import { api } from './api/api'
+import { useAlert } from './context/AlertContext'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 
@@ -156,7 +157,7 @@ function Sidebar({ activeNav, onNavChange, medicoInfo }: { activeNav: NavSection
     <aside className="sidebar">
       <div className="sidebar__logo">
         <div className="sidebar__logo-btn" style={{ cursor: 'default' }}>
-          <img src="/logo-tranqui.png" alt="Tranqui" className="sidebar__logo-img" />
+          <img src="/logoTranquiApp.webp" alt="Tranqui" className="sidebar__logo-img" />
           <span className="sidebar__logo-text">tranqui</span>
         </div>
       </div>
@@ -366,6 +367,7 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
 }
 
 function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[]; onSave: (data: any[]) => Promise<void> }) {
+  const { showAlert } = useAlert();
   const weekdays = [
     { name: 'Lunes', abbr: 'Lun', num: 1 },
     { name: 'Martes', abbr: 'Mar', num: 2 },
@@ -396,6 +398,69 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
     })
     return state
   })
+
+  // To-Do List state and hooks
+  const [tasks, setTasks] = useState<{ id: string; text: string; completed: boolean; category: 'clinical' | 'admin' | 'urgent' }[]>(() => {
+    try {
+      const saved = localStorage.getItem('tranqui_medico_tasks');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error("Error reading tasks from localStorage", e);
+    }
+    return [
+      { id: '1', text: 'Revisar ficha clínica de Rossi', completed: false, category: 'clinical' },
+      { id: '2', text: 'Enviar copagos de OSDE del mes', completed: false, category: 'admin' },
+      { id: '3', text: 'Renovar firma digital', completed: true, category: 'urgent' },
+    ];
+  });
+
+  const [newTaskText, setNewTaskText] = useState('');
+  const [newTaskCategory, setNewTaskCategory] = useState<'clinical' | 'admin' | 'urgent'>('clinical');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
+  const sortedTasks = React.useMemo(() => {
+    return [...tasks].sort((a, b) => {
+      if (a.category === 'urgent' && b.category !== 'urgent') return -1;
+      if (a.category !== 'urgent' && b.category === 'urgent') return 1;
+      return 0;
+    });
+  }, [tasks]);
+
+  const totalPages = Math.ceil(sortedTasks.length / itemsPerPage);
+  const validCurrentPage = Math.min(currentPage, Math.max(1, totalPages));
+  const startIndex = (validCurrentPage - 1) * itemsPerPage;
+  const paginatedTasks = sortedTasks.slice(startIndex, startIndex + itemsPerPage);
+
+  // Persist tasks on change
+  useEffect(() => {
+    try {
+      localStorage.setItem('tranqui_medico_tasks', JSON.stringify(tasks));
+    } catch (e) {
+      console.error("Error saving tasks to localStorage", e);
+    }
+  }, [tasks]);
+
+  const handleAddTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskText.trim()) return;
+    const newTask = {
+      id: String(Date.now()),
+      text: newTaskText.trim(),
+      completed: false,
+      category: newTaskCategory,
+    };
+    setTasks([...tasks, newTask]);
+    setNewTaskText('');
+  };
+
+  const handleToggleTask = (id: string) => {
+    setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+  };
+
+  const handleDeleteTask = (id: string) => {
+    setTasks(tasks.filter(t => t.id !== id));
+  };
 
   const [saving, setSaving] = useState(false)
 
@@ -432,52 +497,248 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
 
     try {
       await onSave(dtos)
-      alert("Disponibilidad guardada correctamente ✓")
+      showAlert("Disponibilidad guardada correctamente ✓", "success")
     } catch (err) {
       console.error(err)
-      alert("Error al guardar disponibilidad")
+      showAlert("Error al guardar disponibilidad", "error")
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="card" style={{ width: '100%', maxWidth: 'none' }}>
-      <div className="card__header">
-        <div>
-          <h2 className="card__title">Disponibilidad semanal</h2>
-          <p className="card__subtitle">Hacé clic en un horario para habilitarlo o deshabilitarlo</p>
+    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-6)', alignItems: 'start', width: '100%' }}>
+      {/* Availability Grid */}
+      <div className="card" style={{ width: '100%', maxWidth: 'none', margin: 0 }}>
+        <div className="card__header">
+          <div>
+            <h2 className="card__title">Disponibilidad semanal</h2>
+            <p className="card__subtitle">Hacé clic en un horario para habilitarlo o deshabilitarlo</p>
+          </div>
+          <button className="btn btn--primary btn--sm" onClick={handleSave} disabled={saving} id="btn-save-availability">
+            {saving ? 'Guardando...' : 'Guardar cambios'}
+          </button>
         </div>
-        <button className="btn btn--primary btn--sm" onClick={handleSave} disabled={saving} id="btn-save-availability">
-          {saving ? 'Guardando...' : 'Guardar cambios'}
-        </button>
+
+        <div className="availability-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', width: '100%' }}>
+          {weekdays.map((day) => {
+            const isActive = baseSlots.some(slot => activeSlots[day.num][slot])
+            return (
+              <div className="day-column" key={day.num}>
+                <div className={`day-column__header ${isActive ? 'day-column__active' : ''}`}>
+                  {day.abbr}
+                </div>
+                {baseSlots.map((slot) => {
+                  const isSlotActive = !!activeSlots[day.num][slot]
+                  return (
+                    <button
+                      key={slot}
+                      className={`time-slot ${isSlotActive ? 'time-slot--available' : 'time-slot--booked'}`}
+                      onClick={() => toggleSlot(day.num, slot)}
+                      style={{ cursor: 'pointer' }}
+                      aria-label={`${day.name} ${slot} ${isSlotActive ? '- disponible' : '- inactivo'}`}
+                    >
+                      {slot}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
       </div>
 
-      <div className="availability-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', width: '100%' }}>
-        {weekdays.map((day) => {
-          const isActive = baseSlots.some(slot => activeSlots[day.num][slot])
-          return (
-            <div className="day-column" key={day.num}>
-              <div className={`day-column__header ${isActive ? 'day-column__active' : ''}`}>
-                {day.abbr}
-              </div>
-              {baseSlots.map((slot) => {
-                const isSlotActive = !!activeSlots[day.num][slot]
-                return (
-                  <button
-                    key={slot}
-                    className={`time-slot ${isSlotActive ? 'time-slot--available' : 'time-slot--booked'}`}
-                    onClick={() => toggleSlot(day.num, slot)}
-                    style={{ cursor: 'pointer' }}
-                    aria-label={`${day.name} ${slot} ${isSlotActive ? '- disponible' : '- inactivo'}`}
-                  >
-                    {slot}
-                  </button>
-                )
-              })}
+      {/* To-Do List Card */}
+      <div className="card" style={{ width: '100%', maxWidth: 'none', margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', boxShadow: 'var(--shadow-md)' }}>
+        <div className="card__header" style={{ paddingBottom: 'var(--space-2)', borderBottom: '1px solid var(--color-border)' }}>
+          <div>
+            <h2 className="card__title" style={{ fontSize: 'var(--text-md)', fontWeight: 'bold' }}>Notas y Pendientes</h2>
+            <p className="card__subtitle" style={{ fontSize: 'var(--text-xs)' }}>Recordatorios clínicos y administrativos</p>
+          </div>
+        </div>
+
+        {/* Add Task Form */}
+        <form onSubmit={handleAddTask} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', backgroundColor: 'var(--neutral-50)', padding: 'var(--space-4)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Descripción de la nota</label>
+            <input 
+              type="text" 
+              className="form-input" 
+              placeholder="Ej. Llamar a prepaga Rossi..." 
+              value={newTaskText} 
+              onChange={(e) => setNewTaskText(e.target.value)}
+              style={{ fontSize: 'var(--text-sm)', backgroundColor: '#ffffff' }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-end' }}>
+            <div className="form-group" style={{ margin: 0, flex: 1 }}>
+              <label className="form-label" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Categoría</label>
+              <select 
+                className="form-input" 
+                value={newTaskCategory} 
+                onChange={(e: any) => setNewTaskCategory(e.target.value)}
+                style={{ 
+                  fontSize: 'var(--text-xs)', 
+                  padding: 'var(--space-2)', 
+                  backgroundColor: '#ffffff',
+                  border: '1px solid var(--color-border)',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="clinical">🩺 Nota Clínica</option>
+                <option value="admin">📋 Nota Administrativa</option>
+                <option value="urgent">⚠️ Prioridad Urgente</option>
+              </select>
             </div>
-          )
-        })}
+            <button type="submit" className="btn btn--primary" style={{ padding: 'var(--space-2) var(--space-4)', fontSize: 'var(--text-xs)', height: '36px' }}>
+              Añadir
+            </button>
+          </div>
+        </form>
+
+        {/* Tasks List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+          {tasks.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-text-secondary)' }}>
+              <span style={{ fontSize: '24px', display: 'block', marginBottom: 'var(--space-2)' }}>📝</span>
+              <p style={{ fontSize: 'var(--text-xs)', fontStyle: 'italic', margin: 0 }}>No tenés notas pendientes.</p>
+            </div>
+          ) : (
+            paginatedTasks.map((task) => {
+              // Premium note card design based on category
+              const isUrgent = task.category === 'urgent';
+              const isAdmin = task.category === 'admin';
+
+              const cardBg = isUrgent ? '#fff5f5' : isAdmin ? '#f0f7ff' : '#f0fdf4';
+              const cardBorder = isUrgent ? '1px solid #fee2e2' : isAdmin ? '1px solid #e0f2fe' : '1px solid #dcfce7';
+              const accentColor = isUrgent ? '#ef4444' : isAdmin ? '#3b82f6' : 'var(--color-primary)';
+              const badgeLabel = isUrgent ? '⚠️ Urgente' : isAdmin ? '📋 Admin' : '🩺 Clínica';
+              const badgeText = isUrgent ? '#991b1b' : isAdmin ? '#1d4ed8' : '#047857';
+              const badgeBg = isUrgent ? '#fee2e2' : isAdmin ? '#dbeafe' : '#d1fae5';
+
+              return (
+                <div 
+                  key={task.id} 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    padding: 'var(--space-3) var(--space-4)',
+                    backgroundColor: cardBg,
+                    border: cardBorder,
+                    borderLeft: `4px solid ${accentColor}`,
+                    borderRadius: 'var(--radius-lg)',
+                    gap: 'var(--space-3)',
+                    transition: 'all 0.2s ease',
+                    opacity: task.completed ? 0.55 : 1,
+                    textDecoration: task.completed ? 'line-through' : 'none',
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.02)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', flex: 1 }}>
+                    <input 
+                      type="checkbox" 
+                      checked={task.completed} 
+                      onChange={() => handleToggleTask(task.id)}
+                      style={{ 
+                        cursor: 'pointer', 
+                        width: '18px', 
+                        height: '18px', 
+                        marginTop: '2px',
+                        accentColor: accentColor
+                      }}
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ 
+                        fontSize: 'var(--text-sm)', 
+                        color: 'var(--color-text-primary)',
+                        fontWeight: '600',
+                        lineHeight: '1.4'
+                      }}>
+                        {task.text}
+                      </span>
+                      <span style={{
+                        alignSelf: 'flex-start',
+                        backgroundColor: badgeBg,
+                        color: badgeText,
+                        fontSize: '9px',
+                        fontWeight: 'bold',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.02em'
+                      }}>
+                        {badgeLabel}
+                      </span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => handleDeleteTask(task.id)}
+                    style={{
+                      border: 'none',
+                      background: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--color-danger)',
+                      fontSize: '14px',
+                      padding: '2px',
+                      lineHeight: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      opacity: 0.7
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+                    title="Eliminar nota"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingTop: 'var(--space-3)',
+            borderTop: '1px solid var(--color-border)',
+            marginTop: 'var(--space-2)'
+          }}>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={validCurrentPage === 1}
+              className="btn btn--secondary btn--sm"
+              style={{
+                fontSize: '11px',
+                padding: 'var(--space-1.5) var(--space-3)',
+                opacity: validCurrentPage === 1 ? 0.5 : 1,
+                cursor: validCurrentPage === 1 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              ◀ Anterior
+            </button>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontWeight: '600' }}>
+              Página {validCurrentPage} de {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={validCurrentPage === totalPages}
+              className="btn btn--secondary btn--sm"
+              style={{
+                fontSize: '11px',
+                padding: 'var(--space-1.5) var(--space-3)',
+                opacity: validCurrentPage === totalPages ? 0.5 : 1,
+                cursor: validCurrentPage === totalPages ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Siguiente ▶
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -505,6 +766,7 @@ const COMMON_MEDS = [
 ]
 
 function PrescriptionView({ onSend }: { onSend: (data: any) => Promise<void> }) {
+  const { showAlert } = useAlert();
   const [selectedPatient, setSelectedPatient] = useState('')
   const [medications, setMedications] = useState([{ name: '', dosage: '', frequency: '', duration: '' }])
   const [diagnosis, setDiagnosis] = useState('')
@@ -543,7 +805,7 @@ function PrescriptionView({ onSend }: { onSend: (data: any) => Promise<void> }) 
     })
     .catch((err) => {
       console.error("Error al emitir receta:", err)
-      alert("Error al emitir y enviar receta")
+      showAlert("Error al emitir y enviar receta", "error")
     })
     .finally(() => {
       setSending(false)
@@ -768,12 +1030,37 @@ function PrescriptionView({ onSend }: { onSend: (data: any) => Promise<void> }) 
 // DEFAULT_TARIFFS mock removed since values are loaded from API
 
 function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (updated: any) => Promise<void> }) {
+  const { showAlert } = useAlert();
   const [name, setName] = useState(medicoInfo?.name || '')
+  const [apellido, setApellido] = useState(medicoInfo?.apellido || '')
+  const [sexo, setSexo] = useState(medicoInfo?.sexo || 'M')
+  const [fechaNacimiento, setFechaNacimiento] = useState(medicoInfo?.fechaNacimiento || '')
+  const [cuil, setCuil] = useState(medicoInfo?.cuil || '')
+  const [tipoDocumento, setTipoDocumento] = useState(medicoInfo?.tipoDocumento || 'DN')
+  const [numeroDocumento, setNumeroDocumento] = useState(medicoInfo?.numeroDocumento || '')
+  const [domicilioAtencion, setDomicilioAtencion] = useState(medicoInfo?.domicilioAtencion || '')
+  const [codigoReFeps, setCodigoReFeps] = useState(medicoInfo?.codigoReFeps || '')
+
+  // MatriculaInfo
+  const [matTipo, setMatTipo] = useState(medicoInfo?.matriculaInfo?.tipo || 'MN')
+  const [matProvincia, setMatProvincia] = useState(medicoInfo?.matriculaInfo?.provincia || '')
+  const [matNumero, setMatNumero] = useState(medicoInfo?.matriculaInfo?.numero || '')
+  const [matEspecialidad, setMatEspecialidad] = useState(medicoInfo?.matriculaInfo?.especialidad?.textoLibre || '')
+  const [matAsocTipo, setMatAsocTipo] = useState(medicoInfo?.matriculaInfo?.asociada?.tipo || 'MN')
+  const [matAsocProvincia, setMatAsocProvincia] = useState(medicoInfo?.matriculaInfo?.asociada?.provincia || '')
+  const [matAsocNumero, setMatAsocNumero] = useState(medicoInfo?.matriculaInfo?.asociada?.numero || '')
+
   const [degree, setDegree] = useState(medicoInfo?.degree || '')
   const [specialty, setSpecialty] = useState(medicoInfo?.specialty || '')
   const [matricula, setMatricula] = useState(medicoInfo?.matricula || '')
   const [cuit, setCuit] = useState(medicoInfo?.cuit || '')
   const [tariffs, setTariffs] = useState<any[]>(medicoInfo?.tariffs || [])
+  const [fotoUrl, setFotoUrl] = useState(medicoInfo?.fotoUrl || '')
+  const [tags, setTags] = useState<string[]>(medicoInfo?.tags || [])
+  const [ofreceOnline, setOfreceOnline] = useState(medicoInfo?.ofreceOnline !== undefined ? medicoInfo.ofreceOnline : true)
+  const [ofrecePresencial, setOfrecePresencial] = useState(medicoInfo?.ofrecePresencial !== undefined ? medicoInfo.ofrecePresencial : false)
+
+  const availableProfessions = ['Psiquiatría', 'Psicología', 'Neurología', 'Terapia Familiar']
 
   const updateTariff = (id: string, field: 'price' | 'enabled', value: number | boolean) => {
     setTariffs(tariffs.map(t => t.id === id ? { ...t, [field]: value } : t))
@@ -787,16 +1074,41 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
       await onSave({
         ...medicoInfo,
         name,
+        apellido,
+        sexo,
+        fechaNacimiento,
+        cuil: cuil ? Number(cuil) : null,
+        tipoDocumento,
+        numeroDocumento: numeroDocumento ? Number(numeroDocumento) : null,
+        domicilioAtencion,
+        codigoReFeps: codigoReFeps ? Number(codigoReFeps) : null,
+        matriculaInfo: {
+          tipo: matTipo,
+          provincia: matProvincia,
+          numero: matNumero ? Number(matNumero) : null,
+          especialidad: {
+            textoLibre: matEspecialidad
+          },
+          asociada: {
+            tipo: matAsocTipo,
+            provincia: matAsocProvincia,
+            numero: matAsocNumero ? Number(matAsocNumero) : null
+          }
+        },
         degree,
         specialty,
-        matricula,
+        matricula: matNumero ? String(matNumero) : matricula,
         cuit,
-        tariffs
+        tariffs,
+        fotoUrl,
+        tags,
+        ofreceOnline,
+        ofrecePresencial
       })
-      alert("Configuración guardada con éxito ✓")
+      showAlert("Configuración guardada con éxito ✓", "success")
     } catch (err) {
       console.error(err)
-      alert("Error al guardar la configuración")
+      showAlert("Error al guardar la configuración", "error")
     } finally {
       setSaving(false)
     }
@@ -804,15 +1116,192 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+      {/* Verification status banner */}
+      {medicoInfo?.verificado ? (
+        <div style={{
+          backgroundColor: '#ecfdf5',
+          border: '1px solid #a7f3d0',
+          borderLeft: '5px solid var(--color-primary)',
+          borderRadius: 'var(--radius-lg)',
+          padding: 'var(--space-4)',
+          color: 'var(--color-primary)',
+          fontSize: 'var(--text-sm)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-2)'
+        }}>
+          <strong>✓ Cuenta Verificada:</strong> Tu perfil profesional cumple con todos los requisitos y es visible públicamente para reserva de turnos.
+        </div>
+      ) : (
+        <div style={{
+          backgroundColor: '#fffbeb',
+          border: '1px solid #fef3c7',
+          borderLeft: '5px solid #d97706',
+          borderRadius: 'var(--radius-lg)',
+          padding: 'var(--space-4)',
+          color: '#b45309',
+          fontSize: 'var(--text-sm)'
+        }}>
+          <strong>⚠️ Cuenta No Verificada:</strong> Para aparecer en la lista de profesionales disponibles de la aplicación y que los pacientes puedan agendar turnos, debés completar todos tus datos demográficos, ReFeps, matrícula y subir una foto de perfil.
+        </div>
+      )}
+
       {/* Profile */}
       <div className="card">
         <div className="card__header">
           <h2 className="card__title">Perfil profesional</h2>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
+          {/* Profile Photo Uploader */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', gridColumn: 'span 2', paddingBottom: 'var(--space-4)', borderBottom: '1px solid var(--color-border)' }}>
+            <div style={{
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              backgroundColor: '#e5e7eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              border: '2px solid var(--color-primary)'
+            }}>
+              {fotoUrl ? (
+                <img src={fotoUrl} alt="Foto de perfil" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ fontSize: '24px', color: '#9ca3af' }}>👤</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <label style={{
+                cursor: 'pointer',
+                backgroundColor: 'var(--color-primary)',
+                color: 'white',
+                padding: 'var(--space-2) var(--space-4)',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 'var(--text-xs)',
+                fontWeight: 'bold',
+                textAlign: 'center'
+              }}>
+                Subir foto
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  style={{ display: 'none' }} 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setFotoUrl(reader.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                />
+              </label>
+              {fotoUrl && (
+                <button 
+                  onClick={() => setFotoUrl('')}
+                  className="btn btn--danger btn--sm"
+                  style={{ fontSize: 'var(--text-xs)' }}
+                >
+                  Eliminar foto
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', marginTop: 'var(--space-2)' }}>
+            Datos Demográficos Básicos
+          </div>
+
           <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-name">Nombre completo</label>
+            <label className="form-label form-label--required" htmlFor="input-name">Nombre</label>
             <input id="input-name" className="form-input" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-apellido">Apellido</label>
+            <input id="input-apellido" className="form-input" type="text" value={apellido} onChange={(e) => setApellido(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-sexo">Sexo</label>
+            <select id="input-sexo" className="form-input" value={sexo} onChange={(e) => setSexo(e.target.value)}>
+              <option value="M">Masculino (M)</option>
+              <option value="F">Femenino (F)</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-nacimiento">Fecha de Nacimiento</label>
+            <input id="input-nacimiento" className="form-input" type="date" value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-tipo-doc">Tipo Documento</label>
+            <select id="input-tipo-doc" className="form-input" value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
+              <option value="DN">DNI (DN)</option>
+              <option value="LE">LE</option>
+              <option value="LC">LC</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-num-doc">Número de Documento</label>
+            <input id="input-num-doc" className="form-input" type="number" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-cuil">CUIL</label>
+            <input id="input-cuil" className="form-input" type="number" placeholder="Ej. 27123456780" value={cuil} onChange={(e) => setCuil(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-domicilio">Domicilio de Atención</label>
+            <input id="input-domicilio" className="form-input" type="text" placeholder="Ej. Consultorio 12" value={domicilioAtencion} onChange={(e) => setDomicilioAtencion(e.target.value)} />
+          </div>
+
+          <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', marginTop: 'var(--space-2)' }}>
+            Registro Nacional (ReFeps)
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-refeps">Código ReFeps</label>
+            <input id="input-refeps" className="form-input" type="number" placeholder="Ej. 123456789012" value={codigoReFeps} onChange={(e) => setCodigoReFeps(e.target.value)} />
+          </div>
+
+          <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', marginTop: 'var(--space-2)' }}>
+            Matrícula Profesional
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-mat-tipo">Tipo de Matrícula</label>
+            <input id="input-mat-tipo" className="form-input" type="text" placeholder="Ej. MN, MP" value={matTipo} onChange={(e) => setMatTipo(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-mat-provincia">Provincia</label>
+            <input id="input-mat-provincia" className="form-input" type="text" placeholder="Ej. S, C, B" value={matProvincia} onChange={(e) => setMatProvincia(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-mat-numero">Número de Matrícula</label>
+            <input id="input-mat-numero" className="form-input" type="number" value={matNumero} onChange={(e) => setMatNumero(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-mat-esp">Especialidad Matrícula</label>
+            <input id="input-mat-esp" className="form-input" type="text" placeholder="Ej. MedicoClinico" value={matEspecialidad} onChange={(e) => setMatEspecialidad(e.target.value)} />
+          </div>
+
+          <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
+            Matrícula Asociada
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="input-mat-asoc-tipo">Tipo Matrícula Asociada</label>
+            <input id="input-mat-asoc-tipo" className="form-input" type="text" value={matAsocTipo} onChange={(e) => setMatAsocTipo(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="input-mat-asoc-prov">Provincia Asociada</label>
+            <input id="input-mat-asoc-prov" className="form-input" type="text" value={matAsocProvincia} onChange={(e) => setMatAsocProvincia(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="input-mat-asoc-num">Número Matrícula Asociada</label>
+            <input id="input-mat-asoc-num" className="form-input" type="number" value={matAsocNumero} onChange={(e) => setMatAsocNumero(e.target.value)} />
+          </div>
+
+          <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', marginTop: 'var(--space-2)' }}>
+            Datos Visuales y de Filtro
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-degree">Título profesional</label>
@@ -830,6 +1319,55 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
           <div className="form-group">
             <label className="form-label" htmlFor="input-cuit">CUIT</label>
             <input id="input-cuit" className="form-input" type="text" value={cuit} onChange={(e) => setCuit(e.target.value)} />
+          </div>
+
+          {/* Professions selector */}
+          <div className="form-group" style={{ gridColumn: 'span 2' }}>
+            <label className="form-label form-label--required">Mis Especialidades / Profesiones (para Filtros)</label>
+            <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
+              {availableProfessions.map((prof) => {
+                const isChecked = tags.includes(prof);
+                return (
+                  <label key={prof} style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={isChecked} 
+                      onChange={() => {
+                        if (isChecked) {
+                          setTags(tags.filter(t => t !== prof));
+                        } else {
+                          setTags([...tags, prof]);
+                        }
+                      }}
+                    />
+                    {prof}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Modalities selector */}
+          <div className="form-group" style={{ gridColumn: 'span 2' }}>
+            <label className="form-label form-label--required">Modalidades de Consulta</label>
+            <div style={{ display: 'flex', gap: 'var(--space-6)', marginTop: 'var(--space-2)' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={ofreceOnline} 
+                  onChange={(e) => setOfreceOnline(e.target.checked)}
+                />
+                💻 Consulta Online (Videollamada Meet)
+              </label>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={ofrecePresencial} 
+                  onChange={(e) => setOfrecePresencial(e.target.checked)}
+                />
+                🏢 Consulta Presencial (Consultorio)
+              </label>
+            </div>
           </div>
         </div>
         <div style={{ marginTop: 'var(--space-6)' }}>
@@ -940,19 +1478,31 @@ function DashboardHome({
   appointments, 
   allAppointments, 
   availability,
-  stats 
+  stats,
+  onCancelAppointment,
+  onUpdateAttendance,
+  onRescheduleAppointment
 }: { 
   mpConnected: boolean; 
   onConnect: () => void; 
   appointments: Appointment[]; 
   allAppointments: any[]; 
   availability: any[];
-  stats: any 
+  stats: any;
+  onCancelAppointment: (id: number) => void;
+  onUpdateAttendance: (id: number, status: string) => void;
+  onRescheduleAppointment: (id: number, date: string, hour: string) => void;
 }) {
   const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
   const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
   const [calendarView, setCalendarView] = useState<'weekly' | 'today'>('weekly');
   const [showInactiveSlots, setShowInactiveSlots] = useState(false);
+  const [selectedAppt, setSelectedAppt] = useState<any | null>(null);
+
+  // Rescheduling states
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleHour, setRescheduleHour] = useState('');
+  const [isRescheduling, setIsRescheduling] = useState(false);
 
   const weekdays = [
     { name: 'Lunes', abbr: 'Lun', num: 1 },
@@ -961,7 +1511,32 @@ function DashboardHome({
     { name: 'Jueves', abbr: 'Jue', num: 4 },
     { name: 'Viernes', abbr: 'Vie', num: 5 },
   ]
-  const baseSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00']
+
+  // Determine dynamic slots based on doctor's actual availability range
+  const getDynamicSlots = () => {
+    if (!availability || availability.length === 0) {
+      return ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+    }
+    let minHour = 24;
+    let maxHour = 0;
+    availability.forEach((disp) => {
+      const start = parseInt(disp.horaInicio.split(':')[0]);
+      const end = parseInt(disp.horaFin.split(':')[0]);
+      if (start < minHour) minHour = start;
+      if (end > maxHour) maxHour = end;
+    });
+    // Fallback if numbers are strange
+    if (minHour >= maxHour) {
+      return ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+    }
+    const slots = [];
+    for (let h = minHour; h < maxHour; h++) {
+      slots.push(`${String(h).padStart(2, '0')}:00`);
+    }
+    return slots;
+  };
+
+  const baseSlots = getDynamicSlots();
 
   // Parse date YYYY-MM-DD to get local day of week (1 = Monday, 5 = Friday)
   const getDayOfWeek = (dateStr: string) => {
@@ -1066,158 +1641,622 @@ function DashboardHome({
             </ul>
           )
         ) : (
-          /* Weekly Calendar Layout */
+          /* Weekly Calendar Matrix Grid */
           <div style={{ 
             display: 'grid', 
-            gridTemplateColumns: 'repeat(5, 1fr)', 
-            gap: 'var(--space-4)', 
+            gridTemplateColumns: '80px repeat(5, 1fr)', 
+            gap: 'var(--space-2)', 
             width: '100%',
-            marginTop: 'var(--space-4)'
+            marginTop: 'var(--space-4)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden',
+            backgroundColor: 'var(--color-surface)'
           }}>
-            {weekdays.map((day) => {
-              const daySlots = baseSlots.map((slot) => {
-                const slotHour = parseInt(slot.split(':')[0]);
-                const appt = allAppointments.find(a => {
-                  const apptDay = getDayOfWeek(a.fecha);
-                  const apptHour = parseInt(a.hour);
-                  return apptDay === day.num && apptHour === slotHour;
-                });
-                const isActive = isSlotAvailable(day.num, slot);
-                return { slot, appt, isActive };
+            {/* Headers */}
+            <div style={{ backgroundColor: 'var(--neutral-50)', padding: 'var(--space-3) var(--space-2)', borderBottom: '2px solid var(--color-border)', borderRight: '1px solid var(--color-border)' }}></div>
+            {weekdays.map((day) => (
+              <div key={day.num} style={{
+                textAlign: 'center',
+                padding: 'var(--space-3) var(--space-2)',
+                fontSize: 'var(--text-xs)',
+                fontWeight: 'bold',
+                color: 'var(--color-primary)',
+                backgroundColor: 'var(--green-50)',
+                borderBottom: '2px solid var(--color-border)',
+                borderRight: day.num < 5 ? '1px solid var(--color-border)' : 'none',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>
+                {day.name}
+              </div>
+            ))}
+
+            {/* Rows by hour */}
+            {baseSlots.filter((slot) => {
+              if (showInactiveSlots) return true;
+              const slotHour = parseInt(slot.split(':')[0]);
+              const hasActiveAvailability = weekdays.some((day) => isSlotAvailable(day.num, slot));
+              const hasAppointment = allAppointments.some((a) => {
+                const apptDay = getDayOfWeek(a.fecha);
+                const apptHour = parseInt(a.hour);
+                return weekdays.some(d => d.num === apptDay) && apptHour === slotHour;
               });
-
-              const visibleSlots = daySlots.filter(item => item.appt || item.isActive || showInactiveSlots);
-
+              return hasActiveAvailability || hasAppointment;
+            }).map((slot) => {
+              const slotHour = parseInt(slot.split(':')[0]);
               return (
-                <div key={day.num} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                <React.Fragment key={slot}>
+                  {/* Hour Label Column */}
                   <div style={{
-                    textAlign: 'center',
-                    padding: 'var(--space-2)',
-                    fontSize: 'var(--text-xs)',
-                    fontWeight: 'var(--font-weight-bold)',
-                    color: 'var(--color-primary)',
-                    backgroundColor: 'var(--green-50)',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--green-100)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'var(--neutral-50)',
+                    borderRight: '1px solid var(--color-border)',
+                    borderBottom: '1px solid #f0f2f5',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    color: 'var(--color-text-secondary)'
                   }}>
-                    {day.name}
+                    {slot} hs
                   </div>
-                  
-                  {visibleSlots.length === 0 ? (
-                    <div style={{
-                      padding: 'var(--space-4) var(--space-2)',
-                      textAlign: 'center',
-                      fontSize: '11px',
-                      color: 'var(--color-text-secondary)',
-                      fontStyle: 'italic',
-                      backgroundColor: 'var(--neutral-50)',
-                      borderRadius: 'var(--radius-sm)',
-                      border: '1px dashed var(--color-border)',
-                      opacity: 0.7
-                    }}>
-                      No laborable
-                    </div>
-                  ) : (
-                    visibleSlots.map(({ slot, appt, isActive }) => {
-                      if (appt) {
-                        const isConfirmed = appt.status === 'confirmed';
-                        const isCompleted = appt.status === 'completed';
-                        
-                        return (
-                          <div key={slot} style={{
-                            padding: 'var(--space-3)',
-                            borderRadius: 'var(--radius-md)',
-                            backgroundColor: isConfirmed ? '#ecfdf5' : isCompleted ? 'var(--neutral-100)' : '#fffbeb',
-                            border: isConfirmed ? '1px solid #a7f3d0' : isCompleted ? '1px solid var(--color-border)' : '1px solid #fef3c7',
-                            borderLeftWidth: '4px',
-                            borderLeftColor: isConfirmed ? 'var(--color-primary)' : isCompleted ? 'var(--color-text-secondary)' : 'var(--color-warning)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 'var(--space-2)'
-                          }}>
+
+                  {/* Day Columns for this hour */}
+                  {weekdays.map((day) => {
+                    const appt = allAppointments.find(a => {
+                      const apptDay = getDayOfWeek(a.fecha);
+                      const apptHour = parseInt(a.hour);
+                      return apptDay === day.num && apptHour === slotHour;
+                    });
+                    const isActive = isSlotAvailable(day.num, slot);
+
+                    // If not active and not appt, and showInactiveSlots is false, render empty/neutral cell
+                    const isCellVisible = appt || isActive || showInactiveSlots;
+
+                    return (
+                      <div key={day.num} style={{
+                        padding: 'var(--space-2)',
+                        borderRight: day.num < 5 ? '1px solid #f0f2f5' : 'none',
+                        borderBottom: '1px solid #f0f2f5',
+                        minHeight: '80px',
+                        backgroundColor: !isCellVisible 
+                          ? '#fafafa' 
+                          : appt 
+                            ? '#ffffff'
+                            : '#f6fbf8', // Light green for active empty slots
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center'
+                      }}>
+                        {appt ? (
+                          <div 
+                            onClick={() => setSelectedAppt(appt)}
+                            style={{
+                              padding: 'var(--space-3)',
+                              borderRadius: 'var(--radius-lg)',
+                              backgroundColor: '#ffffff',
+                              border: '1px solid var(--color-border)',
+                              borderLeft: appt.status === 'confirmed' 
+                                ? '4px solid var(--color-primary)' 
+                                : appt.status === 'completed' 
+                                  ? '4px solid var(--color-text-secondary)' 
+                                  : '4px solid var(--color-warning)',
+                              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 'var(--space-2)',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                              position: 'relative'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
+                              e.currentTarget.style.borderColor = 'var(--color-primary)';
+                              e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                              e.currentTarget.style.borderColor = 'var(--color-border)';
+                              e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)';
+                            }}
+                          >
+                            {/* Time & Modality Header */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>
-                                {slot} hs
+                              <span style={{
+                                fontSize: '10px',
+                                fontWeight: 'bold',
+                                color: appt.status === 'confirmed' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                                textTransform: 'uppercase',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                              }}>
+                                <span>{appt.type.includes('Meet') || appt.type.includes('OSDE') ? '💻 Online' : '🏢 Presencial'}</span>
                               </span>
-                              <span className={`badge ${isConfirmed ? 'badge--success' : isCompleted ? 'badge--neutral' : 'badge--warning'}`} style={{ fontSize: '8px', padding: '1px 3px' }}>
-                                {isConfirmed ? 'Confirmado' : isCompleted ? 'Completado' : 'Pendiente'}
-                              </span>
+                              <span style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                backgroundColor: appt.status === 'confirmed' ? '#10b981' : appt.status === 'completed' ? '#64748b' : '#f59e0b',
+                                display: 'inline-block'
+                              }} />
                             </div>
-                            <div style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semi)', color: 'var(--color-text-primary)' }}>
+
+                            {/* Patient Name */}
+                            <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-primary)' }}>
                               {appt.patientName}
                             </div>
-                            {appt.meetLink && isConfirmed && (
-                              <a 
-                                href={appt.meetLink} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="btn btn--primary" 
-                                style={{ fontSize: '9px', padding: '2px 6px', width: 'fit-content', display: 'flex', gap: '3px', alignItems: 'center' }}
-                              >
-                                <Icon.Video /> Unirse
-                              </a>
+
+                            {/* Attendance text if not Esperando */}
+                            {appt.attendanceStatus && appt.attendanceStatus !== 'ESPERANDO' && (
+                              <div style={{
+                                fontSize: '10px',
+                                fontWeight: '600',
+                                color: appt.attendanceStatus === 'LLEGO' 
+                                  ? 'var(--color-primary)' 
+                                  : appt.attendanceStatus === 'COMPLETADA' 
+                                    ? '#10b981' 
+                                    : 'var(--color-danger)',
+                                marginTop: '-2px'
+                              }}>
+                                {appt.attendanceStatus === 'LLEGO' ? '🚶‍♂️ Presente' : appt.attendanceStatus === 'COMPLETADA' ? '✓ Completada' : '❌ Ausente'}
+                              </div>
                             )}
-                          </div>
-                        );
-                      }
 
-                      if (isActive) {
-                        return (
-                          <div key={slot} style={{
-                            padding: 'var(--space-2)',
+                            {/* Alert badges or details */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                {appt.firstConsultation && (
+                                  <span style={{
+                                    backgroundColor: '#fffbeb',
+                                    color: '#b45309',
+                                    border: '1px solid #fef3c7',
+                                    fontSize: '9px',
+                                    padding: '1px 5px',
+                                    borderRadius: '4px',
+                                    fontWeight: '600'
+                                  }}>
+                                    ⚠️ 1° vez
+                                  </span>
+                                )}
+                                <span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontWeight: '500' }}>
+                                  {appt.type.includes('OSDE') ? 'OSDE' : 'Particular'}
+                                </span>
+                              </div>
+                              {appt.status !== 'completed' && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onCancelAppointment(appt.id);
+                                  }}
+                                  style={{
+                                    border: 'none',
+                                    background: 'none',
+                                    padding: '2px',
+                                    cursor: 'pointer',
+                                    color: 'var(--color-danger)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    fontSize: '9px',
+                                    fontWeight: 'bold'
+                                  }}
+                                  title="Cancelar Turno"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ) : isActive ? (
+                          <div style={{
                             textAlign: 'center',
-                            fontSize: 'var(--text-xs)',
+                            fontSize: '9px',
                             color: 'var(--color-primary)',
-                            border: '1px dashed var(--color-primary)',
+                            fontWeight: 'bold',
+                            border: '1px dashed var(--color-primary-disabled)',
                             borderRadius: 'var(--radius-sm)',
-                            backgroundColor: 'var(--green-50)',
-                            opacity: 0.8,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px'
+                            padding: 'var(--space-2) 0',
+                            backgroundColor: '#ffffff'
                           }}>
-                            <span style={{ display: 'inline-block', width: '6px', height: '6px', backgroundColor: 'var(--color-primary)', borderRadius: '50%' }}></span>
-                            {slot} — Libre
+                            Libre
                           </div>
-                        );
-                      }
-
-                      return (
-                        <div key={slot} style={{
-                          padding: 'var(--space-2)',
-                          textAlign: 'center',
-                          fontSize: 'var(--text-xs)',
-                          color: 'var(--neutral-400)',
-                          border: '1px solid var(--neutral-200)',
-                          borderRadius: 'var(--radius-sm)',
-                          backgroundColor: 'var(--neutral-50)',
-                          opacity: 0.5,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px'
-                        }}>
-                          <span style={{ fontSize: '10px' }}>🔒</span>
-                          {slot} — Inactivo
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+                        ) : (
+                          <div style={{
+                            textAlign: 'center',
+                            fontSize: '9px',
+                            color: '#94a3b8',
+                            fontStyle: 'italic'
+                          }}>
+                            —
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </React.Fragment>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* Appointment Detail Modal */}
+      {selectedAppt && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: 'var(--space-4)'
+        }} onClick={() => setSelectedAppt(null)}>
+          <div style={{
+            backgroundColor: 'var(--color-surface)',
+            borderRadius: 'var(--radius-xl)',
+            width: '100%',
+            maxWidth: '520px',
+            boxShadow: 'var(--shadow-2xl)',
+            overflow: 'hidden',
+            border: '1px solid var(--color-border)',
+            display: 'flex',
+            flexDirection: 'column',
+            animation: 'fadeInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+          }} onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{
+              padding: 'var(--space-5)',
+              borderBottom: '1px solid var(--color-border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'linear-gradient(to right, var(--green-50), var(--color-surface))'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold', color: 'var(--color-primary)' }}>Detalle del Turno</h3>
+                <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                  ID Turno: #{selectedAppt.id} · Fecha: {selectedAppt.fecha}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedAppt(null)}
+                style={{
+                  border: 'none',
+                  background: 'var(--neutral-100)',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  color: 'var(--color-text-primary)'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxHeight: '70vh', overflowY: 'auto' }}>
+              
+              {/* Warning Banner: First Consultation */}
+              {selectedAppt.firstConsultation && (
+                <div style={{
+                  backgroundColor: '#fffbeb',
+                  border: '1px solid #fef3c7',
+                  borderLeft: '4px solid #d97706',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: 'var(--space-4)',
+                  color: '#b45309',
+                  fontSize: 'var(--text-sm)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--space-1)'
+                }}>
+                  <strong style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    ⚠️ Primera Consulta Médica
+                  </strong>
+                  <span>Es la primera vez que este paciente agenda una cita. Debés verificar y completar su Ficha Clínica antes del inicio de la sesión.</span>
+                </div>
+              )}
+
+              {/* Grid with patient information */}
+              <div>
+                <h4 style={{ margin: '0 0 var(--space-2) 0', fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)' }}>Datos del Paciente</h4>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 'var(--space-3)',
+                  backgroundColor: 'var(--neutral-50)',
+                  padding: 'var(--space-4)',
+                  borderRadius: 'var(--radius-lg)',
+                  border: '1px solid var(--color-border)'
+                }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Nombre Completo</label>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>
+                      {selectedAppt.patientInfo?.apellido 
+                        ? `${selectedAppt.patientInfo.nombre} ${selectedAppt.patientInfo.apellido}`
+                        : selectedAppt.patientName}
+                    </span>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Sexo</label>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>
+                      {selectedAppt.patientInfo?.sexo === 'M' ? 'Masculino (M)' : selectedAppt.patientInfo?.sexo === 'F' ? 'Femenino (F)' : selectedAppt.patientInfo?.sexo || 'No especificado'}
+                    </span>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>DNI / Documento</label>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>
+                      {selectedAppt.patientInfo?.tipoDocumento && selectedAppt.patientInfo?.numeroDocumento
+                        ? `${selectedAppt.patientInfo.tipoDocumento} ${selectedAppt.patientInfo.numeroDocumento}`
+                        : selectedAppt.patientInfo?.dni || 'No especificado'}
+                    </span>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>CUIL</label>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>
+                      {selectedAppt.patientInfo?.cuil || 'No especificado'}
+                    </span>
+                  </div>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Contacto (Email & Teléfono)</label>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500', display: 'block' }}>
+                      ✉ {selectedAppt.patientInfo?.mail || selectedAppt.patientInfo?.email || '-'}
+                    </span>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500', display: 'block', marginTop: '2px' }}>
+                      📞 {selectedAppt.patientInfo?.telefono || '-'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cobertura médica (Prepaga / Obra Social) */}
+              <div>
+                <h4 style={{ margin: '0 0 var(--space-2) 0', fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)' }}>Detalle de Cobertura (OSDE)</h4>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 'var(--space-3)',
+                  backgroundColor: 'var(--neutral-50)',
+                  padding: 'var(--space-4)',
+                  borderRadius: 'var(--radius-lg)',
+                  border: '1px solid var(--color-border)'
+                }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Obra Social</label>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>
+                      {selectedAppt.patientInfo?.obraSocial || 'Consulta Particular'}
+                    </span>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Plan</label>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>
+                      {selectedAppt.patientInfo?.credencial?.plan || '-'}
+                    </span>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Nro. Afiliado (PAN)</label>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>
+                      {selectedAppt.patientInfo?.credencial?.pan || selectedAppt.patientInfo?.numAfiliado || '-'}
+                    </span>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Token Digital</label>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600', color: 'var(--color-primary)' }}>
+                      {selectedAppt.patientInfo?.credencial?.token || '-'}
+                    </span>
+                  </div>
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Código Entidad</label>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500' }}>
+                      {selectedAppt.patientInfo?.credencial?.codEntidad || '-'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Consultation detail card */}
+              <div style={{
+                backgroundColor: 'var(--green-50)',
+                padding: 'var(--space-4)',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--color-primary-disabled)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-primary)' }}>Modalidad / Horario</label>
+                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'bold', color: 'var(--color-primary)' }}>
+                    {selectedAppt.type}
+                  </span>
+                  <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                    🕒 {selectedAppt.hour} hs (Bloque de 45 min)
+                  </span>
+                </div>
+                <div>
+                  <span className={`badge ${selectedAppt.status === 'confirmed' ? 'badge--success' : selectedAppt.status === 'completed' ? 'badge--neutral' : 'badge--warning'}`}>
+                    {selectedAppt.status === 'confirmed' ? 'Confirmado' : selectedAppt.status === 'completed' ? 'Completado' : 'Pendiente'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Attendance Section */}
+              <div style={{
+                padding: 'var(--space-4) 0',
+                borderTop: '1px solid var(--color-border)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--space-2)'
+              }}>
+                <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
+                  Asistencia del Paciente
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-2)' }}>
+                  {[
+                    { val: 'ESPERANDO', label: 'Esperando', emoji: '⏳', color: 'var(--neutral-600)' },
+                    { val: 'LLEGO', label: 'Llegó', emoji: '🚶‍♂️', color: 'var(--color-primary)' },
+                    { val: 'AUSENTE', label: 'Ausente', emoji: '❌', color: 'var(--color-danger)' },
+                    { val: 'COMPLETADA', label: 'Terminado', emoji: '✓', color: '#10b981' }
+                  ].map((opt) => {
+                    const isSelected = selectedAppt.attendanceStatus === opt.val;
+                    return (
+                      <button
+                        key={opt.val}
+                        onClick={() => {
+                          onUpdateAttendance(selectedAppt.id, opt.val);
+                          setSelectedAppt((prev: any) => prev ? { ...prev, attendanceStatus: opt.val } : null);
+                        }}
+                        style={{
+                          padding: 'var(--space-2) var(--space-1)',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          borderRadius: 'var(--radius-md)',
+                          border: isSelected ? `2px solid ${opt.color}` : '1px solid var(--color-border)',
+                          backgroundColor: isSelected ? 'var(--neutral-50)' : '#ffffff',
+                          color: isSelected ? opt.color : 'var(--color-text-secondary)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '2px',
+                          boxShadow: isSelected ? 'var(--shadow-sm)' : 'none'
+                        }}
+                      >
+                        <span style={{ fontSize: '14px' }}>{opt.emoji}</span>
+                        <span>{opt.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Reschedule Section */}
+              <div style={{
+                padding: 'var(--space-4) 0',
+                borderTop: '1px solid var(--color-border)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--space-2)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
+                    Reprogramar Consulta
+                  </label>
+                  <button 
+                    onClick={() => {
+                      setIsRescheduling(!isRescheduling);
+                      setRescheduleDate(selectedAppt.fecha || '');
+                      setRescheduleHour(selectedAppt.hour + ':00');
+                    }}
+                    style={{
+                      border: 'none',
+                      background: 'none',
+                      color: 'var(--color-primary)',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    {isRescheduling ? 'Cancelar' : 'Modificar fecha/hora'}
+                  </button>
+                </div>
+
+                {isRescheduling && (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1.2fr 0.8fr 1fr',
+                    gap: 'var(--space-2)',
+                    alignItems: 'flex-end',
+                    backgroundColor: 'var(--neutral-50)',
+                    padding: 'var(--space-3)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border)',
+                    marginTop: 'var(--space-2)'
+                  }}>
+                    <div>
+                      <label style={{ fontSize: '9px', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>Nueva Fecha</label>
+                      <input 
+                        type="date" 
+                        value={rescheduleDate}
+                        onChange={(e) => setRescheduleDate(e.target.value)}
+                        style={{ width: '100%', fontSize: '11px', padding: '4px' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '9px', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>Hora</label>
+                      <select
+                        value={rescheduleHour}
+                        onChange={(e) => setRescheduleHour(e.target.value)}
+                        style={{ width: '100%', fontSize: '11px', padding: '4px' }}
+                      >
+                        {getDynamicSlots().map(slot => (
+                          <option key={slot} value={slot}>{slot} hs</option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      onClick={() => {
+                        onRescheduleAppointment(selectedAppt.id, rescheduleDate, rescheduleHour);
+                        setSelectedAppt(null);
+                        setIsRescheduling(false);
+                      }}
+                      className="btn btn--primary btn--sm"
+                      style={{ height: '26px', fontSize: '10px', padding: '0 var(--space-2)' }}
+                    >
+                      Guardar
+                    </button>
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: 'var(--space-5)',
+              borderTop: '1px solid var(--color-border)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 'var(--space-3)',
+              backgroundColor: 'var(--neutral-50)'
+            }}>
+              <button className="btn btn--secondary" onClick={() => setSelectedAppt(null)}>
+                Cerrar
+              </button>
+              {selectedAppt.meetLink && selectedAppt.status === 'confirmed' && (
+                <a 
+                  href={selectedAppt.meetLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn--primary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)' }}
+                >
+                  <Icon.Video /> Unirse al Meet
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
 
 // ── Root App ───────────────────────────────────────────────────
 export default function App() {
+  const { showAlert } = useAlert()
   const [view, setView] = useState<AppView>('landing')
   const [activeNav, setActiveNav] = useState<NavSection>('dashboard')
   const [mpConnected, setMpConnected] = useState(false)
@@ -1411,13 +2450,18 @@ export default function App() {
   }
 
   const handleConnect = () => {
-    alert('En producción: redirige a Mercado Pago OAuth para vincular tu cuenta.')
+    showAlert('En producción: redirige a Mercado Pago OAuth para vincular tu cuenta.', 'info')
     setMpConnected(true)
   }
 
   const handleBook = (pro: CheckoutTarget) => {
-    setCheckoutTarget(pro)
-    setView('checkout')
+    if (!currentUser) {
+      showAlert("Para reservar un turno, debes iniciar sesión primero.", "warning");
+      setView('login');
+      return;
+    }
+    setCheckoutTarget(pro);
+    setView('checkout');
   }
 
   const handleLogout = async () => {
@@ -1437,6 +2481,55 @@ export default function App() {
         setNotifications(notifications.map(n => ({ ...n, leido: true })))
       })
       .catch((err) => console.error("Error al marcar notificaciones como leídas:", err))
+  }
+
+  const refreshDashboardAppointments = () => {
+    Promise.all([
+      api.getTurnosHoy(),
+      api.getTurnos(),
+      api.getStats()
+    ]).then(([turnos, allTurnos, statsData]) => {
+      setTodayAppointments(turnos || [])
+      setAllAppointments(allTurnos || [])
+      setStats(statsData)
+    }).catch(err => console.error("Error refreshing appointments:", err));
+  }
+
+  const handleCancelAppointment = (turnoId: number) => {
+    if (window.confirm("¿Estás seguro de que deseas cancelar este turno?")) {
+      api.cancelarTurno(turnoId)
+        .then(() => {
+          showAlert("Turno cancelado con éxito.", "success");
+          refreshDashboardAppointments();
+        })
+        .catch(err => {
+          console.error(err);
+          showAlert("Error al cancelar el turno.", "error");
+        });
+    }
+  }
+
+  const handleUpdateAttendance = (turnoId: number, asistencia: string) => {
+    api.actualizarAsistencia(turnoId, asistencia)
+      .then(() => {
+        refreshDashboardAppointments();
+      })
+      .catch(err => {
+        console.error(err);
+        showAlert("Error al actualizar la asistencia.", "error");
+      });
+  }
+
+  const handleRescheduleAppointment = (turnoId: number, fecha: string, hora: string) => {
+    api.reprogramarTurno(turnoId, fecha, hora)
+      .then(() => {
+        showAlert("Turno reprogramado con éxito. Se ha enviado una notificación por WhatsApp al paciente.", "success");
+        refreshDashboardAppointments();
+      })
+      .catch(err => {
+        console.error(err);
+        showAlert("Error al reprogramar el turno.", "error");
+      });
   }
 
   const pageTitle: Record<NavSection, string> = {
@@ -1469,6 +2562,9 @@ export default function App() {
             allAppointments={allAppointments}
             availability={availability}
             stats={stats} 
+            onCancelAppointment={handleCancelAppointment}
+            onUpdateAttendance={handleUpdateAttendance}
+            onRescheduleAppointment={handleRescheduleAppointment}
           />
         )
       case 'agenda': 

@@ -118,5 +118,10 @@ export const api = {
   getMisSeguimientos: () => apiFetch('/pacientes/me/seguimientos'),
   crearMiSeguimiento: (data: { estadoAnimo: string; sintomas: string; notas: string }) => 
     apiFetch('/pacientes/me/seguimientos', { method: 'POST', body: data as any }),
-  getMisInformes: () => apiFetch('/pacientes/me/informes')
+  getMisInformes: () => apiFetch('/pacientes/me/informes'),
+  cancelarTurno: (turnoId: number | string) => apiFetch(`/turnos/${turnoId}/cancelar`, { method: 'POST' }),
+  actualizarAsistencia: (turnoId: number | string, asistencia: string) => 
+    apiFetch(`/turnos/${turnoId}/asistencia?asistencia=${encodeURIComponent(asistencia)}`, { method: 'PUT' }),
+  reprogramarTurno: (turnoId: number | string, fecha: string, hora: string) => 
+    apiFetch(`/turnos/${turnoId}/reprogramar?fecha=${encodeURIComponent(fecha)}&hora=${encodeURIComponent(hora)}`, { method: 'PUT' })
 };
