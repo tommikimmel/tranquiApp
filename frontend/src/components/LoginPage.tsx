@@ -12,7 +12,6 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   
   // Dev simulation states
   const [showDevOptions] = useState(true)
-  const [devEmail, setDevEmail] = useState('paula@tranqui.com')
   const [customEmail, setCustomEmail] = useState('')
 
   const handleGoogleLogin = async (token: string) => {
@@ -65,12 +64,11 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   })
 
   const handleSimulatedLogin = () => {
-    const emailToUse = devEmail === 'custom' ? customEmail : devEmail
-    if (!emailToUse || !emailToUse.includes('@')) {
+    if (!customEmail || !customEmail.includes('@')) {
       setError('Por favor, ingresá un email válido para simular.')
       return
     }
-    handleGoogleLogin(`mock-${emailToUse}`)
+    handleGoogleLogin(`mock-${customEmail}`)
   }
 
   return (
@@ -172,51 +170,25 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              <label htmlFor="dev-role-select" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>
-                Seleccionar perfil de prueba:
+              <label htmlFor="custom-email-input" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>
+                Ingresar email para simulación:
               </label>
-              <select
-                id="dev-role-select"
-                value={devEmail}
-                onChange={(e) => setDevEmail(e.target.value)}
+              <input
+                id="custom-email-input"
+                type="email"
+                placeholder="ejemplo@correo.com"
+                value={customEmail}
+                onChange={(e) => setCustomEmail(e.target.value)}
                 style={{
                   padding: 'var(--space-2)',
                   borderRadius: 'var(--radius-sm)',
                   border: '1px solid var(--color-border)',
-                  backgroundColor: 'var(--neutral-0)',
-                  fontFamily: 'var(--font-body)',
                   fontSize: 'var(--text-sm)',
-                  color: 'var(--color-text-primary)'
+                  fontFamily: 'var(--font-body)',
+                  backgroundColor: 'var(--neutral-0)'
                 }}
-              >
-                <option value="paula@tranqui.com">Lic. María Paula Rossi (Profesional / Psiquiatra)</option>
-                <option value="Demo@gmail.com">Dr. Demo Demo (Profesional Verificado)</option>
-                <option value="mateo.b@gmail.com">Mateo Benítez (Paciente Demo)</option>
-                <option value="custom">Ingresar otro email...</option>
-              </select>
+              />
             </div>
-
-            {devEmail === 'custom' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-                <label htmlFor="custom-email-input" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-                  Email personalizado:
-                </label>
-                <input
-                  id="custom-email-input"
-                  type="email"
-                  placeholder="ejemplo@correo.com"
-                  value={customEmail}
-                  onChange={(e) => setCustomEmail(e.target.value)}
-                  style={{
-                    padding: 'var(--space-2)',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--color-border)',
-                    fontSize: 'var(--text-sm)',
-                    fontFamily: 'var(--font-body)'
-                  }}
-                />
-              </div>
-            )}
 
             <button
               onClick={handleSimulatedLogin}
