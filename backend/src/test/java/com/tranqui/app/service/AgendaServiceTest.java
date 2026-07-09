@@ -23,13 +23,13 @@ class AgendaServiceTest {
         Disponibilidad disp = Disponibilidad.builder()
                 .horaInicio(LocalTime.of(9, 0))
                 .horaFin(LocalTime.of(10, 30)) // Debería dar exactamente 2 bloques (09:00 y 09:45)
-                .diaSemana(LocalDate.now().getDayOfWeek().getValue())
+                .diaSemana(LocalDate.now().plusDays(1).getDayOfWeek().getValue())
                 .build();
 
         List<Disponibilidad> disponibilidades = List.of(disp);
         List<Turno> turnosExistentes = new ArrayList<>();
 
-        List<LocalTime> bloques = agendaService.calcularBloquesDisponibles(disponibilidades, turnosExistentes, LocalDate.now());
+        List<LocalTime> bloques = agendaService.calcularBloquesDisponibles(disponibilidades, turnosExistentes, LocalDate.now().plusDays(1));
         
         assertEquals(2, bloques.size());
         assertEquals(LocalTime.of(9, 0), bloques.get(0));
@@ -41,7 +41,7 @@ class AgendaServiceTest {
         Disponibilidad disp = Disponibilidad.builder()
                 .horaInicio(LocalTime.of(9, 0))
                 .horaFin(LocalTime.of(10, 30))
-                .diaSemana(LocalDate.now().getDayOfWeek().getValue())
+                .diaSemana(LocalDate.now().plusDays(1).getDayOfWeek().getValue())
                 .build();
 
         // Existing booking from 09:00 to 09:45
@@ -53,7 +53,7 @@ class AgendaServiceTest {
         List<Disponibilidad> disponibilidades = List.of(disp);
         List<Turno> turnosExistentes = List.of(turno);
 
-        List<LocalTime> bloques = agendaService.calcularBloquesDisponibles(disponibilidades, turnosExistentes, LocalDate.now());
+        List<LocalTime> bloques = agendaService.calcularBloquesDisponibles(disponibilidades, turnosExistentes, LocalDate.now().plusDays(1));
         
         // 09:00 block should be filtered out, leaving only 09:45 block
         assertEquals(1, bloques.size());

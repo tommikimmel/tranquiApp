@@ -269,13 +269,54 @@ public class ClinicalService {
             paciente.setCredencialPan(dto.getCredencial().getPan());
             paciente.setCredencialPlan(dto.getCredencial().getPlan());
             paciente.setCredencialToken(dto.getCredencial().getToken());
-            if (dto.getCredencial().getPlan() != null) {
+            if (dto.getCredencial().getPlan() != null && !dto.getCredencial().getPlan().trim().isEmpty()) {
                 paciente.setObraSocial("OSDE " + dto.getCredencial().getPlan());
+            } else {
+                paciente.setObraSocial(dto.getObraSocial());
             }
+        } else {
+            paciente.setCredencialCodEntidad(null);
+            paciente.setCredencialPan(null);
+            paciente.setCredencialPlan(null);
+            paciente.setCredencialToken(null);
+            paciente.setObraSocial(null);
         }
         
         Usuario saved = usuarioRepository.save(paciente);
 
         return construirPacienteDto(saved, "Hoy", false, false);
+    }
+
+    @Transactional
+    public void eliminarInforme(Long id, String medicoEmail) {
+        InformeClinico informe = informeClinicoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Informe no encontrado"));
+        if (!informe.getMedico().getEmail().equals(medicoEmail)) {
+            throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para eliminar este informe");
+        }
+        informeClinicoRepository.delete(informe);
+    }
+
+    @Transactional
+    public InformeClinico editarInforme(Long id, String medicoEmail, String tipoInforme, String planTrabajo, String contenido) {
+        InformeClinico informe = informeClinicoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Informe no encontrado"));
+        if (!informe.getMedico().getEmail().equals(medicoEmail)) {
+            throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para editar este informe");
+        }
+        informe.setTipoInforme(tipoInforme);
+        informe.setPlanTrabajo(planTrabajo);
+        informe.setContenido(contenido);
+        return informeClinicoRepository.save(informe);
+    }
+
+    @Transactional
+    public void eliminarSeguimiento(Long id, String medicoEmail) {
+        SeguimientoDiario seguimiento = seguimientoDiarioRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Seguimiento no encontrado"));
+        if (!seguimiento.getMedico().getEmail().equals(medicoEmail)) {
+            throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para eliminar este seguimiento");
+        }
+        seguimientoDiarioRepository.delete(seguimiento);
     }
 }

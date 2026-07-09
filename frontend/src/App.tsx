@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import './styles/index.css'
 import './styles/dashboard.css'
 import LandingPage from './components/LandingPage'
@@ -1579,6 +1579,86 @@ function DashboardHome({
   const [showInactiveSlots, setShowInactiveSlots] = useState(false);
   const [selectedAppt, setSelectedAppt] = useState<any | null>(null);
 
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 10000); // update every 10s
+    return () => clearInterval(interval);
+  }, []);
+
+  // Find the next active/confirmed appointment closest to now
+  const nextAppt = useMemo(() => {
+    if (!allAppointments || allAppointments.length === 0) return null;
+    const now = currentTime;
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+    const currentHour = now.getHours();
+    const currentMin = now.getMinutes();
+
+    const upcoming = allAppointments
+      .filter(a => a.status !== 'completed' && a.status !== 'cancelled' && a.attendanceStatus !== 'AUSENTE' && a.attendanceStatus !== 'COMPLETADA')
+      .sort((a, b) => {
+        const dateDiff = a.fecha.localeCompare(b.fecha);
+        if (dateDiff !== 0) return dateDiff;
+        return a.hour.localeCompare(b.hour);
+      });
+
+    return upcoming.find(a => {
+      if (a.fecha === todayStr) {
+        const parts = a.hour.split(':');
+        const apptHour = parseInt(parts[0]);
+        const apptMin = parseInt(parts[1] || '0');
+        if (apptHour > currentHour) return true;
+        if (apptHour === currentHour) return apptMin >= currentMin;
+        return false;
+      }
+      return a.fecha > todayStr;
+    }) || upcoming[0];
+  }, [allAppointments, currentTime]);
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  };
+
+  const getCountdownString = (appt: any) => {
+    if (!appt || !appt.fecha || !appt.hour) return '';
+    const parts = appt.fecha.split('-');
+    const timeParts = String(appt.hour).split(':');
+    const year = parseInt(parts[0] || '0', 10);
+    const month = parseInt(parts[1] || '1', 10) - 1;
+    const day = parseInt(parts[2] || '1', 10);
+    const hour = parseInt(timeParts[0] || '0', 10);
+    const min = parseInt(timeParts[1] || '0', 10);
+    const apptDate = new Date(year, month, day, hour, min, 0);
+
+    const diffMs = apptDate.getTime() - currentTime.getTime();
+    if (diffMs <= 0) {
+      if (diffMs > -45 * 60 * 1000) {
+        return "¡En curso!";
+      }
+      return "Finalizado";
+    }
+
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const totalHours = Math.floor(totalMinutes / 60);
+    const days = Math.floor(totalHours / 24);
+
+    const hours = totalHours % 24;
+    const minutes = totalMinutes % 60;
+
+    return `Falta: ${days}d ${hours}h ${minutes}m`;
+  };
+
   // Rescheduling states
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleHour, setRescheduleHour] = useState('');
@@ -1642,6 +1722,95 @@ function DashboardHome({
   return (
     <>
       <MPConnectBanner connected={mpConnected} onConnect={onConnect} />
+
+      {nextAppt && (
+        <div className="card" style={{ width: '100%', maxWidth: 'none', marginBottom: 'var(--space-4)', padding: 'var(--space-5)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--color-border)', marginBottom: 'var(--space-4)' }}>
+            <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 16, height: 16, color: 'var(--color-primary)' }}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Próximo Turno Programado
+            </h2>
+            <div style={{
+              backgroundColor: 'var(--green-50)',
+              color: 'var(--color-primary)',
+              padding: 'var(--space-1) var(--space-3)',
+              borderRadius: 'var(--radius-full)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 'bold',
+              border: '1px solid var(--green-200)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span style={{ display: 'inline-block', width: '6px', height: '6px', backgroundColor: 'var(--color-primary)', borderRadius: '50%' }}></span>
+              {getCountdownString(nextAppt)}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
+            <div style={{ textAlign: 'left' }}>
+              <p style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)' }}>
+                {nextAppt.patientName}
+              </p>
+              <div style={{ display: 'flex', gap: 'var(--space-4)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  📅 <strong>Fecha:</strong> {formatDate(nextAppt.fecha)}
+                </span>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  ⏰ <strong>Horario:</strong> {nextAppt.hour} hs
+                </span>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  🩺 <strong>Modalidad:</strong> {nextAppt.type}
+                </span>
+              </div>
+              <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-xs)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span style={{ color: 'var(--color-text-secondary)' }}>Asistencia:</span>
+                <span className="badge" style={{ 
+                  backgroundColor: nextAppt.attendanceStatus === 'LLEGO' ? 'var(--green-100)' : nextAppt.attendanceStatus === 'AUSENTE' ? '#fdf2f2' : 'var(--neutral-100)',
+                  color: nextAppt.attendanceStatus === 'LLEGO' ? 'var(--green-700)' : nextAppt.attendanceStatus === 'AUSENTE' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  padding: '2px 8px',
+                  borderRadius: 'var(--radius-sm)'
+                }}>
+                  {nextAppt.attendanceStatus === 'LLEGO' ? '🚶‍♂️ Presente' : nextAppt.attendanceStatus === 'AUSENTE' ? '❌ Ausente' : '⏳ Esperando paciente'}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+              <button 
+                onClick={() => onUpdateAttendance(nextAppt.id, 'LLEGO')}
+                className="btn btn--secondary btn--sm"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '4px',
+                  backgroundColor: nextAppt.attendanceStatus === 'LLEGO' ? 'var(--green-50)' : 'transparent',
+                  borderColor: nextAppt.attendanceStatus === 'LLEGO' ? 'var(--color-primary)' : 'var(--color-border)',
+                  color: nextAppt.attendanceStatus === 'LLEGO' ? 'var(--color-primary)' : 'var(--color-text-primary)'
+                }}
+              >
+                🚶‍♂️ Llegó
+              </button>
+              <button 
+                onClick={() => onUpdateAttendance(nextAppt.id, 'AUSENTE')}
+                className="btn btn--ghost btn--sm"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '4px',
+                  backgroundColor: nextAppt.attendanceStatus === 'AUSENTE' ? '#fdf2f2' : 'transparent',
+                  color: nextAppt.attendanceStatus === 'AUSENTE' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
+                  border: '1px solid ' + (nextAppt.attendanceStatus === 'AUSENTE' ? 'var(--color-danger)' : 'var(--color-border)')
+                }}
+              >
+                ❌ Ausente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <StatsOverview stats={stats} />
 

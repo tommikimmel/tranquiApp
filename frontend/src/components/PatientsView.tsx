@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { api } from '../api/api'
 import { useChat } from '../hooks/useChat'
 import { useAlert } from '../context/AlertContext'
+import { downloadReportPDF } from '../utils/pdfGenerator'
 
 interface Patient {
   id: number
@@ -37,6 +38,7 @@ interface TrackingEntry {
   estadoAnimo: string
   sintomas: string
   notas: string
+  nombreMedico?: string
 }
 
 interface ClinicalReport {
@@ -46,6 +48,7 @@ interface ClinicalReport {
   planTrabajo: string
   contenido: string
   nombreArchivo: string
+  nombreMedico?: string
 }
 
 export default function PatientsView() {
@@ -79,6 +82,23 @@ export default function PatientsView() {
   const [reportContent, setReportContent] = useState('')
   const [uploadFilename, setUploadFilename] = useState('')
 
+  // Editing & Deleting states
+  const [editingReportId, setEditingReportId] = useState<number | null>(null)
+  const [editReportType, setEditReportType] = useState('')
+  const [editReportPlan, setEditReportPlan] = useState('')
+  const [editReportContent, setEditReportContent] = useState('')
+  const [confirmModalConfig, setConfirmModalConfig] = useState<{
+    isOpen: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  })
+
   // Edit Patient Details states
   const [isEditingPatient, setIsEditingPatient] = useState(false)
   const [editDni, setEditDni] = useState('')
@@ -99,6 +119,7 @@ export default function PatientsView() {
   const [editCredPan, setEditCredPan] = useState('')
   const [editCredPlan, setEditCredPlan] = useState('')
   const [editCredToken, setEditCredToken] = useState('')
+  const [hasObraSocial, setHasObraSocial] = useState(false)
 
   const [savingPatientDetails, setSavingPatientDetails] = useState(false)
 
@@ -123,6 +144,8 @@ export default function PatientsView() {
       setEditCredPlan(selectedPatient.credencial?.plan || '')
       setEditCredToken(selectedPatient.credencial?.token || '')
 
+      setHasObraSocial(!!(selectedPatient.obraSocial || selectedPatient.credencial?.pan || selectedPatient.credencial?.plan || selectedPatient.credencial?.codEntidad))
+
       setIsEditingPatient(false)
     }
   }, [selectedPatient])
@@ -136,8 +159,8 @@ export default function PatientsView() {
         nombre: editNombre,
         apellido: editApellido,
         dni: editDni,
-        obraSocial: editObraSocial,
-        numAfiliado: editNumAfiliado,
+        obraSocial: hasObraSocial ? editObraSocial : '',
+        numAfiliado: hasObraSocial ? editNumAfiliado : '',
         direccion: editDireccion,
         telefono: editTelefono,
         sexo: editSexo,
@@ -146,12 +169,12 @@ export default function PatientsView() {
         tipoDocumento: editTipoDocumento,
         numeroDocumento: editNumeroDocumento ? Number(editNumeroDocumento) : null,
         datosOfuscado: editDatosOfuscado,
-        credencial: {
+        credencial: hasObraSocial ? {
           codEntidad: editCredCodEntidad ? Number(editCredCodEntidad) : null,
           pan: editCredPan,
           plan: editCredPlan,
           token: editCredToken
-        }
+        } : undefined
       }
 
       await api.actualizarPaciente(selectedPatient.id, updatedData)
@@ -297,6 +320,81 @@ export default function PatientsView() {
         console.error("Error al crear informe:", err)
         showAlert("No se pudo guardar el informe", "error")
       })
+  }
+
+  const handleStartEditReport = (r: any) => {
+    setEditingReportId(r.id)
+    setEditReportType(r.tipoInforme)
+    setEditReportPlan(r.planTrabajo || '')
+    setEditReportContent(r.contenido || '')
+  }
+
+  const handleSaveEditReport = (e: React.FormEvent, reportId: number) => {
+    e.preventDefault()
+    if (!selectedPatient) return
+
+    const data = {
+      tipoInforme: editReportType,
+      planTrabajo: editReportPlan,
+      contenido: editReportContent
+    }
+
+    api.editarInforme(selectedPatient.id, reportId, data)
+      .then((res: any) => {
+        setReports(reports.map(rep => rep.id === reportId ? res : rep))
+        setEditingReportId(null)
+        showAlert("Informe editado con éxito ✓", "success")
+      })
+      .catch((err) => {
+        console.error("Error al editar informe:", err)
+        showAlert("No se pudo guardar los cambios del informe", "error")
+      })
+  }
+
+  const handleDeleteReport = (reportId: number) => {
+    if (!selectedPatient) return
+    setConfirmModalConfig({
+      isOpen: true,
+      title: '¿Eliminar Informe Clínico?',
+      message: 'Esta acción no se puede deshacer y el informe clínico se eliminará de forma permanente.',
+      onConfirm: () => {
+        api.eliminarInforme(selectedPatient.id, reportId)
+          .then(() => {
+            setReports(reports.filter(rep => rep.id !== reportId))
+            showAlert("Informe clínico eliminado ✓", "success")
+          })
+          .catch((err) => {
+            console.error("Error al eliminar informe:", err)
+            showAlert("No se pudo eliminar el informe", "error")
+          })
+          .finally(() => {
+            setConfirmModalConfig(prev => ({ ...prev, isOpen: false }))
+          })
+      }
+    })
+  }
+
+  const handleDeleteTracking = (trackingId: number) => {
+    if (!selectedPatient) return
+    setConfirmModalConfig({
+      isOpen: true,
+      title: '¿Eliminar Entrada de Seguimiento?',
+      message: 'Esta acción no se puede deshacer y el registro de seguimiento se eliminará de forma permanente.',
+      onConfirm: () => {
+        api.eliminarSeguimiento(selectedPatient.id, trackingId)
+          .then(() => {
+            setTrackings(trackings.filter(t => t.id !== trackingId))
+            showAlert("Seguimiento diario eliminado ✓", "success")
+          })
+          .catch((err) => {
+            console.error("Error al eliminar seguimiento:", err)
+            showAlert("No se pudo eliminar el seguimiento", "error")
+          })
+          .finally(() => {
+            setConfirmModalConfig(prev => ({ ...prev, isOpen: false }))
+          })
+      }
+    })
   }
 
   const filteredPatients = patients.filter(p => 
@@ -746,65 +844,81 @@ export default function PatientsView() {
                       </div>
 
                       {/* Section: Credencial */}
-                      <div>
-                        <div style={{ fontWeight: 'bold', fontSize: 'var(--text-xs)', color: 'var(--color-primary)', textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>
-                          4. Cobertura y Obra Social
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 'var(--space-3)' }}>
-                          <div className="form-group">
-                            <label className="form-label">Obra Social</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                        <div className="form-group" style={{ marginBottom: 'var(--space-1)' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer', fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
                             <input 
-                              type="text" 
-                              value={editObraSocial} 
-                              onChange={(e) => setEditObraSocial(e.target.value)}
-                              className="form-input"
-                              placeholder="Ej. OSDE"
+                              type="checkbox" 
+                              checked={hasObraSocial} 
+                              onChange={(e) => setHasObraSocial(e.target.checked)} 
+                              style={{ width: '15px', height: '15px', accentColor: 'var(--color-primary)' }}
                             />
-                          </div>
-                          <div className="form-group">
-                            <label className="form-label">Plan</label>
-                            <input 
-                              type="text" 
-                              value={editCredPlan} 
-                              onChange={(e) => setEditCredPlan(e.target.value)}
-                              className="form-input"
-                              placeholder="Ej. 410"
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label className="form-label">Cod. Entidad</label>
-                            <input 
-                              type="number" 
-                              value={editCredCodEntidad} 
-                              onChange={(e) => setEditCredCodEntidad(e.target.value)}
-                              className="form-input"
-                              placeholder="Ej. 7100"
-                            />
-                          </div>
+                            <span>EL PACIENTE POSEE OBRA SOCIAL / COBERTURA</span>
+                          </label>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
-                          <div className="form-group">
-                            <label className="form-label">Nro. Credencial / Afiliado</label>
-                            <input 
-                              type="text" 
-                              value={editCredPan} 
-                              onChange={(e) => setEditCredPan(e.target.value)}
-                              className="form-input"
-                              placeholder="Número impreso en la credencial"
-                            />
+                        {hasObraSocial && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                            <div style={{ fontWeight: 'bold', fontSize: 'var(--text-xs)', color: 'var(--color-primary)', textTransform: 'uppercase', marginBottom: 'var(--space-1)' }}>
+                              4. Cobertura y Obra Social
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 'var(--space-3)' }}>
+                              <div className="form-group">
+                                <label className="form-label">Obra Social</label>
+                                <input 
+                                  type="text" 
+                                  value={editObraSocial} 
+                                  onChange={(e) => setEditObraSocial(e.target.value)}
+                                  className="form-input"
+                                  placeholder="Ej. OSDE"
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label">Plan</label>
+                                <input 
+                                  type="text" 
+                                  value={editCredPlan} 
+                                  onChange={(e) => setEditCredPlan(e.target.value)}
+                                  className="form-input"
+                                  placeholder="Ej. 410"
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label">Cod. Entidad</label>
+                                <input 
+                                  type="number" 
+                                  value={editCredCodEntidad} 
+                                  onChange={(e) => setEditCredCodEntidad(e.target.value)}
+                                  className="form-input"
+                                  placeholder="Ej. 7100"
+                                />
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+                              <div className="form-group">
+                                <label className="form-label">Nro. Credencial / Afiliado</label>
+                                <input 
+                                  type="text" 
+                                  value={editCredPan} 
+                                  onChange={(e) => setEditCredPan(e.target.value)}
+                                  className="form-input"
+                                  placeholder="Número impreso en la credencial"
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label">Token de Seguridad</label>
+                                <input 
+                                  type="text" 
+                                  value={editCredToken} 
+                                  onChange={(e) => setEditCredToken(e.target.value)}
+                                  className="form-input"
+                                  placeholder="Código temporal"
+                                />
+                              </div>
+                            </div>
                           </div>
-                          <div className="form-group">
-                            <label className="form-label">Token de Seguridad</label>
-                            <input 
-                              type="text" 
-                              value={editCredToken} 
-                              onChange={(e) => setEditCredToken(e.target.value)}
-                              className="form-input"
-                              placeholder="Código temporal"
-                            />
-                          </div>
-                        </div>
+                        )}
                       </div>
 
                       <div style={{ display: 'flex', gap: 'var(--space-2)', alignSelf: 'flex-end', marginTop: 'var(--space-2)' }}>
@@ -1005,10 +1119,22 @@ export default function PatientsView() {
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
                             <span style={{ fontWeight: 'bold' }}>Animo: {t.estadoAnimo}</span>
-                            <span style={{ color: 'var(--color-text-secondary)' }}>{t.fecha}</span>
+                            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                              <span style={{ color: 'var(--color-text-secondary)' }}>{t.fecha}</span>
+                              <button 
+                                onClick={() => handleDeleteTracking(t.id)} 
+                                style={{ border: 'none', background: 'none', color: 'var(--color-danger)', cursor: 'pointer', fontWeight: 'bold', fontSize: '11px', padding: '0 2px' }}
+                                title="Eliminar Seguimiento"
+                              >
+                                ✕
+                              </button>
+                            </div>
                           </div>
                           {t.sintomas && <div style={{ color: 'var(--color-primary)', marginBottom: 'var(--space-1)' }}><strong>Síntomas:</strong> {t.sintomas}</div>}
                           {t.notas && <div style={{ color: 'var(--color-text-secondary)' }}><strong>Notas:</strong> {t.notas}</div>}
+                          <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)', marginTop: '4px', borderTop: '1px solid #f1f5f9', paddingTop: '2px' }}>
+                            Registrado por: <strong>{t.nombreMedico || 'No especificado'}</strong>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1134,42 +1260,122 @@ export default function PatientsView() {
                     <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', padding: 'var(--space-2)' }}>No se encontraron informes emitidos.</p>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                      {reports.map((r) => (
-                        <div key={r.id} style={{
-                          padding: 'var(--space-4)',
-                          backgroundColor: 'var(--neutral-0)',
-                          borderRadius: 'var(--radius-md)',
-                          boxShadow: 'var(--shadow-sm)',
-                          fontSize: 'var(--text-xs)',
-                          border: '1px solid var(--color-border)'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-1)' }}>
-                            <span style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--green-700)' }}>
-                              Informe {r.tipoInforme}
-                            </span>
-                            <span style={{ color: 'var(--color-text-secondary)' }}>{r.fecha}</span>
-                          </div>
-                          
-                          <div style={{ marginBottom: 'var(--space-2)' }}>
-                            <strong>Plan de Trabajo:</strong>
-                            <p style={{ margin: 'var(--space-1) 0', color: 'var(--color-text-primary)' }}>{r.planTrabajo}</p>
-                          </div>
+                      {reports.map((r) => {
+                        const isEditing = editingReportId === r.id;
+                        return (
+                          <div key={r.id} style={{
+                            padding: 'var(--space-4)',
+                            backgroundColor: 'var(--neutral-0)',
+                            borderRadius: 'var(--radius-md)',
+                            boxShadow: 'var(--shadow-sm)',
+                            fontSize: 'var(--text-xs)',
+                            border: '1px solid var(--color-border)'
+                          }}>
+                            {isEditing ? (
+                              <form onSubmit={(e) => handleSaveEditReport(e, r.id)} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                                <div style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '4px' }}>Editar Informe</div>
+                                <div className="form-group">
+                                  <label className="form-label" style={{ fontWeight: 'bold' }}>Tipo de Informe</label>
+                                  <select value={editReportType} onChange={(e) => setEditReportType(e.target.value)} className="form-input" style={{ width: '100%' }}>
+                                    <option value="Evaluativo">Evaluativo</option>
+                                    <option value="Evolutivo">Evolutivo</option>
+                                    <option value="General">General</option>
+                                    <option value="Final">Final</option>
+                                  </select>
+                                </div>
+                                <div className="form-group">
+                                  <label className="form-label" style={{ fontWeight: 'bold' }}>Plan de Trabajo</label>
+                                  <textarea 
+                                    value={editReportPlan} 
+                                    onChange={(e) => setEditReportPlan(e.target.value)} 
+                                    className="form-input" 
+                                    rows={3} 
+                                    style={{ width: '100%', resize: 'vertical' }}
+                                    required 
+                                  />
+                                </div>
+                                <div className="form-group">
+                                  <label className="form-label" style={{ fontWeight: 'bold' }}>Detalle Clínico</label>
+                                  <textarea 
+                                    value={editReportContent} 
+                                    onChange={(e) => setEditReportContent(e.target.value)} 
+                                    className="form-input" 
+                                    rows={5} 
+                                    style={{ width: '100%', resize: 'vertical' }}
+                                    required 
+                                  />
+                                </div>
+                                <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', marginTop: 'var(--space-1)' }}>
+                                  <button type="button" onClick={() => setEditingReportId(null)} className="btn btn--secondary btn--sm">
+                                    Cancelar
+                                  </button>
+                                  <button type="submit" className="btn btn--primary btn--sm">
+                                    Guardar Cambios
+                                  </button>
+                                </div>
+                              </form>
+                            ) : (
+                              <>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-1)' }}>
+                                  <div>
+                                    <span style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--green-700)' }}>
+                                      Informe {r.tipoInforme}
+                                    </span>
+                                    <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                                      Emitido por: <strong>{r.nombreMedico || 'No especificado'}</strong>
+                                    </div>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                    <span style={{ color: 'var(--color-text-secondary)' }}>{r.fecha}</span>
+                                    <button 
+                                      onClick={() => downloadReportPDF(r, selectedPatient)}
+                                      className="btn btn--secondary btn--sm" 
+                                      style={{ padding: '2px 8px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    >
+                                      📥 PDF
+                                    </button>
+                                    {!r.nombreArchivo && (
+                                      <button 
+                                        onClick={() => handleStartEditReport(r)}
+                                        className="btn btn--secondary btn--sm" 
+                                        style={{ padding: '2px 8px', fontSize: '10px' }}
+                                      >
+                                        ✏️ Editar
+                                      </button>
+                                    )}
+                                    <button 
+                                      onClick={() => handleDeleteReport(r.id)}
+                                      className="btn btn--ghost btn--sm" 
+                                      style={{ padding: '2px 8px', fontSize: '10px', color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
+                                    >
+                                      🗑️ Eliminar
+                                    </button>
+                                  </div>
+                                </div>
+                                
+                                <div style={{ marginBottom: 'var(--space-2)' }}>
+                                  <strong>Plan de Trabajo:</strong>
+                                  <p style={{ margin: 'var(--space-1) 0', color: 'var(--color-text-primary)' }}>{r.planTrabajo}</p>
+                                </div>
 
-                          {r.contenido && (
-                            <div style={{ marginBottom: 'var(--space-2)' }}>
-                              <strong>Detalle Clínico:</strong>
-                              <p style={{ margin: 'var(--space-1) 0', color: 'var(--color-text-secondary)' }}>{r.contenido}</p>
-                            </div>
-                          )}
+                                {r.contenido && (
+                                  <div style={{ marginBottom: 'var(--space-2)' }}>
+                                    <strong>Detalle Clínico:</strong>
+                                    <p style={{ margin: 'var(--space-1) 0', color: 'var(--color-text-secondary)' }}>{r.contenido}</p>
+                                  </div>
+                                )}
 
-                          {r.nombreArchivo && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--color-primary)', fontWeight: 'bold' }}>
-                              <span>📎 Documento adjunto:</span>
-                              <span style={{ textDecoration: 'underline', cursor: 'pointer' }}>{r.nombreArchivo}</span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                                {r.nombreArchivo && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--color-primary)', fontWeight: 'bold' }}>
+                                    <span>📎 Documento adjunto:</span>
+                                    <span style={{ textDecoration: 'underline', cursor: 'pointer' }}>{r.nombreArchivo}</span>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -1195,6 +1401,101 @@ export default function PatientsView() {
             </p>
           </div>
         )}
+      </div>
+      <ConfirmModal 
+        isOpen={confirmModalConfig.isOpen}
+        title={confirmModalConfig.title}
+        message={confirmModalConfig.message}
+        onConfirm={confirmModalConfig.onConfirm}
+        onCancel={() => setConfirmModalConfig(prev => ({ ...prev, isOpen: false }))}
+      />
+    </div>
+  )
+}
+
+interface ConfirmModalProps {
+  isOpen: boolean
+  title: string
+  message: string
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+function ConfirmModal({ isOpen, title, message, onConfirm, onCancel }: ConfirmModalProps) {
+  if (!isOpen) return null
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      backdropFilter: 'blur(4px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 99999,
+      animation: 'fadeIn 0.2s ease-out'
+    }}>
+      <div className="card" style={{
+        maxWidth: '400px',
+        width: '90%',
+        padding: 'var(--space-6)',
+        textAlign: 'center',
+        boxShadow: 'var(--shadow-lg)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        backgroundColor: 'var(--color-surface)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 'var(--space-4)'
+      }}>
+        <div style={{
+          width: '48px',
+          height: '48px',
+          borderRadius: '50%',
+          backgroundColor: '#fee2e2',
+          color: 'var(--color-danger)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 24, height: 24 }}>
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <h3 style={{
+          fontFamily: 'var(--font-heading)',
+          fontSize: 'var(--text-lg)',
+          fontWeight: 'var(--font-weight-bold)',
+          color: 'var(--color-text-primary)',
+          margin: 0
+        }}>
+          {title}
+        </h3>
+        <p style={{
+          fontSize: 'var(--text-sm)',
+          color: 'var(--color-text-secondary)',
+          lineHeight: 'var(--line-height-relaxed)',
+          margin: 0
+        }}>
+          {message}
+        </p>
+        <div style={{ display: 'flex', gap: 'var(--space-3)', width: '100%', marginTop: 'var(--space-2)' }}>
+          <button
+            className="btn btn--secondary"
+            onClick={onCancel}
+            style={{ flex: 1 }}
+          >
+            Cancelar
+          </button>
+          <button
+            className="btn btn--primary"
+            onClick={onConfirm}
+            style={{ flex: 1, backgroundColor: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
+          >
+            Eliminar
+          </button>
+        </div>
       </div>
     </div>
   )

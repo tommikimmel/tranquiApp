@@ -1,5 +1,6 @@
 package com.tranqui.app.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
@@ -18,10 +19,12 @@ public class SeguimientoDiario {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "paciente_id", nullable = false)
     private Usuario paciente;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "medico_id", nullable = false)
     private Usuario medico;
@@ -50,5 +53,10 @@ public class SeguimientoDiario {
         if (fecha == null) {
             fecha = LocalDate.now();
         }
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("nombreMedico")
+    public String getNombreMedico() {
+        return medico != null ? medico.getNombre() + (medico.getApellido() != null ? " " + medico.getApellido() : "") : null;
     }
 }
