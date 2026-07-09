@@ -7,6 +7,41 @@ import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import { downloadReportPDF } from '../utils/pdfGenerator'
 
+// ── Icons ────────────────────────────────────────────────────────
+function IconCheck({ size = 12 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  )
+}
+
+function IconClose({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
+}
+
+function IconSend({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
+  )
+}
+
+function IconHelp({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  )
+}
+
 // ── Types ──────────────────────────────────────────────────────
 interface Tariff {
   label: string
@@ -131,10 +166,10 @@ function ProCard({ pro, onBook, onChat }: { pro: Professional; onBook: (p: Profe
         <div className="pro-card__info">
           <div className="pro-card__name">{pro.name}</div>
           <div className="pro-card__specialty">{pro.degree} · {pro.specialty}</div>
-          <span className="pro-card__matricula">{pro.matricula} ✓</span>
+          <span className="pro-card__matricula">{pro.matricula} <IconCheck /></span>
           <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
-            {pro.ofreceOnline && <span className="badge badge--success" style={{ fontSize: '9px', padding: '2px 6px', textTransform: 'none', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>💻 Online</span>}
-            {pro.ofrecePresencial && <span className="badge badge--success" style={{ fontSize: '9px', padding: '2px 6px', textTransform: 'none', backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>🏢 Presencial</span>}
+            {pro.ofreceOnline && <span className="badge badge--success" style={{ fontSize: '9px', padding: '2px 6px', textTransform: 'none', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>Online</span>}
+            {pro.ofrecePresencial && <span className="badge badge--success" style={{ fontSize: '9px', padding: '2px 6px', textTransform: 'none', backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>Presencial</span>}
           </div>
         </div>
       </div>
@@ -169,7 +204,7 @@ function ProCard({ pro, onBook, onChat }: { pro: Professional; onBook: (p: Profe
           onClick={(e) => { e.stopPropagation(); onChat(pro) }}
           style={{ whiteSpace: 'nowrap', padding: 'var(--space-2) var(--space-3)' }}
         >
-          💬 Chatear
+          Chatear
         </button>
         <button
           className="btn btn--primary btn--sm"
@@ -226,6 +261,7 @@ function PublicHeader({
     <header className="public-header" role="banner" style={{ position: 'relative', zIndex: 1000 }}>
       <div className="public-header__inner">
         <a href="/" className="public-header__logo" aria-label="Tranqui App - Inicio">
+          <img src="/tranqui-icon.png" alt="" aria-hidden="true" className="public-header__logo-icon" />
           tranqui
         </a>
         <span className="public-header__tagline">por Tranqui Neurociencias</span>
@@ -238,7 +274,8 @@ function PublicHeader({
             onClick={onOpenHelp}
             style={{ fontSize: 'var(--text-xs)', padding: 'var(--space-2) var(--space-4)', display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}
           >
-            ❓ Ayuda / FAQ
+            <IconHelp />
+            Ayuda / FAQ
           </button>
 
           <button
@@ -341,7 +378,7 @@ function PublicHeader({
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                      📅 Mis Turnos
+                      Mis Turnos
                     </button>
                     <button
                       onClick={() => {
@@ -361,7 +398,7 @@ function PublicHeader({
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                      🩺 Mi Historia Clínica
+                      Mi Historia Clínica
                     </button>
                     <button
                       onClick={() => {
@@ -380,7 +417,7 @@ function PublicHeader({
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fdf2f2'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                      🚪 Cerrar sesión
+                      Cerrar sesión
                     </button>
                   </div>
                 )}
@@ -413,35 +450,22 @@ const TRUST_ITEMS = [
 
 function TrustStrip() {
   return (
-    <div className="trust-strip" aria-label="Garantías de servicio" style={{
-      borderBottom: '1px solid var(--color-border)',
-      padding: 'var(--space-3) var(--space-8) var(--space-4)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 'var(--space-6)',
-      flexWrap: 'wrap'
-    }}>
-      {TRUST_ITEMS.map((item, idx) => (
-        <div className="trust-item" key={idx} role="listitem" style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-2)',
-          fontSize: 'var(--text-xs)',
-          color: 'var(--neutral-600)'
-        }}>
-          <span className="trust-item__icon" aria-hidden="true" style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            width: '16px',
-            height: '16px',
-            color: 'var(--color-primary)'
-          }}>
-            {item.icon}
-          </span>
-          <span className="trust-item__text">{item.text}</span>
+    <div className="trust-strip" aria-label="Garantías de servicio">
+      <div className="trust-carousel">
+        <div className="trust-carousel__track">
+          {[...TRUST_ITEMS, ...TRUST_ITEMS].map((item, idx) => (
+            <div
+              className="trust-carousel__item"
+              key={idx}
+              role={idx < TRUST_ITEMS.length ? 'listitem' : undefined}
+              aria-hidden={idx >= TRUST_ITEMS.length}
+            >
+              <span className="trust-carousel__icon" aria-hidden="true">{item.icon}</span>
+              <span className="trust-carousel__text">{item.text}</span>
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
     </div>
   )
 }
@@ -766,37 +790,8 @@ export default function LandingPage({
                 <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" />
                 <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
               </svg>
-              {filterAvailableOnly ? 'Disponibles ahora ✓' : 'Disponibilidad'}
+              {filterAvailableOnly ? 'Disponibles ahora' : 'Disponibilidad'}
             </button>
-          </div>
-
-          {/* Modality Filter segmented buttons */}
-          <div style={{ display: 'flex', gap: 'var(--space-2)', margin: 'var(--space-3) auto var(--space-1)' }}>
-            {(['Todos', 'Online', 'Presencial'] as const).map((mode) => {
-              const isActive = activeModality === mode;
-              const label = mode === 'Todos' ? 'Todas las modalidades' : mode === 'Online' ? '💻 Citas Online' : '🏢 Citas Presenciales';
-              return (
-                <button
-                  key={mode}
-                  onClick={() => setActiveModality(mode)}
-                  style={{
-                    padding: 'var(--space-2) var(--space-4)',
-                    borderRadius: '20px',
-                    border: '1px solid',
-                    borderColor: isActive ? 'var(--color-primary)' : 'var(--color-border)',
-                    backgroundColor: isActive ? 'var(--color-primary)' : 'white',
-                    color: isActive ? 'white' : 'var(--color-text-primary)',
-                    fontSize: 'var(--text-xs)',
-                    fontWeight: isActive ? 'bold' : 'normal',
-                    cursor: 'pointer',
-                    boxShadow: isActive ? 'var(--shadow-sm)' : 'none',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  {label}
-                </button>
-              );
-            })}
           </div>
 
           {/* Specialty chips */}
@@ -879,7 +874,7 @@ export default function LandingPage({
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
                         <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                          📅 {appt.fecha} · ⏰ {appt.hour} hs
+                          {appt.fecha} · {appt.hour} hs
                         </span>
                         <span className={`badge ${isConfirmed ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '9px', padding: '2px 6px', textTransform: 'uppercase' }}>
                           {isConfirmed ? 'Confirmado' : 'Pendiente Pago'}
@@ -925,7 +920,7 @@ export default function LandingPage({
                                 boxShadow: '0 2px 4px rgba(0, 158, 227, 0.15)'
                               }}
                             >
-                              💳 Pagar Copago
+                              Pagar Copago
                             </a>
                           )}
                           <button 
@@ -940,7 +935,7 @@ export default function LandingPage({
                               padding: '2px 4px'
                             }}
                           >
-                            ✕ Cancelar
+                            Cancelar
                           </button>
                         </div>
                       </div>
@@ -968,13 +963,43 @@ export default function LandingPage({
             </div>
           </div>
 
+          {/* Modality Filter segmented buttons */}
+          <div style={{ display: 'flex', gap: 'var(--space-2)', margin: '0 0 var(--space-4)' }}>
+            {(['Todos', 'Online', 'Presencial'] as const).map((mode) => {
+              const isActive = activeModality === mode;
+              const label = mode === 'Todos' ? 'Todas las modalidades' : mode === 'Online' ? 'Citas Online' : 'Citas Presenciales';
+              return (
+                <button
+                  key={mode}
+                  onClick={() => setActiveModality(mode)}
+                  style={{
+                    padding: 'var(--space-3) var(--space-6)',
+                    borderRadius: '24px',
+                    border: '1px solid',
+                    borderColor: isActive ? 'var(--color-primary)' : 'var(--color-border)',
+                    backgroundColor: isActive ? 'var(--color-primary)' : 'white',
+                    color: isActive ? 'white' : 'var(--color-text-primary)',
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: isActive ? 'bold' : 'normal',
+                    cursor: 'pointer',
+                    boxShadow: isActive ? 'var(--shadow-sm)' : 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="results-grid" role="list" aria-label="Profesionales disponibles">
             {loading
               ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
               : filtered.length === 0
                 ? (
                   <div className="empty-state" role="status" aria-live="polite">
-                    <div className="empty-state__emoji" aria-hidden="true">🌱</div>
+                    <img src="/empty-state-sprout.png" alt="" aria-hidden="true" className="empty-state__emoji" />
+                    <span className="empty-state__brand" aria-hidden="true">tranqui</span>
                     <h3 className="empty-state__title">No encontramos resultados</h3>
                     <p className="empty-state__body">
                       No hay profesionales con esa especialidad disponibles ahora.
@@ -1024,8 +1049,8 @@ export default function LandingPage({
             gap: 'var(--space-4)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
-              <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>📅 Mis Turnos Reservados</h3>
-              <button onClick={() => setShowAppointmentsModal(false)} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}>✕</button>
+              <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Mis Turnos Reservados</h3>
+              <button onClick={() => setShowAppointmentsModal(false)} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
             </div>
             {loadingPortal ? (
               <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}><div className="checkout-spinner" style={{ margin: 'auto' }} /></div>
@@ -1066,7 +1091,7 @@ export default function LandingPage({
                               }}
                               title="Cancelar Turno"
                             >
-                              ✕ Cancelar
+                              Cancelar
                             </button>
                           )}
                         </div>
@@ -1112,7 +1137,7 @@ export default function LandingPage({
                             boxShadow: '0 2px 4px rgba(0,158,227,0.15)'
                           }}
                         >
-                          💳 Pagar Turno
+                          Pagar Turno
                         </a>
                       )}
                     </div>
@@ -1149,8 +1174,8 @@ export default function LandingPage({
             gap: 'var(--space-4)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
-              <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>🩺 Mi Historia Clínica / Informes</h3>
-              <button onClick={() => setShowReportsModal(false)} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}>✕</button>
+              <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Mi Historia Clínica / Informes</h3>
+              <button onClick={() => setShowReportsModal(false)} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
             </div>
             {loadingPortal ? (
               <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}><div className="checkout-spinner" style={{ margin: 'auto' }} /></div>
@@ -1186,7 +1211,7 @@ export default function LandingPage({
                           className="btn btn--secondary btn--sm" 
                           style={{ padding: '2px 8px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
                         >
-                          📥 PDF
+                          PDF
                         </button>
                       </div>
                     </div>
@@ -1202,7 +1227,7 @@ export default function LandingPage({
                     )}
                     {r.nombreArchivo && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginTop: 'var(--space-2)', fontSize: '11px', color: 'var(--color-primary)' }}>
-                        📄 Adjunto: <em>{r.nombreArchivo}</em>
+                        Adjunto: <em>{r.nombreArchivo}</em>
                       </div>
                     )}
                   </div>
@@ -1238,8 +1263,8 @@ export default function LandingPage({
             gap: 'var(--space-4)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
-              <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>❓ Ayuda y Preguntas Frecuentes (FAQ)</h3>
-              <button onClick={() => setShowHelpModal(false)} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}>✕</button>
+              <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}><IconHelp size={20} /> Ayuda y Preguntas Frecuentes (FAQ)</h3>
+              <button onClick={() => setShowHelpModal(false)} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', textAlign: 'left', fontSize: 'var(--text-sm)', lineHeight: '1.5' }}>
               <div>
@@ -1263,7 +1288,7 @@ export default function LandingPage({
               <div>
                 <h4 style={{ fontWeight: 'bold', color: 'var(--color-primary)', margin: '0 0 var(--space-1)' }}>4. ¿Cómo cancelar un turno?</h4>
                 <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
-                  Si necesitás cancelar una reserva, abrí tu menú de perfil (haciendo clic en tu nombre en la parte superior derecha), seleccioná <strong>"Mis Turnos"</strong>, ubicá el turno correspondiente y hacé clic en el botón <strong>"✕ Cancelar"</strong>.
+                  Si necesitás cancelar una reserva, abrí tu menú de perfil (haciendo clic en tu nombre en la parte superior derecha), seleccioná <strong>"Mis Turnos"</strong>, ubicá el turno correspondiente y hacé clic en el botón <strong>"Cancelar"</strong>.
                 </p>
               </div>
               <div>
@@ -1426,7 +1451,7 @@ export default function LandingPage({
                   }}
                   aria-label="Cerrar chat"
                 >
-                  ✕
+                  <IconClose />
                 </button>
               </div>
 
@@ -1511,7 +1536,7 @@ export default function LandingPage({
                         maxWidth: '85%',
                         boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                       }}>
-                        🔒 Las conversaciones en Tranqui están cifradas. Escribí un mensaje para iniciar la consulta.
+                        Las conversaciones en Tranqui están cifradas. Escribí un mensaje para iniciar la consulta.
                       </div>
                     ) : (
                       chatMessages.map((msg, index) => {
@@ -1584,7 +1609,7 @@ export default function LandingPage({
                       }}
                       aria-label="Enviar"
                     >
-                      ➤
+                      <IconSend />
                     </button>
                   </form>
                 </>

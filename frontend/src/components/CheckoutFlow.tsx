@@ -3,6 +3,14 @@ import '../styles/checkout.css'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 
+function IconCheck({ size = 12 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  )
+}
+
 // ── Types ──────────────────────────────────────────────────────
 interface Professional {
   id: string
@@ -186,7 +194,7 @@ function StepSelect({
         <div className="checkout-pro-card__info">
           <div className="checkout-pro-card__name">{professional.name}</div>
           <div className="checkout-pro-card__specialty">{professional.degree} · {professional.specialty}</div>
-          <span className="checkout-pro-card__matricula">{professional.matricula} ✓</span>
+          <span className="checkout-pro-card__matricula">{professional.matricula} <IconCheck /></span>
         </div>
       </div>
 
@@ -701,7 +709,7 @@ function StepConfirmed({
         <div className="checkout-summary-card__row">
           <span className="checkout-summary-card__label">Pagado</span>
           <span className="checkout-summary-card__value checkout-summary-card__value--paid">
-            ${createdTurn?.precio ? createdTurn.precio.toLocaleString('es-AR') : professional.price.toLocaleString('es-AR')} ✓
+            ${createdTurn?.precio ? createdTurn.precio.toLocaleString('es-AR') : professional.price.toLocaleString('es-AR')}
           </span>
         </div>
       </div>
@@ -883,7 +891,6 @@ export default function CheckoutFlow({
               paddingBottom: 'var(--space-3)'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                <span style={{ fontSize: '20px' }}>💳</span>
                 <span style={{ fontWeight: 'bold', color: '#009EE3', fontSize: 'var(--text-lg)' }}>Mercado Pago</span>
                 <span className="badge badge--neutral" style={{ fontSize: '9px', backgroundColor: '#e5e7eb', color: '#4b5563' }}>SANDBOX / TEST</span>
               </div>
@@ -948,7 +955,7 @@ export default function CheckoutFlow({
                         console.error("Error fetching updated turn:", e);
                       }
                       
-                      showAlert("Pago acreditado ✓ Webhook simulado con éxito.", "success");
+                      showAlert("Pago acreditado. Webhook simulado con éxito.", "success");
                       setShowMockPaymentGateway(false);
                       setStep('confirmed');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -965,7 +972,7 @@ export default function CheckoutFlow({
                 className="btn btn--primary"
                 style={{ backgroundColor: 'var(--color-primary)', border: 'none', justifyContent: 'center' }}
               >
-                {simulatingWebhook ? 'Simulando acreditación...' : '✓ Simular Pago Exitoso (Aprobar)'}
+                {simulatingWebhook ? 'Simulando acreditación...' : 'Simular Pago Exitoso (Aprobar)'}
               </button>
 
               <button
@@ -978,7 +985,7 @@ export default function CheckoutFlow({
                 className="btn btn--ghost"
                 style={{ color: 'var(--color-danger)', border: '1px solid var(--color-danger)', justifyContent: 'center' }}
               >
-                ✗ Simular Pago Rechazado (Cancelar)
+                Simular Pago Rechazado (Cancelar)
               </button>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', margin: 'var(--space-2) 0' }}>
