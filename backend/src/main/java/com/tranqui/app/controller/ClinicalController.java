@@ -174,4 +174,52 @@ public class ClinicalController {
         }
         return ResponseEntity.ok(clinicalService.actualizarPaciente(pacienteId, userDetails.getUsername(), dto));
     }
+
+    @DeleteMapping("/pacientes/{pacienteId}/informes/{informeId}")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<Void> eliminarInforme(
+            @PathVariable Long pacienteId,
+            @PathVariable Long informeId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        clinicalService.eliminarInforme(informeId, userDetails.getUsername());
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/pacientes/{pacienteId}/informes/{informeId}")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<InformeClinico> editarInforme(
+            @PathVariable Long pacienteId,
+            @PathVariable Long informeId,
+            @RequestParam String tipoInforme,
+            @RequestParam(required = false) String planTrabajo,
+            @RequestParam(required = false) String contenido,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        InformeClinico updated = clinicalService.editarInforme(
+                informeId,
+                userDetails.getUsername(),
+                tipoInforme,
+                planTrabajo,
+                contenido
+        );
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/pacientes/{pacienteId}/seguimientos/{seguimientoId}")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<Void> eliminarSeguimiento(
+            @PathVariable Long pacienteId,
+            @PathVariable Long seguimientoId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        clinicalService.eliminarSeguimiento(seguimientoId, userDetails.getUsername());
+        return ResponseEntity.ok().build();
+    }
 }

@@ -103,6 +103,8 @@ export const api = {
   getSeguimientos: (pacienteId: number | string) => apiFetch(`/pacientes/${pacienteId}/seguimientos`),
   crearSeguimiento: (pacienteId: number | string, data: { estadoAnimo: string; sintomas: string; notas: string; fecha?: string }) => 
     apiFetch(`/pacientes/${pacienteId}/seguimientos`, { method: 'POST', body: data as any }),
+  eliminarSeguimiento: (pacienteId: number | string, seguimientoId: number | string) => 
+    apiFetch(`/pacientes/${pacienteId}/seguimientos/${seguimientoId}`, { method: 'DELETE' }),
   getInformes: (pacienteId: number | string) => apiFetch(`/pacientes/${pacienteId}/informes`),
   crearInforme: (pacienteId: number | string, data: { tipoInforme: string; planTrabajo?: string; contenido?: string; nombreArchivo?: string }) => {
     const q = new URLSearchParams();
@@ -112,6 +114,15 @@ export const api = {
     if (data.nombreArchivo) q.append('nombreArchivo', data.nombreArchivo);
     return apiFetch(`/pacientes/${pacienteId}/informes?${q.toString()}`, { method: 'POST' });
   },
+  editarInforme: (pacienteId: number | string, informeId: number | string, data: { tipoInforme: string; planTrabajo?: string; contenido?: string }) => {
+    const q = new URLSearchParams();
+    q.append('tipoInforme', data.tipoInforme);
+    if (data.planTrabajo) q.append('planTrabajo', data.planTrabajo);
+    if (data.contenido) q.append('contenido', data.contenido);
+    return apiFetch(`/pacientes/${pacienteId}/informes/${informeId}?${q.toString()}`, { method: 'PUT' });
+  },
+  eliminarInforme: (pacienteId: number | string, informeId: number | string) => 
+    apiFetch(`/pacientes/${pacienteId}/informes/${informeId}`, { method: 'DELETE' }),
 
   // Patient Portal APIs
   getMisTurnos: () => apiFetch('/pacientes/me/turnos'),

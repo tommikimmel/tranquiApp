@@ -42,11 +42,23 @@ class MedicoServiceTest {
     @BeforeEach
     void setUp() {
         medico = Usuario.builder()
-                .nombre("Lic. Marta Rossi")
+                .nombre("Marta")
+                .apellido("Rossi")
                 .email("marta.medico@gmail.com")
                 .rol(Rol.PSIQUIATRA)
                 .matricula("12345")
                 .precio(new BigDecimal("35000"))
+                .sexo("F")
+                .fechaNacimiento(LocalDate.of(1980, 5, 10))
+                .cuil(27123456789L)
+                .tipoDocumento("DNI")
+                .numeroDocumento(12345678)
+                .domicilioAtencion("Calle Falsa 123")
+                .codigoReFeps(987654L)
+                .matriculaTipo("Nacional")
+                .matriculaProvincia("Córdoba")
+                .matriculaNumero(12345)
+                .fotoUrl("http://example.com/foto.jpg")
                 .build();
         paciente = Usuario.builder()
                 .nombre("Paciente Pedro")
@@ -90,7 +102,7 @@ class MedicoServiceTest {
     void testObtenerPerfil() {
         MedicoDto result = medicoService.obtenerPerfil(medico.getEmail());
         assertNotNull(result);
-        assertEquals(medico.getNombre(), result.getName());
+        assertEquals(medico.getNombre() + " " + medico.getApellido(), result.getName());
     }
 
     @Test

@@ -27,7 +27,7 @@ public class DisponibilidadService {
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<DisponibilidadDto> obtenerDisponibilidades(String email) {
         Usuario medico = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));

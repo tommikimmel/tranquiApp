@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import './styles/index.css'
 import './styles/dashboard.css'
 import LandingPage from './components/LandingPage'
@@ -1029,6 +1029,109 @@ function PrescriptionView({ onSend }: { onSend: (data: any) => Promise<void> }) 
 // ── Settings: Tariff & Profile ─────────────────────────────────
 // DEFAULT_TARIFFS mock removed since values are loaded from API
 
+const PROVINCIAS_ARGENTINA = [
+  "Buenos Aires",
+  "CABA",
+  "Catamarca",
+  "Chaco",
+  "Chubut",
+  "Córdoba",
+  "Corrientes",
+  "Entre Ríos",
+  "Formosa",
+  "Jujuy",
+  "La Pampa",
+  "La Rioja",
+  "Mendoza",
+  "Misiones",
+  "Neuquén",
+  "Río Negro",
+  "Salta",
+  "San Juan",
+  "San Luis",
+  "Santa Cruz",
+  "Santa Fe",
+  "Santiago del Estero",
+  "Tierra del Fuego",
+  "Tucumán"
+];
+
+const ESPECIALIDADES_GRUPOS = [
+  {
+    "id": "clinicas",
+    "nombreGrupo": "Especialidades Clínicas",
+    "especialidades": [
+      {"id": "alergia_inmuno", "nombre": "Alergia e Inmunología"},
+      {"id": "cardiologia", "nombre": "Cardiología"},
+      {"id": "dermatologia", "nombre": "Dermatología"},
+      {"id": "endocrinologia", "nombre": "Endocrinología y Nutrición"},
+      {"id": "gastroenterologia", "nombre": "Gastroenterología / Hepatología"},
+      {"id": "geriatria", "nombre": "Geriatria"},
+      {"id": "hematologia", "nombre": "Hematología"},
+      {"id": "infectologia", "nombre": "Infectología"},
+      {"id": "medicina_interna", "nombre": "Medicina Interna (Clínica Médica)"},
+      {"id": "nefrologia", "nombre": "Nefrología"},
+      {"id": "neumonologia", "nombre": "Neumonología"},
+      {"id": "neurologia", "nombre": "Neurología"},
+      {"id": "oncologia_medica", "nombre": "Oncología Médica"},
+      {"id": "pediatria", "nombre": "Pediatría"},
+      {"id": "psiquiatria", "nombre": "Psiquiatría"},
+      {"id": "psiquiatria_infantil", "nombre": "Psiquiatría Infanto-Juvenil"},
+      {"id": "reumatologia", "nombre": "Reumatología"}
+    ]
+  },
+  {
+    "id": "quirurgicas",
+    "nombreGrupo": "Especialidades Quirúrgicas",
+    "especialidades": [
+      {"id": "cirugia_cardiovascular", "nombre": "Cirugía Cardiovascular"},
+      {"id": "cirugia_general", "nombre": "Cirugía General y del Aparato Digestivo"},
+      {"id": "cirugia_maxilofacial", "nombre": "Cirugía Oral y Maxilofacial"},
+      {"id": "cirugia_traumatologia", "nombre": "Cirugía Ortopédica y Traumatología"},
+      {"id": "cirugia_pediatrica", "nombre": "Cirugía Pediátrica"},
+      {"id": "cirugia_plastica", "nombre": "Cirugía Plástica, Estética y Reparadora"},
+      {"id": "cirugia_toracica", "nombre": "Cirugía Torácica"},
+      {"id": "cirugia_vascular", "nombre": "Cirugía Vascular / Angiología"},
+      {"id": "neurocirugia", "nombre": "Neurocirugía"}
+    ]
+  },
+  {
+    "id": "mixtas",
+    "nombreGrupo": "Especialidades Médico-Quirúrgicas",
+    "especialidades": [
+      {"id": "ginecologia_obstetricia", "nombre": "Ginecología y Obstetricia (Tocoginecología)"},
+      {"id": "oftalmologia", "nombre": "Oftalmología"},
+      {"id": "otorrinolaringologia", "nombre": "Otorrinolaringología"},
+      {"id": "urologia", "nombre": "Urología"}
+    ]
+  },
+  {
+    "id": "diagnostico_soporte",
+    "nombreGrupo": "Diagnóstico, Soporte y Emergencias",
+    "especialidades": [
+      {"id": "anestesiologia", "nombre": "Anestesiología, Reanimación y Dolor"},
+      {"id": "anatomia_patologica", "nombre": "Anatomía Patológica"},
+      {"id": "diagnostico_imagenes", "nombre": "Diagnóstico por Imágenes / Radiología"},
+      {"id": "medicina_deporte", "nombre": "Medicina del Deporte"},
+      {"id": "medicina_emergencias", "nombre": "Medicina de Emergencias / Urgencias"},
+      {"id": "medicina_intensiva", "nombre": "Medicina Intensiva / Terapia Intensiva"},
+      {"id": "medicina_legal", "nombre": "Medicina Legal y Forense"},
+      {"id": "medicina_nuclear", "nombre": "Medicina Nuclear"},
+      {"id": "medicina_fisica_rehab", "nombre": "Medicina Física y Rehabilitación (Fisiatría)"},
+      {"id": "toxicologia", "nombre": "Toxicología Médica"}
+    ]
+  },
+  {
+    "id": "salud_publica_comunitaria",
+    "nombreGrupo": "Salud Pública y Atención Comunitaria",
+    "especialidades": [
+      {"id": "medicina_familiar", "nombre": "Medicina Familiar y General"},
+      {"id": "medicina_trabajo", "nombre": "Medicina del Trabajo / Laboral"},
+      {"id": "salud_publica", "nombre": "Salud Pública y Administración Sanitaria"}
+    ]
+  }
+];
+
 function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (updated: any) => Promise<void> }) {
   const { showAlert } = useAlert();
   const [name, setName] = useState(medicoInfo?.name || '')
@@ -1036,7 +1139,7 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
   const [sexo, setSexo] = useState(medicoInfo?.sexo || 'M')
   const [fechaNacimiento, setFechaNacimiento] = useState(medicoInfo?.fechaNacimiento || '')
   const [cuil, setCuil] = useState(medicoInfo?.cuil || '')
-  const [tipoDocumento, setTipoDocumento] = useState(medicoInfo?.tipoDocumento || 'DN')
+  const [tipoDocumento, setTipoDocumento] = useState(medicoInfo?.tipoDocumento || 'DNI')
   const [numeroDocumento, setNumeroDocumento] = useState(medicoInfo?.numeroDocumento || '')
   const [domicilioAtencion, setDomicilioAtencion] = useState(medicoInfo?.domicilioAtencion || '')
   const [codigoReFeps, setCodigoReFeps] = useState(medicoInfo?.codigoReFeps || '')
@@ -1044,23 +1147,28 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
   // MatriculaInfo
   const [matTipo, setMatTipo] = useState(medicoInfo?.matriculaInfo?.tipo || 'MN')
   const [matProvincia, setMatProvincia] = useState(medicoInfo?.matriculaInfo?.provincia || '')
-  const [matNumero, setMatNumero] = useState(medicoInfo?.matriculaInfo?.numero || '')
-  const [matEspecialidad, setMatEspecialidad] = useState(medicoInfo?.matriculaInfo?.especialidad?.textoLibre || '')
-  const [matAsocTipo, setMatAsocTipo] = useState(medicoInfo?.matriculaInfo?.asociada?.tipo || 'MN')
-  const [matAsocProvincia, setMatAsocProvincia] = useState(medicoInfo?.matriculaInfo?.asociada?.provincia || '')
-  const [matAsocNumero, setMatAsocNumero] = useState(medicoInfo?.matriculaInfo?.asociada?.numero || '')
 
   const [degree, setDegree] = useState(medicoInfo?.degree || '')
-  const [specialty, setSpecialty] = useState(medicoInfo?.specialty || '')
-  const [matricula, setMatricula] = useState(medicoInfo?.matricula || '')
-  const [cuit, setCuit] = useState(medicoInfo?.cuit || '')
+
+  const initialSpecialty = medicoInfo?.specialty || medicoInfo?.matriculaInfo?.especialidad?.textoLibre || '';
+
+  const initialGroup = ESPECIALIDADES_GRUPOS.find(g => 
+    g.especialidades.some(esp => esp.nombre === initialSpecialty)
+  )?.id || '';
+
+  const [selectedGroup, setSelectedGroup] = useState(initialGroup);
+  const [specialty, setSpecialty] = useState(initialSpecialty)
+
+  const handleGroupChange = (groupId: string) => {
+    setSelectedGroup(groupId);
+    setSpecialty('');
+  }
+
+  const [matricula, setMatricula] = useState(medicoInfo?.matricula || (medicoInfo?.matriculaInfo?.numero ? String(medicoInfo.matriculaInfo.numero) : ''))
   const [tariffs, setTariffs] = useState<any[]>(medicoInfo?.tariffs || [])
   const [fotoUrl, setFotoUrl] = useState(medicoInfo?.fotoUrl || '')
-  const [tags, setTags] = useState<string[]>(medicoInfo?.tags || [])
   const [ofreceOnline, setOfreceOnline] = useState(medicoInfo?.ofreceOnline !== undefined ? medicoInfo.ofreceOnline : true)
   const [ofrecePresencial, setOfrecePresencial] = useState(medicoInfo?.ofrecePresencial !== undefined ? medicoInfo.ofrecePresencial : false)
-
-  const availableProfessions = ['Psiquiatría', 'Psicología', 'Neurología', 'Terapia Familiar']
 
   const updateTariff = (id: string, field: 'price' | 'enabled', value: number | boolean) => {
     setTariffs(tariffs.map(t => t.id === id ? { ...t, [field]: value } : t))
@@ -1085,23 +1193,23 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
         matriculaInfo: {
           tipo: matTipo,
           provincia: matProvincia,
-          numero: matNumero ? Number(matNumero) : null,
+          numero: matricula ? Number(matricula) : null,
           especialidad: {
-            textoLibre: matEspecialidad
+            textoLibre: specialty
           },
           asociada: {
-            tipo: matAsocTipo,
-            provincia: matAsocProvincia,
-            numero: matAsocNumero ? Number(matAsocNumero) : null
+            tipo: medicoInfo?.matriculaInfo?.asociada?.tipo || 'MN',
+            provincia: medicoInfo?.matriculaInfo?.asociada?.provincia || '',
+            numero: medicoInfo?.matriculaInfo?.asociada?.numero || null
           }
         },
         degree,
         specialty,
-        matricula: matNumero ? String(matNumero) : matricula,
-        cuit,
+        matricula,
+        cuit: cuil ? String(cuil) : '',
         tariffs,
         fotoUrl,
-        tags,
+        tags: specialty ? [specialty] : [],
         ofreceOnline,
         ofrecePresencial
       })
@@ -1238,9 +1346,9 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-tipo-doc">Tipo Documento</label>
             <select id="input-tipo-doc" className="form-input" value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
-              <option value="DN">DNI (DN)</option>
-              <option value="LE">LE</option>
-              <option value="LC">LC</option>
+              <option value="DNI">DNI</option>
+              <option value="LC">Libreta Cívica (LC)</option>
+              <option value="LE">Libreta de Enrolamiento (LE)</option>
             </select>
           </div>
           <div className="form-group">
@@ -1248,12 +1356,16 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
             <input id="input-num-doc" className="form-input" type="number" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} />
           </div>
           <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-cuil">CUIL</label>
+            <label className="form-label form-label--required" htmlFor="input-cuil">CUIL/CUIT</label>
             <input id="input-cuil" className="form-input" type="number" placeholder="Ej. 27123456780" value={cuil} onChange={(e) => setCuil(e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-domicilio">Domicilio de Atención</label>
             <input id="input-domicilio" className="form-input" type="text" placeholder="Ej. Consultorio 12" value={domicilioAtencion} onChange={(e) => setDomicilioAtencion(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-degree">Título profesional</label>
+            <input id="input-degree" className="form-input" type="text" value={degree} onChange={(e) => setDegree(e.target.value)} />
           </div>
 
           <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', marginTop: 'var(--space-2)' }}>
@@ -1265,7 +1377,7 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
           </div>
 
           <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', marginTop: 'var(--space-2)' }}>
-            Matrícula Profesional
+            Matrícula
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-mat-tipo">Tipo de Matrícula</label>
@@ -1273,78 +1385,46 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-mat-provincia">Provincia</label>
-            <input id="input-mat-provincia" className="form-input" type="text" placeholder="Ej. S, C, B" value={matProvincia} onChange={(e) => setMatProvincia(e.target.value)} />
+            <select id="input-mat-provincia" className="form-input" value={matProvincia} onChange={(e) => setMatProvincia(e.target.value)}>
+              <option value="">Seleccioná una provincia</option>
+              {PROVINCIAS_ARGENTINA.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-mat-numero">Número de Matrícula</label>
-            <input id="input-mat-numero" className="form-input" type="number" value={matNumero} onChange={(e) => setMatNumero(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-mat-esp">Especialidad Matrícula</label>
-            <input id="input-mat-esp" className="form-input" type="text" placeholder="Ej. MedicoClinico" value={matEspecialidad} onChange={(e) => setMatEspecialidad(e.target.value)} />
-          </div>
-
-          <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
-            Matrícula Asociada
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="input-mat-asoc-tipo">Tipo Matrícula Asociada</label>
-            <input id="input-mat-asoc-tipo" className="form-input" type="text" value={matAsocTipo} onChange={(e) => setMatAsocTipo(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="input-mat-asoc-prov">Provincia Asociada</label>
-            <input id="input-mat-asoc-prov" className="form-input" type="text" value={matAsocProvincia} onChange={(e) => setMatAsocProvincia(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="input-mat-asoc-num">Número Matrícula Asociada</label>
-            <input id="input-mat-asoc-num" className="form-input" type="number" value={matAsocNumero} onChange={(e) => setMatAsocNumero(e.target.value)} />
-          </div>
-
-          <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', marginTop: 'var(--space-2)' }}>
-            Datos Visuales y de Filtro
-          </div>
-          <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-degree">Título profesional</label>
-            <input id="input-degree" className="form-input" type="text" value={degree} onChange={(e) => setDegree(e.target.value)} />
+            <label className="form-label form-label--required" htmlFor="input-specialty-group">Grupo de Especialidad</label>
+            <select 
+              id="input-specialty-group" 
+              className="form-input" 
+              value={selectedGroup} 
+              onChange={(e) => handleGroupChange(e.target.value)}
+            >
+              <option value="">Seleccioná un grupo</option>
+              {ESPECIALIDADES_GRUPOS.map(g => (
+                <option key={g.id} value={g.id}>{g.nombreGrupo}</option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-specialty">Especialidad</label>
-            <input id="input-specialty" className="form-input" type="text" value={specialty} onChange={(e) => setSpecialty(e.target.value)} />
+            <select 
+              id="input-specialty" 
+              className="form-input" 
+              value={specialty} 
+              onChange={(e) => setSpecialty(e.target.value)}
+              disabled={!selectedGroup}
+            >
+              <option value="">{selectedGroup ? 'Seleccioná una especialidad' : 'Primero seleccioná un grupo'}</option>
+              {selectedGroup && ESPECIALIDADES_GRUPOS.find(g => g.id === selectedGroup)?.especialidades.map(esp => (
+                <option key={esp.id} value={esp.nombre}>{esp.nombre}</option>
+              ))}
+            </select>
           </div>
           <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-matricula">Matrícula Nacional</label>
+            <label className="form-label form-label--required" htmlFor="input-matricula">Número de Matrícula</label>
             <input id="input-matricula" className="form-input" type="text" value={matricula} onChange={(e) => setMatricula(e.target.value)} />
             <span className="form-helper">Verificada ✓</span>
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="input-cuit">CUIT</label>
-            <input id="input-cuit" className="form-input" type="text" value={cuit} onChange={(e) => setCuit(e.target.value)} />
-          </div>
-
-          {/* Professions selector */}
-          <div className="form-group" style={{ gridColumn: 'span 2' }}>
-            <label className="form-label form-label--required">Mis Especialidades / Profesiones (para Filtros)</label>
-            <div style={{ display: 'flex', gap: 'var(--space-4)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
-              {availableProfessions.map((prof) => {
-                const isChecked = tags.includes(prof);
-                return (
-                  <label key={prof} style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={isChecked} 
-                      onChange={() => {
-                        if (isChecked) {
-                          setTags(tags.filter(t => t !== prof));
-                        } else {
-                          setTags([...tags, prof]);
-                        }
-                      }}
-                    />
-                    {prof}
-                  </label>
-                );
-              })}
-            </div>
           </div>
 
           {/* Modalities selector */}
@@ -1499,6 +1579,86 @@ function DashboardHome({
   const [showInactiveSlots, setShowInactiveSlots] = useState(false);
   const [selectedAppt, setSelectedAppt] = useState<any | null>(null);
 
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 10000); // update every 10s
+    return () => clearInterval(interval);
+  }, []);
+
+  // Find the next active/confirmed appointment closest to now
+  const nextAppt = useMemo(() => {
+    if (!allAppointments || allAppointments.length === 0) return null;
+    const now = currentTime;
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+    const currentHour = now.getHours();
+    const currentMin = now.getMinutes();
+
+    const upcoming = allAppointments
+      .filter(a => a.status !== 'completed' && a.status !== 'cancelled' && a.attendanceStatus !== 'AUSENTE' && a.attendanceStatus !== 'COMPLETADA')
+      .sort((a, b) => {
+        const dateDiff = a.fecha.localeCompare(b.fecha);
+        if (dateDiff !== 0) return dateDiff;
+        return a.hour.localeCompare(b.hour);
+      });
+
+    return upcoming.find(a => {
+      if (a.fecha === todayStr) {
+        const parts = a.hour.split(':');
+        const apptHour = parseInt(parts[0]);
+        const apptMin = parseInt(parts[1] || '0');
+        if (apptHour > currentHour) return true;
+        if (apptHour === currentHour) return apptMin >= currentMin;
+        return false;
+      }
+      return a.fecha > todayStr;
+    }) || upcoming[0];
+  }, [allAppointments, currentTime]);
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  };
+
+  const getCountdownString = (appt: any) => {
+    if (!appt || !appt.fecha || !appt.hour) return '';
+    const parts = appt.fecha.split('-');
+    const timeParts = String(appt.hour).split(':');
+    const year = parseInt(parts[0] || '0', 10);
+    const month = parseInt(parts[1] || '1', 10) - 1;
+    const day = parseInt(parts[2] || '1', 10);
+    const hour = parseInt(timeParts[0] || '0', 10);
+    const min = parseInt(timeParts[1] || '0', 10);
+    const apptDate = new Date(year, month, day, hour, min, 0);
+
+    const diffMs = apptDate.getTime() - currentTime.getTime();
+    if (diffMs <= 0) {
+      if (diffMs > -45 * 60 * 1000) {
+        return "¡En curso!";
+      }
+      return "Finalizado";
+    }
+
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const totalHours = Math.floor(totalMinutes / 60);
+    const days = Math.floor(totalHours / 24);
+
+    const hours = totalHours % 24;
+    const minutes = totalMinutes % 60;
+
+    return `Falta: ${days}d ${hours}h ${minutes}m`;
+  };
+
   // Rescheduling states
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleHour, setRescheduleHour] = useState('');
@@ -1562,6 +1722,95 @@ function DashboardHome({
   return (
     <>
       <MPConnectBanner connected={mpConnected} onConnect={onConnect} />
+
+      {nextAppt && (
+        <div className="card" style={{ width: '100%', maxWidth: 'none', marginBottom: 'var(--space-4)', padding: 'var(--space-5)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--color-border)', marginBottom: 'var(--space-4)' }}>
+            <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 16, height: 16, color: 'var(--color-primary)' }}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Próximo Turno Programado
+            </h2>
+            <div style={{
+              backgroundColor: 'var(--green-50)',
+              color: 'var(--color-primary)',
+              padding: 'var(--space-1) var(--space-3)',
+              borderRadius: 'var(--radius-full)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 'bold',
+              border: '1px solid var(--green-200)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span style={{ display: 'inline-block', width: '6px', height: '6px', backgroundColor: 'var(--color-primary)', borderRadius: '50%' }}></span>
+              {getCountdownString(nextAppt)}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
+            <div style={{ textAlign: 'left' }}>
+              <p style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-bold)', color: 'var(--color-text-primary)' }}>
+                {nextAppt.patientName}
+              </p>
+              <div style={{ display: 'flex', gap: 'var(--space-4)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  📅 <strong>Fecha:</strong> {formatDate(nextAppt.fecha)}
+                </span>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  ⏰ <strong>Horario:</strong> {nextAppt.hour} hs
+                </span>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  🩺 <strong>Modalidad:</strong> {nextAppt.type}
+                </span>
+              </div>
+              <div style={{ marginTop: 'var(--space-3)', fontSize: 'var(--text-xs)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span style={{ color: 'var(--color-text-secondary)' }}>Asistencia:</span>
+                <span className="badge" style={{ 
+                  backgroundColor: nextAppt.attendanceStatus === 'LLEGO' ? 'var(--green-100)' : nextAppt.attendanceStatus === 'AUSENTE' ? '#fdf2f2' : 'var(--neutral-100)',
+                  color: nextAppt.attendanceStatus === 'LLEGO' ? 'var(--green-700)' : nextAppt.attendanceStatus === 'AUSENTE' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  padding: '2px 8px',
+                  borderRadius: 'var(--radius-sm)'
+                }}>
+                  {nextAppt.attendanceStatus === 'LLEGO' ? '🚶‍♂️ Presente' : nextAppt.attendanceStatus === 'AUSENTE' ? '❌ Ausente' : '⏳ Esperando paciente'}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+              <button 
+                onClick={() => onUpdateAttendance(nextAppt.id, 'LLEGO')}
+                className="btn btn--secondary btn--sm"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '4px',
+                  backgroundColor: nextAppt.attendanceStatus === 'LLEGO' ? 'var(--green-50)' : 'transparent',
+                  borderColor: nextAppt.attendanceStatus === 'LLEGO' ? 'var(--color-primary)' : 'var(--color-border)',
+                  color: nextAppt.attendanceStatus === 'LLEGO' ? 'var(--color-primary)' : 'var(--color-text-primary)'
+                }}
+              >
+                🚶‍♂️ Llegó
+              </button>
+              <button 
+                onClick={() => onUpdateAttendance(nextAppt.id, 'AUSENTE')}
+                className="btn btn--ghost btn--sm"
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '4px',
+                  backgroundColor: nextAppt.attendanceStatus === 'AUSENTE' ? '#fdf2f2' : 'transparent',
+                  color: nextAppt.attendanceStatus === 'AUSENTE' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
+                  border: '1px solid ' + (nextAppt.attendanceStatus === 'AUSENTE' ? 'var(--color-danger)' : 'var(--color-border)')
+                }}
+              >
+                ❌ Ausente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <StatsOverview stats={stats} />
 
@@ -2274,6 +2523,14 @@ export default function App() {
   const [stats, setStats] = useState<any>(null)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
   const [loadingSession, setLoadingSession] = useState(true)
+  const [showUnverifiedAlert, setShowUnverifiedAlert] = useState(true)
+
+  const handleCloseUnverifiedAlert = () => {
+    setShowUnverifiedAlert(false)
+    setTimeout(() => {
+      setShowUnverifiedAlert(true)
+    }, 120000) // 2 minutes
+  }
 
   // Check user session on app load (Recovery from localStorage)
   useEffect(() => {
@@ -2639,8 +2896,74 @@ export default function App() {
 
   const unreadCount = notifications.filter(n => !n.leido).length
 
+  const showBanner = view === 'dashboard' && medicoInfo && !medicoInfo.verificado && showUnverifiedAlert;
+
   return (
     <div className="dashboard-layout">
+      {showBanner && (
+        <>
+          <style>{`
+            @keyframes slideDownAlert {
+              from {
+                transform: translate(-50%, -100%);
+                opacity: 0;
+              }
+              to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+              }
+            }
+          `}</style>
+          <div style={{
+            position: 'fixed',
+            top: '16px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10000,
+            backgroundColor: '#fffbeb',
+            border: '1px solid #fef3c7',
+            borderLeft: '5px solid #d97706',
+            borderRadius: 'var(--radius-lg)',
+            padding: 'var(--space-4) var(--space-5)',
+            color: '#b45309',
+            fontSize: 'var(--text-sm)',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+            maxWidth: '600px',
+            width: '90%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 'var(--space-4)',
+            animation: 'slideDownAlert 0.3s ease-out'
+          }}>
+            <div style={{ flex: 1, lineHeight: 'var(--line-height-relaxed)' }}>
+              <strong>⚠️ Cuenta No Verificada:</strong> Para aparecer en la lista de profesionales disponibles de la aplicación y que los pacientes puedan agendar turnos, debés completar todos tus datos demográficos, ReFeps, matrícula y subir una foto de perfil.
+            </div>
+            <button 
+              onClick={handleCloseUnverifiedAlert}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#b45309',
+                fontSize: '18px',
+                cursor: 'pointer',
+                padding: '0 var(--space-1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 'bold',
+                opacity: 0.7,
+                transition: 'opacity 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+              aria-label="Cerrar alerta"
+            >
+              ✕
+            </button>
+          </div>
+        </>
+      )}
       <Sidebar activeNav={activeNav} onNavChange={setActiveNav} medicoInfo={medicoInfo} />
 
       <header className="dashboard-header" role="banner" style={{ position: 'relative' }}>

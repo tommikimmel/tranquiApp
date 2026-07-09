@@ -5,6 +5,7 @@ import { useChat } from '../hooks/useChat'
 import { useAlert } from '../context/AlertContext'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
+import { downloadReportPDF } from '../utils/pdfGenerator'
 
 // ── Types ──────────────────────────────────────────────────────
 interface Tariff {
@@ -832,9 +833,9 @@ export default function LandingPage({
           const f2 = `${year}-${month}-${day}`;
           return cleanDateStr === f1 || cleanDateStr === f2 || cleanDateStr.includes(f1) || cleanDateStr.includes(f2);
         };
-        const todayAppointments = myAppointments.filter(appt => isToday(appt.fecha));
+        const upcomingAppointments = myAppointments.filter(appt => appt.status !== 'completed');
         
-        if (todayAppointments.length === 0) return null;
+        if (upcomingAppointments.length === 0) return null;
 
         return (
           <div style={{ width: '100%', maxWidth: '1200px', margin: 'var(--space-4) auto', padding: '0 var(--space-6)' }}>
@@ -847,65 +848,105 @@ export default function LandingPage({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: 'var(--space-4)',
-              boxShadow: 'var(--shadow-md)'
+              gap: 'var(--space-5)',
+              boxShadow: 'var(--shadow-md)',
+              flexWrap: 'wrap'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flex: '1 1 300px' }}>
                 <span style={{ fontSize: '24px' }}>⏰</span>
                 <div style={{ textAlign: 'left' }}>
-                  <h4 style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'bold', color: 'var(--color-primary)' }}>
-                    TURNOS DE HOY
+                  <h4 style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'bold', color: 'var(--color-primary)', textTransform: 'uppercase' }}>
+                    Mis Próximos Turnos
                   </h4>
                   <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                    Recordatorio: Tenés turno programado para hoy. Podés unirte directamente a la llamada usando el botón.
+                    Tenés turnos programados en Tranqui App. Podés pagar consultas pendientes o unirte a la videollamada el día de la sesión.
                   </p>
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', minWidth: '220px' }}>
-                {todayAppointments.map(appt => (
-                  <div key={appt.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)', backgroundColor: '#ffffff', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid #a7f3d0' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                      {appt.hour} hs
-                    </span>
-                    {appt.meetLink && appt.status === 'confirmed' ? (
-                      <a 
-                        href={appt.meetLink} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="btn btn--primary btn--sm" 
-                        style={{ fontSize: '9px', padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '3px' }}
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 10, height: 10 }}><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
-                        Unirse
-                      </a>
-                    ) : appt.checkoutUrl ? (
-                      <a 
-                        href={appt.checkoutUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="btn" 
-                        style={{ 
-                          fontSize: '9px', 
-                          padding: '4px 10px', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '3px', 
-                          backgroundColor: '#009fe3', 
-                          color: 'white', 
-                          borderColor: '#009fe3', 
-                          fontWeight: 'bold',
-                          textDecoration: 'none',
-                          borderRadius: 'var(--radius-md)',
-                          boxShadow: '0 2px 4px rgba(0, 158, 227, 0.15)'
-                        }}
-                      >
-                        💳 Pagar
-                      </a>
-                    ) : (
-                      <span style={{ fontSize: '9px', color: 'var(--color-warning)', fontWeight: 'bold' }}>Esperando pago</span>
-                    )}
-                  </div>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', minWidth: '320px', flex: '2 1 400px' }}>
+                {upcomingAppointments.map(appt => {
+                  const isTodayAppt = isToday(appt.fecha);
+                  const isConfirmed = appt.status === 'confirmed';
+                  return (
+                    <div key={appt.id} style={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: '6px', 
+                      backgroundColor: '#ffffff', 
+                      padding: 'var(--space-3)', 
+                      borderRadius: 'var(--radius-md)', 
+                      border: isConfirmed ? '1px solid #a7f3d0' : '1px solid #fef3c7' 
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                          📅 {appt.fecha} · ⏰ {appt.hour} hs
+                        </span>
+                        <span className={`badge ${isConfirmed ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '9px', padding: '2px 6px', textTransform: 'uppercase' }}>
+                          {isConfirmed ? 'Confirmado' : 'Pendiente Pago'}
+                        </span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px', flexWrap: 'wrap', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                          <strong>Profesional:</strong> {appt.patientName} <span style={{ margin: '0 4px', opacity: 0.5 }}>|</span> <strong>Modalidad:</strong> {appt.type}
+                        </span>
+                        
+                        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                          {appt.meetLink && isConfirmed && isTodayAppt && (
+                            <a 
+                              href={appt.meetLink} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="btn btn--primary btn--sm" 
+                              style={{ fontSize: '10px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}
+                            >
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 10, height: 10 }}><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
+                              Unirse
+                            </a>
+                          )}
+                          {appt.checkoutUrl && !isConfirmed && (
+                            <a 
+                              href={appt.checkoutUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="btn btn--sm" 
+                              style={{ 
+                                fontSize: '10px', 
+                                padding: '4px 10px', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '3px', 
+                                backgroundColor: '#009fe3', 
+                                color: 'white', 
+                                borderColor: '#009fe3', 
+                                fontWeight: 'bold',
+                                textDecoration: 'none',
+                                borderRadius: 'var(--radius-md)',
+                                boxShadow: '0 2px 4px rgba(0, 158, 227, 0.15)'
+                              }}
+                            >
+                              💳 Pagar Copago
+                            </a>
+                          )}
+                          <button 
+                            onClick={() => handleCancelAppointmentByPatient(appt.id)}
+                            style={{
+                              border: 'none',
+                              background: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--color-danger)',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              padding: '2px 4px'
+                            }}
+                          >
+                            ✕ Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -1128,12 +1169,26 @@ export default function LandingPage({
                     gap: 'var(--space-2)'
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="badge badge--success" style={{ textTransform: 'uppercase', fontSize: '9px' }}>
-                        {r.tipoInforme.replace('_', ' ')}
-                      </span>
-                      <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>
-                        {r.fecha}
-                      </span>
+                      <div>
+                        <span className="badge badge--success" style={{ textTransform: 'uppercase', fontSize: '9px' }}>
+                          {r.tipoInforme.replace('_', ' ')}
+                        </span>
+                        <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                          Emitido por: <strong>{r.nombreMedico || 'Particular'}</strong>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>
+                          {r.fecha}
+                        </span>
+                        <button 
+                          onClick={() => downloadReportPDF(r, currentUser)}
+                          className="btn btn--secondary btn--sm" 
+                          style={{ padding: '2px 8px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          📥 PDF
+                        </button>
+                      </div>
                     </div>
                     {r.planTrabajo && (
                       <div style={{ fontSize: '11px' }}>

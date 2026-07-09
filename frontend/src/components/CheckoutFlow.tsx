@@ -125,15 +125,36 @@ function StepSelect({
           )
         )
 
-        const formattedDays: DayOption[] = results.map(res => ({
-          date: res.dateStr,
-          label: res.label,
-          sublabel: res.sublabel,
-          slots: res.slots.map((s: string) => ({
+        const formattedDays: DayOption[] = results.map(res => {
+          let slots = res.slots.map((s: string) => ({
             time: s.slice(0, 5),
             available: true
-          }))
-        }))
+          }));
+
+          // If the day is today, filter out past slots based on Buenos Aires timezone context
+          if (res.label === 'Hoy') {
+            const targetTimeZone = 'America/Argentina/Buenos_Aires';
+            const nowInBA = new Date(new Date().toLocaleString('en-US', { timeZone: targetTimeZone }));
+            const currentHour = nowInBA.getHours();
+            const currentMinute = nowInBA.getMinutes();
+
+            slots = slots.filter((slot: { time: string; available: boolean }) => {
+              const [shStr, smStr] = slot.time.split(':');
+              const slotHour = parseInt(shStr, 10);
+              const slotMin = parseInt(smStr, 10);
+              if (slotHour < currentHour) return false;
+              if (slotHour === currentHour && slotMin < currentMinute) return false;
+              return true;
+            });
+          }
+
+          return {
+            date: res.dateStr,
+            label: res.label,
+            sublabel: res.sublabel,
+            slots
+          };
+        })
 
         setDays(formattedDays)
       } catch (err) {
