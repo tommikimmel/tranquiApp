@@ -58,8 +58,23 @@ export const api = {
   loginGoogle: (idToken: string) => 
     apiFetch('/auth/google', { method: 'POST', body: { idToken } as any }),
 
+  login: (data: any) => 
+    apiFetch('/auth/login', { method: 'POST', body: data }),
+  
+  register: (data: any) => 
+    apiFetch('/auth/register', { method: 'POST', body: data }),
+
   getMe: () => apiFetch('/auth/me'),
   logout: () => apiFetch('/auth/logout', { method: 'POST' }),
+
+  // Admin APIs
+  getAdminUsers: () => apiFetch('/admin/users'),
+  updateUserRol: (id: number | string, rol: string) => 
+    apiFetch(`/admin/users/${id}/rol`, { method: 'PUT', body: { rol } as any }),
+  verifyProfessional: (id: number | string) => 
+    apiFetch(`/admin/users/${id}/verify`, { method: 'POST' }),
+  rejectProfessional: (id: number | string) => 
+    apiFetch(`/admin/users/${id}/reject`, { method: 'POST' }),
 
   // Doctor Dashboard
   getPerfil: () => apiFetch('/medicos/perfil'),
@@ -107,19 +122,10 @@ export const api = {
     apiFetch(`/pacientes/${pacienteId}/seguimientos/${seguimientoId}`, { method: 'DELETE' }),
   getInformes: (pacienteId: number | string) => apiFetch(`/pacientes/${pacienteId}/informes`),
   crearInforme: (pacienteId: number | string, data: { tipoInforme: string; planTrabajo?: string; contenido?: string; nombreArchivo?: string }) => {
-    const q = new URLSearchParams();
-    q.append('tipoInforme', data.tipoInforme);
-    if (data.planTrabajo) q.append('planTrabajo', data.planTrabajo);
-    if (data.contenido) q.append('contenido', data.contenido);
-    if (data.nombreArchivo) q.append('nombreArchivo', data.nombreArchivo);
-    return apiFetch(`/pacientes/${pacienteId}/informes?${q.toString()}`, { method: 'POST' });
+    return apiFetch(`/pacientes/${pacienteId}/informes`, { method: 'POST', body: data as any });
   },
   editarInforme: (pacienteId: number | string, informeId: number | string, data: { tipoInforme: string; planTrabajo?: string; contenido?: string }) => {
-    const q = new URLSearchParams();
-    q.append('tipoInforme', data.tipoInforme);
-    if (data.planTrabajo) q.append('planTrabajo', data.planTrabajo);
-    if (data.contenido) q.append('contenido', data.contenido);
-    return apiFetch(`/pacientes/${pacienteId}/informes/${informeId}?${q.toString()}`, { method: 'PUT' });
+    return apiFetch(`/pacientes/${pacienteId}/informes/${informeId}`, { method: 'PUT', body: data as any });
   },
   eliminarInforme: (pacienteId: number | string, informeId: number | string) => 
     apiFetch(`/pacientes/${pacienteId}/informes/${informeId}`, { method: 'DELETE' }),
