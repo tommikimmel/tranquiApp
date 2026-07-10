@@ -36,6 +36,7 @@ public class MedicoDto {
     private Long codigoReFeps;
     private MatriculaInfoDto matriculaInfo;
     private boolean verificado;
+    private Boolean verificadoAdmin;
 
     @Getter
     @Setter

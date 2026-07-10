@@ -33,9 +33,25 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired
     private MensajeRepository mensajeRepository;
 
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     @Override
     public void run(String... args) throws Exception {
         log.info("Initializing clean simulation accounts...");
+
+        // Default Admin account
+        if (usuarioRepository.findByEmail("admin@tranqui.com").isEmpty()) {
+            Usuario admin = Usuario.builder()
+                    .nombre("Administrador")
+                    .email("admin@tranqui.com")
+                    .password(passwordEncoder.encode("admin123"))
+                    .rol(Rol.ADMIN)
+                    .verificadoAdmin(true)
+                    .build();
+            usuarioRepository.save(admin);
+            log.info("Default admin account created: admin@tranqui.com / admin123");
+        }
 
         // Unverified Doctor
         if (usuarioRepository.findByEmail("medico.sinverificar@gmail.com").isEmpty()) {
