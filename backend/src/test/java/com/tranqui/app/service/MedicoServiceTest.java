@@ -59,6 +59,7 @@ class MedicoServiceTest {
                 .matriculaProvincia("Córdoba")
                 .matriculaNumero(12345)
                 .fotoUrl("http://example.com/foto.jpg")
+                .verificadoAdmin(true)
                 .build();
         paciente = Usuario.builder()
                 .nombre("Paciente Pedro")

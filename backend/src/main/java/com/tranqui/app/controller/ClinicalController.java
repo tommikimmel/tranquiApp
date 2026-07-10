@@ -4,6 +4,7 @@ import com.tranqui.app.model.InformeClinico;
 import com.tranqui.app.model.Notificacion;
 import com.tranqui.app.model.SeguimientoDiario;
 import com.tranqui.app.model.dto.PacienteDto;
+import com.tranqui.app.model.dto.InformeClinicoDto;
 import com.tranqui.app.service.ClinicalService;
 import com.tranqui.app.service.NotificacionService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -102,10 +103,7 @@ public class ClinicalController {
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<InformeClinico> crearInforme(
             @PathVariable Long pacienteId,
-            @RequestParam String tipoInforme,
-            @RequestParam(required = false) String planTrabajo,
-            @RequestParam(required = false) String contenido,
-            @RequestParam(required = false) String nombreArchivo,
+            @RequestBody InformeClinicoDto dto,
             @AuthenticationPrincipal UserDetails userDetails) {
         if (userDetails == null) {
             return ResponseEntity.status(401).build();
@@ -113,10 +111,10 @@ public class ClinicalController {
         return ResponseEntity.ok(clinicalService.guardarInforme(
                 userDetails.getUsername(),
                 pacienteId,
-                tipoInforme,
-                planTrabajo,
-                contenido,
-                nombreArchivo
+                dto.getTipoInforme(),
+                dto.getPlanTrabajo(),
+                dto.getContenido(),
+                dto.getNombreArchivo()
         ));
     }
 
@@ -193,9 +191,7 @@ public class ClinicalController {
     public ResponseEntity<InformeClinico> editarInforme(
             @PathVariable Long pacienteId,
             @PathVariable Long informeId,
-            @RequestParam String tipoInforme,
-            @RequestParam(required = false) String planTrabajo,
-            @RequestParam(required = false) String contenido,
+            @RequestBody InformeClinicoDto dto,
             @AuthenticationPrincipal UserDetails userDetails) {
         if (userDetails == null) {
             return ResponseEntity.status(401).build();
@@ -203,9 +199,9 @@ public class ClinicalController {
         InformeClinico updated = clinicalService.editarInforme(
                 informeId,
                 userDetails.getUsername(),
-                tipoInforme,
-                planTrabajo,
-                contenido
+                dto.getTipoInforme(),
+                dto.getPlanTrabajo(),
+                dto.getContenido()
         );
         return ResponseEntity.ok(updated);
     }
