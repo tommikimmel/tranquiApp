@@ -24,7 +24,7 @@ public class CustomUserDetailsService implements UserDetailsService {
 
         return new User(
                 usuario.getEmail(),
-                "", // No password for OAuth2 users
+                usuario.getPassword() != null ? usuario.getPassword() : "",
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + usuario.getRol().name()))
         );
     }

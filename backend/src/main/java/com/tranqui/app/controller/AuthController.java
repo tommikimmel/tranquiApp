@@ -2,6 +2,7 @@ package com.tranqui.app.controller;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.tranqui.app.model.Usuario;
+import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.dto.GoogleLoginDto;
 import com.tranqui.app.model.dto.UserResponseDto;
 import com.tranqui.app.service.GoogleAuthService;
@@ -38,8 +39,81 @@ public class AuthController {
     @Autowired
     private org.springframework.core.env.Environment env;
 
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     @org.springframework.beans.factory.annotation.Value("${google.client-id:dummy-client-id}")
     private String clientId;
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody com.tranqui.app.model.dto.RegisterRequestDto registerRequestDto) {
+        if (usuarioRepository.findByEmail(registerRequestDto.getEmail()).isPresent()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El email ya está registrado");
+        }
+
+        Usuario usuario = Usuario.builder()
+                .email(registerRequestDto.getEmail())
+                .password(passwordEncoder.encode(registerRequestDto.getPassword()))
+                .rol(registerRequestDto.getRol())
+                .nombre(registerRequestDto.getNombre())
+                .apellido(registerRequestDto.getApellido())
+                .sexo(registerRequestDto.getSexo())
+                .fechaNacimiento(registerRequestDto.getFechaNacimiento())
+                .tipoDocumento(registerRequestDto.getTipoDocumento())
+                .numeroDocumento(registerRequestDto.getNumeroDocumento())
+                .telefono(registerRequestDto.getTelefono())
+                .obraSocial(registerRequestDto.getObraSocial())
+                .numAfiliado(registerRequestDto.getNumAfiliado())
+                .matricula(registerRequestDto.getMatricula())
+                .titulo(registerRequestDto.getTitulo())
+                .specialty(registerRequestDto.getSpecialty())
+                .cuit(registerRequestDto.getCuit())
+                .cuil(registerRequestDto.getCuil())
+                .domicilioAtencion(registerRequestDto.getDomicilioAtencion())
+                .codigoReFeps(registerRequestDto.getCodigoReFeps())
+                .matriculaTipo(registerRequestDto.getMatriculaTipo())
+                .matriculaProvincia(registerRequestDto.getMatriculaProvincia())
+                .matriculaNumero(registerRequestDto.getMatriculaNumero())
+                .ofreceOnline(registerRequestDto.getOfreceOnline())
+                .ofrecePresencial(registerRequestDto.getOfrecePresencial())
+                .fotoUrl(registerRequestDto.getFotoUrl())
+                .verificadoAdmin(registerRequestDto.getRol() == Rol.PACIENTE)
+                .build();
+
+        usuarioRepository.save(usuario);
+        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol()));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody com.tranqui.app.model.dto.LoginRequestDto loginRequestDto, HttpServletResponse response) {
+        Usuario usuario = usuarioRepository.findByEmail(loginRequestDto.getEmail())
+                .orElse(null);
+
+        if (usuario == null || usuario.getPassword() == null || !passwordEncoder.matches(loginRequestDto.getPassword(), usuario.getPassword())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Credenciales incorrectas");
+        }
+
+        String jwtToken = jwtService.generateToken(usuario);
+
+        boolean secureCookie = true;
+        String sameSiteVal = "Strict";
+        boolean isDev = java.util.Arrays.asList(env.getActiveProfiles()).contains("dev");
+        if (isDev || "dummy-client-id".equals(clientId)) {
+            secureCookie = false;
+            sameSiteVal = "Lax";
+        }
+
+        ResponseCookie cookie = ResponseCookie.from("SESSION-TOKEN", jwtToken)
+                .httpOnly(true)
+                .secure(secureCookie)
+                .path("/")
+                .maxAge(7 * 24 * 60 * 60) // 7 days
+                .sameSite(sameSiteVal)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol()));
+    }
 
     @PostMapping("/google")
     public ResponseEntity<?> loginWithGoogle(@RequestBody GoogleLoginDto googleLoginDto, HttpServletResponse response) {

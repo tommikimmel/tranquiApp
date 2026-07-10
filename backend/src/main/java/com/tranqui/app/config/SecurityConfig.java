@@ -24,13 +24,18 @@ public class SecurityConfig {
     private JwtAuthenticationFilter jwtAuthFilter;
 
     @Bean
+    public org.springframework.security.crypto.password.PasswordEncoder passwordEncoder() {
+        return new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
+    }
+
+    @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable()) // Session is secured using HttpOnly and SameSite cookies
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/google", "/api/health", "/api/payments/webhook", "/ws-tranqui/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/medicos", "/api/medicos/*/turnos-disponibles").permitAll()
+                .requestMatchers("/api/auth/google", "/api/auth/register", "/api/auth/login", "/api/health", "/api/payments/webhook", "/ws-tranqui/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/medicos", "/api/medicos/*/turnos-disponibles").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
