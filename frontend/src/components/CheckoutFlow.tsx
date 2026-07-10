@@ -334,7 +334,7 @@ function StepReview({
 
   const [name, setName] = useState(cachedUser?.nombre || '')
   const [email, setEmail] = useState(cachedUser?.email || '')
-  const [phone, setPhone] = useState(cachedUser?.telefono || '')
+  const [phone, setPhone] = useState((cachedUser?.telefono || '').replace(/^\+54\s*/, ''))
   const [tipo, setTipo] = useState<'PARTICULAR' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'>('PARTICULAR')
   const [afiliado, setAfiliado] = useState('')
   const [customTime, setCustomTime] = useState(selectedSlot.time)
@@ -395,7 +395,7 @@ function StepReview({
       onPay({
         name,
         email,
-        phone,
+        phone: `+54 ${phone.trim()}`,
         tipo,
         afiliado: tipo === 'OSDE' ? afiliado : undefined,
         customTime: tipo === 'SOBRETUNO' ? customTime : undefined
@@ -549,15 +549,18 @@ function StepReview({
             </div>
             <div className="form-group">
               <label className="form-label form-label--required" htmlFor="checkout-phone">Teléfono</label>
-              <input
-                id="checkout-phone"
-                className="form-input"
-                type="tel"
-                placeholder="351 123 4567"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                autoComplete="tel"
-              />
+              <div className="phone-input">
+                <span className="phone-input__prefix">+54</span>
+                <input
+                  id="checkout-phone"
+                  className="form-input phone-input__field"
+                  type="tel"
+                  placeholder="351 123 4567"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  autoComplete="tel"
+                />
+              </div>
             </div>
           </div>
         </div>

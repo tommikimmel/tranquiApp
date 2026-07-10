@@ -40,6 +40,7 @@
   --color-warning-bg: #FFF6E8;
   --color-success:  var(--green-500);
   --color-info:     #2563eb;
+  --color-info-bg:  #EAF2FE;
 
   /* Semantic */
   --color-primary:       var(--green-500);
@@ -212,4 +213,10 @@ img, svg {
   background: var(--neutral-100);
   color: var(--neutral-600);
   border: 1px solid var(--neutral-200);
+}
+
+.badge--info {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+  border: 1px solid #BFDBFE;
 }
