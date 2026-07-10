@@ -142,7 +142,7 @@ function SkeletonCard() {
 }
 
 // ── Professional Card ──────────────────────────────────────────
-function ProCard({ pro, onBook, onChat }: { pro: Professional; onBook: (p: Professional) => void; onChat: (p: Professional) => void }) {
+function ProCard({ pro, onBook, onChat, currentUser }: { pro: Professional; onBook: (p: Professional) => void; onChat: (p: Professional) => void; currentUser: any }) {
   return (
     <article
       className="pro-card"
@@ -187,12 +187,24 @@ function ProCard({ pro, onBook, onChat }: { pro: Professional; onBook: (p: Profe
 
       {/* Tariff table */}
       <div className="pro-card__tariffs">
-        {pro.tariffs.map((t) => (
-          <div className="pro-card__tariff-row" key={t.label}>
-            <span className="pro-card__tariff-label">{t.label}</span>
-            <span className="pro-card__tariff-price">${t.price.toLocaleString('es-AR')}</span>
-          </div>
-        ))}
+        {pro.tariffs.map((t) => {
+          const isPrimera = t.label.toLowerCase().includes('primera');
+          const isParticular = t.label.toLowerCase().includes('particular') || t.label.toLowerCase() === 'consulta';
+
+          // Hide other service rows for unregistered/visitor users
+          if (!currentUser && !isParticular) {
+            return null;
+          }
+
+          return (
+            <div className="pro-card__tariff-row" key={t.label}>
+              <span className="pro-card__tariff-label">{t.label}</span>
+              <span className="pro-card__tariff-price">
+                {isPrimera ? 'Calculado (se avisa)' : `$${t.price.toLocaleString('es-AR')}`}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       <div className="pro-card__footer" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
@@ -557,7 +569,7 @@ export default function LandingPage({
     let client: Client | null = null;
     
     if (currentUser.id) {
-      const socket = new SockJS('http://localhost:8081/ws-tranqui')
+      const socket = new SockJS('http://localhost:8081/ws-tranqui', null, { withCredentials: true } as any)
       client = new Client({
         webSocketFactory: () => socket,
         reconnectDelay: 5000,
@@ -1016,7 +1028,7 @@ export default function LandingPage({
                 )
                 : filtered.map((pro) => (
                   <div role="listitem" key={pro.id}>
-                    <ProCard pro={pro} onBook={handleBook} onChat={handleStartChat} />
+                    <ProCard pro={pro} onBook={handleBook} onChat={handleStartChat} currentUser={currentUser} />
                   </div>
                 ))
             }

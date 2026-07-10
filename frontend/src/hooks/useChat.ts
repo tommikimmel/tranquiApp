@@ -52,7 +52,7 @@ export function useChat(activeContactId: number | null) {
 
   // Connect to STOMP Broker
   useEffect(() => {
-    const socket = new SockJS('http://localhost:8081/ws-tranqui')
+    const socket = new SockJS('http://localhost:8081/ws-tranqui', null, { withCredentials: true } as any)
     const client = new Client({
       webSocketFactory: () => socket,
       debug: (str) => {

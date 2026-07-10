@@ -19,10 +19,10 @@ class AgendaServiceTest {
     private AgendaService agendaService;
 
     @Test
-    void shouldGenerateCorrectBlocksOf45Minutes() {
+    void shouldGenerateCorrectHourlyBlocks() {
         Disponibilidad disp = Disponibilidad.builder()
                 .horaInicio(LocalTime.of(9, 0))
-                .horaFin(LocalTime.of(10, 30)) // Debería dar exactamente 2 bloques (09:00 y 09:45)
+                .horaFin(LocalTime.of(11, 0)) // Debería dar exactamente 2 bloques (09:00 y 10:00)
                 .diaSemana(LocalDate.now().plusDays(1).getDayOfWeek().getValue())
                 .build();
 
@@ -33,14 +33,14 @@ class AgendaServiceTest {
         
         assertEquals(2, bloques.size());
         assertEquals(LocalTime.of(9, 0), bloques.get(0));
-        assertEquals(LocalTime.of(9, 45), bloques.get(1));
+        assertEquals(LocalTime.of(10, 0), bloques.get(1));
     }
 
     @Test
     void whenTurnoExists_shouldNotGenerateThatBlock() {
         Disponibilidad disp = Disponibilidad.builder()
                 .horaInicio(LocalTime.of(9, 0))
-                .horaFin(LocalTime.of(10, 30))
+                .horaFin(LocalTime.of(11, 0))
                 .diaSemana(LocalDate.now().plusDays(1).getDayOfWeek().getValue())
                 .build();
 
@@ -55,8 +55,8 @@ class AgendaServiceTest {
 
         List<LocalTime> bloques = agendaService.calcularBloquesDisponibles(disponibilidades, turnosExistentes, LocalDate.now().plusDays(1));
         
-        // 09:00 block should be filtered out, leaving only 09:45 block
+        // 09:00 block should be filtered out, leaving only 10:00 block
         assertEquals(1, bloques.size());
-        assertEquals(LocalTime.of(9, 45), bloques.get(0));
+        assertEquals(LocalTime.of(10, 0), bloques.get(0));
     }
 }

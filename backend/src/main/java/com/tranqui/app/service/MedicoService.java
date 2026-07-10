@@ -239,6 +239,7 @@ public class MedicoService {
                 .codigoReFeps(m.getCodigoReFeps())
                 .matriculaInfo(matInfo)
                 .verificado(isMedicoVerificado(m))
+                .verificadoAdmin(m.getVerificadoAdmin())
                 .build();
     }
 
@@ -360,6 +361,7 @@ public class MedicoService {
                 && u.getMatriculaTipo() != null && !u.getMatriculaTipo().trim().isEmpty()
                 && u.getMatriculaProvincia() != null && !u.getMatriculaProvincia().trim().isEmpty()
                 && u.getMatriculaNumero() != null
-                && u.getFotoUrl() != null && !u.getFotoUrl().trim().isEmpty();
+                && u.getFotoUrl() != null && !u.getFotoUrl().trim().isEmpty()
+                && Boolean.TRUE.equals(u.getVerificadoAdmin());
     }
 }

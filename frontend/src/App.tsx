@@ -6,6 +6,7 @@ import CheckoutFlow from './components/CheckoutFlow'
 import LoginPage from './components/LoginPage'
 import PatientsView from './components/PatientsView'
 import VisitorsView from './components/VisitorsView'
+import AdminDashboard from './components/AdminDashboard'
 import { api } from './api/api'
 import { useAlert } from './context/AlertContext'
 import { Client } from '@stomp/stompjs'
@@ -157,7 +158,7 @@ function Sidebar({ activeNav, onNavChange, medicoInfo }: { activeNav: NavSection
     <aside className="sidebar">
       <div className="sidebar__logo">
         <div className="sidebar__logo-btn" style={{ cursor: 'default' }}>
-          <img src="/logoTranquiApp.webp" alt="Tranqui" className="sidebar__logo-img" />
+          <img src="/tranqui-icon.webp" alt="Tranqui" className="sidebar__logo-img" />
           <span className="sidebar__logo-text">tranqui</span>
         </div>
       </div>
@@ -2539,7 +2540,7 @@ export default function App() {
       try {
         const user = JSON.parse(cachedUser)
         setCurrentUser(user)
-        if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO') {
+        if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
           setView('dashboard')
         } else {
           setView('landing')
@@ -2554,7 +2555,7 @@ export default function App() {
         if (user) {
           setCurrentUser(user)
           localStorage.setItem('tranqui_user', JSON.stringify(user))
-          if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO') {
+          if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
             setView('dashboard')
           } else {
             setView('landing')
@@ -2580,7 +2581,7 @@ export default function App() {
     if (loadingSession) return
 
     if (currentUser) {
-      const isPro = currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO'
+      const isPro = currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO' || currentUser.rol === 'ADMIN'
       if (isPro && (view === 'landing' || view === 'login')) {
         setView('dashboard')
       } else if (!isPro && view === 'dashboard') {
@@ -2594,6 +2595,10 @@ export default function App() {
     if (loadingSession) return
 
     if (view === 'dashboard') {
+      if (currentUser?.rol === 'ADMIN') {
+        setLoadingDashboard(false)
+        return
+      }
       const isPro = currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')
       if (!isPro) {
         setView('landing')
@@ -2634,7 +2639,7 @@ export default function App() {
       let client: Client | null = null;
       api.getPerfil().then((perfil) => {
         if (perfil && perfil.id) {
-          const socket = new SockJS('http://localhost:8081/ws-tranqui')
+          const socket = new SockJS('http://localhost:8081/ws-tranqui', null, { withCredentials: true } as any)
           client = new Client({
             webSocketFactory: () => socket,
             reconnectDelay: 5000,
@@ -2650,7 +2655,7 @@ export default function App() {
                     setNotifications(res || [])
                   })
 
-                  if (data.tipo === 'TURNO_RESERVADO') {
+                  if (data.tipo === 'TURNO_RESERVADO' || data.tipo === 'TURNO_CANCELADO') {
                     // Refresh appointments list too so calendar updates immediately
                     api.getTurnos().then((turnos) => {
                       setAllAppointments(turnos || [])
@@ -2860,7 +2865,7 @@ export default function App() {
       <LoginPage
         onLoginSuccess={(user) => {
           setCurrentUser(user)
-          if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO') {
+          if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
             setView('dashboard')
           } else {
             setView('landing')
@@ -2877,6 +2882,15 @@ export default function App() {
         professional={checkoutTarget}
         onBack={() => setView('landing')}
         onComplete={() => setView('landing')}
+      />
+    )
+  }
+
+  if (view === 'dashboard' && currentUser?.rol === 'ADMIN') {
+    return (
+      <AdminDashboard
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
     )
   }

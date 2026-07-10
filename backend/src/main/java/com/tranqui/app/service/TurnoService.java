@@ -40,6 +40,9 @@ public class TurnoService {
     @Autowired
     private WhatsAppService whatsappService;
 
+    @Autowired
+    private NotificacionService notificacionService;
+
     @Transactional(readOnly = true)
     public List<java.time.LocalTime> obtenerHorariosDisponibles(Long medicoId, java.time.LocalDate fecha) {
         List<com.tranqui.app.model.Disponibilidad> disponibilidades = disponibilidadRepository.findByMedicoId(medicoId);
@@ -139,6 +142,19 @@ public class TurnoService {
             String meetUrl = calendarService.crearEventoReunion(turno);
             turno.setTelemedicinaUrl(meetUrl);
             turno = turnoRepository.save(turno);
+
+            // Notify Doctor and Patient
+            String tituloMed = "Nuevo turno reservado";
+            String mensajeMed = "El paciente " + turno.getPaciente().getNombre() + 
+                    " reservó un turno para el " + turno.getFecha() + " a las " + 
+                    turno.getHoraInicio() + " hs por " + turno.getTipo();
+            notificacionService.crearNotificacion(turno.getMedico(), tituloMed, mensajeMed, "TURNO_RESERVADO");
+
+            String tituloPac = "Turno confirmado";
+            String mensajePac = "Tu turno con " + turno.getMedico().getNombre() + 
+                    " para el " + turno.getFecha() + " a las " + 
+                    turno.getHoraInicio() + " hs ha sido confirmado.";
+            notificacionService.crearNotificacion(turno.getPaciente(), tituloPac, mensajePac, "TURNO_CONFIRMADO");
 
             return com.tranqui.app.model.dto.TurnoResponseDto.builder()
                     .turnoId(turno.getId())
@@ -324,7 +340,21 @@ public class TurnoService {
         Turno turno = turnoRepository.findById(turnoId)
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
         turno.setEstado(EstadoTurno.CANCELADO);
-        turnoRepository.save(turno);
+        turno = turnoRepository.save(turno);
+
+        // Notify Doctor
+        String tituloMed = "Turno cancelado";
+        String mensajeMed = "El turno del " + turno.getFecha() + " a las " + 
+                turno.getHoraInicio() + " hs con el paciente " + 
+                turno.getPaciente().getNombre() + " ha sido cancelado.";
+        notificacionService.crearNotificacion(turno.getMedico(), tituloMed, mensajeMed, "TURNO_CANCELADO");
+
+        // Notify Patient
+        String tituloPac = "Turno cancelado";
+        String mensajePac = "El turno del " + turno.getFecha() + " a las " + 
+                turno.getHoraInicio() + " hs con el profesional " + 
+                turno.getMedico().getNombre() + " ha sido cancelado.";
+        notificacionService.crearNotificacion(turno.getPaciente(), tituloPac, mensajePac, "TURNO_CANCELADO");
     }
 
     @Transactional

@@ -12,13 +12,14 @@ import java.util.List;
 public class AgendaService {
 
     private static final int DURACION_TURNO_MINUTOS = 45;
+    private static final int BLOQUE_AGENDA_MINUTOS = 60;
 
     public List<LocalTime> calcularBloquesDisponibles(List<Disponibilidad> disponibilidades, List<Turno> turnosExistentes, LocalDate fecha) {
         List<LocalTime> bloquesDisponibles = new ArrayList<>();
         int dayOfWeek = fecha.getDayOfWeek().getValue();
 
-        LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires"));
-        LocalTime ahora = LocalTime.now(java.time.ZoneId.of("America/Argentina/Buenos_Aires"));
+        LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Argentina/Cordoba"));
+        LocalTime ahora = LocalTime.now(java.time.ZoneId.of("America/Argentina/Cordoba"));
 
         for (Disponibilidad disp : disponibilidades) {
             // Only calculate slots for availability that matches the target date's day of week
@@ -29,20 +30,21 @@ public class AgendaService {
             LocalTime inicio = disp.getHoraInicio();
             LocalTime fin = disp.getHoraFin();
 
-            while (inicio.plusMinutes(DURACION_TURNO_MINUTOS).isBefore(fin) || inicio.plusMinutes(DURACION_TURNO_MINUTOS).equals(fin)) {
-                LocalTime finalBloque = inicio.plusMinutes(DURACION_TURNO_MINUTOS);
+            while (inicio.plusMinutes(BLOQUE_AGENDA_MINUTOS).isBefore(fin) || inicio.plusMinutes(BLOQUE_AGENDA_MINUTOS).equals(fin)) {
+                LocalTime finalBloque = inicio.plusMinutes(BLOQUE_AGENDA_MINUTOS);
                 
                 // If the target date is today, ensure the slot starts in the future
                 boolean enElPasado = fecha.equals(hoy) && inicio.isBefore(ahora);
 
                 // Verify if it overlaps with an existing booking
-                boolean ocupado = comprobarChoqueTurno(inicio, finalBloque, turnosExistentes);
+                boolean ocupado = comprobarChoqueTurno(inicio, inicio.plusMinutes(DURACION_TURNO_MINUTOS), turnosExistentes);
                 if (!ocupado && !enElPasado) {
                     bloquesDisponibles.add(inicio);
                 }
                 inicio = finalBloque;
             }
         }
+        bloquesDisponibles.sort(java.util.Comparator.naturalOrder());
         return bloquesDisponibles;
     }
 

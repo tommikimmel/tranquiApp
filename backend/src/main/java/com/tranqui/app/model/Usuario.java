@@ -150,6 +150,12 @@ public class Usuario {
     @Column(name = "fecha_registro", nullable = false)
     private LocalDateTime fechaRegistro = LocalDateTime.now();
 
+    @Column(name = "password", length = 100)
+    private String password;
+
+    @Column(name = "verificado_admin")
+    private Boolean verificadoAdmin;
+
     @PrePersist
     protected void onCreate() {
         if (fechaRegistro == null) {
