@@ -82,9 +82,6 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   const [ofrecePresencial, setOfrecePresencial] = useState(false)
   const [fotoUrl, setFotoUrl] = useState('')
 
-  // Dev simulation state
-  const [customEmail, setCustomEmail] = useState('')
-
   const handleGoogleLogin = async (token: string) => {
     setLoading(true)
     setError(null)
@@ -262,14 +259,6 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleSimulatedLogin = () => {
-    if (!customEmail || !customEmail.includes('@')) {
-      setError('Por favor, ingresá un email válido para simular.')
-      return
-    }
-    handleGoogleLogin(`mock-${customEmail}`)
   }
 
   return (
@@ -716,74 +705,6 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
           </form>
         )}
-
-        {/* Localhost notice */}
-        <p style={{
-          fontSize: 'var(--text-xs)',
-          color: 'var(--color-text-secondary)',
-          textAlign: 'center',
-          marginTop: '-var(--space-2)',
-          lineHeight: 'var(--line-height-normal)'
-        }}>
-          💡 <strong>Tip para Pruebas:</strong> Podes registrarte como Paciente o Profesional, y usar la cuenta de administrador <strong>admin@tranqui.com</strong> / clave <strong>admin123</strong> para validaciones.
-        </p>
-
-        {/* Development Bypass Card */}
-        <div style={{
-          border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-md)',
-          padding: 'var(--space-4)',
-          backgroundColor: 'var(--neutral-50)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 'var(--space-3)'
-        }}>
-          <div style={{
-            fontSize: 'var(--text-xs)',
-            fontWeight: 'var(--font-weight-bold)',
-            color: 'var(--color-primary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}>
-            ⚙️ Entorno de Desarrollo (Simulación Google)
-          </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            <label htmlFor="custom-email-input" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>
-              Ingresar email para simulación:
-            </label>
-            <input
-              id="custom-email-input"
-              type="email"
-              placeholder="ejemplo@correo.com"
-              value={customEmail}
-              onChange={(e) => setCustomEmail(e.target.value)}
-              style={{
-                padding: 'var(--space-2)',
-                borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--color-border)',
-                fontSize: 'var(--text-sm)',
-                fontFamily: 'var(--font-body)',
-                backgroundColor: 'var(--neutral-0)'
-              }}
-            />
-          </div>
-
-          <button
-            onClick={handleSimulatedLogin}
-            disabled={loading}
-            className="btn btn--primary"
-            style={{
-              width: '100%',
-              padding: 'var(--space-2) var(--space-4)',
-              fontSize: 'var(--text-sm)',
-              fontWeight: 'var(--font-weight-medium)',
-              marginTop: 'var(--space-2)'
-            }}
-          >
-            {loading ? 'Accediendo...' : 'Ingresar con cuenta simulada'}
-          </button>
-        </div>
 
         <div style={{
           display: 'flex',
