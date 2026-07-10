@@ -703,6 +703,116 @@
   color: var(--color-text-secondary);
 }
 
+/* ── Role select cards ─────────────────────────────────────── */
+.role-select {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.role-select__card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semi);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.role-select__card:hover {
+  border-color: var(--green-300);
+  background: var(--green-50);
+}
+
+.role-select__card.active {
+  border-color: var(--color-primary);
+  background: var(--green-50);
+  color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgb(47 168 79 / 0.15);
+}
+
+.role-select__icon {
+  display: flex;
+  color: var(--neutral-400);
+  transition: color var(--transition-fast);
+}
+
+.role-select__card.active .role-select__icon {
+  color: var(--color-primary);
+}
+
+/* ── Obra social checkbox ──────────────────────────────────── */
+.obra-social-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semi);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  width: 100%;
+}
+
+.obra-social-check.active {
+  border-color: var(--color-primary);
+  background: var(--green-50);
+}
+
+.obra-social-check input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  accent-color: var(--green-500);
+  cursor: pointer;
+}
+
+/* ── Phone input with fixed country prefix ─────────────────── */
+.phone-input {
+  display: flex;
+  align-items: stretch;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.phone-input:focus-within {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 3px rgb(27 138 90 / 0.12);
+}
+
+.phone-input__prefix {
+  display: flex;
+  align-items: center;
+  padding: var(--space-3) var(--space-3);
+  background: var(--neutral-100);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-semi);
+  font-size: var(--text-sm);
+  border-right: 1.5px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.phone-input__field.form-input {
+  border: none;
+  border-radius: 0;
+  box-shadow: none !important;
+}
+
 .form-error {
   font-size: var(--text-xs);
   color: var(--color-error);

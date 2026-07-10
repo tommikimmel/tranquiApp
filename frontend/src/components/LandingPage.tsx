@@ -32,6 +32,15 @@ function IconSend({ size = 16 }: { size?: number }) {
   )
 }
 
+function IconCalendar({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  )
+}
+
 function IconHelp({ size = 16 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
@@ -142,7 +151,7 @@ function SkeletonCard() {
 }
 
 // ── Professional Card ──────────────────────────────────────────
-function ProCard({ pro, onBook, onChat, currentUser }: { pro: Professional; onBook: (p: Professional) => void; onChat: (p: Professional) => void; currentUser: any }) {
+function ProCard({ pro, onBook, onChat, currentUser, availabilityDateLabel, availabilityCount }: { pro: Professional; onBook: (p: Professional) => void; onChat: (p: Professional) => void; currentUser: any; availabilityDateLabel?: string | null; availabilityCount?: number }) {
   return (
     <article
       className="pro-card"
@@ -167,9 +176,9 @@ function ProCard({ pro, onBook, onChat, currentUser }: { pro: Professional; onBo
           <div className="pro-card__name">{pro.name}</div>
           <div className="pro-card__specialty">{pro.degree} · {pro.specialty}</div>
           <span className="pro-card__matricula">{pro.matricula} <IconCheck /></span>
-          <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
-            {pro.ofreceOnline && <span className="badge badge--success" style={{ fontSize: '9px', padding: '2px 6px', textTransform: 'none', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>Online</span>}
-            {pro.ofrecePresencial && <span className="badge badge--success" style={{ fontSize: '9px', padding: '2px 6px', textTransform: 'none', backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>Presencial</span>}
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+            {pro.ofreceOnline && <span className="badge badge--info pro-card__modality-badge">Online</span>}
+            {pro.ofrecePresencial && <span className="badge badge--warning pro-card__modality-badge">Presencial</span>}
           </div>
         </div>
       </div>
@@ -182,6 +191,13 @@ function ProCard({ pro, onBook, onChat, currentUser }: { pro: Professional; onBo
           <span className="pro-card__tag">+{pro.tags.length - 3}</span>
         )}
       </div>
+
+      {availabilityDateLabel && (
+        <div className={`pro-card__availability ${!availabilityCount ? 'pro-card__availability--none' : ''}`}>
+          <IconCalendar size={14} />
+          {availabilityCount ? `${availabilityCount} turno${availabilityCount !== 1 ? 's' : ''} el ${availabilityDateLabel}` : `Sin turnos el ${availabilityDateLabel}`}
+        </div>
+      )}
 
       <div className="pro-card__divider" aria-hidden="true" />
 
@@ -528,10 +544,48 @@ export default function LandingPage({
   const [activeDoctorId, setActiveDoctorId] = useState<number | null>(null)
   
   // Custom states for availability filter and WhatsApp chat
-  const [filterAvailableOnly, setFilterAvailableOnly] = useState(false)
+  const [availabilityDate, setAvailabilityDate] = useState('')
+  const [availabilityMap, setAvailabilityMap] = useState<Record<string, number>>({})
+  const [checkingAvailability, setCheckingAvailability] = useState(false)
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const availabilityPopoverRef = useRef<HTMLDivElement | null>(null)
   const [showFloatingChat, setShowFloatingChat] = useState(false)
   const [chatSubView, setChatSubView] = useState<'list' | 'chat'>('list')
   const [chatChannels, setChatChannels] = useState<any[]>([])
+
+  // Close the availability date-picker popover when clicking outside of it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (availabilityPopoverRef.current && !availabilityPopoverRef.current.contains(event.target as Node)) {
+        setShowDatePicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Check real availability for every visible professional on the selected date
+  useEffect(() => {
+    if (!availabilityDate || professionals.length === 0) {
+      setAvailabilityMap({})
+      return
+    }
+    let cancelled = false
+    setCheckingAvailability(true)
+    Promise.all(
+      professionals.map((pro) =>
+        api.getTurnosDisponibles(pro.id, availabilityDate)
+          .then((slots: string[]) => [pro.id, (slots || []).length] as const)
+          .catch(() => [pro.id, 0] as const)
+      )
+    ).then((entries) => {
+      if (cancelled) return
+      setAvailabilityMap(Object.fromEntries(entries))
+    }).finally(() => {
+      if (!cancelled) setCheckingAvailability(false)
+    })
+    return () => { cancelled = true }
+  }, [availabilityDate, professionals])
 
   useEffect(() => {
     if (currentUser && currentUser.rol === 'PACIENTE' && showFloatingChat) {
@@ -678,7 +732,7 @@ export default function LandingPage({
         pro.tags.some((t) => t.toLowerCase().includes(activeSpecialty.toLowerCase())) ||
         pro.specialty.toLowerCase().includes(activeSpecialty.toLowerCase())
 
-      const matchesAvailability = !filterAvailableOnly || pro.online === true
+      const matchesAvailability = !availabilityDate || checkingAvailability || (availabilityMap[pro.id] ?? 0) > 0
 
       const matchesModality = activeModality === 'Todos' ||
         (activeModality === 'Online' && pro.ofreceOnline) ||
@@ -686,7 +740,14 @@ export default function LandingPage({
 
       return matchesQuery && matchesSpecialty && matchesAvailability && matchesModality
     })
-  }, [query, activeSpecialty, activeModality, filterAvailableOnly, professionals])
+  }, [query, activeSpecialty, activeModality, availabilityDate, availabilityMap, checkingAvailability, professionals])
+
+  const availabilityDateLabel = useMemo(() => {
+    if (!availabilityDate) return null
+    const [y, m, d] = availabilityDate.split('-').map(Number)
+    const date = new Date(y, m - 1, d)
+    return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+  }, [availabilityDate])
 
   const handleBook = (pro: Professional) => {
     if (!currentUser) {
@@ -787,23 +848,47 @@ export default function LandingPage({
               autoComplete="off"
             />
             <div className="search-box__divider" aria-hidden="true" />
-            <button 
-              onClick={() => setFilterAvailableOnly(!filterAvailableOnly)}
-              className="search-box__filter" 
-              style={{
-                backgroundColor: filterAvailableOnly ? 'var(--green-100)' : 'transparent',
-                borderColor: filterAvailableOnly ? 'var(--color-primary)' : 'var(--color-border)',
-                color: filterAvailableOnly ? 'var(--color-primary)' : 'var(--color-text-primary)',
-                fontWeight: filterAvailableOnly ? 'bold' : 'normal',
-              }}
-              aria-label="Filtrar por disponibilidad"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" style={{ width: 16, height: 16 }}>
-                <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-              {filterAvailableOnly ? 'Disponibles ahora' : 'Disponibilidad'}
-            </button>
+            <div className="availability-filter" ref={availabilityPopoverRef}>
+              <button
+                type="button"
+                onClick={() => setShowDatePicker(v => !v)}
+                className="search-box__filter"
+                style={{
+                  backgroundColor: availabilityDate ? 'var(--green-100)' : 'transparent',
+                  borderColor: availabilityDate ? 'var(--color-primary)' : 'var(--color-border)',
+                  color: availabilityDate ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                  fontWeight: availabilityDate ? 'bold' : 'normal',
+                }}
+                aria-label="Filtrar por disponibilidad en una fecha"
+                aria-expanded={showDatePicker}
+              >
+                <IconCalendar />
+                {checkingAvailability ? 'Buscando...' : availabilityDateLabel ? `Disponibles el ${availabilityDateLabel}` : 'Disponibilidad'}
+                {availabilityDate && (
+                  <span
+                    role="button"
+                    aria-label="Quitar filtro de fecha"
+                    onClick={(e) => { e.stopPropagation(); setAvailabilityDate(''); setShowDatePicker(false) }}
+                    className="availability-filter__clear"
+                  >
+                    <IconClose size={12} />
+                  </span>
+                )}
+              </button>
+              {showDatePicker && (
+                <div className="availability-popover" role="dialog" aria-label="Elegir fecha de disponibilidad">
+                  <label className="availability-popover__label" htmlFor="availability-date-input">Ver disponibilidad para el:</label>
+                  <input
+                    id="availability-date-input"
+                    type="date"
+                    className="availability-popover__input"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={availabilityDate}
+                    onChange={(e) => { setAvailabilityDate(e.target.value); setShowDatePicker(false) }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Specialty chips */}
@@ -1028,7 +1113,14 @@ export default function LandingPage({
                 )
                 : filtered.map((pro) => (
                   <div role="listitem" key={pro.id}>
-                    <ProCard pro={pro} onBook={handleBook} onChat={handleStartChat} currentUser={currentUser} />
+                    <ProCard
+                      pro={pro}
+                      onBook={handleBook}
+                      onChat={handleStartChat}
+                      currentUser={currentUser}
+                      availabilityDateLabel={availabilityDateLabel}
+                      availabilityCount={availabilityMap[pro.id]}
+                    />
                   </div>
                 ))
             }

@@ -6,6 +6,25 @@ interface LoginPageProps {
   onBack: () => void
 }
 
+function IconPatient({ size = 26 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" />
+    </svg>
+  )
+}
+
+function IconStethoscope({ size = 26 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M4.5 3v6a4.5 4.5 0 0 0 9 0V3" />
+      <path d="M8.5 13.5V17a5 5 0 0 0 10 0v-2" />
+      <circle cx="18.5" cy="13" r="2" />
+    </svg>
+  )
+}
+
 const PROVINCIAS_ARGENTINA = [
   "Buenos Aires", "CABA", "Catamarca", "Chaco", "Chubut", "Córdoba", "Corrientes",
   "Entre Ríos", "Formosa", "Jujuy", "La Pampa", "La Rioja", "Mendoza", "Misiones",
@@ -192,7 +211,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       fechaNacimiento,
       tipoDocumento,
       numeroDocumento: Number(numeroDocumento),
-      telefono,
+      telefono: `+54 ${telefono.trim()}`,
     }
 
     if (role === 'PACIENTE') {
@@ -461,27 +480,27 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                 {/* Role select */}
                 <div className="form-group">
                   <label className="form-label">Registrarme como:</label>
-                  <div style={{ display: 'flex', gap: 'var(--space-4)', marginTop: '4px' }}>
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
-                      <input
-                        type="radio"
-                        name="role"
-                        value="PACIENTE"
-                        checked={role === 'PACIENTE'}
-                        onChange={() => setRole('PACIENTE')}
-                      />
-                      🩺 Paciente
-                    </label>
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
-                      <input
-                        type="radio"
-                        name="role"
-                        value="PSIQUIATRA"
-                        checked={role === 'PSIQUIATRA'}
-                        onChange={() => setRole('PSIQUIATRA')}
-                      />
-                      ⚕️ Profesional
-                    </label>
+                  <div className="role-select" role="radiogroup" aria-label="Registrarme como">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={role === 'PACIENTE'}
+                      className={`role-select__card ${role === 'PACIENTE' ? 'active' : ''}`}
+                      onClick={() => setRole('PACIENTE')}
+                    >
+                      <span className="role-select__icon"><IconPatient /></span>
+                      Paciente
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={role === 'PSIQUIATRA'}
+                      className={`role-select__card ${role === 'PSIQUIATRA' ? 'active' : ''}`}
+                      onClick={() => setRole('PSIQUIATRA')}
+                    >
+                      <span className="role-select__icon"><IconStethoscope /></span>
+                      Profesional
+                    </button>
                   </div>
                 </div>
 
@@ -546,12 +565,15 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                   </div>
                   <div className="form-group" style={{ gridColumn: 'span 2' }}>
                     <label className="form-label form-label--required">Teléfono</label>
-                    <input type="text" className="form-input" placeholder="+54 9 351 1234567" value={telefono} onChange={(e) => setTelefono(e.target.value)} required />
+                    <div className="phone-input">
+                      <span className="phone-input__prefix">+54</span>
+                      <input type="tel" className="form-input phone-input__field" placeholder="9 351 1234567" value={telefono} onChange={(e) => setTelefono(e.target.value)} required />
+                    </div>
                   </div>
 
                   {role === 'PACIENTE' && (
                     <div className="form-group" style={{ gridColumn: 'span 2', marginTop: 'var(--space-2)' }}>
-                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: '600' }}>
+                      <label className={`obra-social-check ${hasObraSocial ? 'active' : ''}`}>
                         <input
                           type="checkbox"
                           checked={hasObraSocial}
