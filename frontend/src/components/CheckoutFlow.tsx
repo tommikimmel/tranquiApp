@@ -107,17 +107,51 @@ function StepSelect({
       setLoading(true)
       const weekdays = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
       const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-      const now = new Date()
+      const targetTimeZone = 'America/Argentina/Cordoba'
+      
+      const getCordobaDateParts = (date: Date) => {
+        const parts = new Intl.DateTimeFormat('en-US', {
+          timeZone: targetTimeZone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        }).formatToParts(date);
+        
+        const map: Record<string, string> = {};
+        parts.forEach(p => {
+          map[p.type] = p.value;
+        });
+        return {
+          year: parseInt(map.year, 10),
+          month: parseInt(map.month, 10) - 1, // 0-indexed for Date constructor
+          day: parseInt(map.day, 10),
+          hour: parseInt(map.hour, 10),
+          minute: parseInt(map.minute, 10)
+        };
+      };
+
+      const nowParts = getCordobaDateParts(new Date());
+      const baseDate = new Date(nowParts.year, nowParts.month, nowParts.day, nowParts.hour, nowParts.minute);
       
       const datesToFetch: { dateStr: string; label: string; sublabel: string }[] = []
       for (let i = 0; i < 7; i++) {
-        const d = new Date(now)
+        const d = new Date(baseDate)
         d.setDate(d.getDate() + i)
-        if (d.getDay() === 0 || d.getDay() === 6) continue
+        const dayOfWeek = d.getDay()
+        if (dayOfWeek === 0 || dayOfWeek === 6) continue
 
-        const label = i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : weekdays[d.getDay()]
+        const label = i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : weekdays[dayOfWeek]
         const sublabel = `${d.getDate()} ${months[d.getMonth()]}`
-        const dateStr = d.toISOString().split('T')[0]
+        
+        const yearStr = d.getFullYear()
+        const monthStr = String(d.getMonth() + 1).padStart(2, '0')
+        const dayStr = String(d.getDate()).padStart(2, '0')
+        const dateStr = `${yearStr}-${monthStr}-${dayStr}`
+        
         datesToFetch.push({ dateStr, label, sublabel })
       }
 
@@ -139,12 +173,10 @@ function StepSelect({
             available: true
           }));
 
-          // If the day is today, filter out past slots based on Buenos Aires timezone context
+          // If the day is today, filter out past slots based on Cordoba timezone context
           if (res.label === 'Hoy') {
-            const targetTimeZone = 'America/Argentina/Buenos_Aires';
-            const nowInBA = new Date(new Date().toLocaleString('en-US', { timeZone: targetTimeZone }));
-            const currentHour = nowInBA.getHours();
-            const currentMinute = nowInBA.getMinutes();
+            const currentHour = nowParts.hour;
+            const currentMinute = nowParts.minute;
 
             slots = slots.filter((slot: { time: string; available: boolean }) => {
               const [shStr, smStr] = slot.time.split(':');
