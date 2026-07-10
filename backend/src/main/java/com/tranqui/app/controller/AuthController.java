@@ -77,7 +77,7 @@ public class AuthController {
                 .ofreceOnline(registerRequestDto.getOfreceOnline())
                 .ofrecePresencial(registerRequestDto.getOfrecePresencial())
                 .fotoUrl(registerRequestDto.getFotoUrl())
-                .verificadoAdmin(registerRequestDto.getRol() == Rol.PACIENTE)
+                .verificadoAdmin(registerRequestDto.getRol() == Rol.PACIENTE ? true : null)
                 .build();
 
         usuarioRepository.save(usuario);
