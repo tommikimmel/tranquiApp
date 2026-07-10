@@ -2635,7 +2635,7 @@ export default function App() {
   useEffect(() => {
     if (loadingSession) return
 
-    if (currentUser && view === 'dashboard') {
+    if (currentUser && currentUser.rol === 'PSIQUIATRA' && view === 'dashboard') {
       let client: Client | null = null;
       api.getPerfil().then((perfil) => {
         if (perfil && perfil.id) {
