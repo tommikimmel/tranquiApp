@@ -88,6 +88,12 @@ export default function AddressMapPicker({
   const [leafletReady, setLeafletReady] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [searching, setSearching] = useState(false)
+  
+  // Controls if manual adjustment (dragging marker or clicking map) is allowed
+  const [manualAdjustmentEnabled, setManualAdjustmentEnabled] = useState(false)
+  const manualAdjustmentRef = useRef(manualAdjustmentEnabled)
+  manualAdjustmentRef.current = manualAdjustmentEnabled
+
   const searchedRef = useRef('')
 
   // Load appropriate map library
@@ -125,6 +131,7 @@ export default function AddressMapPicker({
     searchedRef.current = fullQuery
 
     setSearching(true)
+    setManualAdjustmentEnabled(false) // Lock location when a new address search starts
     try {
       if (mapsReady) {
         // Google Geocoder
@@ -208,20 +215,22 @@ export default function AddressMapPicker({
     const marker = new google.maps.Marker({
       map,
       position: initialCenter,
-      draggable: true,
+      draggable: manualAdjustmentRef.current,
       visible: hasInitialPin,
     })
     markerRef.current = marker
 
-    // Marker drag updates lat/lng (manual selection override)
+    // Marker drag updates lat/lng (only if manual adjustment is enabled)
     marker.addListener('dragend', () => {
+      if (!manualAdjustmentRef.current) return
       const pos = marker.getPosition()
       if (!pos) return
       onLocationChange(pos.lat(), pos.lng())
     })
 
-    // Map click places/updates marker (manual selection override)
+    // Map click places/updates marker (only if manual adjustment is enabled)
     map.addListener('click', (e: any) => {
+      if (!manualAdjustmentRef.current) return
       const newLat = e.latLng.lat()
       const newLng = e.latLng.lng()
       marker.setPosition({ lat: newLat, lng: newLng })
@@ -249,6 +258,7 @@ export default function AddressMapPicker({
         const formatted = place.formatted_address || direccion
         onDireccionChange(formatted)
         onLocationChange(newLat, newLng)
+        setManualAdjustmentEnabled(false) // Lock pin position on new Autocomplete selection
       })
     }
 
@@ -292,7 +302,7 @@ export default function AddressMapPicker({
     })
 
     const marker = L.marker(initialCenter, {
-      draggable: true,
+      draggable: manualAdjustmentRef.current,
       icon: customIcon
     })
     leafletMarkerRef.current = marker
@@ -301,14 +311,16 @@ export default function AddressMapPicker({
       marker.addTo(map)
     }
 
-    // Drag marker updates lat/lng (manual selection override)
+    // Drag marker updates lat/lng (only if manual adjustment is enabled)
     marker.on('dragend', () => {
+      if (!manualAdjustmentRef.current) return
       const latlng = marker.getLatLng()
       onLocationChange(latlng.lat, latlng.lng)
     })
 
-    // Click map updates marker (manual selection override)
+    // Click map updates marker (only if manual adjustment is enabled)
     map.on('click', (e: any) => {
+      if (!manualAdjustmentRef.current) return
       const newLat = e.latlng.lat
       const newLng = e.latlng.lng
       marker.setLatLng([newLat, newLng])
@@ -359,6 +371,23 @@ export default function AddressMapPicker({
       leafletMapRef.current.setView([lat, lng], ZOOM_WITH_PIN)
     }
   }, [lat, lng])
+
+  // Dynamically update marker draggable states on changes to manualAdjustmentEnabled
+  useEffect(() => {
+    if (markerRef.current) {
+      markerRef.current.setDraggable(manualAdjustmentEnabled)
+    }
+  }, [manualAdjustmentEnabled, mapsReady])
+
+  useEffect(() => {
+    if (leafletMarkerRef.current) {
+      if (manualAdjustmentEnabled) {
+        leafletMarkerRef.current.dragging.enable()
+      } else {
+        leafletMarkerRef.current.dragging.disable()
+      }
+    }
+  }, [manualAdjustmentEnabled, leafletReady])
 
   // Double fallback check
   const hasMapLoaded = mapsReady || leafletReady
@@ -428,12 +457,29 @@ export default function AddressMapPicker({
         style={{ width: '100%', height: '220px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)', marginTop: '8px' }}
       />
       
-      <span className="form-helper" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
-        <IconMapPin />
-        {lat != null && lng != null
-          ? 'Ubicación seleccionada. Si la posición es incorrecta, podés arrastrar el marcador verde o hacer clic en el mapa para corregirla.'
-          : 'Escribí la dirección y hacé clic en "Ubicar" para posicionar el marcador. Podés ajustarlo manualmente haciendo clic en el mapa.'}
-      </span>
+      {lat != null && lng != null ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', gap: 'var(--space-2)' }}>
+          <span className="form-helper" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+            <IconMapPin />
+            {manualAdjustmentEnabled 
+              ? 'Ajuste manual activo. Hacé clic en el mapa o arrastrá el marcador verde.' 
+              : 'Ubicación establecida y bloqueada.'}
+          </span>
+          <button
+            type="button"
+            className={`btn ${manualAdjustmentEnabled ? 'btn--primary' : 'btn--secondary'}`}
+            onClick={() => setManualAdjustmentEnabled(!manualAdjustmentEnabled)}
+            style={{ padding: '6px 14px', fontSize: '12px', height: '32px', fontWeight: 'bold' }}
+          >
+            {manualAdjustmentEnabled ? 'Confirmar Ubicación' : 'Ubicación Incorrecta'}
+          </button>
+        </div>
+      ) : (
+        <span className="form-helper" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+          <IconMapPin />
+          Escribí la dirección y hacé clic en "Ubicar" para posicionar el marcador.
+        </span>
+      )}
     </div>
   )
 }
