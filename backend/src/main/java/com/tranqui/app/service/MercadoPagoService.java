@@ -1,9 +1,9 @@
 package com.tranqui.app.service;
 
-import com.mercadopago.MercadoPagoConfig;
 import com.mercadopago.client.preference.PreferenceClient;
 import com.mercadopago.client.preference.PreferenceItemRequest;
 import com.mercadopago.client.preference.PreferenceRequest;
+import com.mercadopago.core.MPRequestOptions;
 import com.mercadopago.resources.preference.Preference;
 import com.tranqui.app.model.Turno;
 import com.tranqui.app.model.Usuario;
@@ -19,8 +19,23 @@ public class MercadoPagoService {
     @Autowired
     private EncryptionUtil encryptionUtil;
 
+    @Autowired
+    private MercadoPagoOAuthService oauthService;
+
     @Value("${mercadopago.enabled:false}")
     private boolean isEnabled;
+
+    @Value("${app.public-url:http://localhost:8081}")
+    private String appPublicUrl;
+
+    private String notificationUrl() {
+        return appPublicUrl + "/api/payments/webhook";
+    }
+
+    // Extracted so tests can substitute a mock client instead of hitting the real Mercado Pago API.
+    protected PreferenceClient buildPreferenceClient() {
+        return new PreferenceClient();
+    }
 
     public String crearPreferenciaPago(Turno turno, Usuario medico) throws Exception {
         String rawToken = "dummy-token";
@@ -33,10 +48,12 @@ public class MercadoPagoService {
             return "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-preference-id";
         }
 
-        // Initialize SDK with physician's decrypted token
-        MercadoPagoConfig.setAccessToken(rawToken);
+        String accessToken = oauthService.obtenerAccessTokenValido(medico);
+        if (accessToken == null) {
+            throw new IllegalStateException("El profesional todavía no vinculó su cuenta de Mercado Pago.");
+        }
 
-        PreferenceClient client = new PreferenceClient();
+        PreferenceClient client = buildPreferenceClient();
 
         PreferenceItemRequest itemRequest = PreferenceItemRequest.builder()
                 .title("Consulta Psiquiátrica - " + medico.getNombre())
@@ -47,10 +64,13 @@ public class MercadoPagoService {
         PreferenceRequest request = PreferenceRequest.builder()
                 .items(List.of(itemRequest))
                 .externalReference(turno.getId().toString())
-                .notificationUrl("https://tranquiapp.com/api/payments/webhook")
+                .notificationUrl(notificationUrl())
                 .build();
 
-        Preference preference = client.create(request);
+        // Per-request access token (instead of the global/static MercadoPagoConfig)
+        // so concurrent requests for different professionals never cross wires.
+        MPRequestOptions options = MPRequestOptions.builder().accessToken(accessToken).build();
+        Preference preference = client.create(request, options);
         return preference.getInitPoint();
     }
 
@@ -65,9 +85,12 @@ public class MercadoPagoService {
             return "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-doc-preference-id";
         }
 
-        MercadoPagoConfig.setAccessToken(rawToken);
+        String accessToken = oauthService.obtenerAccessTokenValido(medico);
+        if (accessToken == null) {
+            throw new IllegalStateException("El profesional todavía no vinculó su cuenta de Mercado Pago.");
+        }
 
-        PreferenceClient client = new PreferenceClient();
+        PreferenceClient client = buildPreferenceClient();
 
         PreferenceItemRequest itemRequest = PreferenceItemRequest.builder()
                 .title(solicitud.getTipoConcepto().toString() + " - " + medico.getNombre())
@@ -78,10 +101,11 @@ public class MercadoPagoService {
         PreferenceRequest request = PreferenceRequest.builder()
                 .items(List.of(itemRequest))
                 .externalReference("doc-" + solicitud.getId().toString())
-                .notificationUrl("https://tranquiapp.com/api/payments/webhook")
+                .notificationUrl(notificationUrl())
                 .build();
 
-        Preference preference = client.create(request);
+        MPRequestOptions options = MPRequestOptions.builder().accessToken(accessToken).build();
+        Preference preference = client.create(request, options);
         return preference.getInitPoint();
     }
 }

@@ -57,8 +57,9 @@ public class GoogleAuthService {
             if (idToken != null) {
                 return idToken.getPayload();
             }
-        } catch (GeneralSecurityException | IOException e) {
-            // Log or handle error
+        } catch (GeneralSecurityException | IOException | IllegalArgumentException e) {
+            // A malformed/garbage token string throws IllegalArgumentException before it even
+            // reaches signature verification; treat it the same as any other invalid token.
         }
         return null;
     }

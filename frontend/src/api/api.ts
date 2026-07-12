@@ -85,10 +85,22 @@ export const api = {
     apiFetch('/medicos/perfil', { method: 'PUT', body: data }),
   
   getDisponibilidad: () => apiFetch('/medicos/disponibilidad'),
-  
-  actualizarDisponibilidad: (data: any[]) => 
+
+  actualizarDisponibilidad: (data: any[]) =>
     apiFetch('/medicos/disponibilidad', { method: 'PUT', body: data as any }),
-  
+
+  getMercadoPagoStatus: (): Promise<{ connected: boolean; mpUserId: string; mercadopagoEnabled: boolean }> =>
+    apiFetch('/medicos/mercadopago/status'),
+
+  getMercadoPagoConnectUrl: (): Promise<{ url: string }> =>
+    apiFetch('/medicos/mercadopago/connect'),
+
+  simularConexionMercadoPago: () =>
+    apiFetch('/medicos/mercadopago/connect-simulado', { method: 'POST' }),
+
+  desconectarMercadoPago: () =>
+    apiFetch('/medicos/mercadopago/disconnect', { method: 'POST' }),
+
   getTurnosHoy: () => apiFetch('/medicos/turnos/hoy'),
   getTurnos: () => apiFetch('/medicos/turnos'),
   

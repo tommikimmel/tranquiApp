@@ -141,4 +141,163 @@ class MedicoServiceTest {
         assertEquals(1, stats.getSessionsToday());
         assertEquals(0, new BigDecimal("35000").compareTo(stats.getEarningsThisWeek()));
     }
+
+    @Test
+    void testObtenerPerfil_promotesNonPsiquiatraRoleToPsiquiatra() {
+        Usuario misconfigured = usuarioRepository.save(Usuario.builder()
+                .nombre("Alguien").email("alguien.mal-rol@gmail.com").rol(Rol.PACIENTE).build());
+        try {
+            medicoService.obtenerPerfil("alguien.mal-rol@gmail.com");
+
+            Usuario updated = usuarioRepository.findByEmail("alguien.mal-rol@gmail.com").orElseThrow();
+            assertEquals(Rol.PSIQUIATRA, updated.getRol());
+        } finally {
+            tarifaRepository.deleteAll(tarifaRepository.findByMedicoId(misconfigured.getId()));
+            usuarioRepository.delete(misconfigured);
+        }
+    }
+
+    @Test
+    void testActualizarPerfil_withMatriculaInfoAndExistingTarifa() {
+        // Pre-seed an existing tarifa so actualizarPerfil takes the "update" branch, not "create".
+        TarifaMedico existente = tarifaRepository.save(TarifaMedico.builder()
+                .medico(medico).servicioId("particular").label("Particular").precio(new BigDecimal("1")).habilitado(false).build());
+
+        MedicoDto.TarifaDto tDto = MedicoDto.TarifaDto.builder()
+                .id("particular").label("Particular").price(new BigDecimal("50000")).enabled(true).build();
+
+        MedicoDto.MatriculaInfoDto matInfo = MedicoDto.MatriculaInfoDto.builder()
+                .tipo("MP").provincia("Buenos Aires").numero(999)
+                .especialidad(MedicoDto.EspecialidadDto.builder().textoLibre("Psiquiatria Infantil").build())
+                .asociada(MedicoDto.AsociadaDto.builder().tipo("MN").provincia("Santa Fe").numero(111).build())
+                .build();
+
+        MedicoDto dto = MedicoDto.builder()
+                .name("Marta").matriculaInfo(matInfo).tariffs(List.of(tDto)).build();
+
+        medicoService.actualizarPerfil(medico.getEmail(), dto);
+
+        Usuario updated = usuarioRepository.findByEmail(medico.getEmail()).orElseThrow();
+        assertEquals("MP", updated.getMatriculaTipo());
+        assertEquals("Buenos Aires", updated.getMatriculaProvincia());
+        assertEquals(999, updated.getMatriculaNumero());
+        assertEquals("Psiquiatria Infantil", updated.getMatriculaEspecialidad());
+        assertEquals("MN", updated.getMatriculaAsocTipo());
+        assertEquals("Santa Fe", updated.getMatriculaAsocProvincia());
+        assertEquals(111, updated.getMatriculaAsocNumero());
+        assertEquals("999", updated.getMatricula());
+
+        TarifaMedico tarifaActualizada = tarifaRepository.findById(existente.getId()).orElseThrow();
+        assertEquals(0, new BigDecimal("50000").compareTo(tarifaActualizada.getPrecio()));
+        assertTrue(tarifaActualizada.isHabilitado());
+    }
+
+    @Test
+    void testConstruirMedicoDto_initialsFallbackWhenNameIsOnlyATitle() {
+        Usuario soloTitulo = usuarioRepository.save(Usuario.builder()
+                .nombre("Dr.").email("solo.titulo@gmail.com").rol(Rol.PSIQUIATRA).build());
+        try {
+            MedicoDto result = medicoService.obtenerPerfil("solo.titulo@gmail.com");
+            assertEquals("DR", result.getInitials());
+        } finally {
+            tarifaRepository.deleteAll(tarifaRepository.findByMedicoId(soloTitulo.getId()));
+            usuarioRepository.delete(soloTitulo);
+        }
+    }
+
+    @Test
+    void testObtenerStats_fewerSessionsTodayThanYesterday_reportsNegativeChange() {
+        Usuario m = usuarioRepository.save(Usuario.builder().nombre("M2").email("m2@gmail.com").rol(Rol.PSIQUIATRA).build());
+        Usuario p = usuarioRepository.save(Usuario.builder().nombre("P2").email("p2@gmail.com").rol(Rol.PACIENTE).build());
+        Turno hoy = turnoRepository.save(turnoFor(m, p, LocalDate.now()));
+        Turno ayer1 = turnoRepository.save(turnoFor(m, p, LocalDate.now().minusDays(1)));
+        Turno ayer2 = turnoRepository.save(turnoFor(m, p, LocalDate.now().minusDays(1)));
+        try {
+            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail());
+            assertEquals("-1 vs ayer", stats.getSessionsTodayChange());
+        } finally {
+            turnoRepository.delete(hoy); turnoRepository.delete(ayer1); turnoRepository.delete(ayer2);
+            usuarioRepository.delete(m); usuarioRepository.delete(p);
+        }
+    }
+
+    @Test
+    void testObtenerStats_sameSessionsTodayAndYesterday_reportsEqualChange() {
+        Usuario m = usuarioRepository.save(Usuario.builder().nombre("M3").email("m3@gmail.com").rol(Rol.PSIQUIATRA).build());
+        Usuario p = usuarioRepository.save(Usuario.builder().nombre("P3").email("p3@gmail.com").rol(Rol.PACIENTE).build());
+        Turno hoy = turnoRepository.save(turnoFor(m, p, LocalDate.now()));
+        Turno ayer = turnoRepository.save(turnoFor(m, p, LocalDate.now().minusDays(1)));
+        try {
+            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail());
+            assertEquals("igual que ayer", stats.getSessionsTodayChange());
+        } finally {
+            turnoRepository.delete(hoy); turnoRepository.delete(ayer);
+            usuarioRepository.delete(m); usuarioRepository.delete(p);
+        }
+    }
+
+    @Test
+    void testObtenerStats_noEarningsEitherWeek_reportsZeroPercent() {
+        Usuario m = usuarioRepository.save(Usuario.builder().nombre("M4").email("m4@gmail.com").rol(Rol.PSIQUIATRA).build());
+        Usuario p = usuarioRepository.save(Usuario.builder().nombre("P4").email("p4@gmail.com").rol(Rol.PACIENTE).build());
+        // Unconfirmed appointment: excluded from earnings calculations entirely.
+        Turno pendiente = turnoRepository.save(Turno.builder()
+                .medico(m).paciente(p).fecha(LocalDate.now())
+                .horaInicio(LocalTime.of(11, 0)).horaFin(LocalTime.of(11, 45))
+                .tipo(TipoTurno.PARTICULAR).estado(EstadoTurno.PENDIENTE_PAGO).precio(new BigDecimal("10000"))
+                .build());
+        try {
+            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail());
+            assertEquals("0% vs sem. anterior", stats.getEarningsThisWeekChange());
+        } finally {
+            turnoRepository.delete(pendiente);
+            usuarioRepository.delete(m); usuarioRepository.delete(p);
+        }
+    }
+
+    @Test
+    void testObtenerStats_earningsIncreaseVsLastWeek_reportsPositivePercent() {
+        Usuario m = usuarioRepository.save(Usuario.builder().nombre("M5").email("m5@gmail.com").rol(Rol.PSIQUIATRA).build());
+        Usuario p = usuarioRepository.save(Usuario.builder().nombre("P5").email("p5@gmail.com").rol(Rol.PACIENTE).build());
+        Turno estaSemana = turnoRepository.save(confirmadoCon(m, p, LocalDate.now(), new BigDecimal("20000")));
+        Turno semanaPasada = turnoRepository.save(confirmadoCon(m, p, LocalDate.now().minusWeeks(1), new BigDecimal("10000")));
+        try {
+            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail());
+            assertTrue(stats.getEarningsThisWeekChange().startsWith("+"));
+        } finally {
+            turnoRepository.delete(estaSemana); turnoRepository.delete(semanaPasada);
+            usuarioRepository.delete(m); usuarioRepository.delete(p);
+        }
+    }
+
+    @Test
+    void testObtenerStats_earningsDecreaseVsLastWeek_reportsNegativePercent() {
+        Usuario m = usuarioRepository.save(Usuario.builder().nombre("M6").email("m6@gmail.com").rol(Rol.PSIQUIATRA).build());
+        Usuario p = usuarioRepository.save(Usuario.builder().nombre("P6").email("p6@gmail.com").rol(Rol.PACIENTE).build());
+        Turno estaSemana = turnoRepository.save(confirmadoCon(m, p, LocalDate.now(), new BigDecimal("5000")));
+        Turno semanaPasada = turnoRepository.save(confirmadoCon(m, p, LocalDate.now().minusWeeks(1), new BigDecimal("20000")));
+        try {
+            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail());
+            assertTrue(stats.getEarningsThisWeekChange().startsWith("-"));
+        } finally {
+            turnoRepository.delete(estaSemana); turnoRepository.delete(semanaPasada);
+            usuarioRepository.delete(m); usuarioRepository.delete(p);
+        }
+    }
+
+    private Turno turnoFor(Usuario m, Usuario p, LocalDate fecha) {
+        return Turno.builder()
+                .medico(m).paciente(p).fecha(fecha)
+                .horaInicio(LocalTime.of(9, 0)).horaFin(LocalTime.of(9, 45))
+                .tipo(TipoTurno.PARTICULAR).estado(EstadoTurno.CONFIRMADO).precio(new BigDecimal("1000"))
+                .build();
+    }
+
+    private Turno confirmadoCon(Usuario m, Usuario p, LocalDate fecha, BigDecimal precio) {
+        return Turno.builder()
+                .medico(m).paciente(p).fecha(fecha)
+                .horaInicio(LocalTime.of(9, 0)).horaFin(LocalTime.of(9, 45))
+                .tipo(TipoTurno.PARTICULAR).estado(EstadoTurno.CONFIRMADO).precio(precio)
+                .build();
+    }
 }

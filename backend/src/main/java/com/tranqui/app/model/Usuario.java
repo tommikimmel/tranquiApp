@@ -33,6 +33,12 @@ public class Usuario {
     @Column(name = "mp_access_token_encrypted", columnDefinition = "TEXT")
     private String mpAccessTokenEncrypted;
 
+    @Column(name = "mp_refresh_token_encrypted", columnDefinition = "TEXT")
+    private String mpRefreshTokenEncrypted;
+
+    @Column(name = "mp_token_expires_at")
+    private LocalDateTime mpTokenExpiresAt;
+
     @Column(name = "mp_user_id", length = 50)
     private String mpUserId;
 
@@ -92,6 +98,12 @@ public class Usuario {
 
     @Column(name = "domicilio_atencion", length = 255)
     private String domicilioAtencion;
+
+    @Column(name = "domicilio_lat")
+    private Double domicilioLat;
+
+    @Column(name = "domicilio_lng")
+    private Double domicilioLng;
 
     @Column(name = "codigo_refeps")
     private Long codigoReFeps;

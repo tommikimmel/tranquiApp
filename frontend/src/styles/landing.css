@@ -736,11 +736,13 @@
 .trust-carousel__track {
   display: flex;
   width: max-content;
-  animation: trust-carousel-scroll 24s linear infinite;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
-.trust-strip:hover .trust-carousel__track {
-  animation-play-state: paused;
+.trust-carousel__group {
+  display: flex;
+  flex-shrink: 0;
 }
 
 .trust-carousel__item {
@@ -759,17 +761,6 @@
   width: 16px;
   height: 16px;
   color: var(--color-primary);
-}
-
-@keyframes trust-carousel-scroll {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .trust-carousel__track {
-    animation: none;
-  }
 }
 
 /* ── Responsive ────────────────────────────────────────────── */

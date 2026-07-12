@@ -24,3 +24,13 @@ twilio:
 
 google:
   client-id: ${GOOGLE_CLIENT_ID:dummy-client-id}
+
+mercadopago:
+  enabled: ${MERCADOPAGO_ENABLED:false}
+  client-id: ${MERCADOPAGO_CLIENT_ID:}
+  client-secret: ${MERCADOPAGO_CLIENT_SECRET:}
+  webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
+
+app:
+  public-url: ${APP_PUBLIC_URL:http://localhost:8081}
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}

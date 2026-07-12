@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../api/api'
+import AddressMapPicker from './AddressMapPicker'
 
 interface LoginPageProps {
   onLoginSuccess: (user: any) => void
@@ -21,6 +22,26 @@ function IconStethoscope({ size = 26 }: { size?: number }) {
       <path d="M4.5 3v6a4.5 4.5 0 0 0 9 0V3" />
       <path d="M8.5 13.5V17a5 5 0 0 0 10 0v-2" />
       <circle cx="18.5" cy="13" r="2" />
+    </svg>
+  )
+}
+
+function IconVideoCall({ size = 18 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" />
+    </svg>
+  )
+}
+
+function IconBuilding({ size = 18 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <rect x="4" y="2" width="16" height="20" rx="1" />
+      <line x1="9" y1="7" x2="9" y2="7.01" /><line x1="15" y1="7" x2="15" y2="7.01" />
+      <line x1="9" y1="11" x2="9" y2="11.01" /><line x1="15" y1="11" x2="15" y2="11.01" />
+      <line x1="9" y1="15" x2="9" y2="15.01" /><line x1="15" y1="15" x2="15" y2="15.01" />
+      <path d="M9 22v-4h6v4" />
     </svg>
   )
 }
@@ -75,6 +96,9 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   const [specialty, setSpecialty] = useState('')
   const [cuil, setCuil] = useState('')
   const [domicilioAtencion, setDomicilioAtencion] = useState('')
+  const [domicilioProvincia, setDomicilioProvincia] = useState('')
+  const [domicilioLat, setDomicilioLat] = useState<number | null>(null)
+  const [domicilioLng, setDomicilioLng] = useState<number | null>(null)
   const [codigoReFeps, setCodigoReFeps] = useState('')
   const [matriculaTipo, setMatriculaTipo] = useState('MN')
   const [matriculaProvincia, setMatriculaProvincia] = useState('')
@@ -224,8 +248,16 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
         payload.numAfiliado = null
       }
     } else {
-      if (!titulo || !specialty || !matricula || !domicilioAtencion || !codigoReFeps) {
+      if (!titulo || !specialty || !matricula || !codigoReFeps) {
         setError('Por favor, completá los datos profesionales obligatorios.')
+        return
+      }
+      if (!ofreceOnline && !ofrecePresencial) {
+        setError('Seleccioná al menos una modalidad de consulta (Online o Presencial).')
+        return
+      }
+      if (ofrecePresencial && !domicilioAtencion) {
+        setError('Si ofrecés consultas presenciales, indicá el domicilio de atención.')
         return
       }
       payload.matricula = matricula
@@ -233,7 +265,9 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       payload.specialty = specialty
       payload.cuit = cuil
       payload.cuil = cuil ? Number(cuil) : null
-      payload.domicilioAtencion = domicilioAtencion
+      payload.domicilioAtencion = ofrecePresencial ? domicilioAtencion : null
+      payload.domicilioLat = ofrecePresencial ? domicilioLat : null
+      payload.domicilioLng = ofrecePresencial ? domicilioLng : null
       payload.codigoReFeps = codigoReFeps ? Number(codigoReFeps) : null
       payload.matriculaTipo = matriculaTipo
       payload.matriculaProvincia = matriculaProvincia
@@ -268,43 +302,45 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       justifyContent: 'center',
       minHeight: '100vh',
       backgroundColor: 'var(--color-bg)',
-      padding: 'var(--space-4)'
+      padding: 'var(--space-3)'
     }}>
       <div className="card" style={{
         maxWidth: activeTab === 'register' ? '640px' : '440px',
         width: '100%',
-        padding: 'var(--space-8)',
+        maxHeight: '94vh',
+        overflowY: 'auto',
+        padding: 'var(--space-3) var(--space-5)',
         boxShadow: 'var(--shadow-lg)',
         border: '1px solid var(--color-border)',
         borderRadius: 'var(--radius-lg)',
         backgroundColor: 'var(--color-surface)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 'var(--space-6)',
+        gap: 'var(--space-2)',
         transition: 'max-width 0.3s ease-in-out'
       }}>
         {/* Header / Logo */}
         <div style={{ textAlign: 'center' }}>
-          <img 
-            src="/tranqui-icon.webp" 
-            alt="Tranqui Logo" 
-            style={{ 
-              height: '48px', 
-              margin: '0 auto var(--space-4)',
+          <img
+            src="/tranqui-icon.webp"
+            alt="Tranqui Logo"
+            style={{
+              height: '28px',
+              margin: '0 auto 4px',
               display: 'block'
-            }} 
+            }}
           />
-          <h2 style={{ 
+          <h2 style={{
             fontFamily: 'var(--font-heading)',
-            fontSize: 'var(--text-xl)',
+            fontSize: 'var(--text-lg)',
             fontWeight: 'var(--font-weight-bold)',
             color: 'var(--color-text-primary)',
-            marginBottom: 'var(--space-1)'
+            marginBottom: '2px'
           }}>
             {activeTab === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
           </h2>
-          <p style={{ 
-            fontSize: 'var(--text-sm)',
+          <p style={{
+            fontSize: 'var(--text-xs)',
             color: 'var(--color-text-secondary)'
           }}>
             Gestioná tus turnos, agenda y pacientes en un solo lugar.
@@ -442,7 +478,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
           <form onSubmit={handleFormRegister} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             
             {/* Step Progress Indicator */}
-            <div className="checkout-progress" style={{ marginBottom: 'var(--space-2)' }}>
+            <div className="checkout-progress" style={{ padding: '0 var(--space-6)' }}>
               <div className={`checkout-progress__step ${regStep >= 1 ? 'active' : ''}`}>
                 <span className="checkout-progress__dot">1</span>
                 Credenciales
@@ -465,7 +501,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
             {/* PASO 1: Credenciales & Rol */}
             {regStep === 1 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                 {/* Role select */}
                 <div className="form-group">
                   <label className="form-label">Registrarme como:</label>
@@ -493,7 +529,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                   <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: '12px', color: 'var(--color-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '4px' }}>
                     Credenciales de Acceso
                   </div>
@@ -515,8 +551,8 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
             {/* PASO 2: Datos Personales */}
             {regStep === 2 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
                   <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: '12px', color: 'var(--color-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '4px' }}>
                     Datos Personales Básicos
                   </div>
@@ -562,7 +598,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
                   {role === 'PACIENTE' && (
                     <div className="form-group" style={{ gridColumn: 'span 2', marginTop: 'var(--space-2)' }}>
-                      <label className={`obra-social-check ${hasObraSocial ? 'active' : ''}`}>
+                      <label className={`check-chip ${hasObraSocial ? 'active' : ''}`}>
                         <input
                           type="checkbox"
                           checked={hasObraSocial}
@@ -578,14 +614,11 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
             {/* PASO 3: Cobertura o Profesionales */}
             {regStep === 3 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr',
-                  gap: 'var(--space-4)',
-                  maxHeight: '300px',
-                  overflowY: 'auto',
-                  paddingRight: '6px'
+                  gap: 'var(--space-3)'
                 }}>
                   {role === 'PACIENTE' ? (
                     <>
@@ -628,10 +661,6 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                         <input type="number" className="form-input" placeholder="Ej: 123456" value={codigoReFeps} onChange={(e) => setCodigoReFeps(e.target.value)} required />
                       </div>
                       <div className="form-group">
-                        <label className="form-label form-label--required">Domicilio de Atención</label>
-                        <input type="text" className="form-input" placeholder="Ej: Av. Colón 123, Córdoba" value={domicilioAtencion} onChange={(e) => setDomicilioAtencion(e.target.value)} required />
-                      </div>
-                      <div className="form-group">
                         <label className="form-label form-label--required">Número de Matrícula</label>
                         <input type="number" className="form-input" placeholder="Ej: 49281" value={matricula} onChange={(e) => setMatricula(e.target.value)} required />
                       </div>
@@ -649,16 +678,34 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                         </select>
                       </div>
 
-                      <div className="form-group" style={{ gridColumn: 'span 2', display: 'flex', gap: '16px', marginTop: '8px' }}>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                          <input type="checkbox" checked={ofreceOnline} onChange={(e) => setOfreceOnline(e.target.checked)} />
-                          💻 Consulta Online
-                        </label>
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                          <input type="checkbox" checked={ofrecePresencial} onChange={(e) => setOfrecePresencial(e.target.checked)} />
-                          🏢 Consulta Presencial
-                        </label>
+                      <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                        <label className="form-label">Modalidades de Consulta</label>
+                        <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+                          <label className={`check-chip check-chip--auto ${ofreceOnline ? 'active' : ''}`}>
+                            <input type="checkbox" checked={ofreceOnline} onChange={(e) => setOfreceOnline(e.target.checked)} />
+                            <span className="check-chip__icon"><IconVideoCall /></span>
+                            Consulta Online
+                          </label>
+                          <label className={`check-chip check-chip--auto ${ofrecePresencial ? 'active' : ''}`}>
+                            <input type="checkbox" checked={ofrecePresencial} onChange={(e) => setOfrecePresencial(e.target.checked)} />
+                            <span className="check-chip__icon"><IconBuilding /></span>
+                            Consulta Presencial
+                          </label>
+                        </div>
                       </div>
+
+                      {ofrecePresencial && (
+                        <AddressMapPicker
+                          provincia={domicilioProvincia}
+                          onProvinciaChange={setDomicilioProvincia}
+                          direccion={domicilioAtencion}
+                          onDireccionChange={setDomicilioAtencion}
+                          lat={domicilioLat}
+                          lng={domicilioLng}
+                          onLocationChange={(lat, lng) => { setDomicilioLat(lat); setDomicilioLng(lng) }}
+                          provinciasList={PROVINCIAS_ARGENTINA}
+                        />
+                      )}
 
                       <div className="form-group" style={{ gridColumn: 'span 2' }}>
                         <label className="form-label">Foto de Perfil (Opcional - URL)</label>
@@ -671,7 +718,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
             )}
 
             {/* Wizard Navigation Buttons */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
               {regStep > 1 && (
                 <button
                   type="button"
@@ -710,13 +757,13 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
           display: 'flex',
           justifyContent: 'center',
           borderTop: '1px solid var(--color-border)',
-          paddingTop: 'var(--space-4)'
+          paddingTop: '4px'
         }}>
           <button
             onClick={onBack}
             className="btn btn--ghost"
             style={{
-              fontSize: 'var(--text-sm)',
+              fontSize: 'var(--text-xs)',
               color: 'var(--color-text-secondary)',
               cursor: 'pointer'
             }}

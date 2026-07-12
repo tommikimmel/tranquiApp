@@ -34,4 +34,24 @@ class WebhookControllerTest {
                 .content("{\"id\": 1234}"))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void whenExternalReferenceIsNumericButTurnoDoesNotExist_thenStillOk() throws Exception {
+        // Exercises the "turno" branch (non "doc-" prefix); the handler throws
+        // EntityNotFoundException for a non-existent turno, which the controller must swallow.
+        mockMvc.perform(post("/api/payments/webhook")
+                .header("x-signature", "valid-signature-12345")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"external_reference\": \"999999999\", \"transaction_id\": \"tx-1\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void whenExternalReferenceIsNotNumeric_thenLogsAndStillOk() throws Exception {
+        mockMvc.perform(post("/api/payments/webhook")
+                .header("x-signature", "valid-signature-12345")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"external_reference\": \"not-a-number\"}"))
+                .andExpect(status().isOk());
+    }
 }

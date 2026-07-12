@@ -86,6 +86,8 @@ public class MedicoService {
         medico.setTipoDocumento(dto.getTipoDocumento());
         medico.setNumeroDocumento(dto.getNumeroDocumento());
         medico.setDomicilioAtencion(dto.getDomicilioAtencion());
+        medico.setDomicilioLat(dto.getDomicilioLat());
+        medico.setDomicilioLng(dto.getDomicilioLng());
         medico.setCodigoReFeps(dto.getCodigoReFeps());
 
         if (dto.getMatriculaInfo() != null) {
@@ -236,6 +238,8 @@ public class MedicoService {
                 .tipoDocumento(m.getTipoDocumento())
                 .numeroDocumento(m.getNumeroDocumento())
                 .domicilioAtencion(m.getDomicilioAtencion())
+                .domicilioLat(m.getDomicilioLat())
+                .domicilioLng(m.getDomicilioLng())
                 .codigoReFeps(m.getCodigoReFeps())
                 .matriculaInfo(matInfo)
                 .verificado(isMedicoVerificado(m))

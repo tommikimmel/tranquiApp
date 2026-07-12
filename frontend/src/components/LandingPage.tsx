@@ -476,20 +476,68 @@ const TRUST_ITEMS = [
   { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>, text: 'Turnos disponibles en menos de 24hs' },
 ]
 
+// Number of times TRUST_ITEMS is repeated in the track. Kept generous so the
+// carousel still has content to show ahead of the viewport on very wide
+// screens after it wraps (avoids any visible gap/jump at the loop point).
+const TRUST_TRACK_COPIES = 4
+const TRUST_SCROLL_SPEED_PX_PER_SEC = 32
+
 function TrustStrip() {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const firstGroupRef = useRef<HTMLDivElement>(null)
+  const offsetRef = useRef(0)
+  const pausedRef = useRef(false)
+
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (prefersReducedMotion) return
+
+    let rafId: number
+    let lastTime: number | null = null
+
+    const tick = (time: number) => {
+      if (lastTime === null) lastTime = time
+      const deltaSeconds = (time - lastTime) / 1000
+      lastTime = time
+
+      const groupWidth = firstGroupRef.current?.offsetWidth ?? 0
+      if (!pausedRef.current && groupWidth > 0 && trackRef.current) {
+        offsetRef.current += TRUST_SCROLL_SPEED_PX_PER_SEC * deltaSeconds
+        if (offsetRef.current >= groupWidth) {
+          offsetRef.current -= groupWidth
+        }
+        trackRef.current.style.transform = `translateX(-${offsetRef.current}px)`
+      }
+      rafId = requestAnimationFrame(tick)
+    }
+
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [])
+
   return (
-    <div className="trust-strip" aria-label="Garantías de servicio">
+    <div
+      className="trust-strip"
+      aria-label="Garantías de servicio"
+      onMouseEnter={() => { pausedRef.current = true }}
+      onMouseLeave={() => { pausedRef.current = false }}
+    >
       <div className="trust-carousel">
-        <div className="trust-carousel__track">
-          {[...TRUST_ITEMS, ...TRUST_ITEMS].map((item, idx) => (
+        <div className="trust-carousel__track" ref={trackRef}>
+          {Array.from({ length: TRUST_TRACK_COPIES }).map((_, copyIdx) => (
             <div
-              className="trust-carousel__item"
-              key={idx}
-              role={idx < TRUST_ITEMS.length ? 'listitem' : undefined}
-              aria-hidden={idx >= TRUST_ITEMS.length}
+              className="trust-carousel__group"
+              key={copyIdx}
+              ref={copyIdx === 0 ? firstGroupRef : undefined}
+              role={copyIdx === 0 ? 'list' : undefined}
+              aria-hidden={copyIdx > 0}
             >
-              <span className="trust-carousel__icon" aria-hidden="true">{item.icon}</span>
-              <span className="trust-carousel__text">{item.text}</span>
+              {TRUST_ITEMS.map((item, idx) => (
+                <div className="trust-carousel__item" key={idx} role={copyIdx === 0 ? 'listitem' : undefined}>
+                  <span className="trust-carousel__icon" aria-hidden="true">{item.icon}</span>
+                  <span className="trust-carousel__text">{item.text}</span>
+                </div>
+              ))}
             </div>
           ))}
         </div>

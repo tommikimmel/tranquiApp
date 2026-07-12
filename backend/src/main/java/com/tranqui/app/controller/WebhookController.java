@@ -2,6 +2,7 @@ package com.tranqui.app.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tranqui.app.service.MercadoPagoWebhookValidator;
 import com.tranqui.app.service.PagoWebhookHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,17 +21,21 @@ public class WebhookController {
     private PagoWebhookHandler pagoWebhookHandler;
 
     @Autowired
+    private MercadoPagoWebhookValidator webhookValidator;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @PostMapping("/webhook")
     public ResponseEntity<?> receiveWebhook(
             @RequestHeader(value = "x-signature", required = false) String signature,
+            @RequestHeader(value = "x-request-id", required = false) String requestId,
+            @RequestParam(value = "data.id", required = false) String dataId,
             @RequestBody String body) {
 
         log.info("Recibido Webhook de Mercado Pago. Firma: {}", signature);
 
-        // Validation of authenticity: if signature is missing or marked invalid, reject
-        if (signature == null || signature.equals("invalid-signature") || signature.contains("fake")) {
+        if (!webhookValidator.isValid(signature, requestId, dataId)) {
             log.warn("Firma de Webhook de Mercado Pago no válida. Rechazando petición.");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Firma inválida");
         }
