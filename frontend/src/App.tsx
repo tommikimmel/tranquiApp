@@ -1169,6 +1169,7 @@ function getMissingRequirements(m: any): string[] {
 
 function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (updated: any) => Promise<void> }) {
   const { showAlert } = useAlert();
+  const [showUnmetList, setShowUnmetList] = useState(false);
   const [name, setName] = useState(medicoInfo?.name || '')
   const [apellido, setApellido] = useState(medicoInfo?.apellido || '')
   const [sexo, setSexo] = useState(medicoInfo?.sexo || 'M')
@@ -1289,59 +1290,71 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
         </div>
       ) : (
         <div style={{
-          backgroundColor: '#fffdf5',
-          border: '1px solid #fef08a',
-          borderLeft: '5px solid var(--color-warning)',
+          backgroundColor: '#fafaf9',
+          border: '1px solid var(--color-border)',
           borderRadius: '12px',
-          padding: 'var(--space-5)',
-          color: 'var(--neutral-800)',
+          padding: 'var(--space-4)',
+          color: 'var(--color-text-primary)',
           fontSize: 'var(--text-sm)',
-          boxShadow: 'var(--shadow-sm)',
           display: 'flex',
           flexDirection: 'column',
           gap: 'var(--space-3)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '28px',
-              height: '28px',
-              borderRadius: '50%',
-              backgroundColor: '#fef9c3',
-              color: 'var(--color-warning)',
-              flexShrink: 0
-            }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: '16px', height: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: '16px', height: '16px', color: 'var(--color-warning)', flexShrink: 0 }}>
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                 <line x1="12" y1="9" x2="12" y2="13" />
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
+              <strong style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>Cuenta No Verificada</strong>
             </div>
-            <strong style={{ fontSize: '14px', color: '#854d0e' }}>Cuenta No Verificada</strong>
+            
+            <button
+              onClick={() => setShowUnmetList(!showUnmetList)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--color-primary)',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                padding: '2px 0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              {showUnmetList ? 'Ocultar detalles' : 'Ver requisitos pendientes'}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: '12px', height: '12px', transform: showUnmetList ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
           </div>
           
-          <div style={{ fontSize: '13px', color: 'var(--neutral-600)', lineHeight: '1.4' }}>
-            Para aparecer en la lista de profesionales disponibles de la aplicación y recibir reservas de pacientes, debés completar todas las siguientes condiciones para lograr la verificación:
+          <div style={{ fontSize: '12.5px', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
+            Para aparecer en la lista de profesionales disponibles de la aplicación y recibir reservas, debés completar todos tus datos de perfil.
           </div>
 
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '8px', 
-            backgroundColor: '#fafaf9', 
-            border: '1px solid #f5f5f4',
-            borderRadius: '8px',
-            padding: '12px 16px' 
-          }}>
-            {getMissingRequirements(medicoInfo).map((req, idx) => (
-              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: 'var(--neutral-700)' }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', flexShrink: 0 }} />
-                <span>{req}</span>
-              </div>
-            ))}
-          </div>
+          {showUnmetList && (
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '6px', 
+              backgroundColor: 'var(--color-surface)', 
+              border: '1px solid var(--color-border)',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              animation: 'fadeIn 0.2s ease-out'
+            }}>
+              {getMissingRequirements(medicoInfo).map((req, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--color-text-primary)' }}>
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', flexShrink: 0 }} />
+                  <span>{req}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -2633,6 +2646,7 @@ export default function App() {
   const [loadingDashboard, setLoadingDashboard] = useState(false)
   const [loadingSession, setLoadingSession] = useState(true)
   const [showUnverifiedAlert, setShowUnverifiedAlert] = useState(true)
+  const [showDashboardAlertList, setShowDashboardAlertList] = useState(false)
 
   const handleCloseUnverifiedAlert = () => {
     setShowUnverifiedAlert(false)
@@ -3096,88 +3110,99 @@ export default function App() {
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 10000,
-            backgroundColor: '#fffdf5',
-            border: '1px solid #fef08a',
-            borderLeft: '5px solid var(--color-warning)',
+            backgroundColor: '#fafaf9',
+            border: '1px solid var(--color-border)',
             borderRadius: '12px',
             padding: 'var(--space-4)',
-            color: 'var(--neutral-800)',
+            color: 'var(--color-text-primary)',
             fontSize: 'var(--text-sm)',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-            maxWidth: '540px',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+            maxWidth: '520px',
             width: '92%',
             display: 'flex',
             flexDirection: 'column',
             gap: 'var(--space-3)',
             animation: 'slideDownAlert 0.35s cubic-bezier(0.16, 1, 0.3, 1) both'
           }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '28px',
-                  height: '28px',
-                  borderRadius: '50%',
-                  backgroundColor: '#fef9c3',
-                  color: 'var(--color-warning)',
-                  flexShrink: 0
-                }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: '16px', height: '16px' }}>
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                </div>
-                <strong style={{ fontSize: '14px', color: '#854d0e' }}>Verificación de cuenta pendiente</strong>
-              </div>
-              <button 
-                onClick={handleCloseUnverifiedAlert}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--color-text-secondary)',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'background-color 0.2s',
-                  flexShrink: 0
-                }}
-                title="Cerrar aviso"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: '16px', height: '16px', color: 'var(--color-warning)', flexShrink: 0 }}>
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
                 </svg>
-              </button>
+                <strong style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>Verificación pendiente</strong>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  onClick={() => setShowDashboardAlertList(!showDashboardAlertList)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--color-primary)',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2px'
+                  }}
+                >
+                  {showDashboardAlertList ? 'Ocultar' : 'Ver qué falta'}
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: '10px', height: '10px', transform: showDashboardAlertList ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                <button 
+                  onClick={handleCloseUnverifiedAlert}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--color-text-secondary)',
+                    cursor: 'pointer',
+                    padding: '2px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background-color 0.2s',
+                    flexShrink: 0
+                  }}
+                  title="Cerrar aviso"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '14px', height: '14px' }}>
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
             </div>
             
-            <div style={{ fontSize: '13px', color: 'var(--neutral-600)', lineHeight: '1.4' }}>
-              Para aparecer en el buscador de pacientes y recibir reservas, debés completar las siguientes condiciones en tu perfil:
+            <div style={{ fontSize: '12.5px', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
+              Completá tu perfil para aparecer en el buscador de pacientes y recibir reservas de turnos.
             </div>
 
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '6px', 
-              backgroundColor: '#fafaf9', 
-              border: '1px solid #f5f5f4',
-              borderRadius: '8px',
-              padding: '10px 14px' 
-            }}>
-              {getMissingRequirements(medicoInfo).map((req, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--neutral-700)' }}>
-                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', flexShrink: 0 }} />
-                  <span>{req}</span>
-                </div>
-              ))}
-            </div>
+            {showDashboardAlertList && (
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '5px', 
+                backgroundColor: 'var(--color-surface)', 
+                border: '1px solid var(--color-border)',
+                borderRadius: '8px',
+                padding: '10px 12px',
+                animation: 'fadeIn 0.2s ease-out'
+              }}>
+                {getMissingRequirements(medicoInfo).map((req, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--color-text-primary)' }}>
+                    <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', flexShrink: 0 }} />
+                    <span>{req}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2px' }}>
               <button
                 onClick={() => {
                   setActiveNav('settings')
@@ -3185,14 +3210,12 @@ export default function App() {
                 }}
                 className="btn btn--primary btn--sm"
                 style={{ 
-                  backgroundColor: '#ca8a04', 
-                  border: 'none',
-                  padding: 'var(--space-2) var(--space-4)',
-                  fontSize: '12px',
+                  padding: '4px 10px',
+                  fontSize: '11px',
                   fontWeight: '600'
                 }}
               >
-                Completar Configuración
+                Configurar Perfil
               </button>
             </div>
           </div>
