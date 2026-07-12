@@ -74,6 +74,9 @@ interface Professional {
   color: string
   ofreceOnline?: boolean
   ofrecePresencial?: boolean
+  domicilioAtencion?: string
+  domicilioLat?: number | null
+  domicilioLng?: number | null
 }
 
 // PROFESSIONALS mock array removed since values are loaded from API
@@ -557,6 +560,9 @@ interface BookTarget {
   nextSlot: string
   nextSlotDay: string
   fotoUrl?: string
+  domicilioAtencion?: string
+  domicilioLat?: number | null
+  domicilioLng?: number | null
 }
 
 export default function LandingPage({ 
@@ -813,7 +819,10 @@ export default function LandingPage({
         price: pro.price,
         nextSlot: pro.nextSlot,
         nextSlotDay: pro.nextSlotDay,
-        fotoUrl: pro.fotoUrl
+        fotoUrl: pro.fotoUrl,
+        domicilioAtencion: pro.domicilioAtencion,
+        domicilioLat: pro.domicilioLat,
+        domicilioLng: pro.domicilioLng
       })
     }
   }
@@ -1254,6 +1263,40 @@ export default function LandingPage({
                       <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
                         Modalidad: {appt.type}
                       </div>
+                      {appt.domicilioAtencion && (
+                        <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div>Dirección de atención: <strong>{appt.domicilioAtencion}</strong></div>
+                          {isConfirmed && (
+                            <a 
+                              href={appt.domicilioLat && appt.domicilioLng 
+                                ? `https://www.google.com/maps/search/?api=1&query=${appt.domicilioLat},${appt.domicilioLng}`
+                                : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(appt.domicilioAtencion)}`
+                              }
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="btn btn--ghost btn--sm" 
+                              style={{ 
+                                fontSize: '10px', 
+                                padding: 'var(--space-1) var(--space-2)', 
+                                width: 'fit-content', 
+                                display: 'inline-flex', 
+                                gap: '4px', 
+                                alignItems: 'center', 
+                                border: '1px solid var(--color-border)',
+                                backgroundColor: 'var(--color-surface)',
+                                color: 'var(--color-primary)',
+                                fontWeight: 'bold'
+                              }}
+                            >
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 12, height: 12 }}>
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                <circle cx="12" cy="10" r="3" />
+                              </svg>
+                              Ver dirección en Google Maps
+                            </a>
+                          )}
+                        </div>
+                      )}
                       {appt.meetLink && isConfirmed && (
                         <a 
                           href={appt.meetLink} 

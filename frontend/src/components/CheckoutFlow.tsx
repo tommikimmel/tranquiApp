@@ -1,7 +1,37 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import '../styles/checkout.css'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
+
+let leafletLoadingPromise: Promise<void> | null = null
+function loadLeafletScript(): Promise<void> {
+  if ((window as any).L) {
+    return Promise.resolve()
+  }
+  if (leafletLoadingPromise) return leafletLoadingPromise
+
+  leafletLoadingPromise = new Promise((resolve, reject) => {
+    const linkId = 'leaflet-css'
+    if (!document.getElementById(linkId)) {
+      const link = document.createElement('link')
+      link.id = linkId
+      link.rel = 'stylesheet'
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+      document.head.appendChild(link)
+    }
+
+    const scriptId = 'leaflet-script'
+    const script = document.createElement('script')
+    script.id = scriptId
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+    script.async = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('No se pudo cargar Leaflet'))
+    document.body.appendChild(script)
+  })
+
+  return leafletLoadingPromise
+}
 
 function IconCheck({ size = 12 }: { size?: number }) {
   return (
@@ -21,6 +51,11 @@ interface Professional {
   price: number
   nextSlot: string
   nextSlotDay: string
+  ofreceOnline?: boolean
+  ofrecePresencial?: boolean
+  domicilioAtencion?: string
+  domicilioLat?: number | null
+  domicilioLng?: number | null
 }
 
 interface TimeSlot {
@@ -312,6 +347,8 @@ function StepReview({
   onBack,
   paymentStatus,
   errorMessage,
+  modality,
+  setModality,
 }: {
   professional: Professional
   selectedDay: DayOption
@@ -320,6 +357,8 @@ function StepReview({
   onBack: () => void
   paymentStatus: PaymentStatus
   errorMessage?: string | null
+  modality: 'online' | 'presencial'
+  setModality: (m: 'online' | 'presencial') => void
 }) {
   const getCachedUserData = () => {
     try {
@@ -441,6 +480,70 @@ function StepReview({
           Cambiar horario
         </button>
       </div>
+
+      {/* Modalidad de atención */}
+      {(professional.ofreceOnline !== false || professional.ofrecePresencial === true) && (
+        <div className="checkout-section">
+          <h2 className="checkout-section__title">Modalidad de atención</h2>
+          {professional.ofreceOnline !== false && professional.ofrecePresencial === true ? (
+            <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+              <div
+                onClick={() => setModality('online')}
+                style={{
+                  flex: 1,
+                  padding: 'var(--space-4)',
+                  border: modality === 'online' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: modality === 'online' ? 'var(--green-50)' : 'var(--color-surface)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--space-1)',
+                  transition: 'all 0.2s',
+                  boxShadow: 'var(--shadow-sm)'
+                }}
+              >
+                <div style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)' }}>Online</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>Videollamada mediante Google Meet</div>
+              </div>
+              <div
+                onClick={() => setModality('presencial')}
+                style={{
+                  flex: 1,
+                  padding: 'var(--space-4)',
+                  border: modality === 'presencial' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: modality === 'presencial' ? 'var(--green-50)' : 'var(--color-surface)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 'var(--space-1)',
+                  transition: 'all 0.2s',
+                  boxShadow: 'var(--shadow-sm)'
+                }}
+              >
+                <div style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)' }}>Presencial</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>En consultorio: {professional.domicilioAtencion || 'Dirección a confirmar'}</div>
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              padding: 'var(--space-4)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: 'var(--color-surface)',
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-text-secondary)',
+              marginBottom: 'var(--space-4)'
+            }}>
+              Modalidad disponible: <strong>{professional.ofrecePresencial ? 'Presencial (en consultorio)' : 'Online (videollamada)'}</strong>
+              {professional.ofrecePresencial && professional.domicilioAtencion && (
+                <div style={{ marginTop: 'var(--space-2)' }}>Dirección: {professional.domicilioAtencion}</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tipo de consulta select */}
       <div className="checkout-section">
@@ -704,6 +807,7 @@ function StepConfirmed({
   onDone,
   meetLink,
   createdTurn,
+  modality,
 }: {
   professional: Professional
   selectedDay: DayOption
@@ -711,8 +815,59 @@ function StepConfirmed({
   onDone: () => void
   meetLink?: string
   createdTurn?: any
+  modality: 'online' | 'presencial'
 }) {
   const actualMeetLink = meetLink || `https://meet.google.com/${Math.random().toString(36).slice(2, 5)}-${Math.random().toString(36).slice(2, 6)}-${Math.random().toString(36).slice(2, 5)}`
+  const isPresencial = modality === 'presencial'
+
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const [leafletLoaded, setLeafletLoaded] = useState(!!(window as any).L)
+
+  useEffect(() => {
+    if (isPresencial && (professional.domicilioLat || professional.domicilioLng)) {
+      loadLeafletScript()
+        .then(() => setLeafletLoaded(true))
+        .catch(err => console.error("Error loading Leaflet for mini map", err))
+    }
+  }, [isPresencial, professional])
+
+  useEffect(() => {
+    if (!isPresencial || !leafletLoaded || !professional.domicilioLat || !professional.domicilioLng || !mapContainerRef.current) return
+    const L = (window as any).L
+    if (!L) return
+
+    const lat = professional.domicilioLat
+    const lng = professional.domicilioLng
+    
+    const map = L.map(mapContainerRef.current, {
+      zoomControl: false,
+      attributionControl: false,
+      dragging: false,
+      touchZoom: false,
+      doubleClickZoom: false,
+      scrollWheelZoom: false
+    }).setView([lat, lng], 15)
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map)
+
+    const customIcon = L.divIcon({
+      html: `
+        <svg viewBox="0 0 24 24" fill="none" stroke="#2E7D5B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 24px; height: 24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); display: block;">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" fill="#ffffff" />
+          <circle cx="12" cy="10" r="3.2" fill="#2E7D5B" />
+        </svg>
+      `,
+      className: 'custom-leaflet-marker-mini',
+      iconSize: [24, 24],
+      iconAnchor: [12, 24]
+    })
+
+    L.marker([lat, lng], { icon: customIcon }).addTo(map)
+
+    return () => {
+      map.remove()
+    }
+  }, [isPresencial, leafletLoaded, professional.domicilioLat, professional.domicilioLng])
 
   return (
     <div className="checkout-body checkout-body--confirmed">
@@ -724,7 +879,10 @@ function StepConfirmed({
         </div>
         <h1 className="checkout-confirmed__title">¡Turno confirmado!</h1>
         <p className="checkout-confirmed__subtitle">
-          Te enviamos un email con todos los detalles y el link de la videollamada.
+          {isPresencial 
+            ? "Te enviamos un email con todos los detalles de la consulta."
+            : "Te enviamos un email con todos los detalles y el link de la videollamada."
+          }
         </p>
       </div>
 
@@ -732,6 +890,10 @@ function StepConfirmed({
         <div className="checkout-summary-card__row">
           <span className="checkout-summary-card__label">Profesional</span>
           <span className="checkout-summary-card__value">{professional.name}</span>
+        </div>
+        <div className="checkout-summary-card__row">
+          <span className="checkout-summary-card__label">Modalidad</span>
+          <span className="checkout-summary-card__value">{isPresencial ? 'Presencial (en consultorio)' : 'Online (videollamada)'}</span>
         </div>
         <div className="checkout-summary-card__row">
           <span className="checkout-summary-card__label">Fecha y hora</span>
@@ -749,36 +911,95 @@ function StepConfirmed({
         </div>
       </div>
 
-      {/* Meet link */}
-      <div className="checkout-meet-card">
-        <div className="checkout-meet-card__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" style={{ width: 24, height: 24 }}>
-            <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" />
-          </svg>
+      {/* Online Meet Link */}
+      {!isPresencial && (
+        <div className="checkout-meet-card">
+          <div className="checkout-meet-card__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" style={{ width: 24, height: 24 }}>
+              <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" />
+            </svg>
+          </div>
+          <div className="checkout-meet-card__content">
+            <div className="checkout-meet-card__label">Link de videollamada</div>
+            <div className="checkout-meet-card__sublabel">Este link se activa 10 minutos antes de tu sesión</div>
+          </div>
+          <a
+            href={actualMeetLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn--primary btn--sm"
+            id="btn-meet-link"
+          >
+            Abrir Meet
+          </a>
         </div>
-        <div className="checkout-meet-card__content">
-          <div className="checkout-meet-card__label">Link de videollamada</div>
-          <div className="checkout-meet-card__sublabel">Este link se activa 10 minutos antes de tu sesión</div>
+      )}
+
+      {/* In-Person Office Location */}
+      {isPresencial && professional.domicilioAtencion && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          <div className="checkout-meet-card" style={{ borderLeft: '5px solid var(--color-primary)' }}>
+            <div className="checkout-meet-card__icon" aria-hidden="true" style={{ color: 'var(--color-primary)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" style={{ width: 24, height: 24 }}>
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+            </div>
+            <div className="checkout-meet-card__content">
+              <div className="checkout-meet-card__label">Dirección del consultorio</div>
+              <div className="checkout-meet-card__sublabel" style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>
+                {professional.domicilioAtencion}
+              </div>
+            </div>
+            <a
+              href={
+                professional.domicilioLat && professional.domicilioLng
+                  ? `https://www.google.com/maps/search/?api=1&query=${professional.domicilioLat},${professional.domicilioLng}`
+                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(professional.domicilioAtencion)}`
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn--primary btn--sm"
+              style={{ backgroundColor: 'var(--color-primary)', flexShrink: 0 }}
+            >
+              Cómo llegar
+            </a>
+          </div>
+
+          {/* Small Mini-Map */}
+          {professional.domicilioLat && professional.domicilioLng && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontWeight: 'bold' }}>Ubicación en el mapa:</div>
+              <div 
+                ref={mapContainerRef} 
+                style={{ 
+                  height: '160px', 
+                  borderRadius: 'var(--radius-md)', 
+                  border: '1px solid var(--color-border)',
+                  zIndex: 1
+                }} 
+              />
+            </div>
+          )}
         </div>
-        <a
-          href={actualMeetLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn btn--primary btn--sm"
-          id="btn-meet-link"
-        >
-          Abrir Meet
-        </a>
-      </div>
+      )}
 
       {/* Next steps */}
       <div className="checkout-next-steps">
         <h3 className="checkout-next-steps__title">Próximos pasos</h3>
-        <ol className="checkout-next-steps__list">
-          <li>Revisá tu email — te enviamos la confirmación con todos los datos.</li>
-          <li>10 minutos antes de la sesión, abrí el link de Google Meet desde arriba.</li>
-          <li>Buscá un lugar tranquilo con buena conexión a internet.</li>
-        </ol>
+        {isPresencial ? (
+          <ol className="checkout-next-steps__list">
+            <li>Revisá tu email — te enviamos la confirmación con los datos de contacto del médico.</li>
+            <li>Acercate al consultorio 10 minutos antes del horario pactado.</li>
+            <li>Podés guiarte utilizando la dirección o el mapa que figuran arriba.</li>
+          </ol>
+        ) : (
+          <ol className="checkout-next-steps__list">
+            <li>Revisá tu email — te enviamos la confirmación con todos los datos.</li>
+            <li>10 minutos antes de la sesión, abrí el link de Google Meet desde arriba.</li>
+            <li>Buscá un lugar tranquilo con buena conexión a internet.</li>
+          </ol>
+        )}
       </div>
 
       <div className="checkout-actions">
@@ -809,6 +1030,10 @@ export default function CheckoutFlow({
   const [createdTurn, setCreatedTurn] = useState<any>(null)
   const [showMockPaymentGateway, setShowMockPaymentGateway] = useState(false)
   const [simulatingWebhook, setSimulatingWebhook] = useState(false)
+
+  const [modality, setModality] = useState<'online' | 'presencial'>(
+    professional.ofrecePresencial && !professional.ofreceOnline ? 'presencial' : 'online'
+  )
 
   const handleSelectSlot = (day: DayOption, slot: TimeSlot) => {
     setSelectedDay(day)
@@ -879,6 +1104,8 @@ export default function CheckoutFlow({
           onBack={() => setStep('select')}
           paymentStatus={paymentStatus}
           errorMessage={errorMessage}
+          modality={modality}
+          setModality={setModality}
         />
       )}
 
@@ -890,6 +1117,7 @@ export default function CheckoutFlow({
           onDone={onComplete}
           meetLink={createdTurn?.meetLink}
           createdTurn={createdTurn}
+          modality={modality}
         />
       )}
       {showMockPaymentGateway && createdTurn && (

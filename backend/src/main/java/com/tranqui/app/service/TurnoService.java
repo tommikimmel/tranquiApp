@@ -330,6 +330,9 @@ public class TurnoService {
                             .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
                             .fecha(t.getFecha().toString())
                             .checkoutUrl(checkoutUrl)
+                            .domicilioAtencion(t.getMedico().getDomicilioAtencion())
+                            .domicilioLat(t.getMedico().getDomicilioLat())
+                            .domicilioLng(t.getMedico().getDomicilioLng())
                             .build();
                 })
                 .collect(Collectors.toList());

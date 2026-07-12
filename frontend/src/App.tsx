@@ -24,6 +24,9 @@ interface CheckoutTarget {
   price: number
   nextSlot: string
   nextSlotDay: string
+  domicilioAtencion?: string
+  domicilioLat?: number | null
+  domicilioLng?: number | null
 }
 
 // ── Types ──────────────────────────────────────────────────────

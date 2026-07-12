@@ -20,4 +20,7 @@ public class TurnoMedicoDto {
     private String checkoutUrl;
     private boolean firstConsultation;
     private PacienteDto patientInfo;
+    private String domicilioAtencion;
+    private Double domicilioLat;
+    private Double domicilioLng;
 }

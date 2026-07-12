@@ -89,6 +89,51 @@ export default function AddressMapPicker({
   const [loadError, setLoadError] = useState(false)
   const [searching, setSearching] = useState(false)
   
+  const onDireccionChangeRef = useRef(onDireccionChange)
+  useEffect(() => {
+    onDireccionChangeRef.current = onDireccionChange
+  }, [onDireccionChange])
+
+  const performReverseGeocode = async (newLat: number, newLng: number) => {
+    try {
+      if (mapsReady) {
+        const google = (window as any).google
+        const geocoder = new google.maps.Geocoder()
+        geocoder.geocode({ location: { lat: newLat, lng: newLng } }, (results: any, status: string) => {
+          if (status === 'OK' && results?.[0]) {
+            const formatted = results[0].formatted_address
+            onDireccionChangeRef.current(formatted)
+          }
+        })
+      } else if (leafletReady) {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}`, {
+          headers: {
+            'Accept-Language': 'es',
+            'User-Agent': 'TranquiApp/1.0'
+          }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data && data.address) {
+            const road = data.address.road || data.address.pedestrian || data.address.suburb || ''
+            const num = data.address.house_number || ''
+            const city = data.address.city || data.address.town || data.address.village || ''
+            let formatted = ''
+            if (road) {
+              formatted = `${road} ${num}`.trim()
+              if (city) formatted += `, ${city}`
+            } else {
+              formatted = data.display_name.split(',').slice(0, 3).join(',').trim()
+            }
+            onDireccionChangeRef.current(formatted)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error in reverse geocoding:', err)
+    }
+  }
+
   // Controls if manual adjustment (dragging marker or clicking map) is allowed
   const [manualAdjustmentEnabled, setManualAdjustmentEnabled] = useState(false)
   const manualAdjustmentRef = useRef(manualAdjustmentEnabled)
@@ -225,7 +270,10 @@ export default function AddressMapPicker({
       if (!manualAdjustmentRef.current) return
       const pos = marker.getPosition()
       if (!pos) return
-      onLocationChange(pos.lat(), pos.lng())
+      const newLat = pos.lat()
+      const newLng = pos.lng()
+      onLocationChange(newLat, newLng)
+      performReverseGeocode(newLat, newLng)
     })
 
     // Map click places/updates marker (only if manual adjustment is enabled)
@@ -236,6 +284,7 @@ export default function AddressMapPicker({
       marker.setPosition({ lat: newLat, lng: newLng })
       marker.setVisible(true)
       onLocationChange(newLat, newLng)
+      performReverseGeocode(newLat, newLng)
     })
 
     // Auto-search bias integration
@@ -316,6 +365,7 @@ export default function AddressMapPicker({
       if (!manualAdjustmentRef.current) return
       const latlng = marker.getLatLng()
       onLocationChange(latlng.lat, latlng.lng)
+      performReverseGeocode(latlng.lat, latlng.lng)
     })
 
     // Click map updates marker (only if manual adjustment is enabled)
@@ -328,6 +378,7 @@ export default function AddressMapPicker({
         marker.addTo(map)
       }
       onLocationChange(newLat, newLng)
+      performReverseGeocode(newLat, newLng)
     })
 
     return () => {
