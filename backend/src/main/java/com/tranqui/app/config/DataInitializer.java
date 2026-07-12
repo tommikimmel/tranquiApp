@@ -54,25 +54,39 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         // Unverified Doctor
-        if (usuarioRepository.findByEmail("medico.sinverificar@gmail.com").isEmpty()) {
+        Optional<Usuario> existingMedico = usuarioRepository.findByEmail("medico.sinverificar@gmail.com");
+        if (existingMedico.isEmpty()) {
             Usuario medicoUnverified = Usuario.builder()
                     .nombre("Medico")
                     .email("medico.sinverificar@gmail.com")
+                    .password(passwordEncoder.encode("admin123"))
                     .rol(Rol.PSIQUIATRA)
                     .build();
             usuarioRepository.save(medicoUnverified);
-            log.info("Unverified doctor account created: medico.sinverificar@gmail.com");
+            log.info("Unverified doctor account created: medico.sinverificar@gmail.com / admin123");
+        } else if (existingMedico.get().getPassword() == null) {
+            Usuario medico = existingMedico.get();
+            medico.setPassword(passwordEncoder.encode("admin123"));
+            usuarioRepository.save(medico);
+            log.info("Updated password for unverified doctor: medico.sinverificar@gmail.com / admin123");
         }
 
         // Data-less Patient
-        if (usuarioRepository.findByEmail("paciente.sindatos@gmail.com").isEmpty()) {
+        Optional<Usuario> existingPaciente = usuarioRepository.findByEmail("paciente.sindatos@gmail.com");
+        if (existingPaciente.isEmpty()) {
             Usuario pacienteSinDatos = Usuario.builder()
                     .nombre("Paciente")
                     .email("paciente.sindatos@gmail.com")
+                    .password(passwordEncoder.encode("admin123"))
                     .rol(Rol.PACIENTE)
                     .build();
             usuarioRepository.save(pacienteSinDatos);
-            log.info("Data-less patient account created: paciente.sindatos@gmail.com");
+            log.info("Data-less patient account created: paciente.sindatos@gmail.com / admin123");
+        } else if (existingPaciente.get().getPassword() == null) {
+            Usuario paciente = existingPaciente.get();
+            paciente.setPassword(passwordEncoder.encode("admin123"));
+            usuarioRepository.save(paciente);
+            log.info("Updated password for data-less patient: paciente.sindatos@gmail.com / admin123");
         }
     }
 }
