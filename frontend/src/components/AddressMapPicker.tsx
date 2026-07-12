@@ -380,7 +380,7 @@ export default function AddressMapPicker({
   }, [manualAdjustmentEnabled, mapsReady])
 
   useEffect(() => {
-    if (leafletMarkerRef.current) {
+    if (leafletMarkerRef.current && leafletMarkerRef.current.dragging) {
       if (manualAdjustmentEnabled) {
         leafletMarkerRef.current.dragging.enable()
       } else {
