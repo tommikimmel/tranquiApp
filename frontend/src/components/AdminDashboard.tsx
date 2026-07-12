@@ -41,6 +41,43 @@ interface User {
   ofreceOnline?: boolean
   ofrecePresencial?: boolean
   telefono?: string
+  sexo?: string
+  fechaNacimiento?: string
+  tipoDocumento?: string
+  numeroDocumento?: number
+  fotoUrl?: string
+}
+
+function isProfileComplete(u: User): boolean {
+  const hasNombre = !!(u.nombre && u.nombre.trim())
+  const hasApellido = !!(u.apellido && u.apellido.trim())
+  const hasSexo = !!(u.sexo && u.sexo.trim())
+  const hasFechaNac = !!u.fechaNacimiento
+  const hasCuil = !!u.cuil
+  const hasTipoDoc = !!(u.tipoDocumento && u.tipoDocumento.trim())
+  const hasNumDoc = !!u.numeroDocumento
+  const hasDomicilio = !!(u.domicilioAtencion && u.domicilioAtencion.trim())
+  const hasReFeps = !!u.codigoReFeps
+  const hasMatriculaTipo = !!(u.matriculaTipo && u.matriculaTipo.trim())
+  const hasMatriculaProvincia = !!(u.matriculaProvincia && u.matriculaProvincia.trim())
+  const hasMatriculaNumero = !!u.matricula
+  const hasFoto = !!(u.fotoUrl && u.fotoUrl.trim())
+
+  return (
+    hasNombre &&
+    hasApellido &&
+    hasSexo &&
+    hasFechaNac &&
+    hasCuil &&
+    hasTipoDoc &&
+    hasNumDoc &&
+    hasDomicilio &&
+    hasReFeps &&
+    hasMatriculaTipo &&
+    hasMatriculaProvincia &&
+    hasMatriculaNumero &&
+    hasFoto
+  )
 }
 
 interface AdminDashboardProps {
@@ -423,9 +460,13 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
                           </span>
                         </td>
                         <td style={{ padding: '12px var(--space-2)' }}>
-                          {user.rol === 'PSIQUIATRA' ? (
+                           {user.rol === 'PSIQUIATRA' ? (
                             user.verificadoAdmin ? (
-                              <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓ Verificado</span>
+                              isProfileComplete(user) ? (
+                                <span style={{ color: '#10b981', fontWeight: 'bold' }} title="Cuenta aprobada y perfil completo">✓ Verificado</span>
+                              ) : (
+                                <span style={{ color: '#ca8a04', fontWeight: 'bold' }} title="Aprobado por administración, pero el profesional aún no completó su perfil">⚠️ Aprobado (Perfil incompleto)</span>
+                              )
                             ) : user.verificadoAdmin === false ? (
                               <span style={{ color: 'var(--color-danger)', fontWeight: 'bold' }}>✕ Rechazado</span>
                             ) : (
