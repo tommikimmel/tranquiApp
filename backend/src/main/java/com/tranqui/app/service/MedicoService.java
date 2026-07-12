@@ -36,12 +36,10 @@ public class MedicoService {
 
     private static final List<MedicoDto.TarifaDto> DEFAULT_TARIFFS = Arrays.asList(
             new MedicoDto.TarifaDto("particular", "Consulta particular", new BigDecimal("60000"), true),
-            new MedicoDto.TarifaDto("primera", "Primera consulta (+30%)", new BigDecimal("80000"), true),
             new MedicoDto.TarifaDto("sobreturno", "Sobreturno", new BigDecimal("90000"), true),
             new MedicoDto.TarifaDto("osde", "Copago OSDE", new BigDecimal("10500"), true),
             new MedicoDto.TarifaDto("receta-fuera", "Receta fuera de turno", new BigDecimal("45000"), true),
             new MedicoDto.TarifaDto("certificado", "Certificado", new BigDecimal("55000"), true),
-            new MedicoDto.TarifaDto("certificado-laboral", "Certificado laboral", new BigDecimal("55000"), true),
             new MedicoDto.TarifaDto("informe-apto", "Informe / Apto médico", new BigDecimal("165000"), true)
     );
 
@@ -167,6 +165,7 @@ public class MedicoService {
         }
 
         List<MedicoDto.TarifaDto> tarifasDto = tarifasDb.stream()
+                .filter(t -> !"primera".equals(t.getServicioId()) && !"certificado-laboral".equals(t.getServicioId()))
                 .map(t -> MedicoDto.TarifaDto.builder()
                         .id(t.getServicioId())
                         .label(t.getLabel())

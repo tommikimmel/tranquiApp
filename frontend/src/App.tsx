@@ -1146,6 +1146,27 @@ const ESPECIALIDADES_GRUPOS = [
   }
 ];
 
+function getMissingRequirements(m: any): string[] {
+  const missing: string[] = []
+  if (!m) return ["Cargando información del perfil..."]
+
+  if (!m.name || !m.name.trim()) missing.push("Nombre profesional")
+  if (!m.apellido || !m.apellido.trim()) missing.push("Apellido profesional")
+  if (!m.sexo || !m.sexo.trim()) missing.push("Sexo biológico")
+  if (!m.fechaNacimiento) missing.push("Fecha de nacimiento")
+  if (!m.cuil) missing.push("CUIL profesional")
+  if (!m.tipoDocumento || !m.numeroDocumento) missing.push("Tipo y número de documento")
+  if (!m.domicilioAtencion || !m.domicilioAtencion.trim()) missing.push("Dirección física del consultorio")
+  if (!m.codigoReFeps) missing.push("Código de registro nacional ReFePS")
+  if (!m.matriculaInfo?.tipo || !m.matriculaInfo?.provincia || !m.matriculaInfo?.numero) {
+    missing.push("Datos completos de matrícula (tipo, provincia y número)")
+  }
+  if (!m.fotoUrl || !m.fotoUrl.trim()) missing.push("Foto de perfil profesional")
+  if (!m.verificadoAdmin) missing.push("Verificación y validación de matrícula por el Administrador de Tranqui")
+
+  return missing
+}
+
 function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (updated: any) => Promise<void> }) {
   const { showAlert } = useAlert();
   const [name, setName] = useState(medicoInfo?.name || '')
@@ -1268,26 +1289,59 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
         </div>
       ) : (
         <div style={{
-          backgroundColor: 'var(--color-warning-bg)',
-          border: '1px solid #fde68a',
+          backgroundColor: '#fffdf5',
+          border: '1px solid #fef08a',
           borderLeft: '5px solid var(--color-warning)',
-          borderRadius: 'var(--radius-md)',
-          padding: 'var(--space-4) var(--space-5)',
+          borderRadius: '12px',
+          padding: 'var(--space-5)',
           color: 'var(--neutral-800)',
           fontSize: 'var(--text-sm)',
+          boxShadow: 'var(--shadow-sm)',
           display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-3)',
-          boxShadow: 'var(--shadow-sm)'
+          flexDirection: 'column',
+          gap: 'var(--space-3)'
         }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px', color: 'var(--color-warning)', flexShrink: 0 }}>
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-            <line x1="12" y1="9" x2="12" y2="13" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-          <span style={{ lineHeight: 'var(--line-height-relaxed)' }}>
-            <strong style={{ color: 'var(--color-warning)' }}>Cuenta No Verificada:</strong> Para aparecer en la lista de profesionales disponibles de la aplicación y que los pacientes puedan agendar turnos, debés completar todos tus datos demográficos, ReFeps, matrícula y subir una foto de perfil.
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              backgroundColor: '#fef9c3',
+              color: 'var(--color-warning)',
+              flexShrink: 0
+            }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: '16px', height: '16px' }}>
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <strong style={{ fontSize: '14px', color: '#854d0e' }}>Cuenta No Verificada</strong>
+          </div>
+          
+          <div style={{ fontSize: '13px', color: 'var(--neutral-600)', lineHeight: '1.4' }}>
+            Para aparecer en la lista de profesionales disponibles de la aplicación y recibir reservas de pacientes, debés completar todas las siguientes condiciones para lograr la verificación:
+          </div>
+
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '8px', 
+            backgroundColor: '#fafaf9', 
+            border: '1px solid #f5f5f4',
+            borderRadius: '8px',
+            padding: '12px 16px' 
+          }}>
+            {getMissingRequirements(medicoInfo).map((req, idx) => (
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: 'var(--neutral-700)' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', flexShrink: 0 }} />
+                <span>{req}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -3042,54 +3096,105 @@ export default function App() {
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 10000,
-            backgroundColor: 'var(--color-warning-bg)',
-            border: '1px solid #fde68a',
+            backgroundColor: '#fffdf5',
+            border: '1px solid #fef08a',
             borderLeft: '5px solid var(--color-warning)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-3) var(--space-4)',
+            borderRadius: '12px',
+            padding: 'var(--space-4)',
             color: 'var(--neutral-800)',
             fontSize: 'var(--text-sm)',
-            boxShadow: 'var(--shadow-lg)',
-            maxWidth: '640px',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+            maxWidth: '540px',
             width: '92%',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            flexDirection: 'column',
             gap: 'var(--space-3)',
-            animation: 'slideDownAlert 0.3s cubic-bezier(0.16, 1, 0.3, 1) both'
+            animation: 'slideDownAlert 0.35s cubic-bezier(0.16, 1, 0.3, 1) both'
           }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px', color: 'var(--color-warning)', flexShrink: 0 }}>
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-              <line x1="12" y1="9" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            <div style={{ flex: 1, lineHeight: 'var(--line-height-normal)', fontSize: '13px' }}>
-              <strong style={{ color: 'var(--color-warning)' }}>Cuenta No Verificada:</strong> Para aparecer en el buscador de pacientes y recibir reservas, completá tus datos, matrícula y foto de perfil en Configuración.
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  backgroundColor: '#fef9c3',
+                  color: 'var(--color-warning)',
+                  flexShrink: 0
+                }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: '16px', height: '16px' }}>
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                </div>
+                <strong style={{ fontSize: '14px', color: '#854d0e' }}>Verificación de cuenta pendiente</strong>
+              </div>
+              <button 
+                onClick={handleCloseUnverifiedAlert}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--color-text-secondary)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background-color 0.2s',
+                  flexShrink: 0
+                }}
+                title="Cerrar aviso"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: '16px', height: '16px' }}>
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
             </div>
-            <button 
-              onClick={handleCloseUnverifiedAlert}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--color-warning)',
-                cursor: 'pointer',
-                padding: '6px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'background-color 0.2s',
-                flexShrink: 0
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(201, 138, 27, 0.1)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              aria-label="Cerrar alerta"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '14px', height: '14px' }}>
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+            
+            <div style={{ fontSize: '13px', color: 'var(--neutral-600)', lineHeight: '1.4' }}>
+              Para aparecer en el buscador de pacientes y recibir reservas, debés completar las siguientes condiciones en tu perfil:
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '6px', 
+              backgroundColor: '#fafaf9', 
+              border: '1px solid #f5f5f4',
+              borderRadius: '8px',
+              padding: '10px 14px' 
+            }}>
+              {getMissingRequirements(medicoInfo).map((req, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--neutral-700)' }}>
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', flexShrink: 0 }} />
+                  <span>{req}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '4px' }}>
+              <button
+                onClick={() => {
+                  setActiveNav('settings')
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                className="btn btn--primary btn--sm"
+                style={{ 
+                  backgroundColor: '#ca8a04', 
+                  border: 'none',
+                  padding: 'var(--space-2) var(--space-4)',
+                  fontSize: '12px',
+                  fontWeight: '600'
+                }}
+              >
+                Completar Configuración
+              </button>
+            </div>
           </div>
         </>
       )}
