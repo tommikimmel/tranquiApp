@@ -7,6 +7,7 @@ import LoginPage from './components/LoginPage'
 import PatientsView from './components/PatientsView'
 import VisitorsView from './components/VisitorsView'
 import AdminDashboard from './components/AdminDashboard'
+import AddressMapPicker from './components/AddressMapPicker'
 import { api } from './api/api'
 import { useAlert } from './context/AlertContext'
 import { Client } from '@stomp/stompjs'
@@ -72,9 +73,18 @@ const Icon = {
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   ),
-  Video: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+  Video: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
       <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" />
+    </svg>
+  ),
+  Building: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <rect x="4" y="2" width="16" height="20" rx="1" />
+      <line x1="9" y1="7" x2="9" y2="7.01" /><line x1="15" y1="7" x2="15" y2="7.01" />
+      <line x1="9" y1="11" x2="9" y2="11.01" /><line x1="15" y1="11" x2="15" y2="11.01" />
+      <line x1="9" y1="15" x2="9" y2="15.01" /><line x1="15" y1="15" x2="15" y2="15.01" />
+      <path d="M9 22v-4h6v4" />
     </svg>
   ),
   ArrowUp: () => (
@@ -197,7 +207,7 @@ function Sidebar({ activeNav, onNavChange, medicoInfo }: { activeNav: NavSection
 }
 
 // ── MP Connect Banner ──────────────────────────────────────────
-function MPConnectBanner({ connected, onConnect }: { connected: boolean; onConnect: () => void }) {
+function MPConnectBanner({ connected, onConnect, onDisconnect }: { connected: boolean; onConnect: () => void; onDisconnect: () => void }) {
   if (connected) {
     return (
       <div className="mp-connect-banner mp-connect-banner--connected" role="status">
@@ -211,7 +221,7 @@ function MPConnectBanner({ connected, onConnect }: { connected: boolean; onConne
             al confirmarse cada sesión. Tranqui es 100% libre de comisiones.
           </p>
         </div>
-        <button className="btn btn--ghost btn--sm">Desconectar</button>
+        <button className="btn btn--ghost btn--sm" onClick={onDisconnect}>Desconectar</button>
       </div>
     )
   }
@@ -1143,6 +1153,9 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
   const [tipoDocumento, setTipoDocumento] = useState(medicoInfo?.tipoDocumento || 'DNI')
   const [numeroDocumento, setNumeroDocumento] = useState(medicoInfo?.numeroDocumento || '')
   const [domicilioAtencion, setDomicilioAtencion] = useState(medicoInfo?.domicilioAtencion || '')
+  const [domicilioProvincia, setDomicilioProvincia] = useState('')
+  const [domicilioLat, setDomicilioLat] = useState<number | null>(medicoInfo?.domicilioLat ?? null)
+  const [domicilioLng, setDomicilioLng] = useState<number | null>(medicoInfo?.domicilioLng ?? null)
   const [codigoReFeps, setCodigoReFeps] = useState(medicoInfo?.codigoReFeps || '')
 
   // MatriculaInfo
@@ -1189,7 +1202,9 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
         cuil: cuil ? Number(cuil) : null,
         tipoDocumento,
         numeroDocumento: numeroDocumento ? Number(numeroDocumento) : null,
-        domicilioAtencion,
+        domicilioAtencion: ofrecePresencial ? domicilioAtencion : '',
+        domicilioLat: ofrecePresencial ? domicilioLat : null,
+        domicilioLng: ofrecePresencial ? domicilioLng : null,
         codigoReFeps: codigoReFeps ? Number(codigoReFeps) : null,
         matriculaInfo: {
           tipo: matTipo,
@@ -1360,10 +1375,43 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
             <label className="form-label form-label--required" htmlFor="input-cuil">CUIL/CUIT</label>
             <input id="input-cuil" className="form-input" type="number" placeholder="Ej. 27123456780" value={cuil} onChange={(e) => setCuil(e.target.value)} />
           </div>
-          <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-domicilio">Domicilio de Atención</label>
-            <input id="input-domicilio" className="form-input" type="text" placeholder="Ej. Consultorio 12" value={domicilioAtencion} onChange={(e) => setDomicilioAtencion(e.target.value)} />
+          {/* Modalities selector */}
+          <div className="form-group" style={{ gridColumn: 'span 2' }}>
+            <label className="form-label form-label--required">Modalidades de Consulta</label>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+              <label className={`check-chip check-chip--auto ${ofreceOnline ? 'active' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={ofreceOnline}
+                  onChange={(e) => setOfreceOnline(e.target.checked)}
+                />
+                <span className="check-chip__icon"><Icon.Video /></span>
+                Consulta Online (Videollamada Meet)
+              </label>
+              <label className={`check-chip check-chip--auto ${ofrecePresencial ? 'active' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={ofrecePresencial}
+                  onChange={(e) => setOfrecePresencial(e.target.checked)}
+                />
+                <span className="check-chip__icon"><Icon.Building /></span>
+                Consulta Presencial (Consultorio)
+              </label>
+            </div>
           </div>
+
+          {ofrecePresencial && (
+            <AddressMapPicker
+              provincia={domicilioProvincia}
+              onProvinciaChange={setDomicilioProvincia}
+              direccion={domicilioAtencion}
+              onDireccionChange={setDomicilioAtencion}
+              lat={domicilioLat}
+              lng={domicilioLng}
+              onLocationChange={(lat, lng) => { setDomicilioLat(lat); setDomicilioLng(lng) }}
+              provinciasList={PROVINCIAS_ARGENTINA}
+            />
+          )}
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-degree">Título profesional</label>
             <input id="input-degree" className="form-input" type="text" value={degree} onChange={(e) => setDegree(e.target.value)} />
@@ -1428,28 +1476,6 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
             <span className="form-helper">Verificada ✓</span>
           </div>
 
-          {/* Modalities selector */}
-          <div className="form-group" style={{ gridColumn: 'span 2' }}>
-            <label className="form-label form-label--required">Modalidades de Consulta</label>
-            <div style={{ display: 'flex', gap: 'var(--space-6)', marginTop: 'var(--space-2)' }}>
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={ofreceOnline} 
-                  onChange={(e) => setOfreceOnline(e.target.checked)}
-                />
-                💻 Consulta Online (Videollamada Meet)
-              </label>
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={ofrecePresencial} 
-                  onChange={(e) => setOfrecePresencial(e.target.checked)}
-                />
-                🏢 Consulta Presencial (Consultorio)
-              </label>
-            </div>
-          </div>
         </div>
         <div style={{ marginTop: 'var(--space-6)' }}>
           <button className="btn btn--primary" onClick={handleSave} disabled={saving} id="btn-save-profile">
@@ -1553,21 +1579,23 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
   )
 }
 
-function DashboardHome({ 
-  mpConnected, 
-  onConnect, 
-  appointments, 
-  allAppointments, 
+function DashboardHome({
+  mpConnected,
+  onConnect,
+  onDisconnect,
+  appointments,
+  allAppointments,
   availability,
   stats,
   onCancelAppointment,
   onUpdateAttendance,
   onRescheduleAppointment
-}: { 
-  mpConnected: boolean; 
-  onConnect: () => void; 
-  appointments: Appointment[]; 
-  allAppointments: any[]; 
+}: {
+  mpConnected: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  appointments: Appointment[];
+  allAppointments: any[];
   availability: any[];
   stats: any;
   onCancelAppointment: (id: number) => void;
@@ -1722,7 +1750,7 @@ function DashboardHome({
 
   return (
     <>
-      <MPConnectBanner connected={mpConnected} onConnect={onConnect} />
+      <MPConnectBanner connected={mpConnected} onConnect={onConnect} onDisconnect={onDisconnect} />
 
       {nextAppt && (
         <div className="card" style={{ width: '100%', maxWidth: 'none', marginBottom: 'var(--space-4)', padding: 'var(--space-5)' }}>
@@ -2022,7 +2050,11 @@ function DashboardHome({
                                 alignItems: 'center',
                                 gap: '3px'
                               }}>
-                                <span>{appt.type.includes('Meet') || appt.type.includes('OSDE') ? '💻 Online' : '🏢 Presencial'}</span>
+                                {appt.type.includes('Meet') || appt.type.includes('OSDE') ? (
+                                  <><Icon.Video size={11} /> Online</>
+                                ) : (
+                                  <><Icon.Building size={11} /> Presencial</>
+                                )}
                               </span>
                               <span style={{
                                 width: '6px',
@@ -2510,6 +2542,7 @@ export default function App() {
   const [view, setView] = useState<AppView>('landing')
   const [activeNav, setActiveNav] = useState<NavSection>('dashboard')
   const [mpConnected, setMpConnected] = useState(false)
+  const [mpEnabled, setMpEnabled] = useState(false)
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null)
 
   // API states
@@ -2611,15 +2644,18 @@ export default function App() {
         api.getDisponibilidad(),
         api.getStats(),
         api.getTurnos(),
-        api.getNotificaciones()
+        api.getNotificaciones(),
+        api.getMercadoPagoStatus().catch(() => ({ connected: false }))
       ])
-        .then(([perfil, turnos, disp, statsData, allTurnos, notifData]) => {
+        .then(([perfil, turnos, disp, statsData, allTurnos, notifData, mpStatus]) => {
           setMedicoInfo(perfil)
           setTodayAppointments(turnos || [])
           setAvailability(disp || [])
           setStats(statsData)
           setAllAppointments(allTurnos || [])
           setNotifications(notifData || [])
+          setMpConnected(!!mpStatus?.connected)
+          setMpEnabled(!!(mpStatus as any)?.mercadopagoEnabled)
         })
         .catch((err) => {
           console.error("Error al inicializar dashboard:", err)
@@ -2711,10 +2747,60 @@ export default function App() {
     await api.enviarReceta(data)
   }
 
-  const handleConnect = () => {
-    showAlert('En producción: redirige a Mercado Pago OAuth para vincular tu cuenta.', 'info')
-    setMpConnected(true)
+  const handleConnect = async () => {
+    // In local/dev environments (no real Mercado Pago credentials configured on the
+    // backend) we simulate the link instead of redirecting to the real OAuth flow,
+    // which would otherwise always fail with an empty client_id.
+    if (!mpEnabled) {
+      try {
+        await api.simularConexionMercadoPago()
+        setMpConnected(true)
+        showAlert('Conexión simulada (modo desarrollo): tu cuenta de Mercado Pago quedó vinculada para pruebas locales.', 'success')
+      } catch (err) {
+        console.error("Error al simular la conexión de Mercado Pago:", err)
+        showAlert('No se pudo simular la conexión con Mercado Pago.', 'error')
+      }
+      return
+    }
+
+    try {
+      const { url } = await api.getMercadoPagoConnectUrl()
+      window.location.href = url
+    } catch (err) {
+      console.error("Error al obtener la URL de conexión de Mercado Pago:", err)
+      showAlert('No se pudo iniciar la conexión con Mercado Pago. Intentá de nuevo.', 'error')
+    }
   }
+
+  const handleDisconnectMercadoPago = async () => {
+    try {
+      await api.desconectarMercadoPago()
+      setMpConnected(false)
+      showAlert('Desvinculaste tu cuenta de Mercado Pago.', 'success')
+    } catch (err) {
+      console.error("Error al desvincular Mercado Pago:", err)
+      showAlert('No se pudo desvincular la cuenta. Intentá de nuevo.', 'error')
+    }
+  }
+
+  // Handle the ?mp=success / ?mp=error redirect coming back from the Mercado Pago OAuth callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const mpResult = params.get('mp')
+    if (!mpResult) return
+
+    if (mpResult === 'success') {
+      showAlert('¡Tu cuenta de Mercado Pago quedó vinculada! Ya podés recibir pagos.', 'success')
+      setMpConnected(true)
+    } else if (mpResult === 'error') {
+      showAlert('No se pudo vincular tu cuenta de Mercado Pago. Intentá de nuevo.', 'error')
+    }
+
+    params.delete('mp')
+    params.delete('reason')
+    const newSearch = params.toString()
+    window.history.replaceState({}, '', window.location.pathname + (newSearch ? `?${newSearch}` : ''))
+  }, [])
 
   const handleBook = (pro: CheckoutTarget) => {
     if (!currentUser) {
@@ -2817,10 +2903,11 @@ export default function App() {
     switch (activeNav) {
       case 'dashboard': 
         return (
-          <DashboardHome 
-            mpConnected={mpConnected} 
-            onConnect={handleConnect} 
-            appointments={todayAppointments} 
+          <DashboardHome
+            mpConnected={mpConnected}
+            onConnect={handleConnect}
+            onDisconnect={handleDisconnectMercadoPago}
+            appointments={todayAppointments}
             allAppointments={allAppointments}
             availability={availability}
             stats={stats} 

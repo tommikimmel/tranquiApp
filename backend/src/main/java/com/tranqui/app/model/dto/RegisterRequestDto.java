@@ -34,6 +34,8 @@ public class RegisterRequestDto {
     private String cuit;
     private Long cuil;
     private String domicilioAtencion;
+    private Double domicilioLat;
+    private Double domicilioLng;
     private Long codigoReFeps;
     private String matriculaTipo;
     private String matriculaProvincia;

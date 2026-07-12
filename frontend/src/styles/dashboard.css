@@ -750,8 +750,8 @@
   color: var(--color-primary);
 }
 
-/* ── Obra social checkbox ──────────────────────────────────── */
-.obra-social-check {
+/* ── Reusable checkbox "chip" (obra social, modalidades, etc.) ─ */
+.check-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
@@ -766,17 +766,33 @@
   width: 100%;
 }
 
-.obra-social-check.active {
-  border-color: var(--color-primary);
-  background: var(--green-50);
+.check-chip--auto {
+  width: auto;
 }
 
-.obra-social-check input[type="checkbox"] {
+.check-chip.active {
+  border-color: var(--color-primary);
+  background: var(--green-50);
+  color: var(--color-primary);
+}
+
+.check-chip input[type="checkbox"] {
   width: 22px;
   height: 22px;
   flex-shrink: 0;
   accent-color: var(--green-500);
   cursor: pointer;
+}
+
+.check-chip__icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--neutral-400);
+  transition: color var(--transition-fast);
+}
+
+.check-chip.active .check-chip__icon {
+  color: var(--color-primary);
 }
 
 /* ── Phone input with fixed country prefix ─────────────────── */

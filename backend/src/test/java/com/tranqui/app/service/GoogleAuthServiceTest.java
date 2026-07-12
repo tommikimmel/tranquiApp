@@ -74,6 +74,14 @@ class GoogleAuthServiceTest {
     }
 
     @Test
+    void testVerifyGoogleTokenRealPath_withGarbageTokenReturnsNull() {
+        // Exercises the real (non-mock) verification branch; a malformed token can never
+        // validate, so this must safely return null regardless of network availability.
+        GoogleIdToken.Payload payload = googleAuthService.verifyGoogleToken("not-a-valid-jwt-token");
+        assertNull(payload);
+    }
+
+    @Test
     void testGetOrCreateUsuarioNew() {
         GoogleIdToken.Payload payload = new GoogleIdToken.Payload();
         payload.setEmail("new.user@gmail.com");

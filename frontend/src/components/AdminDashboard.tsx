@@ -2,6 +2,26 @@ import { useState, useEffect } from 'react'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 
+function IconVideoCall({ size = 13 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" />
+    </svg>
+  )
+}
+
+function IconBuilding({ size = 13 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <rect x="4" y="2" width="16" height="20" rx="1" />
+      <line x1="9" y1="7" x2="9" y2="7.01" /><line x1="15" y1="7" x2="15" y2="7.01" />
+      <line x1="9" y1="11" x2="9" y2="11.01" /><line x1="15" y1="11" x2="15" y2="11.01" />
+      <line x1="9" y1="15" x2="9" y2="15.01" /><line x1="15" y1="15" x2="15" y2="15.01" />
+      <path d="M9 22v-4h6v4" />
+    </svg>
+  )
+}
+
 interface User {
   id: number
   nombre: string
@@ -310,8 +330,10 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
                       </div>
                       <div>
                         <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>Modalidad de Atención:</span>
-                        <strong>
-                          {pro.ofreceOnline ? '💻 Online' : ''} {pro.ofreceOnline && pro.ofrecePresencial ? '·' : ''} {pro.ofrecePresencial ? '🏢 Presencial' : ''}
+                        <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          {pro.ofreceOnline && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><IconVideoCall /> Online</span>}
+                          {pro.ofreceOnline && pro.ofrecePresencial ? '·' : ''}
+                          {pro.ofrecePresencial && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><IconBuilding /> Presencial</span>}
                         </strong>
                       </div>
                     </div>

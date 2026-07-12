@@ -33,6 +33,8 @@ public class MedicoDto {
     private String tipoDocumento;
     private Integer numeroDocumento;
     private String domicilioAtencion;
+    private Double domicilioLat;
+    private Double domicilioLng;
     private Long codigoReFeps;
     private MatriculaInfoDto matriculaInfo;
     private boolean verificado;

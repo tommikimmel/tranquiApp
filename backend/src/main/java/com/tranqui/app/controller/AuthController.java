@@ -70,6 +70,8 @@ public class AuthController {
                 .cuit(registerRequestDto.getCuit())
                 .cuil(registerRequestDto.getCuil())
                 .domicilioAtencion(registerRequestDto.getDomicilioAtencion())
+                .domicilioLat(registerRequestDto.getDomicilioLat())
+                .domicilioLng(registerRequestDto.getDomicilioLng())
                 .codigoReFeps(registerRequestDto.getCodigoReFeps())
                 .matriculaTipo(registerRequestDto.getMatriculaTipo())
                 .matriculaProvincia(registerRequestDto.getMatriculaProvincia())
