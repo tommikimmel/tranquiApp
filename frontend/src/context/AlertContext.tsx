@@ -46,7 +46,7 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
     setAlerts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       removeAlert(id);
-    }, 4500);
+    }, 5000);
   };
 
   const removeAlert = (id: string) => {
