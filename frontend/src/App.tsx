@@ -1243,30 +1243,48 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
       {/* Verification status banner */}
       {medicoInfo?.verificado ? (
         <div style={{
-          backgroundColor: '#ecfdf5',
-          border: '1px solid #a7f3d0',
-          borderLeft: '5px solid var(--color-primary)',
-          borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-4)',
-          color: 'var(--color-primary)',
+          backgroundColor: 'var(--green-50)',
+          border: '1px solid var(--green-200)',
+          borderLeft: '5px solid var(--color-success)',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--space-4) var(--space-5)',
+          color: 'var(--neutral-800)',
           fontSize: 'var(--text-sm)',
           display: 'flex',
           alignItems: 'center',
-          gap: 'var(--space-2)'
+          gap: 'var(--space-3)',
+          boxShadow: 'var(--shadow-sm)'
         }}>
-          <strong>✓ Cuenta Verificada:</strong> Tu perfil profesional cumple con todos los requisitos y es visible públicamente para reserva de turnos.
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px', color: 'var(--color-success)', flexShrink: 0 }}>
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+            <polyline points="22 4 12 14.01 9 11.01" />
+          </svg>
+          <span style={{ lineHeight: 'var(--line-height-normal)' }}>
+            <strong style={{ color: 'var(--green-700)' }}>Cuenta Verificada:</strong> Tu perfil profesional cumple con todos los requisitos y es visible públicamente para reserva de turnos.
+          </span>
         </div>
       ) : (
         <div style={{
-          backgroundColor: '#fffbeb',
-          border: '1px solid #fef3c7',
-          borderLeft: '5px solid #d97706',
-          borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-4)',
-          color: '#b45309',
-          fontSize: 'var(--text-sm)'
+          backgroundColor: 'var(--color-warning-bg)',
+          border: '1px solid #fde68a',
+          borderLeft: '5px solid var(--color-warning)',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--space-4) var(--space-5)',
+          color: 'var(--neutral-800)',
+          fontSize: 'var(--text-sm)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-3)',
+          boxShadow: 'var(--shadow-sm)'
         }}>
-          <strong>⚠️ Cuenta No Verificada:</strong> Para aparecer en la lista de profesionales disponibles de la aplicación y que los pacientes puedan agendar turnos, debés completar todos tus datos demográficos, ReFeps, matrícula y subir una foto de perfil.
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px', color: 'var(--color-warning)', flexShrink: 0 }}>
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <span style={{ lineHeight: 'var(--line-height-relaxed)' }}>
+            <strong style={{ color: 'var(--color-warning)' }}>Cuenta No Verificada:</strong> Para aparecer en la lista de profesionales disponibles de la aplicación y que los pacientes puedan agendar turnos, debés completar todos tus datos demográficos, ReFeps, matrícula y subir una foto de perfil.
+          </span>
         </div>
       )}
 
@@ -3017,50 +3035,57 @@ export default function App() {
           `}</style>
           <div style={{
             position: 'fixed',
-            top: '16px',
+            top: '20px',
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 10000,
-            backgroundColor: '#fffbeb',
-            border: '1px solid #fef3c7',
-            borderLeft: '5px solid #d97706',
-            borderRadius: 'var(--radius-lg)',
-            padding: 'var(--space-4) var(--space-5)',
-            color: '#b45309',
+            backgroundColor: 'var(--color-warning-bg)',
+            border: '1px solid #fde68a',
+            borderLeft: '5px solid var(--color-warning)',
+            borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-3) var(--space-4)',
+            color: 'var(--neutral-800)',
             fontSize: 'var(--text-sm)',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-            maxWidth: '600px',
-            width: '90%',
+            boxShadow: 'var(--shadow-lg)',
+            maxWidth: '640px',
+            width: '92%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: 'var(--space-4)',
-            animation: 'slideDownAlert 0.3s ease-out'
+            gap: 'var(--space-3)',
+            animation: 'slideDownAlert 0.3s cubic-bezier(0.16, 1, 0.3, 1) both'
           }}>
-            <div style={{ flex: 1, lineHeight: 'var(--line-height-relaxed)' }}>
-              <strong>⚠️ Cuenta No Verificada:</strong> Para aparecer en la lista de profesionales disponibles de la aplicación y que los pacientes puedan agendar turnos, debés completar todos tus datos demográficos, ReFeps, matrícula y subir una foto de perfil.
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px', color: 'var(--color-warning)', flexShrink: 0 }}>
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <div style={{ flex: 1, lineHeight: 'var(--line-height-normal)', fontSize: '13px' }}>
+              <strong style={{ color: 'var(--color-warning)' }}>Cuenta No Verificada:</strong> Para aparecer en el buscador de pacientes y recibir reservas, completá tus datos, matrícula y foto de perfil en Configuración.
             </div>
             <button 
               onClick={handleCloseUnverifiedAlert}
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#b45309',
-                fontSize: '18px',
+                color: 'var(--color-warning)',
                 cursor: 'pointer',
-                padding: '0 var(--space-1)',
+                padding: '6px',
+                borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontWeight: 'bold',
-                opacity: 0.7,
-                transition: 'opacity 0.2s'
+                transition: 'background-color 0.2s',
+                flexShrink: 0
               }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(201, 138, 27, 0.1)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               aria-label="Cerrar alerta"
             >
-              ✕
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '14px', height: '14px' }}>
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
             </button>
           </div>
         </>
