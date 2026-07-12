@@ -291,7 +291,7 @@ export default function AddressMapPicker({
     // Premium custom SVG marker styled to match the green primary theme of Tranqui App
     const customIcon = L.divIcon({
       html: `
-        <svg viewBox="0 0 24 24" fill="none" stroke="#2E7D5B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35)); position: absolute; transform: translate(-50%, -100%);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#2E7D5B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); display: block;">
           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" fill="#ffffff" />
           <circle cx="12" cy="10" r="3.2" fill="#2E7D5B" />
         </svg>
