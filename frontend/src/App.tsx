@@ -157,13 +157,11 @@ const Icon = {
 }
 
 // ── Sidebar Component ──────────────────────────────────────────
-function Sidebar({ activeNav, onNavChange, medicoInfo }: { activeNav: NavSection; onNavChange: (s: NavSection) => void; medicoInfo: any }) {
+function Sidebar({ activeNav, onNavChange, medicoInfo, hasUnreadChats }: { activeNav: NavSection; onNavChange: (s: NavSection) => void; medicoInfo: any; hasUnreadChats: boolean }) {
   const navItems = [
     { id: 'dashboard' as NavSection, label: 'Inicio', Icon: Icon.Dashboard },
-    { id: 'agenda' as NavSection, label: 'Agenda', Icon: Icon.Calendar, badge: 4 },
+    { id: 'agenda' as NavSection, label: 'Agenda', Icon: Icon.Calendar },
     { id: 'patients' as NavSection, label: 'Pacientes', Icon: Icon.Users },
-    { id: 'visitors' as NavSection, label: 'Visitadores', Icon: Icon.Users },
-    { id: 'payments' as NavSection, label: 'Cobros', Icon: Icon.CreditCard },
     { id: 'settings' as NavSection, label: 'Configuración', Icon: Icon.Settings },
   ]
 
@@ -178,7 +176,7 @@ function Sidebar({ activeNav, onNavChange, medicoInfo }: { activeNav: NavSection
 
       <nav className="sidebar__nav" role="navigation" aria-label="Navegación principal">
         <span className="sidebar__nav-section-title">Panel</span>
-        {navItems.map(({ id, label, Icon: NavIcon, badge }) => (
+        {navItems.map(({ id, label, Icon: NavIcon }) => (
           <button
             key={id}
             className={`sidebar__nav-item ${activeNav === id ? 'active' : ''}`}
@@ -187,16 +185,27 @@ function Sidebar({ activeNav, onNavChange, medicoInfo }: { activeNav: NavSection
           >
             <NavIcon />
             {label}
-            {badge && <span className="sidebar__badge">{badge}</span>}
+            {id === 'patients' && hasUnreadChats && (
+              <span className="sidebar__badge" style={{ backgroundColor: 'var(--color-danger)', width: '8px', height: '8px', minWidth: '8px', padding: 0, borderRadius: '50%', marginLeft: 'auto' }} />
+            )}
           </button>
         ))}
       </nav>
 
       <div className="sidebar__footer">
         <div className="sidebar__user" role="button" tabIndex={0}>
-          <div className="sidebar__avatar" aria-hidden="true">
-            {medicoInfo?.initials || 'LP'}
-          </div>
+          {medicoInfo?.fotoUrl ? (
+            <img 
+              src={medicoInfo.fotoUrl} 
+              alt={medicoInfo.name} 
+              className="sidebar__avatar" 
+              style={{ objectFit: 'cover', border: '1.5px solid var(--color-border)', width: '36px', height: '36px', borderRadius: '50%' }} 
+            />
+          ) : (
+            <div className="sidebar__avatar" aria-hidden="true">
+              {medicoInfo?.initials || 'LP'}
+            </div>
+          )}
           <div className="sidebar__user-info">
             <div className="sidebar__user-name">{medicoInfo?.name || 'Lic. Paula Rossi'}</div>
             <div className="sidebar__user-role">
@@ -243,6 +252,47 @@ function MPConnectBanner({ connected, onConnect, onDisconnect }: { connected: bo
       </div>
       <button className="btn btn--primary" onClick={onConnect} id="btn-connect-mp">
         Conectar Mercado Pago
+      </button>
+    </div>
+  )
+}
+
+// ── Google Calendar Connect Banner ──────────────────────────────
+function GoogleCalendarConnectBanner({ connected, onConnect, onDisconnect }: { connected: boolean; onConnect: () => void; onDisconnect: () => void }) {
+  if (connected) {
+    return (
+      <div className="mp-connect-banner mp-connect-banner--connected" role="status" style={{ borderLeft: '5px solid #4285F4', marginTop: 'var(--space-4)' }}>
+        <div className="mp-connect-banner__icon">
+          <svg viewBox="0 0 24 24" style={{ width: 32, height: 32 }}>
+            <path fill="#4285F4" d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
+          </svg>
+        </div>
+        <div className="mp-connect-banner__content">
+          <h2 className="mp-connect-banner__title" style={{ color: '#1a73e8' }}>Google Calendar conectado ✓</h2>
+          <p className="mp-connect-banner__body">
+            Tu Google Calendar está vinculado. Se crearán reuniones reales de Google Meet automáticamente en tu agenda para todas las videollamadas con pacientes de Tranqui App.
+          </p>
+        </div>
+        <button className="btn btn--ghost btn--sm" onClick={onDisconnect}>Desconectar</button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mp-connect-banner" role="alert" style={{ borderLeft: '5px solid #bdc1c6', marginTop: 'var(--space-4)' }}>
+      <div className="mp-connect-banner__icon">
+        <svg viewBox="0 0 24 24" style={{ width: 32, height: 32 }}>
+          <path fill="#70757a" d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
+        </svg>
+      </div>
+      <div className="mp-connect-banner__content">
+        <h2 className="mp-connect-banner__title">Vinculá tu Google Calendar / Google Meet</h2>
+        <p className="mp-connect-banner__body">
+          Para que el sistema genere automáticamente enlaces reales de Google Meet en cada turno confirmado y se añadan a tu agenda de Google, necesitás conectar tu cuenta.
+        </p>
+      </div>
+      <button className="btn btn--primary" onClick={onConnect} id="btn-connect-google" style={{ backgroundColor: '#1a73e8', borderColor: '#1a73e8' }}>
+        Conectar Google Calendar
       </button>
     </div>
   )
@@ -338,40 +388,73 @@ function AppointmentCard({ appt }: { appt: Appointment }) {
     pending: { label: 'Pago pendiente', cls: 'badge--warning' },
     completed: { label: 'Completado', cls: 'badge--neutral' },
   }
-  const st = statusMap[appt.status]
+  const st = statusMap[appt.status] || { label: appt.status, cls: 'badge--neutral' }
 
   return (
-    <li className="appointment-item" role="listitem">
-      <div className="appointment-item__time">
-        <div className="appointment-item__hour">{appt.hour}:00</div>
-        <div className="appointment-item__ampm">{appt.ampm}</div>
-      </div>
+    <li className="card" style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 'var(--space-4)',
+      marginBottom: 'var(--space-3)',
+      borderLeft: appt.status === 'confirmed' 
+        ? '4px solid var(--color-primary)' 
+        : appt.status === 'completed' 
+          ? '4px solid var(--color-text-secondary)' 
+          : '4px solid var(--color-warning)',
+      backgroundColor: 'var(--color-surface)',
+      borderTop: '1px solid var(--color-border)',
+      borderRight: '1px solid var(--color-border)',
+      borderBottom: '1px solid var(--color-border)',
+      borderRadius: 'var(--radius-lg)'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'var(--neutral-50)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--space-2) var(--space-3)',
+          minWidth: '70px'
+        }}>
+          <span style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--color-primary)' }}>{appt.hour}:00</span>
+          <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>{appt.ampm || 'hs'}</span>
+        </div>
 
-      <div className="appointment-item__divider" aria-hidden="true" />
-
-      <div className="appointment-item__info">
-        <div className="appointment-item__name">{appt.patientName}</div>
-        <div className="appointment-item__meta">
-          {appt.type} · 50 min
-          <span className={`badge ${st.cls}`} style={{ marginLeft: 8 }}>{st.label}</span>
+        <div>
+          <h4 style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+            {appt.patientName}
+          </h4>
+          <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+              🩺 {appt.type}
+            </span>
+            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>·</span>
+            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>⏱️ 50 min</span>
+            <span className={`badge ${st.cls}`} style={{ fontSize: '9px', padding: '1px 6px', marginLeft: '4px' }}>
+              {st.label}
+            </span>
+          </div>
         </div>
       </div>
 
-      <div className="appointment-item__actions">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
         {appt.meetLink && appt.status === 'confirmed' && (
           <a
             href={appt.meetLink}
             target="_blank"
             rel="noopener noreferrer"
             className="btn btn--primary btn--sm"
-            id={`btn-meet-${appt.id}`}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}
           >
-            <Icon.Video />
-            Unirse
+            <Icon.Video /> Unirse
           </a>
         )}
         {appt.status === 'pending' && (
-          <span className="btn btn--ghost btn--sm" style={{ color: 'var(--color-warning)', cursor: 'default' }}>
+          <span style={{ fontSize: '11px', color: 'var(--color-warning)', fontWeight: 'bold' }}>
             Esperando pago
           </span>
         )}
@@ -421,11 +504,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
     } catch (e) {
       console.error("Error reading tasks from localStorage", e);
     }
-    return [
-      { id: '1', text: 'Revisar ficha clínica de Rossi', completed: false, category: 'clinical' },
-      { id: '2', text: 'Enviar copagos de OSDE del mes', completed: false, category: 'admin' },
-      { id: '3', text: 'Renovar firma digital', completed: true, category: 'urgent' },
-    ];
+    return [];
   });
 
   const [newTaskText, setNewTaskText] = useState('');
@@ -1167,7 +1246,19 @@ function getMissingRequirements(m: any): string[] {
   return missing
 }
 
-function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (updated: any) => Promise<void> }) {
+function SettingsView({
+  medicoInfo,
+  onSave,
+  mpConnected,
+  onConnect,
+  onDisconnect
+}: {
+  medicoInfo: any
+  onSave: (updated: any) => Promise<void>
+  mpConnected: boolean
+  onConnect: () => void
+  onDisconnect: () => void
+}) {
   const { showAlert } = useAlert();
   const [showUnmetList, setShowUnmetList] = useState(false);
   const [name, setName] = useState(medicoInfo?.name || '')
@@ -1663,6 +1754,59 @@ function SettingsView({ medicoInfo, onSave }: { medicoInfo: any; onSave: (update
           ))}
         </div>
       </div>
+
+      {/* Mercado Pago Integration */}
+      <div className="card">
+        <div className="card__header" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <img src="/logo-mp.png" alt="Mercado Pago" style={{ width: '32px', height: 'auto' }} />
+          <div>
+            <h2 className="card__title">Integración con Mercado Pago</h2>
+            <p className="card__subtitle">Vinculá tu cuenta para cobrar tus sesiones directamente en tu Mercado Pago, 100% libre de comisiones.</p>
+          </div>
+        </div>
+        <div style={{
+          padding: 'var(--space-4)',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--color-border)',
+          backgroundColor: mpConnected ? 'var(--green-50)' : '#fafaf9',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 'var(--space-4)'
+        }}>
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {mpConnected ? (
+                <>
+                  <span style={{ color: 'var(--color-success)' }}>●</span> Conectado
+                </>
+              ) : (
+                <>
+                  <span style={{ color: 'var(--color-warning)' }}>●</span> Desconectado
+                </>
+              )}
+            </div>
+            <p style={{ margin: '4px 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', maxWidth: '480px', lineHeight: '1.4' }}>
+              {mpConnected 
+                ? 'Tu cuenta de Mercado Pago está vinculada y activa para recibir cobros en tu perfil público.' 
+                : 'Conectá tu cuenta para permitir a los pacientes abonar sus turnos de forma automatizada por Mercado Pago. Si no la vinculás, tu perfil no se mostrará en las búsquedas públicas.'}
+            </p>
+          </div>
+          <div>
+            {mpConnected ? (
+              <button className="btn btn--ghost btn--sm" onClick={onDisconnect} style={{ border: '1px solid var(--color-border)' }}>
+                Desconectar cuenta
+              </button>
+            ) : (
+              <button className="btn btn--primary btn--sm" onClick={onConnect}>
+                Vincular Mercado Pago
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
     </div>
   )
 }
@@ -1677,7 +1821,8 @@ function DashboardHome({
   stats,
   onCancelAppointment,
   onUpdateAttendance,
-  onRescheduleAppointment
+  onRescheduleAppointment,
+  onNavigateSettings
 }: {
   mpConnected: boolean;
   onConnect: () => void;
@@ -1689,14 +1834,19 @@ function DashboardHome({
   onCancelAppointment: (id: number) => void;
   onUpdateAttendance: (id: number, status: string) => void;
   onRescheduleAppointment: (id: number, date: string, hour: string) => void;
+  onNavigateSettings?: () => void;
 }) {
   const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
   const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
-  const [calendarView, setCalendarView] = useState<'weekly' | 'today'>('weekly');
+  
+  const [calendarView, setCalendarView] = useState<'monthly' | 'weekly' | 'today'>('weekly');
   const [showInactiveSlots, setShowInactiveSlots] = useState(false);
   const [selectedAppt, setSelectedAppt] = useState<any | null>(null);
-
+  const [currentDate, setCurrentDate] = useState(() => new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleHour, setRescheduleHour] = useState('09:00');
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1749,37 +1899,88 @@ function DashboardHome({
   const getCountdownString = (appt: any) => {
     if (!appt || !appt.fecha || !appt.hour) return '';
     const parts = appt.fecha.split('-');
-    const timeParts = String(appt.hour).split(':');
-    const year = parseInt(parts[0] || '0', 10);
-    const month = parseInt(parts[1] || '1', 10) - 1;
-    const day = parseInt(parts[2] || '1', 10);
-    const hour = parseInt(timeParts[0] || '0', 10);
-    const min = parseInt(timeParts[1] || '0', 10);
-    const apptDate = new Date(year, month, day, hour, min, 0);
-
-    const diffMs = apptDate.getTime() - currentTime.getTime();
-    if (diffMs <= 0) {
-      if (diffMs > -45 * 60 * 1000) {
-        return "¡En curso!";
-      }
-      return "Finalizado";
-    }
-
-    const totalSeconds = Math.floor(diffMs / 1000);
-    const totalMinutes = Math.floor(totalSeconds / 60);
-    const totalHours = Math.floor(totalMinutes / 60);
-    const days = Math.floor(totalHours / 24);
-
-    const hours = totalHours % 24;
-    const minutes = totalMinutes % 60;
-
-    return `Falta: ${days}d ${hours}h ${minutes}m`;
+    const hourParts = appt.hour.split(':');
+    const target = new Date(
+      parseInt(parts[0]),
+      parseInt(parts[1]) - 1,
+      parseInt(parts[2]),
+      parseInt(hourParts[0]),
+      parseInt(hourParts[1] || '0')
+    );
+    const diffMs = target.getTime() - currentTime.getTime();
+    if (diffMs <= 0) return 'Ahora';
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 60) return `En ${diffMins} min`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `En ${diffHours} hs`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `En ${diffDays} días`;
   };
 
-  // Rescheduling states
-  const [rescheduleDate, setRescheduleDate] = useState('');
-  const [rescheduleHour, setRescheduleHour] = useState('');
-  const [isRescheduling, setIsRescheduling] = useState(false);
+  const getDayOfWeek = (dateStr: string) => {
+    if (!dateStr) return -1;
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return -1;
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    const day = d.getDay();
+    return day === 0 ? 7 : day; // Map Sunday to 7
+  };
+
+  const isSlotAvailable = (dayNum: number, time: string) => {
+    return availability.some(av => av.diaSemana === dayNum && av.horaInicio.startsWith(time.substring(0, 5)) && av.activo);
+  };
+
+  // Navigations for the trimodal view
+  const handlePrevPeriod = () => {
+    setCurrentDate(prev => {
+      const d = new Date(prev);
+      if (calendarView === 'monthly') {
+        d.setMonth(d.getMonth() - 1);
+      } else if (calendarView === 'weekly') {
+        d.setDate(d.getDate() - 7);
+      } else {
+        d.setDate(d.getDate() - 1);
+      }
+      return d;
+    });
+  };
+
+  const handleNextPeriod = () => {
+    setCurrentDate(prev => {
+      const d = new Date(prev);
+      if (calendarView === 'monthly') {
+        d.setMonth(d.getMonth() + 1);
+      } else if (calendarView === 'weekly') {
+        d.setDate(d.getDate() + 7);
+      } else {
+        d.setDate(d.getDate() + 1);
+      }
+      return d;
+    });
+  };
+
+  const getPeriodLabel = () => {
+    if (calendarView === 'monthly') {
+      return currentDate.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }).toUpperCase();
+    } else if (calendarView === 'weekly') {
+      const day = currentDate.getDay();
+      const diff = currentDate.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(currentDate.getFullYear(), currentDate.getMonth(), diff);
+      const friday = new Date(monday);
+      friday.setDate(monday.getDate() + 4);
+      return `${monday.getDate()} ${monday.toLocaleDateString('es-AR', { month: 'short' })} — ${friday.getDate()} ${friday.toLocaleDateString('es-AR', { month: 'short' })} ${friday.getFullYear()}`;
+    } else {
+      return currentDate.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
+    }
+  };
+
+  // Rescheduled appointments date calculations (weekly grid view)
+  const currentWeekMonday = useMemo(() => {
+    const d = new Date(currentDate);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.getFullYear(), d.getMonth(), diff);
+  }, [currentDate]);
 
   const weekdays = [
     { name: 'Lunes', abbr: 'Lun', num: 1 },
@@ -1787,58 +1988,104 @@ function DashboardHome({
     { name: 'Miércoles', abbr: 'Mié', num: 3 },
     { name: 'Jueves', abbr: 'Jue', num: 4 },
     { name: 'Viernes', abbr: 'Vie', num: 5 },
-  ]
+  ];
 
-  // Determine dynamic slots based on doctor's actual availability range
-  const getDynamicSlots = () => {
-    if (!availability || availability.length === 0) {
-      return ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
-    }
-    let minHour = 24;
-    let maxHour = 0;
-    availability.forEach((disp) => {
-      const start = parseInt(disp.horaInicio.split(':')[0]);
-      const end = parseInt(disp.horaFin.split(':')[0]);
-      if (start < minHour) minHour = start;
-      if (end > maxHour) maxHour = end;
+  const weekdaysWithDates = useMemo(() => {
+    return weekdays.map((day, idx) => {
+      const cellDate = new Date(currentWeekMonday);
+      cellDate.setDate(currentWeekMonday.getDate() + idx);
+      const year = cellDate.getFullYear();
+      const month = String(cellDate.getMonth() + 1).padStart(2, '0');
+      const dateNum = String(cellDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${dateNum}`;
+      return {
+        ...day,
+        dateStr,
+        label: `${day.name} ${cellDate.getDate()}/${cellDate.getMonth() + 1}`
+      };
     });
-    // Fallback if numbers are strange
-    if (minHour >= maxHour) {
-      return ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+  }, [currentWeekMonday]);
+
+  // Dynamic slot height helper
+  const getDynamicSlots = () => {
+    let minHour = 9;
+    let maxHour = 18;
+    
+    if (availability && availability.length > 0) {
+      const activeAvailabilities = availability.filter(av => av.activo);
+      if (activeAvailabilities.length > 0) {
+        const startHours = activeAvailabilities.map(av => parseInt(av.horaInicio.split(':')[0]));
+        const endHours = activeAvailabilities.map(av => parseInt(av.horaFin.split(':')[0]));
+        
+        minHour = Math.min(...startHours);
+        maxHour = Math.max(...endHours);
+      }
     }
+    
     const slots = [];
     for (let h = minHour; h < maxHour; h++) {
       slots.push(`${String(h).padStart(2, '0')}:00`);
     }
-    return slots;
+    return slots.length > 0 ? slots : ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
   };
 
   const baseSlots = getDynamicSlots();
 
-  // Parse date YYYY-MM-DD to get local day of week (1 = Monday, 5 = Friday)
-  const getDayOfWeek = (dateStr: string) => {
-    if (!dateStr) return -1
-    const parts = dateStr.split('-')
-    if (parts.length !== 3) return -1
-    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
-    const day = d.getDay()
-    return day === 0 ? 7 : day // Map Sunday to 7, Mon-Sat to 1-6
-  }
+  // Monthly days array (35 cells)
+  const monthDays = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const firstDayOfMonth = new Date(year, month, 1);
+    const startDayOfWeek = firstDayOfMonth.getDay();
+    const startOffset = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1; // offset to Monday
 
-  // Check if a slot is active in availability for a specific day
-  const isSlotAvailable = (dayNum: number, slot: string) => {
-    const hour = parseInt(slot.split(':')[0])
-    return availability.some((disp) => {
-      if (disp.diaSemana !== dayNum) return false
-      const start = parseInt(disp.horaInicio.split(':')[0])
-      const end = parseInt(disp.horaFin.split(':')[0])
-      return hour >= start && hour < end
-    })
-  }
+    const startDate = new Date(year, month, 1);
+    startDate.setDate(startDate.getDate() - startOffset);
+
+    const days = [];
+    for (let i = 0; i < 35; i++) {
+      const d = new Date(startDate);
+      d.setDate(startDate.getDate() + i);
+      days.push(d);
+    }
+    return days;
+  }, [currentDate]);
+
+  // Appointments for the selected day in Diario view
+  const selectedDayStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+  const dayAppointments = allAppointments.filter(a => a.fecha === selectedDayStr && a.status !== 'cancelled');
 
   return (
     <>
-      <MPConnectBanner connected={mpConnected} onConnect={onConnect} onDisconnect={onDisconnect} />
+      {!mpConnected && (
+        <div style={{
+          backgroundColor: '#fffbeb',
+          border: '1px solid #fef3c7',
+          borderLeft: '4px solid #f59e0b',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--space-3) var(--space-4)',
+          color: 'var(--neutral-800)',
+          fontSize: 'var(--text-sm)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 'var(--space-3)',
+          marginBottom: 'var(--space-4)',
+          boxShadow: 'var(--shadow-sm)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: '18px', height: '18px', color: '#f59e0b', flexShrink: 0 }}>
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <span style={{ textAlign: 'left' }}>
+              <strong>Mercado Pago no conectado:</strong> Vinculá tu cuenta desde <a href="#" onClick={(e) => { e.preventDefault(); onNavigateSettings?.(); }} style={{ color: 'var(--color-primary)', fontWeight: 'bold', textDecoration: 'underline' }}>Configuración</a> para recibir cobros de tus pacientes.
+            </span>
+          </div>
+        </div>
+      )}
 
       {nextAppt && (
         <div className="card" style={{ width: '100%', maxWidth: 'none', marginBottom: 'var(--space-4)', padding: 'var(--space-5)' }}>
@@ -1888,41 +2135,32 @@ function DashboardHome({
                   fontWeight: 'bold',
                   fontSize: '11px',
                   padding: '2px 8px',
-                  borderRadius: 'var(--radius-sm)'
+                  borderRadius: 'var(--radius-full)'
                 }}>
-                  {nextAppt.attendanceStatus === 'LLEGO' ? '🚶‍♂️ Presente' : nextAppt.attendanceStatus === 'AUSENTE' ? '❌ Ausente' : '⏳ Esperando paciente'}
+                  {nextAppt.attendanceStatus || 'SIN CONFIRMAR'}
                 </span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              {nextAppt.meetLink && nextAppt.status === 'confirmed' && (
+                <a
+                  href={nextAppt.meetLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn--primary"
+                  id="btn-next-meet"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)' }}
+                >
+                  <Icon.Video />
+                  Unirse al Meet
+                </a>
+              )}
               <button 
-                onClick={() => onUpdateAttendance(nextAppt.id, 'LLEGO')}
-                className="btn btn--secondary btn--sm"
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '4px',
-                  backgroundColor: nextAppt.attendanceStatus === 'LLEGO' ? 'var(--green-50)' : 'transparent',
-                  borderColor: nextAppt.attendanceStatus === 'LLEGO' ? 'var(--color-primary)' : 'var(--color-border)',
-                  color: nextAppt.attendanceStatus === 'LLEGO' ? 'var(--color-primary)' : 'var(--color-text-primary)'
-                }}
+                onClick={() => setSelectedAppt(nextAppt)}
+                className="btn btn--secondary"
               >
-                🚶‍♂️ Llegó
-              </button>
-              <button 
-                onClick={() => onUpdateAttendance(nextAppt.id, 'AUSENTE')}
-                className="btn btn--ghost btn--sm"
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '4px',
-                  backgroundColor: nextAppt.attendanceStatus === 'AUSENTE' ? '#fdf2f2' : 'transparent',
-                  color: nextAppt.attendanceStatus === 'AUSENTE' ? 'var(--color-danger)' : 'var(--color-text-secondary)',
-                  border: '1px solid ' + (nextAppt.attendanceStatus === 'AUSENTE' ? 'var(--color-danger)' : 'var(--color-border)')
-                }}
-              >
-                ❌ Ausente
+                Ficha de Turno
               </button>
             </div>
           </div>
@@ -1932,15 +2170,24 @@ function DashboardHome({
       <StatsOverview stats={stats} />
 
       <div className="card" style={{ width: '100%', maxWidth: 'none' }}>
-        <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
           <div>
-            <h2 className="card__title">
-              {calendarView === 'weekly' ? 'Calendario Semanal' : 'Sesiones de Hoy'}
+            <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+              <span>
+                {calendarView === 'monthly' ? 'Calendario Mensual' : calendarView === 'weekly' ? 'Calendario Semanal' : 'Sesiones del Día'}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontWeight: 'normal' }}>
+                <button className="btn btn--icon btn--ghost" onClick={handlePrevPeriod} style={{ padding: '2px', height: '24px', width: '24px' }}>←</button>
+                <span style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>{getPeriodLabel()}</span>
+                <button className="btn btn--icon btn--ghost" onClick={handleNextPeriod} style={{ padding: '2px', height: '24px', width: '24px' }}>→</button>
+              </div>
             </h2>
             <p className="card__subtitle">
-              {calendarView === 'weekly' 
-                ? 'Cronograma de turnos reservados por día y horario' 
-                : `${capitalizedDate} · ${appointments.length} sesiones programadas`
+              {calendarView === 'monthly' 
+                ? 'Vista de distribución de turnos mensual'
+                : calendarView === 'weekly'
+                  ? 'Cronograma de turnos por día y horario' 
+                  : `${capitalizedDate} · ${dayAppointments.length} sesiones programadas`
               }
             </p>
           </div>
@@ -1965,12 +2212,25 @@ function DashboardHome({
             )}
             <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
               <button 
+                onClick={() => setCalendarView('monthly')} 
+                className={`btn btn--sm`} 
+                style={{ 
+                  borderRadius: 0, 
+                  backgroundColor: calendarView === 'monthly' ? 'var(--color-primary)' : 'transparent',
+                  color: calendarView === 'monthly' ? 'white' : 'var(--color-text-primary)'
+                }}
+              >
+                Mensual
+              </button>
+              <button 
                 onClick={() => setCalendarView('weekly')} 
                 className={`btn btn--sm`} 
                 style={{ 
                   borderRadius: 0, 
                   backgroundColor: calendarView === 'weekly' ? 'var(--color-primary)' : 'transparent',
-                  color: calendarView === 'weekly' ? 'white' : 'var(--color-text-primary)'
+                  color: calendarView === 'weekly' ? 'white' : 'var(--color-text-primary)',
+                  borderLeft: '1px solid var(--color-border)',
+                  borderRight: '1px solid var(--color-border)'
                 }}
               >
                 Semanal
@@ -1984,29 +2244,25 @@ function DashboardHome({
                   color: calendarView === 'today' ? 'white' : 'var(--color-text-primary)'
                 }}
               >
-                Hoy
+                Diario
               </button>
             </div>
-            <button className="btn btn--secondary btn--sm" id="btn-add-slot">
-              <Icon.Plus />
-              Agregar horario
-            </button>
           </div>
         </div>
 
         {calendarView === 'today' ? (
-          appointments.length === 0 ? (
+          dayAppointments.length === 0 ? (
             <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', padding: 'var(--space-6)', textAlign: 'center' }}>
-              No tenés sesiones programadas para el día de hoy.
+              No tenés sesiones programadas para este día.
             </p>
           ) : (
             <ul className="appointment-list" role="list" aria-label="Sesiones de hoy">
-              {appointments.map((appt) => (
+              {dayAppointments.map((appt) => (
                 <AppointmentCard key={appt.id} appt={appt} />
               ))}
             </ul>
           )
-        ) : (
+        ) : calendarView === 'weekly' ? (
           /* Weekly Calendar Matrix Grid */
           <div style={{ 
             display: 'grid', 
@@ -2021,7 +2277,7 @@ function DashboardHome({
           }}>
             {/* Headers */}
             <div style={{ backgroundColor: 'var(--neutral-50)', padding: 'var(--space-3) var(--space-2)', borderBottom: '2px solid var(--color-border)', borderRight: '1px solid var(--color-border)' }}></div>
-            {weekdays.map((day) => (
+            {weekdaysWithDates.map((day) => (
               <div key={day.num} style={{
                 textAlign: 'center',
                 padding: 'var(--space-3) var(--space-2)',
@@ -2034,7 +2290,7 @@ function DashboardHome({
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em'
               }}>
-                {day.name}
+                {day.label}
               </div>
             ))}
 
@@ -2044,9 +2300,8 @@ function DashboardHome({
               const slotHour = parseInt(slot.split(':')[0]);
               const hasActiveAvailability = weekdays.some((day) => isSlotAvailable(day.num, slot));
               const hasAppointment = allAppointments.some((a) => {
-                const apptDay = getDayOfWeek(a.fecha);
                 const apptHour = parseInt(a.hour);
-                return weekdays.some(d => d.num === apptDay) && apptHour === slotHour;
+                return weekdaysWithDates.some(d => d.dateStr === a.fecha) && apptHour === slotHour && a.status !== 'cancelled';
               });
               return hasActiveAvailability || hasAppointment;
             }).map((slot) => {
@@ -2069,11 +2324,10 @@ function DashboardHome({
                   </div>
 
                   {/* Day Columns for this hour */}
-                  {weekdays.map((day) => {
+                  {weekdaysWithDates.map((day) => {
                     const appt = allAppointments.find(a => {
-                      const apptDay = getDayOfWeek(a.fecha);
                       const apptHour = parseInt(a.hour);
-                      return apptDay === day.num && apptHour === slotHour;
+                      return a.fecha === day.dateStr && apptHour === slotHour && a.status !== 'cancelled';
                     });
                     const isActive = isSlotAvailable(day.num, slot);
 
@@ -2127,114 +2381,41 @@ function DashboardHome({
                               e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)';
                             }}
                           >
-                            {/* Time & Modality Header */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{
-                                fontSize: '10px',
-                                fontWeight: 'bold',
-                                color: appt.status === 'confirmed' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-                                textTransform: 'uppercase',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '3px'
-                              }}>
-                                {appt.type.includes('Meet') || appt.type.includes('OSDE') ? (
-                                  <><Icon.Video size={11} /> Online</>
-                                ) : (
-                                  <><Icon.Building size={11} /> Presencial</>
-                                )}
-                              </span>
-                              <span style={{
-                                width: '6px',
-                                height: '6px',
-                                borderRadius: '50%',
-                                backgroundColor: appt.status === 'confirmed' ? '#10b981' : appt.status === 'completed' ? '#64748b' : '#f59e0b',
-                                display: 'inline-block'
-                              }} />
-                            </div>
-
-                            {/* Patient Name */}
                             <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-primary)' }}>
                               {appt.patientName}
                             </div>
-
-                            {/* Attendance text if not Esperando */}
                             {appt.attendanceStatus && appt.attendanceStatus !== 'ESPERANDO' && (
                               <div style={{
                                 fontSize: '10px',
                                 fontWeight: '600',
                                 color: appt.attendanceStatus === 'LLEGO' 
                                   ? 'var(--color-primary)' 
-                                  : appt.attendanceStatus === 'COMPLETADA' 
-                                    ? '#10b981' 
-                                    : 'var(--color-danger)',
-                                marginTop: '-2px'
+                                  : appt.attendanceStatus === 'AUSENTE'
+                                    ? 'var(--color-danger)'
+                                    : '#10b981',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                marginTop: '2px'
                               }}>
-                                {appt.attendanceStatus === 'LLEGO' ? '🚶‍♂️ Presente' : appt.attendanceStatus === 'COMPLETADA' ? '✓ Completada' : '❌ Ausente'}
+                                <span>{appt.attendanceStatus === 'LLEGO' ? '🚶‍♂️' : appt.attendanceStatus === 'AUSENTE' ? '❌' : '✓'}</span>
+                                {appt.attendanceStatus}
                               </div>
                             )}
-
-                            {/* Alert badges or details */}
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                                {appt.firstConsultation && (
-                                  <span style={{
-                                    backgroundColor: '#fffbeb',
-                                    color: '#b45309',
-                                    border: '1px solid #fef3c7',
-                                    fontSize: '9px',
-                                    padding: '1px 5px',
-                                    borderRadius: '4px',
-                                    fontWeight: '600'
-                                  }}>
-                                    ⚠️ 1° vez
-                                  </span>
-                                )}
-                                <span style={{ fontSize: '9px', color: 'var(--color-text-secondary)', fontWeight: '500' }}>
-                                  {appt.type.includes('OSDE') ? 'OSDE' : 'Particular'}
-                                </span>
-                              </div>
-                              {appt.status !== 'completed' && (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onCancelAppointment(appt.id);
-                                  }}
-                                  style={{
-                                    border: 'none',
-                                    background: 'none',
-                                    padding: '2px',
-                                    cursor: 'pointer',
-                                    color: 'var(--color-danger)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    fontSize: '9px',
-                                    fontWeight: 'bold'
-                                  }}
-                                  title="Cancelar Turno"
-                                >
-                                  ✕
-                                </button>
-                              )}
-                            </div>
                           </div>
                         ) : isActive ? (
                           <div style={{
                             textAlign: 'center',
-                            fontSize: '9px',
+                            fontSize: '10px',
                             color: 'var(--color-primary)',
-                            fontWeight: 'bold',
-                            border: '1px dashed var(--color-primary-disabled)',
-                            borderRadius: 'var(--radius-sm)',
-                            padding: 'var(--space-2) 0',
-                            backgroundColor: '#ffffff'
+                            fontWeight: 'bold'
                           }}>
-                            Libre
+                            Disponible
                           </div>
                         ) : (
                           <div style={{
                             textAlign: 'center',
-                            fontSize: '9px',
+                            fontSize: '10px',
                             color: '#94a3b8',
                             fontStyle: 'italic'
                           }}>
@@ -2242,43 +2423,129 @@ function DashboardHome({
                           </div>
                         )}
                       </div>
-                    );
+                    )
                   })}
                 </React.Fragment>
+              );
+            })}
+          </div>
+        ) : (
+          /* Monthly Calendar Grid */
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, 1fr)',
+            gap: '1px',
+            backgroundColor: 'var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden',
+            marginTop: 'var(--space-4)'
+          }}>
+            {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((dName) => (
+              <div key={dName} style={{
+                backgroundColor: 'var(--green-50)',
+                color: 'var(--color-primary)',
+                padding: 'var(--space-2)',
+                textAlign: 'center',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                textTransform: 'uppercase'
+              }}>
+                {dName}
+              </div>
+            ))}
+            {monthDays.map((d, index) => {
+              const isCurrentMonth = d.getMonth() === currentDate.getMonth();
+              const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+              const dayAppts = allAppointments.filter(a => a.fecha === dateStr && a.status !== 'cancelled');
+
+              return (
+                <div key={index} style={{
+                  backgroundColor: '#ffffff',
+                  minHeight: '90px',
+                  padding: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  opacity: isCurrentMonth ? 1 : 0.4,
+                  borderBottom: '1px solid #f0f2f5',
+                  borderRight: '1px solid #f0f2f5'
+                }}>
+                  <div style={{
+                    fontWeight: 'bold',
+                    fontSize: '11px',
+                    color: d.toDateString() === new Date().toDateString() ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                    alignSelf: 'flex-start',
+                    backgroundColor: d.toDateString() === new Date().toDateString() ? 'var(--green-100)' : 'transparent',
+                    borderRadius: '50%',
+                    width: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {d.getDate()}
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
+                    {dayAppts.slice(0, 2).map((a) => (
+                      <div 
+                        key={a.id} 
+                        onClick={() => setSelectedAppt(a)}
+                        style={{
+                          fontSize: '9px',
+                          padding: '2px 4px',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: a.status === 'confirmed' ? 'var(--green-50)' : '#fffbeb',
+                          color: a.status === 'confirmed' ? 'var(--color-primary)' : '#b45309',
+                          borderLeft: a.status === 'confirmed' ? '2px solid var(--color-primary)' : '2px solid #f59e0b',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {a.hour} {a.patientName}
+                      </div>
+                    ))}
+                    {dayAppts.length > 2 && (
+                      <div style={{ fontSize: '9px', color: 'var(--color-text-secondary)', paddingLeft: '4px', fontWeight: 'bold' }}>
+                        +{dayAppts.length - 2} más
+                      </div>
+                    )}
+                  </div>
+                </div>
               );
             })}
           </div>
         )}
       </div>
 
-      {/* Appointment Detail Modal */}
+      {/* Appointment Detail Popup Modal */}
       {selectedAppt && (
         <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: 'rgba(15, 23, 42, 0.6)',
-          backdropFilter: 'blur(6px)',
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(4px)',
           display: 'flex',
-          alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 9999,
+          alignItems: 'center',
+          zIndex: 1100,
           padding: 'var(--space-4)'
-        }} onClick={() => setSelectedAppt(null)}>
-          <div style={{
-            backgroundColor: 'var(--color-surface)',
-            borderRadius: 'var(--radius-xl)',
+        }}>
+          <div className="card" style={{
+            maxWidth: '540px',
             width: '100%',
-            maxWidth: '520px',
-            boxShadow: 'var(--shadow-2xl)',
-            overflow: 'hidden',
-            border: '1px solid var(--color-border)',
+            padding: 0,
+            boxShadow: 'var(--shadow-xl)',
+            backgroundColor: '#ffffff',
+            borderRadius: 'var(--radius-lg)',
             display: 'flex',
             flexDirection: 'column',
-            animation: 'fadeInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
-          }} onClick={(e) => e.stopPropagation()}>
+            overflow: 'hidden'
+          }}>
             {/* Header */}
             <div style={{
               padding: 'var(--space-5)',
@@ -2286,62 +2553,43 @@ function DashboardHome({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              background: 'linear-gradient(to right, var(--green-50), var(--color-surface))'
+              backgroundColor: 'var(--neutral-50)'
             }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold', color: 'var(--color-primary)' }}>Detalle del Turno</h3>
-                <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                  ID Turno: #{selectedAppt.id} · Fecha: {selectedAppt.fecha}
-                </p>
+                <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                  Detalle del Turno #{selectedAppt.id}
+                </h3>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                  Registrado el {formatDate(selectedAppt.fecha)}
+                </span>
               </div>
               <button 
-                onClick={() => setSelectedAppt(null)}
-                style={{
-                  border: 'none',
-                  background: 'var(--neutral-100)',
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  color: 'var(--color-text-primary)'
-                }}
+                onClick={() => {
+                  setSelectedAppt(null);
+                  setIsRescheduling(false);
+                }} 
+                style={{ border: 'none', background: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--color-text-secondary)' }}
               >
-                ✕
+                &times;
               </button>
             </div>
 
             {/* Content */}
-            <div style={{ padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxHeight: '70vh', overflowY: 'auto' }}>
-              
-              {/* Warning Banner: First Consultation */}
-              {selectedAppt.firstConsultation && (
-                <div style={{
-                  backgroundColor: '#fffbeb',
-                  border: '1px solid #fef3c7',
-                  borderLeft: '4px solid #d97706',
-                  borderRadius: 'var(--radius-lg)',
-                  padding: 'var(--space-4)',
-                  color: '#b45309',
-                  fontSize: 'var(--text-sm)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 'var(--space-1)'
-                }}>
-                  <strong style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    ⚠️ Primera Consulta Médica
-                  </strong>
-                  <span>Es la primera vez que este paciente agenda una cita. Debés verificar y completar su Ficha Clínica antes del inicio de la sesión.</span>
-                </div>
-              )}
-
-              {/* Grid with patient information */}
+            <div style={{
+              padding: 'var(--space-5)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-4)',
+              maxHeight: '450px',
+              overflowY: 'auto'
+            }}>
+              {/* Patient info block */}
               <div>
-                <h4 style={{ margin: '0 0 var(--space-2) 0', fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)' }}>Datos del Paciente</h4>
+                <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
+                  Información del Paciente
+                </label>
                 <div style={{
+                  marginTop: 'var(--space-2)',
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr',
                   gap: 'var(--space-3)',
@@ -2353,47 +2601,37 @@ function DashboardHome({
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Nombre Completo</label>
                     <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>
-                      {selectedAppt.patientInfo?.apellido 
-                        ? `${selectedAppt.patientInfo.nombre} ${selectedAppt.patientInfo.apellido}`
-                        : selectedAppt.patientName}
+                      {selectedAppt.patientName}
                     </span>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Sexo</label>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>
-                      {selectedAppt.patientInfo?.sexo === 'M' ? 'Masculino (M)' : selectedAppt.patientInfo?.sexo === 'F' ? 'Femenino (F)' : selectedAppt.patientInfo?.sexo || 'No especificado'}
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Email</label>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500' }}>
+                      {selectedAppt.patientEmail || '-'}
                     </span>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>DNI / Documento</label>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>
-                      {selectedAppt.patientInfo?.tipoDocumento && selectedAppt.patientInfo?.numeroDocumento
-                        ? `${selectedAppt.patientInfo.tipoDocumento} ${selectedAppt.patientInfo.numeroDocumento}`
-                        : selectedAppt.patientInfo?.dni || 'No especificado'}
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>DNI</label>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500' }}>
+                      {selectedAppt.patientDni || '-'}
                     </span>
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>CUIL</label>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>
-                      {selectedAppt.patientInfo?.cuil || 'No especificado'}
-                    </span>
-                  </div>
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Contacto (Email & Teléfono)</label>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500', display: 'block' }}>
-                      ✉ {selectedAppt.patientInfo?.mail || selectedAppt.patientInfo?.email || '-'}
-                    </span>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500', display: 'block', marginTop: '2px' }}>
-                      📞 {selectedAppt.patientInfo?.telefono || '-'}
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Dato de Contacto</label>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500' }}>
+                      {selectedAppt.patientPhone || '-'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Cobertura médica (Prepaga / Obra Social) */}
+              {/* Cobertura / Obra Social details */}
               <div>
-                <h4 style={{ margin: '0 0 var(--space-2) 0', fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)' }}>Detalle de Cobertura (OSDE)</h4>
+                <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
+                  Detalles de Cobertura
+                </label>
                 <div style={{
+                  marginTop: 'var(--space-2)',
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr',
                   gap: 'var(--space-3)',
@@ -2404,110 +2642,12 @@ function DashboardHome({
                 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Obra Social</label>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>
-                      {selectedAppt.patientInfo?.obraSocial || 'Consulta Particular'}
-                    </span>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>{selectedAppt.obraSocial || 'Particular'}</span>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Plan</label>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>
-                      {selectedAppt.patientInfo?.credencial?.plan || '-'}
-                    </span>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>{selectedAppt.plan || '-'}</span>
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Nro. Afiliado (PAN)</label>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>
-                      {selectedAppt.patientInfo?.credencial?.pan || selectedAppt.patientInfo?.numAfiliado || '-'}
-                    </span>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Token Digital</label>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600', color: 'var(--color-primary)' }}>
-                      {selectedAppt.patientInfo?.credencial?.token || '-'}
-                    </span>
-                  </div>
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Código Entidad</label>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500' }}>
-                      {selectedAppt.patientInfo?.credencial?.codEntidad || '-'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Consultation detail card */}
-              <div style={{
-                backgroundColor: 'var(--green-50)',
-                padding: 'var(--space-4)',
-                borderRadius: 'var(--radius-lg)',
-                border: '1px solid var(--color-primary-disabled)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-primary)' }}>Modalidad / Horario</label>
-                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'bold', color: 'var(--color-primary)' }}>
-                    {selectedAppt.type}
-                  </span>
-                  <span style={{ display: 'block', fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                    🕒 {selectedAppt.hour} hs (Bloque de 45 min)
-                  </span>
-                </div>
-                <div>
-                  <span className={`badge ${selectedAppt.status === 'confirmed' ? 'badge--success' : selectedAppt.status === 'completed' ? 'badge--neutral' : 'badge--warning'}`}>
-                    {selectedAppt.status === 'confirmed' ? 'Confirmado' : selectedAppt.status === 'completed' ? 'Completado' : 'Pendiente'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Attendance Section */}
-              <div style={{
-                padding: 'var(--space-4) 0',
-                borderTop: '1px solid var(--color-border)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 'var(--space-2)'
-              }}>
-                <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
-                  Asistencia del Paciente
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-2)' }}>
-                  {[
-                    { val: 'ESPERANDO', label: 'Esperando', emoji: '⏳', color: 'var(--neutral-600)' },
-                    { val: 'LLEGO', label: 'Llegó', emoji: '🚶‍♂️', color: 'var(--color-primary)' },
-                    { val: 'AUSENTE', label: 'Ausente', emoji: '❌', color: 'var(--color-danger)' },
-                    { val: 'COMPLETADA', label: 'Terminado', emoji: '✓', color: '#10b981' }
-                  ].map((opt) => {
-                    const isSelected = selectedAppt.attendanceStatus === opt.val;
-                    return (
-                      <button
-                        key={opt.val}
-                        onClick={() => {
-                          onUpdateAttendance(selectedAppt.id, opt.val);
-                          setSelectedAppt((prev: any) => prev ? { ...prev, attendanceStatus: opt.val } : null);
-                        }}
-                        style={{
-                          padding: 'var(--space-2) var(--space-1)',
-                          fontSize: '11px',
-                          fontWeight: 'bold',
-                          borderRadius: 'var(--radius-md)',
-                          border: isSelected ? `2px solid ${opt.color}` : '1px solid var(--color-border)',
-                          backgroundColor: isSelected ? 'var(--neutral-50)' : '#ffffff',
-                          color: isSelected ? opt.color : 'var(--color-text-secondary)',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: '2px',
-                          boxShadow: isSelected ? 'var(--shadow-sm)' : 'none'
-                        }}
-                      >
-                        <span style={{ fontSize: '14px' }}>{opt.emoji}</span>
-                        <span>{opt.label}</span>
-                      </button>
-                    )
-                  })}
                 </div>
               </div>
 
@@ -2527,7 +2667,7 @@ function DashboardHome({
                     onClick={() => {
                       setIsRescheduling(!isRescheduling);
                       setRescheduleDate(selectedAppt.fecha || '');
-                      setRescheduleHour(selectedAppt.hour + ':00');
+                      setRescheduleHour(selectedAppt.hour || '09:00');
                     }}
                     style={{
                       border: 'none',
@@ -2571,7 +2711,7 @@ function DashboardHome({
                         onChange={(e) => setRescheduleHour(e.target.value)}
                         style={{ width: '100%', fontSize: '11px', padding: '4px' }}
                       >
-                        {getDynamicSlots().map(slot => (
+                        {baseSlots.map(slot => (
                           <option key={slot} value={slot}>{slot} hs</option>
                         ))}
                       </select>
@@ -2630,6 +2770,7 @@ export default function App() {
   const [view, setView] = useState<AppView>('landing')
   const [activeNav, setActiveNav] = useState<NavSection>('dashboard')
   const [mpConnected, setMpConnected] = useState(false)
+  const [googleConnected, setGoogleConnected] = useState(false)
   const [mpEnabled, setMpEnabled] = useState(false)
   const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null)
 
@@ -2647,6 +2788,15 @@ export default function App() {
   const [loadingSession, setLoadingSession] = useState(true)
   const [showUnverifiedAlert, setShowUnverifiedAlert] = useState(true)
   const [showDashboardAlertList, setShowDashboardAlertList] = useState(false)
+  const [hasUnreadChats, setHasUnreadChats] = useState(false)
+
+  const refreshUnreadChatsStatus = () => {
+    if (currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')) {
+      api.getTieneNoLeidos()
+        .then((status) => setHasUnreadChats(!!status))
+        .catch((err) => console.error("Error refreshing unread chats status:", err))
+    }
+  }
 
   const handleCloseUnverifiedAlert = () => {
     setShowUnverifiedAlert(false)
@@ -2734,9 +2884,11 @@ export default function App() {
         api.getStats(),
         api.getTurnos(),
         api.getNotificaciones(),
-        api.getMercadoPagoStatus().catch(() => ({ connected: false }))
+        api.getMercadoPagoStatus().catch(() => ({ connected: false })),
+        api.getGoogleCalendarStatus().catch(() => ({ connected: false })),
+        api.getTieneNoLeidos().catch(() => false)
       ])
-        .then(([perfil, turnos, disp, statsData, allTurnos, notifData, mpStatus]) => {
+        .then(([perfil, turnos, disp, statsData, allTurnos, notifData, mpStatus, googleStatus, unreadStatus]) => {
           setMedicoInfo(perfil)
           setTodayAppointments(turnos || [])
           setAvailability(disp || [])
@@ -2745,6 +2897,7 @@ export default function App() {
           setNotifications(notifData || [])
           setMpConnected(!!mpStatus?.connected)
           setMpEnabled(!!(mpStatus as any)?.mercadopagoEnabled)
+          setGoogleConnected(!!googleStatus?.connected)
         })
         .catch((err) => {
           console.error("Error al inicializar dashboard:", err)
@@ -2764,7 +2917,8 @@ export default function App() {
       let client: Client | null = null;
       api.getPerfil().then((perfil) => {
         if (perfil && perfil.id) {
-          const socket = new SockJS('http://localhost:8081/ws-tranqui', null, { withCredentials: true } as any)
+          const socketUrl = window.location.protocol === 'https:' ? `https://${window.location.host}/ws-tranqui` : `http://${window.location.hostname}:8081/ws-tranqui`;
+          const socket = new SockJS(socketUrl, null, { withCredentials: true } as any)
           client = new Client({
             webSocketFactory: () => socket,
             reconnectDelay: 5000,
@@ -2779,6 +2933,10 @@ export default function App() {
                   api.getNotificaciones().then((res) => {
                     setNotifications(res || [])
                   })
+
+                  if (data.tipo === 'NUEVO_MENSAJE') {
+                    setHasUnreadChats(true)
+                  }
 
                   if (data.tipo === 'TURNO_RESERVADO' || data.tipo === 'TURNO_CANCELADO') {
                     // Refresh appointments list too so calendar updates immediately
@@ -3003,12 +3161,13 @@ export default function App() {
             onCancelAppointment={handleCancelAppointment}
             onUpdateAttendance={handleUpdateAttendance}
             onRescheduleAppointment={handleRescheduleAppointment}
+            onNavigateSettings={() => setActiveNav('settings')}
           />
         )
       case 'agenda': 
         return <AgendaView initialAvailability={availability} onSave={handleSaveAvailability} />
       case 'patients': 
-        return <PatientsView />
+        return <PatientsView onUnreadChatsChange={refreshUnreadChatsStatus} />
       case 'prescriptions': 
         return <PrescriptionView onSend={handleSendPrescription} />
       case 'visitors': 
@@ -3020,7 +3179,15 @@ export default function App() {
         </div>
       )
       case 'settings': 
-        return <SettingsView medicoInfo={medicoInfo} onSave={handleSaveSettings} />
+        return (
+          <SettingsView 
+            medicoInfo={medicoInfo} 
+            onSave={handleSaveSettings} 
+            mpConnected={mpConnected}
+            onConnect={handleConnect}
+            onDisconnect={handleDisconnectMercadoPago}
+          />
+        )
     }
   }
 
@@ -3221,7 +3388,7 @@ export default function App() {
           </div>
         </>
       )}
-      <Sidebar activeNav={activeNav} onNavChange={setActiveNav} medicoInfo={medicoInfo} />
+      <Sidebar activeNav={activeNav} onNavChange={setActiveNav} medicoInfo={medicoInfo} hasUnreadChats={hasUnreadChats} />
 
       <header className="dashboard-header" role="banner" style={{ position: 'relative' }}>
         <h1 className="dashboard-header__title">{pageTitle[activeNav]}</h1>
@@ -3294,16 +3461,27 @@ export default function App() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                     {notifications.map((n) => (
                       <div key={n.id} style={{
-                        padding: 'var(--space-2) var(--space-3)',
-                        borderRadius: 'var(--radius-sm)',
-                        backgroundColor: n.leido ? 'transparent' : '#ecfdf5',
-                        borderLeft: n.leido ? '3px solid var(--color-border)' : '3px solid var(--color-primary)',
+                        padding: 'var(--space-3)',
+                        borderRadius: 'var(--radius-md)',
+                        backgroundColor: n.leido ? '#ffffff' : '#f0fdf4',
+                        borderTop: '1px solid var(--color-border)',
+                        borderRight: '1px solid var(--color-border)',
+                        borderBottom: '1px solid var(--color-border)',
+                        borderLeft: n.leido ? '4px solid var(--color-border)' : '4px solid var(--color-primary)',
                         fontSize: '11px',
-                        transition: 'background-color 0.2s',
-                        color: n.leido ? 'var(--color-text-secondary)' : 'var(--color-text-primary)'
+                        transition: 'all 0.2s',
+                        color: 'var(--color-text-primary)',
+                        boxShadow: 'var(--shadow-xs)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '2px'
                       }}>
-                        <div style={{ fontWeight: 'bold' }}>{n.titulo}</div>
-                        <div style={{ marginTop: '2px', fontSize: '10px' }}>{n.mensaje}</div>
+                        <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', color: n.leido ? 'var(--color-text-secondary)' : 'var(--color-primary)' }}>
+                          🔔 {n.titulo}
+                        </div>
+                        <div style={{ color: 'var(--color-text-secondary)', fontSize: '10px' }}>
+                          {n.mensaje}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -3313,9 +3491,21 @@ export default function App() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <div className="sidebar__avatar" aria-label="Menú de perfil" role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
-              {medicoInfo?.initials || 'LP'}
-            </div>
+            {medicoInfo?.fotoUrl ? (
+              <img 
+                src={medicoInfo.fotoUrl} 
+                alt={medicoInfo.name} 
+                className="sidebar__avatar" 
+                style={{ cursor: 'pointer', objectFit: 'cover', border: '1.5px solid var(--color-border)', width: '36px', height: '36px', borderRadius: '50%' }} 
+                aria-label="Menú de perfil" 
+                role="button" 
+                tabIndex={0}
+              />
+            ) : (
+              <div className="sidebar__avatar" aria-label="Menú de perfil" role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
+                {medicoInfo?.initials || 'LP'}
+              </div>
+            )}
             <button 
               onClick={handleLogout}
               className="btn btn--ghost btn--sm"

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { api } from '../api/api'
 import { useChat } from '../hooks/useChat'
 import { useAlert } from '../context/AlertContext'
@@ -51,17 +51,141 @@ interface ClinicalReport {
   nombreMedico?: string
 }
 
-export default function PatientsView() {
+// A custom select component for Mood with SVGs
+function MoodSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const options = [
+    { value: 'Excelente', label: 'Excelente', emoji: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 18, height: 18, color: '#10b981' }}>
+        <circle cx="12" cy="12" r="10" />
+        <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+        <line x1="9" y1="9" x2="9.01" y2="9" />
+        <line x1="15" y1="9" x2="15.01" y2="9" />
+      </svg>
+    )},
+    { value: 'Bueno', label: 'Bueno', emoji: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 18, height: 18, color: '#3b82f6' }}>
+        <circle cx="12" cy="12" r="10" />
+        <path d="M8 15s1.5 1 4 1 4-1 4-1" />
+        <line x1="9" y1="9" x2="9.01" y2="9" />
+        <line x1="15" y1="9" x2="15.01" y2="9" />
+      </svg>
+    )},
+    { value: 'Regular', label: 'Regular', emoji: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 18, height: 18, color: '#ca8a04' }}>
+        <circle cx="12" cy="12" r="10" />
+        <line x1="8" y1="15" x2="16" y2="15" />
+        <line x1="9" y1="9" x2="9.01" y2="9" />
+        <line x1="15" y1="9" x2="15.01" y2="9" />
+      </svg>
+    )},
+    { value: 'Malo', label: 'Malo', emoji: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 18, height: 18, color: '#ef4444' }}>
+        <circle cx="12" cy="12" r="10" />
+        <path d="M16 16s-1.5-2-4-2-4 2-4 2" />
+        <line x1="9" y1="9" x2="9.01" y2="9" />
+        <line x1="15" y1="9" x2="15.01" y2="9" />
+      </svg>
+    )}
+  ];
+  const selected = options.find(o => o.value === value) || options[1];
+
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="form-input"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-2)',
+          justifyContent: 'space-between',
+          textAlign: 'left',
+          cursor: 'pointer',
+          backgroundColor: '#ffffff',
+          width: '100%',
+          height: '38px',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)'
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {selected.emoji}
+          <span>{selected.label}</span>
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          top: '42px',
+          left: 0,
+          right: 0,
+          backgroundColor: '#ffffff',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          boxShadow: 'var(--shadow-md)',
+          zIndex: 100,
+          overflow: 'hidden'
+        }}>
+          {options.map(o => (
+            <div
+              key={o.value}
+              onClick={() => {
+                onChange(o.value);
+                setIsOpen(false);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: 'var(--space-2) var(--space-3)',
+                cursor: 'pointer',
+                backgroundColor: value === o.value ? 'var(--neutral-100)' : 'transparent',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                if (value !== o.value) e.currentTarget.style.backgroundColor = 'var(--neutral-50)';
+              }}
+              onMouseLeave={(e) => {
+                if (value !== o.value) e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              {o.emoji}
+              <span style={{ fontSize: 'var(--text-sm)' }}>{o.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsChange?: () => void }) {
   const { showAlert } = useAlert()
   const [patients, setPatients] = useState<Patient[]>([])
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [loadingPatients, setLoadingPatients] = useState(true)
   const [activeTab, setActiveTab] = useState<'chat' | 'clinical'>('chat')
+  const [unreadCounts, setUnreadCounts] = useState<Record<number, number>>({})
+
+  const handleMessageReceived = useCallback((msg: any) => {
+    if (msg.remitenteId && msg.remitenteId !== selectedPatient?.id) {
+      setUnreadCounts((prev) => ({
+        ...prev,
+        [msg.remitenteId]: (prev[msg.remitenteId] || 0) + 1
+      }))
+      onUnreadChatsChange?.()
+    }
+  }, [selectedPatient, onUnreadChatsChange])
 
   // Chat states
   const [inputText, setInputText] = useState('')
-  const { messages, sendMessage } = useChat(selectedPatient ? selectedPatient.id : null)
+  const { messages, sendMessage } = useChat(selectedPatient ? selectedPatient.id : null, handleMessageReceived)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   // Tracking states
@@ -216,7 +340,15 @@ export default function PatientsView() {
     setLoadingPatients(true)
     api.getPacientesAtendidos()
       .then((res: any) => {
-        setPatients(res || [])
+        const list = res || []
+        setPatients(list)
+        const initialCounts: Record<number, number> = {}
+        list.forEach((p: any) => {
+          if (p.unreadMessagesCount > 0) {
+            initialCounts[p.id] = p.unreadMessagesCount
+          }
+        })
+        setUnreadCounts(initialCounts)
       })
       .catch((err) => {
         console.error("Error al cargar pacientes:", err)
@@ -230,8 +362,11 @@ export default function PatientsView() {
   useEffect(() => {
     if (selectedPatient) {
       loadClinicalDetails(selectedPatient.id)
+      setTimeout(() => {
+        onUnreadChatsChange?.()
+      }, 300)
     }
-  }, [selectedPatient])
+  }, [selectedPatient, onUnreadChatsChange])
 
   const loadClinicalDetails = (id: number) => {
     setLoadingTrackings(true)
@@ -477,22 +612,33 @@ export default function PatientsView() {
                   onClick={() => {
                     setSelectedPatient(patient)
                     setActiveTab('chat')
+                    setUnreadCounts((prev) => ({ ...prev, [patient.id]: 0 }))
                   }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 'var(--space-3)',
-                    padding: 'var(--space-4) var(--space-5)',
+                    padding: 'var(--space-3) var(--space-4)',
                     cursor: 'pointer',
+                    borderTop: '1px solid var(--color-border)',
+                    borderRight: '1px solid var(--color-border)',
                     borderBottom: '1px solid var(--color-border)',
-                    backgroundColor: isSelected ? 'var(--green-50)' : 'transparent',
-                    transition: 'background-color 0.2s',
-                    position: 'relative'
+                    borderLeft: isSelected 
+                      ? '4px solid var(--color-primary)' 
+                      : isHighPriority 
+                        ? '4px solid #f59e0b' 
+                        : '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: isSelected ? 'var(--green-50)' : '#ffffff',
+                    transition: 'all 0.2s',
+                    position: 'relative',
+                    margin: 'var(--space-2) var(--space-3)',
+                    boxShadow: isSelected ? 'var(--shadow-sm)' : 'none'
                   }}
                 >
                   <div style={{
-                    width: '40px',
-                    height: '40px',
+                    width: '36px',
+                    height: '36px',
                     borderRadius: '50%',
                     backgroundColor: isHighPriority ? '#fef3c7' : 'var(--neutral-100)',
                     color: isHighPriority ? 'var(--color-warning)' : 'var(--color-text-secondary)',
@@ -500,15 +646,15 @@ export default function PatientsView() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontWeight: 'var(--font-weight-semi)',
-                    fontSize: 'var(--text-sm)',
-                    border: isHighPriority ? '1px solid #fde68a' : '1px solid var(--color-border)'
+                    fontSize: 'var(--text-xs)',
+                    border: '1px solid var(--color-border)'
                   }}>
                     {getInitials(patient.nombre)}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ 
                       fontSize: 'var(--text-sm)', 
-                      fontWeight: 'var(--font-weight-medium)',
+                      fontWeight: 'var(--font-weight-semi)',
                       color: 'var(--color-text-primary)',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
@@ -517,29 +663,40 @@ export default function PatientsView() {
                       alignItems: 'center',
                       justifyContent: 'space-between'
                     }}>
-                      <span>
-                        {patient.nombre}
-                        {patient.sinTurno && (
-                          <span className="badge badge--neutral" style={{ fontSize: '9px', padding: '1px 4px', backgroundColor: '#e2e8f0', color: '#475569', marginLeft: 'var(--space-2)' }}>
-                            💬 Sin Turno
-                          </span>
-                        )}
-                      </span>
-                      {isHighPriority && (
-                        <span className="badge badge--warning" style={{ fontSize: '9px', padding: '1px 4px' }}>
-                          Urgente
+                      <span>{patient.nombre}</span>
+                      {unreadCounts[patient.id] > 0 && (
+                        <span style={{
+                          backgroundColor: 'var(--color-error)',
+                          color: 'white',
+                          borderRadius: '50%',
+                          width: '18px',
+                          height: '18px',
+                          fontSize: '9px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 'bold',
+                          marginLeft: '4px',
+                          flexShrink: 0
+                        }}>
+                          {unreadCounts[patient.id]}
                         </span>
                       )}
                     </div>
-                    <div style={{ 
-                      fontSize: 'var(--text-xs)', 
-                      color: 'var(--color-text-secondary)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      marginTop: 'var(--space-1)'
-                    }}>
-                      Última visita: {patient.ultimaVisita || 'Ninguna'}
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginTop: '2px', flexWrap: 'wrap' }}>
+                      {patient.sinTurno && (
+                        <span className="badge badge--neutral" style={{ fontSize: '8px', padding: '0px 3px', backgroundColor: '#e2e8f0', color: '#475569' }}>
+                          💬 Sin Turno
+                        </span>
+                      )}
+                      {isHighPriority && (
+                        <span className="badge badge--warning" style={{ fontSize: '8px', padding: '0px 3px' }}>
+                          Urgente
+                        </span>
+                      )}
+                      <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>
+                        Última: {patient.ultimaVisita || 'Ninguna'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -709,7 +866,8 @@ export default function PatientsView() {
                         onClick={() => setIsEditingPatient(true)} 
                         className="btn btn--secondary btn--sm"
                       >
-                        ✏️ Editar Datos
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 12, height: 12, marginRight: 4, display: 'inline-block', verticalAlign: 'middle' }}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                        Editar Datos
                       </button>
                     )}
                   </div>
@@ -1061,16 +1219,10 @@ export default function PatientsView() {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--space-3)' }}>
                         <div className="form-group">
                           <label className="form-label form-label--required">Estado de Animo</label>
-                          <select 
+                          <MoodSelect 
                             value={newMood} 
-                            onChange={(e) => setNewMood(e.target.value)}
-                            className="form-input"
-                          >
-                            <option value="Excelente">Excelente 😀</option>
-                            <option value="Bueno">Bueno 🙂</option>
-                            <option value="Regular">Regular 😐</option>
-                            <option value="Malo">Malo 🙁</option>
-                          </select>
+                            onChange={setNewMood} 
+                          />
                         </div>
                         <div className="form-group">
                           <label className="form-label">Síntomas presentados</label>
@@ -1175,7 +1327,8 @@ export default function PatientsView() {
                         fontSize: 'var(--text-xs)',
                         border: '1px solid #bfdbfe'
                       }}>
-                        ℹ️ Se autocompletarán los datos cargados del paciente: 
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 12, height: 12, marginRight: 4, display: 'inline-block', verticalAlign: 'middle', color: '#1e40af' }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+                        Se autocompletarán los datos cargados del paciente: 
                         <strong> DNI: {selectedPatient.dni || 'No especificado'}</strong>, 
                         <strong> Obra Social: {selectedPatient.obraSocial || 'Particular (Sin Obra Social)'}</strong>
                         {selectedPatient.obraSocial && <span>, <strong> Afiliado: {selectedPatient.numAfiliado || 'No especificado'}</strong></span>}.
@@ -1332,23 +1485,26 @@ export default function PatientsView() {
                                       className="btn btn--secondary btn--sm" 
                                       style={{ padding: '2px 8px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
                                     >
-                                      📥 PDF
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 10, height: 10 }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                                      PDF
                                     </button>
                                     {!r.nombreArchivo && (
                                       <button 
                                         onClick={() => handleStartEditReport(r)}
                                         className="btn btn--secondary btn--sm" 
-                                        style={{ padding: '2px 8px', fontSize: '10px' }}
+                                        style={{ padding: '2px 8px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
                                       >
-                                        ✏️ Editar
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 10, height: 10 }}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                        Editar
                                       </button>
                                     )}
                                     <button 
                                       onClick={() => handleDeleteReport(r.id)}
                                       className="btn btn--ghost btn--sm" 
-                                      style={{ padding: '2px 8px', fontSize: '10px', color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
+                                      style={{ padding: '2px 8px', fontSize: '10px', color: 'var(--color-danger)', borderColor: 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: '4px' }}
                                     >
-                                      🗑️ Eliminar
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 10, height: 10, color: 'var(--color-danger)' }}><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
+                                      Eliminar
                                     </button>
                                   </div>
                                 </div>

@@ -210,11 +210,15 @@
 
 /* ── Day Selector ─────────────────────────────────────────── */
 .day-selector {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
   gap: var(--space-2);
-  overflow-x: auto;
-  padding-bottom: var(--space-2);
-  -webkit-overflow-scrolling: touch;
+  max-height: 230px;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: #f8fafc;
 }
 
 .day-selector__item {

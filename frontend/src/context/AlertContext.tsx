@@ -73,35 +73,55 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
           const isWarning = a.type === 'warning';
           const isInfo = a.type === 'info';
           
-          const bg = isError ? '#fef2f2' : isWarning ? '#fffbeb' : isInfo ? '#f0f9ff' : '#f0fdf4';
-          const border = isError ? '1px solid #fecaca' : isWarning ? '1px solid #fef3c7' : isInfo ? '1px solid #e0f2fe' : '1px solid #dcfce7';
-          const text = isError ? '#991b1b' : isWarning ? '#92400e' : isInfo ? '#075985' : '#166534';
+          const accentColor = isError ? 'var(--color-danger)' : isWarning ? '#f59e0b' : isInfo ? '#0284c7' : 'var(--color-primary)';
+          const iconColor = accentColor;
+          const bg = '#ffffff';
 
           return (
             <div key={a.id} style={{
               backgroundColor: bg,
-              border: border,
-              borderRadius: 'var(--radius-lg)',
-              padding: 'var(--space-3) var(--space-4)',
-              color: text,
+              borderTop: '1px solid var(--color-border)',
+              borderRight: '1px solid var(--color-border)',
+              borderBottom: '1px solid var(--color-border)',
+              borderLeft: `4px solid ${accentColor}`,
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-3.5) var(--space-5)',
+              color: 'var(--color-text-primary)',
               fontSize: 'var(--text-sm)',
-              fontWeight: '600',
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+              fontFamily: 'var(--font-body)',
+              fontWeight: '500',
+              boxShadow: 'var(--shadow-lg)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: 'var(--space-2.5)',
-              animation: 'slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+              gap: 'var(--space-4)',
+              animation: 'slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              position: 'relative'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <AlertIcon type={a.type} />
-                <span>{a.message}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                <span style={{ color: iconColor, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                  <AlertIcon type={a.type} size={18} />
+                </span>
+                <span style={{ lineHeight: '1.4' }}>{a.message}</span>
               </div>
               <button
                 onClick={() => removeAlert(a.id)}
-                style={{ border: 'none', background: 'none', color: 'inherit', cursor: 'pointer', padding: '0 4px', opacity: 0.6, display: 'flex' }}
+                style={{ 
+                  border: 'none', 
+                  background: 'none', 
+                  color: 'var(--color-text-secondary)', 
+                  cursor: 'pointer', 
+                  padding: '4px', 
+                  opacity: 0.6, 
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'opacity 0.2s',
+                  borderRadius: '50%',
+                  backgroundColor: 'transparent'
+                }}
               >
-                <CloseIcon />
+                <CloseIcon size={14} />
               </button>
             </div>
           );

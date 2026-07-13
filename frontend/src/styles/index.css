@@ -36,6 +36,7 @@
   /* State colors */
   --color-error:    #D64545;
   --color-error-bg: #FDECEC;
+  --color-danger:   var(--color-error);
   --color-warning:  #C98A1B;
   --color-warning-bg: #FFF6E8;
   --color-success:  var(--green-500);

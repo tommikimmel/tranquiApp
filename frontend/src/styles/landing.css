@@ -738,6 +738,20 @@
   width: max-content;
   will-change: transform;
   backface-visibility: hidden;
+  animation: marquee 25s linear infinite;
+}
+
+.trust-carousel__track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-33.3333%);
+  }
 }
 
 .trust-carousel__group {

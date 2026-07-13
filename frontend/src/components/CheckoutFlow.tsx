@@ -51,6 +51,7 @@ interface Professional {
   price: number
   nextSlot: string
   nextSlotDay: string
+  fotoUrl?: string
   ofreceOnline?: boolean
   ofrecePresencial?: boolean
   domicilioAtencion?: string
@@ -136,6 +137,34 @@ function StepSelect({
   const [loading, setLoading] = useState(true)
   const [selectedDay, setSelectedDay] = useState(0)
   const currentDay = days[selectedDay]
+  const [viewMonth, setViewMonth] = useState(() => new Date())
+
+  const getDayOptionIndex = (date: Date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
+    return days.findIndex(d => d.date === dateStr)
+  }
+
+  const gridDays = useMemo(() => {
+    const year = viewMonth.getFullYear()
+    const month = viewMonth.getMonth()
+    const firstDay = new Date(year, month, 1)
+    let startOffset = firstDay.getDay() - 1 // Lunes = 0
+    if (startOffset === -1) startOffset = 6 // Domingo = 6
+
+    const list: (Date | null)[] = []
+    for (let i = 0; i < startOffset; i++) {
+      list.push(null)
+    }
+
+    const lastDay = new Date(year, month + 1, 0).getDate()
+    for (let d = 1; d <= lastDay; d++) {
+      list.push(new Date(year, month, d))
+    }
+    return list
+  }, [viewMonth])
 
   useEffect(() => {
     const fetchAvailability = async () => {
@@ -173,11 +202,10 @@ function StepSelect({
       const baseDate = new Date(nowParts.year, nowParts.month, nowParts.day, nowParts.hour, nowParts.minute);
       
       const datesToFetch: { dateStr: string; label: string; sublabel: string }[] = []
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < 31; i++) {
         const d = new Date(baseDate)
         d.setDate(d.getDate() + i)
         const dayOfWeek = d.getDay()
-        if (dayOfWeek === 0 || dayOfWeek === 6) continue
 
         const label = i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : weekdays[dayOfWeek]
         const sublabel = `${d.getDate()} ${months[d.getMonth()]}`
@@ -255,9 +283,18 @@ function StepSelect({
     <div className="checkout-body">
       {/* Professional summary card */}
       <div className="checkout-pro-card">
-        <div className="checkout-pro-card__avatar" aria-hidden="true">
-          {professional.name.split(' ').filter((_, i) => i === 0 || i === professional.name.split(' ').length - 1).map(w => w[0]).join('')}
-        </div>
+        {professional.fotoUrl ? (
+          <img 
+            src={professional.fotoUrl} 
+            alt={professional.name} 
+            className="checkout-pro-card__avatar" 
+            style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid var(--color-border)' }}
+          />
+        ) : (
+          <div className="checkout-pro-card__avatar" aria-hidden="true">
+            {professional.name.split(' ').filter((_, i) => i === 0 || i === professional.name.split(' ').length - 1).map(w => w[0]).join('')}
+          </div>
+        )}
         <div className="checkout-pro-card__info">
           <div className="checkout-pro-card__name">{professional.name}</div>
           <div className="checkout-pro-card__specialty">{professional.degree} · {professional.specialty}</div>
@@ -265,29 +302,135 @@ function StepSelect({
         </div>
       </div>
 
-      {/* Day selector */}
+      {/* Day selector - Monthly Calendar Grid */}
       <div className="checkout-section">
         <h2 className="checkout-section__title">Elegí el día</h2>
-        <div className="day-selector" role="radiogroup" aria-label="Seleccionar día">
-          {days.map((day, i) => {
-            const availableCount = day.slots.filter(s => s.available).length
-            return (
-              <button
-                key={day.date}
-                className={`day-selector__item ${selectedDay === i ? 'active' : ''} ${availableCount === 0 ? 'disabled' : ''}`}
-                onClick={() => availableCount > 0 && setSelectedDay(i)}
-                role="radio"
-                aria-checked={selectedDay === i}
-                disabled={availableCount === 0}
-              >
-                <span className="day-selector__label">{day.label}</span>
-                <span className="day-selector__date">{day.sublabel}</span>
-                <span className={`day-selector__avail ${availableCount === 0 ? 'none' : ''}`}>
-                  {availableCount === 0 ? 'Sin turnos' : `${availableCount} turnos`}
-                </span>
-              </button>
-            )
-          })}
+        <div style={{
+          backgroundColor: '#ffffff',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--color-border)',
+          padding: 'var(--space-4)',
+          maxWidth: '380px',
+          margin: '0 auto',
+          boxShadow: 'var(--shadow-sm)'
+        }}>
+          {/* Calendar Header */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 'var(--space-4)'
+          }}>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => setViewMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+              disabled={viewMonth.getMonth() === new Date().getMonth() && viewMonth.getFullYear() === new Date().getFullYear()}
+              style={{ padding: '4px 8px', fontSize: '14px', fontWeight: 'bold' }}
+            >
+              ◀
+            </button>
+            <span style={{
+              fontSize: 'var(--text-sm)',
+              fontWeight: 'bold',
+              textTransform: 'capitalize',
+              color: 'var(--color-text-primary)'
+            }}>
+              {viewMonth.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
+            </span>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => setViewMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+              disabled={viewMonth.getMonth() === (new Date().getMonth() + 1) % 12}
+              style={{ padding: '4px 8px', fontSize: '14px', fontWeight: 'bold' }}
+            >
+              ▶
+            </button>
+          </div>
+
+          {/* Weekday labels */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, 1fr)',
+            gap: '4px',
+            textAlign: 'center',
+            fontWeight: 'bold',
+            fontSize: '11px',
+            color: 'var(--color-text-secondary)',
+            marginBottom: 'var(--space-2)'
+          }}>
+            {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(d => (
+              <div key={d}>{d}</div>
+            ))}
+          </div>
+
+          {/* Grid of days */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, 1fr)',
+            gap: '8px'
+          }}>
+            {gridDays.map((date, i) => {
+              if (date === null) {
+                return <div key={`empty-${i}`} />
+              }
+
+              const dayIdx = getDayOptionIndex(date)
+              const hasOption = dayIdx !== -1
+              const dayOpt = hasOption ? days[dayIdx] : null
+              const availableCount = dayOpt ? dayOpt.slots.filter(s => s.available).length : 0
+              const isSelected = hasOption && selectedDay === dayIdx
+              const isToday = date.toDateString() === new Date().toDateString()
+
+              return (
+                <button
+                  key={date.toDateString()}
+                  type="button"
+                  onClick={() => hasOption && availableCount > 0 && setSelectedDay(dayIdx)}
+                  disabled={!hasOption || availableCount === 0}
+                  style={{
+                    aspectRatio: '1',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: isSelected ? '1px solid var(--color-primary)' : isToday ? '1px solid var(--neutral-300)' : '1px solid transparent',
+                    borderRadius: '50%',
+                    cursor: hasOption && availableCount > 0 ? 'pointer' : 'default',
+                    fontSize: 'var(--text-sm)',
+                    fontWeight: isSelected || isToday ? 'bold' : 'normal',
+                    backgroundColor: isSelected 
+                      ? 'var(--color-primary)' 
+                      : (hasOption && availableCount > 0) 
+                        ? 'var(--green-50)' 
+                        : 'transparent',
+                    color: isSelected 
+                      ? '#ffffff' 
+                      : (hasOption && availableCount > 0) 
+                        ? 'var(--color-primary)' 
+                        : 'var(--neutral-400)',
+                    position: 'relative',
+                    transition: 'all 0.2s',
+                    padding: 0
+                  }}
+                  title={hasOption ? `${availableCount} turnos disponibles` : 'No disponible'}
+                >
+                  <span>{date.getDate()}</span>
+                  {hasOption && availableCount > 0 && (
+                    <span style={{
+                      position: 'absolute',
+                      bottom: '4px',
+                      width: '4px',
+                      height: '4px',
+                      borderRadius: '50%',
+                      backgroundColor: isSelected ? '#ffffff' : 'var(--color-primary)'
+                    }} />
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
 
@@ -707,7 +850,7 @@ function StepReview({
             </>
           ) : (
             <>
-              Pagar ${currentPrice.toLocaleString('es-AR')} con Mercado Pago
+              {tipo === 'OSDE' ? 'Pagar Copago' : 'Pagar Consulta'} ${currentPrice.toLocaleString('es-AR')} con Mercado Pago
             </>
           )}
         </button>
@@ -1191,7 +1334,9 @@ export default function CheckoutFlow({
                   setSimulatingWebhook(true);
                   try {
                     // Send request to webhook controller directly
-                    const response = await fetch('http://localhost:8081/api/payments/webhook', {
+                    const isHttps = window.location.protocol === 'https:';
+                    const baseUrl = isHttps ? `${window.location.protocol}//${window.location.host}` : `http://${window.location.hostname}:8081`;
+                    const response = await fetch(`${baseUrl}/api/payments/webhook`, {
                       method: 'POST',
                       headers: {
                         'Content-Type': 'application/json',
@@ -1206,7 +1351,7 @@ export default function CheckoutFlow({
                     if (response.ok) {
                       // Fetch updated details so we get the meetLink if generated
                       try {
-                        const updatedTurn = await api.getTurnos();
+                        const updatedTurn = await api.getMisTurnos();
                         const matching = updatedTurn.find((t: any) => t.id === createdTurn.turnoId);
                         if (matching) {
                           setCreatedTurn((prev: any) => ({
