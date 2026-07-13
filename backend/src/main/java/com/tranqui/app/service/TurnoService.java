@@ -47,7 +47,65 @@ public class TurnoService {
     public List<java.time.LocalTime> obtenerHorariosDisponibles(Long medicoId, java.time.LocalDate fecha) {
         List<com.tranqui.app.model.Disponibilidad> disponibilidades = disponibilidadRepository.findByMedicoId(medicoId);
         List<Turno> turnosExistentes = turnoRepository.findByMedicoIdAndFechaAndEstadoNot(medicoId, fecha, EstadoTurno.CANCELADO);
-        return agendaService.calcularBloquesDisponibles(disponibilidades, turnosExistentes, fecha);
+        List<java.time.LocalTime> locales = agendaService.calcularBloquesDisponibles(disponibilidades, turnosExistentes, fecha);
+
+        Usuario medico = usuarioRepository.findById(medicoId).orElse(null);
+        if (medico == null) {
+            return locales;
+        }
+
+        // Consultar eventos de Google Calendar del día
+        List<com.google.api.services.calendar.model.Event> eventosGoogle = java.util.Collections.emptyList();
+        try {
+            eventosGoogle = calendarService.obtenerEventosDelDia(medico, fecha);
+        } catch (Exception e) {
+            // Fallback silencioso: loguear y seguir con la disponibilidad local
+            org.slf4j.LoggerFactory.getLogger(TurnoService.class)
+                .warn("Error consultando disponibilidad en Google Calendar para médico ID: {}. Usando fallback local.", medicoId, e);
+        }
+
+        if (eventosGoogle.isEmpty()) {
+            return locales;
+        }
+
+        java.time.ZoneId zoneId = java.time.ZoneId.of("America/Argentina/Buenos_Aires");
+        List<com.google.api.services.calendar.model.Event> finalEventos = eventosGoogle;
+
+        return locales.stream()
+                .filter(hora -> {
+                    java.time.LocalTime bloqueInicio = hora;
+                    java.time.LocalTime bloqueFin = hora.plusMinutes(45);
+
+                    for (com.google.api.services.calendar.model.Event event : finalEventos) {
+                        // Eventos transparent (disponibles) no bloquean la agenda
+                        if ("transparent".equals(event.getTransparency())) {
+                            continue;
+                        }
+
+                        // Validar evento de todo el día (all-day event)
+                        if (event.getStart() != null && event.getStart().getDateTime() == null && event.getStart().getDate() != null) {
+                            // Evento de todo el día bloquea todo el día
+                            return false;
+                        }
+
+                        if (event.getStart() != null && event.getStart().getDateTime() != null &&
+                            event.getEnd() != null && event.getEnd().getDateTime() != null) {
+                            
+                            java.time.Instant startInstant = java.time.Instant.ofEpochMilli(event.getStart().getDateTime().getValue());
+                            java.time.Instant endInstant = java.time.Instant.ofEpochMilli(event.getEnd().getDateTime().getValue());
+                            
+                            java.time.LocalTime eventStart = startInstant.atZone(zoneId).toLocalTime();
+                            java.time.LocalTime eventEnd = endInstant.atZone(zoneId).toLocalTime();
+
+                            // Solapamiento: bloqueInicio < eventEnd && bloqueFin > eventStart
+                            if (bloqueInicio.isBefore(eventEnd) && bloqueFin.isAfter(eventStart)) {
+                                return false; // Está ocupado por Google Calendar
+                            }
+                        }
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -317,6 +375,14 @@ public class TurnoService {
         Turno turno = turnoRepository.findById(turnoId)
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
         turno.setEstado(EstadoTurno.CANCELADO);
+        
+        try {
+            calendarService.eliminarEventoReunion(turno);
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(TurnoService.class)
+                .error("Error al eliminar evento en Google Calendar para turno ID: {}", turnoId, e);
+        }
+
         turno = turnoRepository.save(turno);
 
         // Notify Doctor
@@ -359,7 +425,14 @@ public class TurnoService {
         turno.setFecha(nuevaFecha);
         turno.setHoraInicio(nuevaHoraInicio);
         turno.setHoraFin(nuevaHoraFin);
-        turnoRepository.save(turno);
+        turno = turnoRepository.save(turno);
+
+        try {
+            calendarService.actualizarEventoReunion(turno);
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(TurnoService.class)
+                .error("Error al actualizar evento en Google Calendar para turno ID: {}", turnoId, e);
+        }
 
         try {
             String linkInfo = (turno.getTelemedicinaUrl() != null && !turno.getTelemedicinaUrl().isEmpty()) 

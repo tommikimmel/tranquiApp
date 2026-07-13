@@ -24,6 +24,7 @@ twilio:
 
 google:
   client-id: ${GOOGLE_CLIENT_ID:dummy-client-id}
+  client-secret: ${GOOGLE_CLIENT_SECRET:}
 
 mercadopago:
   enabled: ${MERCADOPAGO_ENABLED:false}
