@@ -113,7 +113,8 @@ public class GoogleCalendarService {
                     }
 
                     if (!meetUrl.isEmpty()) {
-                        log.info("Evento creado con éxito en Google Calendar REAL. Meet URL: {}", meetUrl);
+                        turno.setGoogleEventId(event.getId());
+                        log.info("Evento creado con éxito en Google Calendar REAL. Event ID: {}, Meet URL: {}", event.getId(), meetUrl);
                         return meetUrl;
                     }
                 }
@@ -126,5 +127,105 @@ public class GoogleCalendarService {
 
         log.info("Usando simulación de Google Calendar API. Retornando Meet URL mock dinámico.");
         return generarMeetUrl();
+    }
+
+    public java.util.List<com.google.api.services.calendar.model.Event> obtenerEventosDelDia(Usuario medico, java.time.LocalDate fecha) {
+        boolean medicoConectado = medico != null && medico.getGoogleCalendarConnected() != null && medico.getGoogleCalendarConnected();
+        if (!isEnabled || !medicoConectado) {
+            return java.util.Collections.emptyList();
+        }
+
+        try {
+            String accessToken = googleCalendarOAuthService.obtenerAccessToken(medico);
+            if (accessToken != null) {
+                HttpRequestInitializer requestInitializer = request -> request.getHeaders().setAuthorization("Bearer " + accessToken);
+                Calendar service = new Calendar.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance(), requestInitializer)
+                        .setApplicationName("TranquiApp")
+                        .build();
+
+                java.time.ZonedDateTime startOfDay = java.time.ZonedDateTime.of(fecha, java.time.LocalTime.MIN, java.time.ZoneId.of("America/Argentina/Buenos_Aires"));
+                java.time.ZonedDateTime endOfDay = java.time.ZonedDateTime.of(fecha, java.time.LocalTime.MAX, java.time.ZoneId.of("America/Argentina/Buenos_Aires"));
+
+                com.google.api.client.util.DateTime startDateTime = new com.google.api.client.util.DateTime(startOfDay.toInstant().toEpochMilli());
+                com.google.api.client.util.DateTime endDateTime = new com.google.api.client.util.DateTime(endOfDay.toInstant().toEpochMilli());
+
+                com.google.api.services.calendar.model.Events events = service.events().list("primary")
+                        .setTimeMin(startDateTime)
+                        .setTimeMax(endDateTime)
+                        .setSingleEvents(true)
+                        .setOrderBy("startTime")
+                        .execute();
+
+                if (events != null && events.getItems() != null) {
+                    return events.getItems();
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error al obtener eventos de Google Calendar para el médico ID: {}", medico.getId(), e);
+        }
+        return java.util.Collections.emptyList();
+    }
+
+    public void eliminarEventoReunion(Turno turno) {
+        Usuario medico = turno.getMedico();
+        boolean medicoConectado = medico != null && medico.getGoogleCalendarConnected() != null && medico.getGoogleCalendarConnected();
+        String eventId = turno.getGoogleEventId();
+
+        if (isEnabled && medicoConectado && eventId != null && !eventId.isEmpty()) {
+            try {
+                String accessToken = googleCalendarOAuthService.obtenerAccessToken(medico);
+                if (accessToken != null) {
+                    HttpRequestInitializer requestInitializer = request -> request.getHeaders().setAuthorization("Bearer " + accessToken);
+                    Calendar service = new Calendar.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance(), requestInitializer)
+                            .setApplicationName("TranquiApp")
+                            .build();
+
+                    service.events().delete("primary", eventId).execute();
+                    log.info("Evento eliminado con éxito de Google Calendar. Event ID: {}", eventId);
+                }
+            } catch (Exception e) {
+                log.error("Fallo al eliminar evento en Google Calendar para turno ID: {}. Error: {}", turno.getId(), e.getMessage());
+            }
+        }
+    }
+
+    public void actualizarEventoReunion(Turno turno) {
+        Usuario medico = turno.getMedico();
+        boolean medicoConectado = medico != null && medico.getGoogleCalendarConnected() != null && medico.getGoogleCalendarConnected();
+        String eventId = turno.getGoogleEventId();
+
+        if (isEnabled && medicoConectado && eventId != null && !eventId.isEmpty()) {
+            try {
+                String accessToken = googleCalendarOAuthService.obtenerAccessToken(medico);
+                if (accessToken != null) {
+                    HttpRequestInitializer requestInitializer = request -> request.getHeaders().setAuthorization("Bearer " + accessToken);
+                    Calendar service = new Calendar.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance(), requestInitializer)
+                            .setApplicationName("TranquiApp")
+                            .build();
+
+                    Event event = service.events().get("primary", eventId).execute();
+
+                    java.time.ZonedDateTime startZoned = java.time.ZonedDateTime.of(turno.getFecha(), turno.getHoraInicio(), java.time.ZoneId.of("America/Argentina/Buenos_Aires"));
+                    java.time.ZonedDateTime endZoned = java.time.ZonedDateTime.of(turno.getFecha(), turno.getHoraFin(), java.time.ZoneId.of("America/Argentina/Buenos_Aires"));
+
+                    com.google.api.client.util.DateTime startDateTime = new com.google.api.client.util.DateTime(startZoned.toInstant().toEpochMilli());
+                    EventDateTime start = new EventDateTime()
+                            .setDateTime(startDateTime)
+                            .setTimeZone("America/Argentina/Buenos_Aires");
+                    event.setStart(start);
+
+                    com.google.api.client.util.DateTime endDateTime = new com.google.api.client.util.DateTime(endZoned.toInstant().toEpochMilli());
+                    EventDateTime end = new EventDateTime()
+                            .setDateTime(endDateTime)
+                            .setTimeZone("America/Argentina/Buenos_Aires");
+                    event.setEnd(end);
+
+                    service.events().update("primary", eventId, event).execute();
+                    log.info("Evento actualizado con éxito en Google Calendar. Event ID: {}", eventId);
+                }
+            } catch (Exception e) {
+                log.error("Fallo al actualizar evento en Google Calendar para turno ID: {}. Error: {}", turno.getId(), e.getMessage());
+            }
+        }
     }
 }

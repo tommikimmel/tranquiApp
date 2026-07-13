@@ -60,6 +60,9 @@ public class Turno {
     @Column(name = "telemedicina_url", length = 500)
     private String telemedicinaUrl;
 
+    @Column(name = "google_event_id", length = 255)
+    private String googleEventId;
+
     @OneToOne(mappedBy = "turno", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Pago pago;
 

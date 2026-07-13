@@ -524,6 +524,7 @@ function StepReview({
 
   const [isFirstTime, setIsFirstTime] = useState(false)
   const [showFirstTimeAlert, setShowFirstTimeAlert] = useState(false)
+  const [hasShownAlert, setHasShownAlert] = useState(false)
 
   const handleEmailBlur = async () => {
     if (email.trim().includes('@')) {
@@ -531,7 +532,7 @@ function StepReview({
         const isFirst = await api.checkFirstConsultation(email.trim())
         if (isFirst) {
           setIsFirstTime(true)
-          setShowFirstTimeAlert(true)
+          setHasShownAlert(false)
         } else {
           setIsFirstTime(false)
         }
@@ -540,6 +541,15 @@ function StepReview({
       }
     }
   }
+
+  useEffect(() => {
+    if (isFirstTime && tipo === 'PARTICULAR' && !hasShownAlert) {
+      setShowFirstTimeAlert(true)
+      setHasShownAlert(true)
+    } else if (tipo !== 'PARTICULAR') {
+      setShowFirstTimeAlert(false)
+    }
+  }, [tipo, isFirstTime, hasShownAlert])
 
   useEffect(() => {
     if (email) {
@@ -558,7 +568,7 @@ function StepReview({
   const currentPrice = useMemo(() => {
     const s = services.find(x => x.id === tipo)
     let basePrice = s ? s.price : professional.price
-    if (isFirstTime) {
+    if (isFirstTime && tipo === 'PARTICULAR') {
       basePrice = Math.round(basePrice * 1.30)
     }
     return basePrice
