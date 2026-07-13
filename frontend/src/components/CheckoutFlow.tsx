@@ -305,75 +305,48 @@ function StepSelect({
       {/* Day selector - Monthly Calendar Grid */}
       <div className="checkout-section">
         <h2 className="checkout-section__title">Elegí el día</h2>
-        <div style={{
-          backgroundColor: '#ffffff',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--color-border)',
-          padding: 'var(--space-4)',
-          maxWidth: '380px',
-          margin: '0 auto',
-          boxShadow: 'var(--shadow-sm)'
-        }}>
+        <div className="monthly-calendar">
           {/* Calendar Header */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 'var(--space-4)'
-          }}>
+          <div className="calendar-header">
             <button
               type="button"
-              className="btn btn--ghost btn--sm"
+              className="calendar-nav-btn"
               onClick={() => setViewMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
               disabled={viewMonth.getMonth() === new Date().getMonth() && viewMonth.getFullYear() === new Date().getFullYear()}
-              style={{ padding: '4px 8px', fontSize: '14px', fontWeight: 'bold' }}
+              title="Mes anterior"
             >
-              ◀
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 14, height: 14 }}>
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
             </button>
-            <span style={{
-              fontSize: 'var(--text-sm)',
-              fontWeight: 'bold',
-              textTransform: 'capitalize',
-              color: 'var(--color-text-primary)'
-            }}>
+            <span className="calendar-title">
               {viewMonth.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
             </span>
             <button
               type="button"
-              className="btn btn--ghost btn--sm"
+              className="calendar-nav-btn"
               onClick={() => setViewMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
               disabled={viewMonth.getMonth() === (new Date().getMonth() + 1) % 12}
-              style={{ padding: '4px 8px', fontSize: '14px', fontWeight: 'bold' }}
+              title="Mes siguiente"
             >
-              ▶
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 14, height: 14 }}>
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </button>
           </div>
 
           {/* Weekday labels */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            gap: '4px',
-            textAlign: 'center',
-            fontWeight: 'bold',
-            fontSize: '11px',
-            color: 'var(--color-text-secondary)',
-            marginBottom: 'var(--space-2)'
-          }}>
+          <div className="calendar-weekdays">
             {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(d => (
               <div key={d}>{d}</div>
             ))}
           </div>
 
           {/* Grid of days */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            gap: '8px'
-          }}>
+          <div className="calendar-grid">
             {gridDays.map((date, i) => {
               if (date === null) {
-                return <div key={`empty-${i}`} />
+                return <div key={`empty-${i}`} className="calendar-day-btn empty" />
               }
 
               const dayIdx = getDayOptionIndex(date)
@@ -389,43 +362,16 @@ function StepSelect({
                   type="button"
                   onClick={() => hasOption && availableCount > 0 && setSelectedDay(dayIdx)}
                   disabled={!hasOption || availableCount === 0}
-                  style={{
-                    aspectRatio: '1',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: isSelected ? '1px solid var(--color-primary)' : isToday ? '1px solid var(--neutral-300)' : '1px solid transparent',
-                    borderRadius: '50%',
-                    cursor: hasOption && availableCount > 0 ? 'pointer' : 'default',
-                    fontSize: 'var(--text-sm)',
-                    fontWeight: isSelected || isToday ? 'bold' : 'normal',
-                    backgroundColor: isSelected 
-                      ? 'var(--color-primary)' 
-                      : (hasOption && availableCount > 0) 
-                        ? 'var(--green-50)' 
-                        : 'transparent',
-                    color: isSelected 
-                      ? '#ffffff' 
-                      : (hasOption && availableCount > 0) 
-                        ? 'var(--color-primary)' 
-                        : 'var(--neutral-400)',
-                    position: 'relative',
-                    transition: 'all 0.2s',
-                    padding: 0
-                  }}
+                  className={`calendar-day-btn ${
+                    !hasOption || availableCount === 0 
+                      ? 'not-available' 
+                      : 'available'
+                  } ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
                   title={hasOption ? `${availableCount} turnos disponibles` : 'No disponible'}
                 >
                   <span>{date.getDate()}</span>
                   {hasOption && availableCount > 0 && (
-                    <span style={{
-                      position: 'absolute',
-                      bottom: '4px',
-                      width: '4px',
-                      height: '4px',
-                      borderRadius: '50%',
-                      backgroundColor: isSelected ? '#ffffff' : 'var(--color-primary)'
-                    }} />
+                    <span className="calendar-dot" />
                   )}
                 </button>
               )
@@ -1124,14 +1070,32 @@ function StepConfirmed({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontWeight: 'bold' }}>Ubicación en el mapa:</div>
               <div 
-                ref={mapContainerRef} 
-                style={{ 
-                  height: '160px', 
-                  borderRadius: 'var(--radius-md)', 
-                  border: '1px solid var(--color-border)',
-                  zIndex: 1
-                }} 
-              />
+                style={{ position: 'relative', cursor: 'pointer' }}
+                onClick={() => {
+                  const url = `https://www.google.com/maps/search/?api=1&query=${professional.domicilioLat},${professional.domicilioLng}`;
+                  window.open(url, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                <div 
+                  ref={mapContainerRef} 
+                  style={{ 
+                    height: '160px', 
+                    borderRadius: 'var(--radius-md)', 
+                    border: '1px solid var(--color-border)',
+                    zIndex: 1
+                  }} 
+                />
+                {/* Overlay transparente para asegurar que el click funcione en todo el mapa y deshabilitar clicks de Leaflet */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  zIndex: 10,
+                  backgroundColor: 'transparent'
+                }} />
+              </div>
             </div>
           )}
         </div>

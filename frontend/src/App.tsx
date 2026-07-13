@@ -1839,7 +1839,7 @@ function DashboardHome({
   const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
   const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
   
-  const [calendarView, setCalendarView] = useState<'monthly' | 'weekly' | 'today'>('weekly');
+  const [calendarView, setCalendarView] = useState<'monthly' | 'weekly' | 'today'>('monthly');
   const [showInactiveSlots, setShowInactiveSlots] = useState(false);
   const [selectedAppt, setSelectedAppt] = useState<any | null>(null);
   const [currentDate, setCurrentDate] = useState(() => new Date());
