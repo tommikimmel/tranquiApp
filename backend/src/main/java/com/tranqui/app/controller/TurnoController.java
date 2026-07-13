@@ -28,13 +28,11 @@ public class TurnoController {
     }
 
     @PostMapping("/turnos/reservar")
-    @PreAuthorize("hasRole('PACIENTE')")
     public ResponseEntity<TurnoResponseDto> reservarTurno(@RequestBody ReservaTurnoDto dto) {
         return ResponseEntity.ok(turnoService.reservarTurno(dto));
     }
 
     @GetMapping("/turnos/check-first-consultation")
-    @PreAuthorize("hasRole('PACIENTE')")
     public ResponseEntity<Boolean> isFirstConsultation(@RequestParam String email) {
         return ResponseEntity.ok(turnoService.esPrimeraConsulta(email));
     }

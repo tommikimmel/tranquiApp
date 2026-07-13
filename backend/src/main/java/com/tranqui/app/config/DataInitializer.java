@@ -71,6 +71,60 @@ public class DataInitializer implements CommandLineRunner {
             log.info("Updated password for unverified doctor: medico.sinverificar@gmail.com / admin123");
         }
 
+        // Fully Verified Doctor
+        if (usuarioRepository.findByEmail("medico.verificado@gmail.com").isEmpty()) {
+            Usuario medicoVerificado = Usuario.builder()
+                    .nombre("Carlos")
+                    .apellido("Perez")
+                    .email("medico.verificado@gmail.com")
+                    .password(passwordEncoder.encode("admin123"))
+                    .rol(Rol.PSIQUIATRA)
+                    .sexo("M")
+                    .fechaNacimiento(LocalDate.of(1985, 8, 20))
+                    .cuil(20321234567L)
+                    .tipoDocumento("DNI")
+                    .numeroDocumento(32123456)
+                    .domicilioAtencion("Av. Santa Fe 1234, CABA")
+                    .domicilioLat(-34.5956)
+                    .domicilioLng(-58.4234)
+                    .codigoReFeps(123456L)
+                    .matriculaTipo("MN")
+                    .matriculaProvincia("CABA")
+                    .matriculaNumero(49281)
+                    .matricula("49281")
+                    .fotoUrl("https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=200")
+                    .specialty("Psiquiatría de Adultos")
+                    .titulo("Médico Psiquiatra")
+                    .precio(java.math.BigDecimal.valueOf(60000))
+                    .ofreceOnline(true)
+                    .ofrecePresencial(true)
+                    .verificadoAdmin(true)
+                    .build();
+            Usuario savedMedico = usuarioRepository.save(medicoVerificado);
+            log.info("Fully verified doctor account created: medico.verificado@gmail.com / admin123");
+
+            if (savedMedico != null) {
+                // Initialize availability slots for this doctor
+                for (int day = 1; day <= 5; day++) {
+                    Disponibilidad slot1 = Disponibilidad.builder()
+                            .medico(savedMedico)
+                            .diaSemana(day)
+                            .horaInicio(LocalTime.of(9, 0))
+                            .horaFin(LocalTime.of(13, 0))
+                            .build();
+                    Disponibilidad slot2 = Disponibilidad.builder()
+                            .medico(savedMedico)
+                            .diaSemana(day)
+                            .horaInicio(LocalTime.of(14, 0))
+                            .horaFin(LocalTime.of(18, 0))
+                            .build();
+                    disponibilidadRepository.save(slot1);
+                    disponibilidadRepository.save(slot2);
+                }
+                log.info("Availability slots initialized for medico.verificado@gmail.com");
+            }
+        }
+
         // Data-less Patient
         Optional<Usuario> existingPaciente = usuarioRepository.findByEmail("paciente.sindatos@gmail.com");
         if (existingPaciente.isEmpty()) {
@@ -87,6 +141,21 @@ public class DataInitializer implements CommandLineRunner {
             paciente.setPassword(passwordEncoder.encode("admin123"));
             usuarioRepository.save(paciente);
             log.info("Updated password for data-less patient: paciente.sindatos@gmail.com / admin123");
+        }
+
+        // Fully Complete Patient
+        if (usuarioRepository.findByEmail("paciente.completo@gmail.com").isEmpty()) {
+            Usuario pacienteCompleto = Usuario.builder()
+                    .nombre("Juan")
+                    .apellido("Paciente")
+                    .email("paciente.completo@gmail.com")
+                    .password(passwordEncoder.encode("admin123"))
+                    .rol(Rol.PACIENTE)
+                    .dni("40123456")
+                    .telefono("+541165432109")
+                    .build();
+            usuarioRepository.save(pacienteCompleto);
+            log.info("Fully complete patient account created: paciente.completo@gmail.com / admin123");
         }
     }
 }

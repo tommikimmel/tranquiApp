@@ -4,6 +4,7 @@ import com.tranqui.app.model.Mensaje;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.model.dto.CanalPrioritarioDto;
 import com.tranqui.app.model.dto.MensajeDto;
+import com.tranqui.app.model.dto.NotificacionDocDto;
 import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.service.MensajeService;
 import jakarta.persistence.EntityNotFoundException;
@@ -49,6 +50,19 @@ public class ChatController {
         // Also dispatch to sender's own queue for delivery confirmation
         String remitenteEmail = mensaje.getRemitente().getEmail();
         messagingTemplate.convertAndSendToUser(remitenteEmail, "/queue/mensajes", mensajeDto);
+
+        // Notify recipient's general notifications channel to update unread status in real-time
+        try {
+            NotificacionDocDto notifPayload = NotificacionDocDto.builder()
+                    .tipo("NUEVO_MENSAJE")
+                    .fecha(java.time.LocalDateTime.now().toString())
+                    .titulo("Nuevo mensaje de " + mensaje.getRemitente().getNombre())
+                    .mensaje(mensaje.getContenido())
+                    .build();
+            messagingTemplate.convertAndSend("/topic/notificaciones/" + mensaje.getDestinatario().getId(), notifPayload);
+        } catch (Exception e) {
+            // ignore
+        }
     }
 
     @GetMapping("/api/chat/historial/{destinatarioId}")
@@ -63,8 +77,21 @@ public class ChatController {
         Usuario usuarioActual = usuarioRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
 
+        mensajeService.marcarMensajesComoLeidos(destinatarioId, userDetails.getUsername());
+
         Page<Mensaje> historial = mensajeService.obtenerHistorial(usuarioActual.getId(), destinatarioId, PageRequest.of(page, size));
         return ResponseEntity.ok(historial);
+    }
+
+    @GetMapping("/api/chat/tiene-no-leidos")
+    @ResponseBody
+    @PreAuthorize("hasAnyRole('PACIENTE', 'PSIQUIATRA')")
+    public ResponseEntity<Boolean> tieneNoLeidos(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        boolean hasUnread = mensajeService.tieneMensajesSinLeer(userDetails.getUsername());
+        return ResponseEntity.ok(hasUnread);
     }
 
     @GetMapping("/api/chat/canales")

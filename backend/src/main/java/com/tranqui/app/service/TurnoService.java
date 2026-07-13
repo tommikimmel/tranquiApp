@@ -57,6 +57,12 @@ public class TurnoService {
 
     @Transactional
     public com.tranqui.app.model.dto.TurnoResponseDto reservarTurno(com.tranqui.app.model.dto.ReservaTurnoDto dto) {
+        // Check if patient already has an active or pending appointment in the future
+        boolean tieneTurnoActivo = turnoRepository.existsActiveTurnoByPacienteEmail(dto.getEmailPaciente(), java.time.LocalDate.now());
+        if (tieneTurnoActivo) {
+            throw new IllegalStateException("Ya tenés un turno activo o pendiente de pago. No podés reservar más de un turno a la vez.");
+        }
+
         Usuario medico = usuarioRepository.findById(dto.getMedicoId())
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
@@ -120,7 +126,7 @@ public class TurnoService {
         }
 
         // If it is the first consultation, apply a 30% surcharge and round to nearest whole number
-        if (esPrimeraConsulta(dto.getEmailPaciente())) {
+        if (dto.getTipo() == TipoTurno.PARTICULAR && esPrimeraConsulta(dto.getEmailPaciente())) {
             java.math.BigDecimal surcharge = precio.multiply(new java.math.BigDecimal("0.30"));
             precio = precio.add(surcharge).setScale(0, java.math.RoundingMode.HALF_UP);
         }
@@ -132,60 +138,28 @@ public class TurnoService {
                 .horaInicio(dto.getHora())
                 .horaFin(dto.getHora().plusMinutes(45))
                 .tipo(dto.getTipo())
-                .estado(dto.getTipo() == TipoTurno.OSDE ? EstadoTurno.CONFIRMADO : EstadoTurno.PENDIENTE_PAGO)
+                .estado(EstadoTurno.PENDIENTE_PAGO)
                 .precio(precio)
                 .metadataAfiliado(dto.getMetadataAfiliado())
                 .build();
 
-        if (dto.getTipo() == TipoTurno.OSDE) {
-            // Confirm immediately, generate Meet link
-            String meetUrl = calendarService.crearEventoReunion(turno);
-            turno.setTelemedicinaUrl(meetUrl);
-            turno = turnoRepository.save(turno);
-
-            // Notify Doctor and Patient
-            String tituloMed = "Nuevo turno reservado";
-            String mensajeMed = "El paciente " + turno.getPaciente().getNombre() + 
-                    " reservó un turno para el " + turno.getFecha() + " a las " + 
-                    turno.getHoraInicio() + " hs por " + turno.getTipo();
-            notificacionService.crearNotificacion(turno.getMedico(), tituloMed, mensajeMed, "TURNO_RESERVADO");
-
-            String tituloPac = "Turno confirmado";
-            String mensajePac = "Tu turno con " + turno.getMedico().getNombre() + 
-                    " para el " + turno.getFecha() + " a las " + 
-                    turno.getHoraInicio() + " hs ha sido confirmado.";
-            notificacionService.crearNotificacion(turno.getPaciente(), tituloPac, mensajePac, "TURNO_CONFIRMADO");
-
-            return com.tranqui.app.model.dto.TurnoResponseDto.builder()
-                    .turnoId(turno.getId())
-                    .estado(turno.getEstado().name())
-                    .attendanceStatus(turno.getAsistencia() != null ? turno.getAsistencia().name() : null)
-                    .fecha(turno.getFecha())
-                    .horaInicio(turno.getHoraInicio())
-                    .precio(turno.getPrecio())
-                    .meetLink(turno.getTelemedicinaUrl())
-                    .build();
-        } else {
-            // For PARTICULAR, generate MP checkout link
-            turno = turnoRepository.save(turno);
-            String checkoutUrl = "";
-            try {
-                checkoutUrl = mercadoPagoService.crearPreferenciaPago(turno, medico);
-            } catch (Exception e) {
-                // If MP fails, we keep the turn but checkoutUrl is empty (or we throw error)
-                throw new RuntimeException("Error al conectar con la pasarela de Mercado Pago", e);
-            }
-
-            return com.tranqui.app.model.dto.TurnoResponseDto.builder()
-                    .turnoId(turno.getId())
-                    .estado(turno.getEstado().name())
-                    .attendanceStatus(turno.getAsistencia() != null ? turno.getAsistencia().name() : null)
-                    .fecha(turno.getFecha())
-                    .horaInicio(turno.getHoraInicio())
-                    .precio(turno.getPrecio())
-                    .checkoutUrl(checkoutUrl)
-                    .build();
+        turno = turnoRepository.save(turno);
+        String checkoutUrl = "";
+        try {
+            checkoutUrl = mercadoPagoService.crearPreferenciaPago(turno, medico);
+        } catch (Exception e) {
+            throw new RuntimeException("Error al conectar con la pasarela de Mercado Pago: " + e.getMessage(), e);
         }
+
+        return com.tranqui.app.model.dto.TurnoResponseDto.builder()
+                .turnoId(turno.getId())
+                .estado(turno.getEstado().name())
+                .attendanceStatus(turno.getAsistencia() != null ? turno.getAsistencia().name() : null)
+                .fecha(turno.getFecha())
+                .horaInicio(turno.getHoraInicio())
+                .precio(turno.getPrecio())
+                .checkoutUrl(checkoutUrl)
+                .build();
     }
 
     @Transactional

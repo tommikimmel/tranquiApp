@@ -35,7 +35,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable()) // Session is secured using HttpOnly and SameSite cookies
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/google", "/api/auth/register", "/api/auth/login", "/api/health", "/api/payments/webhook", "/ws-tranqui/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/medicos", "/api/medicos/*/turnos-disponibles", "/api/medicos/mercadopago/callback").permitAll()
+                .requestMatchers("/api/auth/google", "/api/auth/register", "/api/auth/login", "/api/health", "/api/payments/webhook", "/ws-tranqui/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/medicos", "/api/medicos/*/turnos-disponibles", "/api/medicos/mercadopago/callback", "/api/turnos/reservar", "/api/turnos/check-first-consultation", "/error").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

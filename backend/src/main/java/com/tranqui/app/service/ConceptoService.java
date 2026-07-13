@@ -51,7 +51,7 @@ public class ConceptoService {
         try {
             return mercadoPagoService.crearPreferenciaDocumento(solicitud);
         } catch (Exception e) {
-            throw new RuntimeException("Error al generar la preferencia de pago en Mercado Pago", e);
+            throw new RuntimeException("Error al generar la preferencia de pago en Mercado Pago: " + e.getMessage(), e);
         }
     }
 

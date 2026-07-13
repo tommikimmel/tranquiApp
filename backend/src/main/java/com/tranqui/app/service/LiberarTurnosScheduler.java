@@ -19,7 +19,7 @@ public class LiberarTurnosScheduler {
     @Scheduled(fixedRate = 60000) // Every minute
     @Transactional
     public void liberarTurnosExpirados() {
-        LocalDateTime limite = LocalDateTime.now().minusMinutes(10);
+        LocalDateTime limite = LocalDateTime.now().minusMinutes(5);
         List<Turno> turnosExpirados = turnoRepository.findByEstadoAndFechaCreacionBefore(
                 EstadoTurno.PENDIENTE_PAGO, limite
         );

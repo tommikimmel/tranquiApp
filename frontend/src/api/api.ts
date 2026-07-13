@@ -1,4 +1,6 @@
-const API_BASE = 'http://localhost:8081/api';
+const API_BASE = window.location.protocol === 'https:'
+  ? `https://${window.location.host}/api`
+  : `http://${window.location.hostname}:8081/api`;
 
 // Helper for fetch with credentials
 async function apiFetch(endpoint: string, options: RequestInit = {}) {
@@ -101,6 +103,15 @@ export const api = {
   desconectarMercadoPago: () =>
     apiFetch('/medicos/mercadopago/disconnect', { method: 'POST' }),
 
+  getGoogleCalendarStatus: (): Promise<{ connected: boolean }> =>
+    apiFetch('/medicos/google-calendar/status'),
+
+  getGoogleCalendarConnectUrl: (): Promise<{ url: string }> =>
+    apiFetch('/medicos/google-calendar/connect'),
+
+  desconectarGoogleCalendar: () =>
+    apiFetch('/medicos/google-calendar/disconnect', { method: 'POST' }),
+
   getTurnosHoy: () => apiFetch('/medicos/turnos/hoy'),
   getTurnos: () => apiFetch('/medicos/turnos'),
   
@@ -119,6 +130,7 @@ export const api = {
   // Chat API
   getChatHistorial: (destinatarioId: number | string) => apiFetch(`/chat/historial/${destinatarioId}`),
   getChatCanales: () => apiFetch('/chat/canales'),
+  getTieneNoLeidos: (): Promise<boolean> => apiFetch('/chat/tiene-no-leidos'),
   getChatCanalesVisitadores: () => apiFetch('/chat/canales/visitadores'),
 
   // Clinical & Notification API

@@ -11,11 +11,16 @@ export interface Message {
   fechaEnvio?: string
 }
 
-export function useChat(activeContactId: number | null) {
+export function useChat(activeContactId: number | null, onMessageReceived?: (msg: Message) => void) {
   const [messages, setMessages] = useState<Message[]>([])
   const [connected, setConnected] = useState(false)
   const stompClientRef = useRef<Client | null>(null)
   const activeContactIdRef = useRef<number | null>(null)
+  const onMessageReceivedRef = useRef(onMessageReceived)
+
+  useEffect(() => {
+    onMessageReceivedRef.current = onMessageReceived
+  }, [onMessageReceived])
 
   // Keep ref up to date to avoid closures issues in message handler
   useEffect(() => {
@@ -52,7 +57,8 @@ export function useChat(activeContactId: number | null) {
 
   // Connect to STOMP Broker
   useEffect(() => {
-    const socket = new SockJS('http://localhost:8081/ws-tranqui', null, { withCredentials: true } as any)
+    const socketUrl = window.location.protocol === 'https:' ? `https://${window.location.host}/ws-tranqui` : `http://${window.location.hostname}:8081/ws-tranqui`;
+    const socket = new SockJS(socketUrl, null, { withCredentials: true } as any)
     const client = new Client({
       webSocketFactory: () => socket,
       debug: (str) => {
@@ -80,6 +86,10 @@ export function useChat(activeContactId: number | null) {
             destinatarioId: payload.destinatarioId,
             contenido: payload.contenido,
             fechaEnvio: payload.fechaEnvio
+          }
+
+          if (onMessageReceivedRef.current) {
+            onMessageReceivedRef.current(newMsg)
           }
 
           // If the message belongs to the currently active conversation (either sent or received),

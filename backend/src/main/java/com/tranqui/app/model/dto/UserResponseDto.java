@@ -15,4 +15,12 @@ public class UserResponseDto {
     private String nombre;
     private String email;
     private Rol rol;
+    private String telefono;
+
+    public UserResponseDto(Long id, String nombre, String email, Rol rol) {
+        this.id = id;
+        this.nombre = nombre;
+        this.email = email;
+        this.rol = rol;
+    }
 }

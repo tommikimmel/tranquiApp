@@ -80,14 +80,15 @@ public class ClinicalService {
                     .max(String::compareTo)
                     .orElse("Ninguna");
 
+            int unreadMessagesCount = mensajeRepository.countUnreadMessages(p.getId(), medico.getId());
             boolean sinTurno = patientTurnos.isEmpty();
-            dtos.add(construirPacienteDto(p, sinTurno ? "Sin turnos registrados" : ultimaVisita, sinTurno, highPriority));
+            dtos.add(construirPacienteDto(p, sinTurno ? "Sin turnos registrados" : ultimaVisita, sinTurno, highPriority, unreadMessagesCount));
         }
 
         return dtos;
     }
 
-    private PacienteDto construirPacienteDto(Usuario p, String ultimaVisita, boolean sinTurno, boolean highPriority) {
+    private PacienteDto construirPacienteDto(Usuario p, String ultimaVisita, boolean sinTurno, boolean highPriority, int unreadMessagesCount) {
         PacienteDto.CredencialInfoDto cred = null;
         if (p.getCredencialCodEntidad() != null || p.getCredencialPan() != null) {
             cred = PacienteDto.CredencialInfoDto.builder()
@@ -110,6 +111,7 @@ public class ClinicalService {
                 .ultimaVisita(ultimaVisita)
                 .prioridadClinica(highPriority ? "PRIORIDAD_ALTA" : "PRIORIDAD_BAJA")
                 .sinTurno(sinTurno)
+                .unreadMessagesCount(unreadMessagesCount)
                 .apellido(p.getApellido())
                 .sexo(p.getSexo())
                 .fechaNacimiento(p.getFechaNacimiento() != null ? p.getFechaNacimiento().toString() : null)
@@ -283,8 +285,9 @@ public class ClinicalService {
         }
         
         Usuario saved = usuarioRepository.save(paciente);
+        int unreadMessagesCount = mensajeRepository.countUnreadMessages(saved.getId(), medico.getId());
 
-        return construirPacienteDto(saved, "Hoy", false, false);
+        return construirPacienteDto(saved, "Hoy", false, false, unreadMessagesCount);
     }
 
     @Transactional

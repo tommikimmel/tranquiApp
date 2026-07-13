@@ -479,59 +479,15 @@ const TRUST_ITEMS = [
   { icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>, text: 'Turnos disponibles en menos de 24hs' },
 ]
 
-// Number of times TRUST_ITEMS is repeated in the track. Kept generous so the
-// carousel still has content to show ahead of the viewport on very wide
-// screens after it wraps (avoids any visible gap/jump at the loop point).
-const TRUST_TRACK_COPIES = 4
-const TRUST_SCROLL_SPEED_PX_PER_SEC = 32
-
 function TrustStrip() {
-  const trackRef = useRef<HTMLDivElement>(null)
-  const firstGroupRef = useRef<HTMLDivElement>(null)
-  const offsetRef = useRef(0)
-  const pausedRef = useRef(false)
-
-  useEffect(() => {
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (prefersReducedMotion) return
-
-    let rafId: number
-    let lastTime: number | null = null
-
-    const tick = (time: number) => {
-      if (lastTime === null) lastTime = time
-      const deltaSeconds = (time - lastTime) / 1000
-      lastTime = time
-
-      const groupWidth = firstGroupRef.current?.offsetWidth ?? 0
-      if (!pausedRef.current && groupWidth > 0 && trackRef.current) {
-        offsetRef.current += TRUST_SCROLL_SPEED_PX_PER_SEC * deltaSeconds
-        if (offsetRef.current >= groupWidth) {
-          offsetRef.current -= groupWidth
-        }
-        trackRef.current.style.transform = `translateX(-${offsetRef.current}px)`
-      }
-      rafId = requestAnimationFrame(tick)
-    }
-
-    rafId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafId)
-  }, [])
-
   return (
-    <div
-      className="trust-strip"
-      aria-label="Garantías de servicio"
-      onMouseEnter={() => { pausedRef.current = true }}
-      onMouseLeave={() => { pausedRef.current = false }}
-    >
+    <div className="trust-strip" aria-label="Garantías de servicio">
       <div className="trust-carousel">
-        <div className="trust-carousel__track" ref={trackRef}>
-          {Array.from({ length: TRUST_TRACK_COPIES }).map((_, copyIdx) => (
+        <div className="trust-carousel__track">
+          {Array.from({ length: 3 }).map((_, copyIdx) => (
             <div
               className="trust-carousel__group"
               key={copyIdx}
-              ref={copyIdx === 0 ? firstGroupRef : undefined}
               role={copyIdx === 0 ? 'list' : undefined}
               aria-hidden={copyIdx > 0}
             >
@@ -593,6 +549,7 @@ export default function LandingPage({
   const [showAppointmentsModal, setShowAppointmentsModal] = useState(false)
   const [showReportsModal, setShowReportsModal] = useState(false)
   const [showHelpModal, setShowHelpModal] = useState(false)
+  const [cancelTurnoId, setCancelTurnoId] = useState<number | null>(null)
 
   // Portal inner tabs
   const [activeDoctorId, setActiveDoctorId] = useState<number | null>(null)
@@ -677,7 +634,8 @@ export default function LandingPage({
     let client: Client | null = null;
     
     if (currentUser.id) {
-      const socket = new SockJS('http://localhost:8081/ws-tranqui', null, { withCredentials: true } as any)
+      const socketUrl = window.location.protocol === 'https:' ? `https://${window.location.host}/ws-tranqui` : `http://${window.location.hostname}:8081/ws-tranqui`;
+      const socket = new SockJS(socketUrl, null, { withCredentials: true } as any)
       client = new Client({
         webSocketFactory: () => socket,
         reconnectDelay: 5000,
@@ -758,17 +716,22 @@ export default function LandingPage({
   }, [currentUser])
 
   const handleCancelAppointmentByPatient = (turnoId: number) => {
-    if (window.confirm("¿Estás seguro de que deseas cancelar este turno?")) {
-      api.cancelarTurno(turnoId)
-        .then(() => {
-          showAlert("Turno cancelado con éxito.", "success")
-          refreshPatientData()
-        })
-        .catch(err => {
-          console.error(err)
-          showAlert("Error al cancelar el turno.", "error")
-        })
-    }
+    setCancelTurnoId(turnoId)
+  }
+
+  const confirmCancelAppointmentByPatient = (turnoId: number) => {
+    api.cancelarTurno(turnoId)
+      .then(() => {
+        showAlert("Turno cancelado con éxito.", "success")
+        refreshPatientData()
+      })
+      .catch(err => {
+        console.error(err)
+        showAlert("Error al cancelar el turno.", "error")
+      })
+      .finally(() => {
+        setCancelTurnoId(null)
+      })
   }
 
 
@@ -1074,7 +1037,7 @@ export default function LandingPage({
                                 boxShadow: '0 2px 4px rgba(0, 158, 227, 0.15)'
                               }}
                             >
-                              Pagar Copago
+                              {appt.type === 'Copago OSDE' ? 'Pagar Copago' : 'Pagar Consulta'}
                             </a>
                           )}
                           <button 
@@ -1266,7 +1229,7 @@ export default function LandingPage({
                       {appt.domicilioAtencion && (
                         <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <div>Dirección de atención: <strong>{appt.domicilioAtencion}</strong></div>
-                          {isConfirmed && (
+                          {true && (
                             <a 
                               href={appt.domicilioLat && appt.domicilioLng 
                                 ? `https://www.google.com/maps/search/?api=1&query=${appt.domicilioLat},${appt.domicilioLng}`
@@ -1496,6 +1459,102 @@ export default function LandingPage({
           </div>
         </div>
       )}
+
+      {/* Cancellation Confirmation Modal */}
+      {cancelTurnoId !== null && (() => {
+        const appt = myAppointments.find(a => a.id === cancelTurnoId)
+        if (!appt) return null;
+        return (
+          <div style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: 'var(--space-4)'
+          }}>
+            <div className="card" style={{
+              maxWidth: '420px',
+              width: '100%',
+              padding: 'var(--space-6)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-4)',
+              boxShadow: 'var(--shadow-xl)',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--color-border)',
+              backgroundColor: '#ffffff',
+              textAlign: 'center'
+            }}>
+              <div style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                color: 'var(--color-danger)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto var(--space-2)'
+              }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 28, height: 28 }}>
+                  <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
+
+              <div>
+                <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                  ¿Cancelar este turno?
+                </h3>
+                <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
+                  Esta acción no se puede deshacer. Si el turno ya fue pagado, se gestionará el reembolso según las políticas vigentes.
+                </p>
+              </div>
+
+              <div style={{
+                backgroundColor: 'var(--neutral-50)',
+                padding: 'var(--space-3) var(--space-4)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-border)',
+                textAlign: 'left',
+                fontSize: 'var(--text-sm)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}>
+                <div><strong>Profesional:</strong> {appt.patientName}</div>
+                <div><strong>Fecha:</strong> {appt.fecha}</div>
+                <div><strong>Horario:</strong> {appt.hour} hs</div>
+                <div><strong>Modalidad:</strong> {appt.type}</div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => setCancelTurnoId(null)}
+                  style={{ flex: 1, height: '42px', justifyContent: 'center' }}
+                >
+                  No, mantener
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--danger"
+                  onClick={() => confirmCancelAppointmentByPatient(cancelTurnoId)}
+                  style={{ flex: 1, height: '42px', justifyContent: 'center' }}
+                >
+                  Sí, cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
       {/* WhatsApp Floating Chat Widget */}
       {currentUser && currentUser.rol === 'PACIENTE' && (
         <>
