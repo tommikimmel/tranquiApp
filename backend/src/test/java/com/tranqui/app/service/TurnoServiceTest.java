@@ -177,7 +177,9 @@ class TurnoServiceTest {
 
         com.tranqui.app.model.dto.TurnoResponseDto response = turnoService.reservarTurno(dto);
         assertNotNull(response);
-        assertEquals("CONFIRMADO", response.getEstado());
+        assertEquals("PENDIENTE_PAGO", response.getEstado());
+        assertNotNull(response.getCheckoutUrl());
+        assertFalse(response.getCheckoutUrl().isEmpty());
         
         // Clean up created turno & patient if created
         if (response.getTurnoId() != null) {
@@ -514,6 +516,9 @@ class TurnoServiceTest {
                 .habilitado(true)
                 .build();
         tarifaMedicoRepository.save(tarifa);
+
+        turno.setFecha(LocalDate.now().minusDays(1));
+        turnoRepository.save(turno);
 
         try {
             com.tranqui.app.model.dto.ReservaTurnoDto dto = com.tranqui.app.model.dto.ReservaTurnoDto.builder()

@@ -22,6 +22,9 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
 
     boolean existsByPacienteEmailAndEstadoNot(String email, EstadoTurno estado);
 
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(t) > 0 FROM Turno t WHERE t.paciente.email = :email AND t.fecha >= :fecha AND t.estado != 'CANCELADO'")
+    boolean existsActiveTurnoByPacienteEmail(@org.springframework.data.repository.query.Param("email") String email, @org.springframework.data.repository.query.Param("fecha") LocalDate fecha);
+
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT t.paciente FROM Turno t WHERE t.medico.id = :medicoId AND t.estado != 'CANCELADO'")
     List<Usuario> findDistinctPacientesByMedicoId(@org.springframework.data.repository.query.Param("medicoId") Long medicoId);
 

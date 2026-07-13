@@ -21,6 +21,7 @@ public class PacienteDto {
     private String ultimaVisita;
     private String prioridadClinica;
     private boolean sinTurno;
+    private int unreadMessagesCount;
 
     private String apellido;
     private String sexo;

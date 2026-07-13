@@ -1,5 +1,6 @@
 package com.tranqui.app.service;
 
+import com.tranqui.app.model.EstadoAsistencia;
 import com.tranqui.app.model.EstadoTurno;
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.TarifaMedico;
@@ -335,8 +336,31 @@ public class MedicoService {
         String activePatientsChange = "+" + newPatientsThisMonth + " este mes";
 
         // 4. No shows this month
-        int noShowsThisMonth = 0;
-        String noShowsChange = "Política 24hs activa";
+        LocalDate endOfThisMonth = hoy.with(TemporalAdjusters.lastDayOfMonth());
+
+        int noShowsThisMonthVal = (int) turnos.stream()
+                .filter(t -> t.getAsistencia() == EstadoAsistencia.AUSENTE
+                        && !t.getFecha().isBefore(startOfThisMonth)
+                        && !t.getFecha().isAfter(endOfThisMonth))
+                .count();
+
+        LocalDate startOfLastMonth = startOfThisMonth.minusMonths(1);
+        LocalDate endOfLastMonth = startOfThisMonth.minusDays(1);
+        int noShowsLastMonthVal = (int) turnos.stream()
+                .filter(t -> t.getAsistencia() == EstadoAsistencia.AUSENTE
+                        && !t.getFecha().isBefore(startOfLastMonth)
+                        && !t.getFecha().isAfter(endOfLastMonth))
+                .count();
+
+        String noShowsChange;
+        int diffNoShows = noShowsThisMonthVal - noShowsLastMonthVal;
+        if (diffNoShows > 0) {
+            noShowsChange = "+" + diffNoShows + " vs mes anterior";
+        } else if (diffNoShows < 0) {
+            noShowsChange = diffNoShows + " vs mes anterior";
+        } else {
+            noShowsChange = "igual que mes anterior";
+        }
 
         return DashboardStatsDto.builder()
                 .sessionsToday(sessionsToday)
@@ -345,7 +369,7 @@ public class MedicoService {
                 .earningsThisWeekChange(earningsThisWeekChange)
                 .activePatients(activePatients)
                 .activePatientsChange(activePatientsChange)
-                .noShowsThisMonth(noShowsThisMonth)
+                .noShowsThisMonth(noShowsThisMonthVal)
                 .noShowsChange(noShowsChange)
                 .build();
     }

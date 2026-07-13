@@ -38,6 +38,9 @@ public class MedicoController {
     @Autowired
     private MercadoPagoOAuthService mercadoPagoOAuthService;
 
+    @Autowired
+    private com.tranqui.app.service.GoogleCalendarOAuthService googleCalendarOAuthService;
+
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
 
@@ -164,6 +167,58 @@ public class MedicoController {
         } catch (Exception e) {
             log.error("Error al procesar el callback de OAuth de Mercado Pago", e);
             response.sendRedirect(frontendUrl + "/?mp=error&reason=exchange_failed");
+        }
+    }
+
+    @GetMapping("/google-calendar/status")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<Map<String, Object>> obtenerEstadoGoogleCalendar(@AuthenticationPrincipal UserDetails userDetails) {
+        Usuario medico = obtenerMedicoAutenticado(userDetails);
+        return ResponseEntity.ok(Map.of(
+                "connected", medico.getGoogleCalendarConnected() != null && medico.getGoogleCalendarConnected()
+        ));
+    }
+
+    @GetMapping("/google-calendar/connect")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<Map<String, String>> obtenerUrlConexionGoogleCalendar(@AuthenticationPrincipal UserDetails userDetails) {
+        Usuario medico = obtenerMedicoAutenticado(userDetails);
+        String url = googleCalendarOAuthService.buildAuthorizationUrl(medico);
+        return ResponseEntity.ok(Map.of("url", url));
+    }
+
+    @PostMapping("/google-calendar/disconnect")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<Void> desvincularGoogleCalendar(@AuthenticationPrincipal UserDetails userDetails) {
+        Usuario medico = obtenerMedicoAutenticado(userDetails);
+        googleCalendarOAuthService.desvincular(medico);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/google-calendar/callback")
+    public void callbackGoogleCalendar(
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String error,
+            HttpServletResponse response) throws IOException {
+
+        if (error != null) {
+            response.sendRedirect(frontendUrl + "/?googleCalendar=error&reason=" + error);
+            return;
+        }
+
+        Long medicoId = googleCalendarOAuthService.verificarState(state);
+        if (medicoId == null || code == null) {
+            response.sendRedirect(frontendUrl + "/?googleCalendar=error&reason=invalid_state");
+            return;
+        }
+
+        try {
+            googleCalendarOAuthService.procesarCallback(medicoId, code);
+            response.sendRedirect(frontendUrl + "/?googleCalendar=success");
+        } catch (Exception e) {
+            log.error("Error al procesar el callback de OAuth de Google Calendar", e);
+            response.sendRedirect(frontendUrl + "/?googleCalendar=error&reason=exchange_failed");
         }
     }
 }

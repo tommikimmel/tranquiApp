@@ -35,10 +35,17 @@ public class Mensaje {
     @Column(name = "fecha_envio", nullable = false)
     private LocalDateTime fechaEnvio = LocalDateTime.now();
 
+    @Builder.Default
+    @Column(name = "leido", nullable = false)
+    private Boolean leido = false;
+
     @PrePersist
     protected void onCreate() {
         if (fechaEnvio == null) {
             fechaEnvio = LocalDateTime.now();
+        }
+        if (leido == null) {
+            leido = false;
         }
     }
 }

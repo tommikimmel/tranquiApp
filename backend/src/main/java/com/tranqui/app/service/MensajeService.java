@@ -74,4 +74,18 @@ public class MensajeService {
 
         return mensajeRepository.findVisitorChannels(medico.getId());
     }
+
+    @Transactional
+    public void marcarMensajesComoLeidos(Long remitenteId, String destinatarioEmail) {
+        Usuario destinatario = usuarioRepository.findByEmail(destinatarioEmail)
+                .orElseThrow(() -> new EntityNotFoundException("Destinatario no encontrado"));
+        mensajeRepository.markAsRead(remitenteId, destinatario.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public boolean tieneMensajesSinLeer(String email) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+        return mensajeRepository.hasUnreadMessages(usuario.getId());
+    }
 }

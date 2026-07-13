@@ -42,6 +42,19 @@ public class Usuario {
     @Column(name = "mp_user_id", length = 50)
     private String mpUserId;
 
+    @Column(name = "google_access_token_encrypted", columnDefinition = "TEXT")
+    private String googleAccessTokenEncrypted;
+
+    @Column(name = "google_refresh_token_encrypted", columnDefinition = "TEXT")
+    private String googleRefreshTokenEncrypted;
+
+    @Column(name = "google_token_expires_at")
+    private LocalDateTime googleTokenExpiresAt;
+
+    @Builder.Default
+    @Column(name = "google_calendar_connected")
+    private Boolean googleCalendarConnected = false;
+
     @Column(name = "telefono", length = 30)
     private String telefono;
 

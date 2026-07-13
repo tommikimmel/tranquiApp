@@ -8,4 +8,5 @@ public interface CanalPrioritarioDto {
     String getEmail();
     String getPrioridadClinica();
     LocalDateTime getUltimoMensaje();
+    Integer getMensajesSinLeer();
 }

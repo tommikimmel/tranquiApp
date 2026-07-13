@@ -76,7 +76,7 @@ class LiberarTurnosSchedulerTest {
                 .horaFin(LocalTime.of(11, 45))
                 .tipo(TipoTurno.PARTICULAR)
                 .estado(EstadoTurno.PENDIENTE_PAGO)
-                .fechaCreacion(LocalDateTime.now().minusMinutes(5))
+                .fechaCreacion(LocalDateTime.now().minusMinutes(3))
                 .build();
 
         // 3. Confirmed (15 mins ago) - should remain CONFIRMADO

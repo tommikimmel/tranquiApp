@@ -3,6 +3,7 @@ package com.tranqui.app.service;
 import com.mercadopago.client.preference.PreferenceClient;
 import com.mercadopago.client.preference.PreferenceItemRequest;
 import com.mercadopago.client.preference.PreferenceRequest;
+import com.mercadopago.client.preference.PreferenceBackUrlsRequest;
 import com.mercadopago.core.MPRequestOptions;
 import com.mercadopago.resources.preference.Preference;
 import com.tranqui.app.model.Turno;
@@ -25,8 +26,14 @@ public class MercadoPagoService {
     @Value("${mercadopago.enabled:false}")
     private boolean isEnabled;
 
+    @Value("${mercadopago.sandbox:true}")
+    private boolean isSandbox;
+
     @Value("${app.public-url:http://localhost:8081}")
     private String appPublicUrl;
+
+    @Value("${app.frontend-url:http://localhost:5173}")
+    private String frontendUrl;
 
     private String notificationUrl() {
         return appPublicUrl + "/api/payments/webhook";
@@ -58,20 +65,29 @@ public class MercadoPagoService {
         PreferenceItemRequest itemRequest = PreferenceItemRequest.builder()
                 .title("Consulta Psiquiátrica - " + medico.getNombre())
                 .quantity(1)
+                .currencyId("ARS")
                 .unitPrice(turno.getPrecio())
+                .build();
+
+        PreferenceBackUrlsRequest backUrls = PreferenceBackUrlsRequest.builder()
+                .success(frontendUrl)
+                .failure(frontendUrl)
+                .pending(frontendUrl)
                 .build();
 
         PreferenceRequest request = PreferenceRequest.builder()
                 .items(List.of(itemRequest))
                 .externalReference(turno.getId().toString())
                 .notificationUrl(notificationUrl())
+                .backUrls(backUrls)
+                .autoReturn("approved")
                 .build();
 
         // Per-request access token (instead of the global/static MercadoPagoConfig)
         // so concurrent requests for different professionals never cross wires.
         MPRequestOptions options = MPRequestOptions.builder().accessToken(accessToken).build();
         Preference preference = client.create(request, options);
-        return preference.getInitPoint();
+        return isSandbox ? preference.getSandboxInitPoint() : preference.getInitPoint();
     }
 
     public String crearPreferenciaDocumento(com.tranqui.app.model.SolicitudDocumento solicitud) throws Exception {
@@ -95,17 +111,26 @@ public class MercadoPagoService {
         PreferenceItemRequest itemRequest = PreferenceItemRequest.builder()
                 .title(solicitud.getTipoConcepto().toString() + " - " + medico.getNombre())
                 .quantity(1)
+                .currencyId("ARS")
                 .unitPrice(solicitud.getPrecio())
+                .build();
+
+        PreferenceBackUrlsRequest backUrls = PreferenceBackUrlsRequest.builder()
+                .success(frontendUrl)
+                .failure(frontendUrl)
+                .pending(frontendUrl)
                 .build();
 
         PreferenceRequest request = PreferenceRequest.builder()
                 .items(List.of(itemRequest))
                 .externalReference("doc-" + solicitud.getId().toString())
                 .notificationUrl(notificationUrl())
+                .backUrls(backUrls)
+                .autoReturn("approved")
                 .build();
 
         MPRequestOptions options = MPRequestOptions.builder().accessToken(accessToken).build();
         Preference preference = client.create(request, options);
-        return preference.getInitPoint();
+        return isSandbox ? preference.getSandboxInitPoint() : preference.getInitPoint();
     }
 }
