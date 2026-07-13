@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: tranqui-app
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/tranqui_app}
+    username: ${SPRING_DATASOURCE_USERNAME:tomaskimmel}
+    password: ${SPRING_DATASOURCE_PASSWORD:securepassword}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+twilio:
+  account:
+    sid: ${TWILIO_ACCOUNT_SID:ACmockaccount}
+  auth:
+    token: ${TWILIO_AUTH_TOKEN:mocktoken}
+  whatsapp:
+    number: ${TWILIO_WHATSAPP_NUMBER:+14155238886}
+
+google:
+  client-id: ${GOOGLE_CLIENT_ID:dummy-client-id}
+  client-secret: ${GOOGLE_CLIENT_SECRET:}
+
+mercadopago:
+  enabled: ${MERCADOPAGO_ENABLED:false}
+  client-id: ${MERCADOPAGO_CLIENT_ID:}
+  client-secret: ${MERCADOPAGO_CLIENT_SECRET:}
+  webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
+  sandbox: ${MERCADOPAGO_SANDBOX:true}
+
+app:
+  public-url: ${APP_PUBLIC_URL:http://localhost:8081}
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}

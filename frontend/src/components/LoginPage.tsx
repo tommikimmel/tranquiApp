@@ -1,0 +1,777 @@
+import { useState } from 'react'
+import { api } from '../api/api'
+import AddressMapPicker from './AddressMapPicker'
+
+interface LoginPageProps {
+  onLoginSuccess: (user: any) => void
+  onBack: () => void
+}
+
+function IconPatient({ size = 26 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" />
+    </svg>
+  )
+}
+
+function IconStethoscope({ size = 26 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M4.5 3v6a4.5 4.5 0 0 0 9 0V3" />
+      <path d="M8.5 13.5V17a5 5 0 0 0 10 0v-2" />
+      <circle cx="18.5" cy="13" r="2" />
+    </svg>
+  )
+}
+
+function IconVideoCall({ size = 18 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" />
+    </svg>
+  )
+}
+
+function IconBuilding({ size = 18 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <rect x="4" y="2" width="16" height="20" rx="1" />
+      <line x1="9" y1="7" x2="9" y2="7.01" /><line x1="15" y1="7" x2="15" y2="7.01" />
+      <line x1="9" y1="11" x2="9" y2="11.01" /><line x1="15" y1="11" x2="15" y2="11.01" />
+      <line x1="9" y1="15" x2="9" y2="15.01" /><line x1="15" y1="15" x2="15" y2="15.01" />
+      <path d="M9 22v-4h6v4" />
+    </svg>
+  )
+}
+
+const PROVINCIAS_ARGENTINA = [
+  "Buenos Aires", "CABA", "Catamarca", "Chaco", "Chubut", "Córdoba", "Corrientes",
+  "Entre Ríos", "Formosa", "Jujuy", "La Pampa", "La Rioja", "Mendoza", "Misiones",
+  "Neuquén", "Río Negro", "Salta", "San Juan", "San Luis", "Santa Cruz", "Santa Fe",
+  "Santiago del Estero", "Tierra del Fuego", "Tucumán"
+];
+
+const ESPECIALIDADES_GRUPOS = [
+  "Alergia e Inmunología", "Cardiología", "Dermatología", "Endocrinología y Nutrición",
+  "Gastroenterología / Hepatología", "Geriatria", "Hematología", "Infectología",
+  "Medicina Interna (Clínica Médica)", "Nefrología", "Neumonología", "Neurología",
+  "Oncología Médica", "Pediatría", "Psiquiatría", "Psiquiatría Infanto-Juvenil", "Reumatología"
+];
+
+export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login')
+  const [role, setRole] = useState<'PACIENTE' | 'PSIQUIATRA'>('PACIENTE')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  
+  const [regStep, setRegStep] = useState(1)
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [hasObraSocial, setHasObraSocial] = useState(false)
+
+  // Login form state
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+
+  // Signup form state
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [nombre, setNombre] = useState('')
+  const [apellido, setApellido] = useState('')
+  const [sexo, setSexo] = useState('M')
+  const [fechaNacimiento, setFechaNacimiento] = useState('')
+  const [tipoDocumento, setTipoDocumento] = useState('DNI')
+  const [numeroDocumento, setNumeroDocumento] = useState('')
+  const [telefono, setTelefono] = useState('')
+
+  // Patient spec
+  const [obraSocial, setObraSocial] = useState('')
+  const [numAfiliado, setNumAfiliado] = useState('')
+
+  // Pro spec
+  const [matricula, setMatricula] = useState('')
+  const [titulo, setTitulo] = useState('')
+  const [specialty, setSpecialty] = useState('')
+  const [cuil, setCuil] = useState('')
+  const [domicilioAtencion, setDomicilioAtencion] = useState('')
+  const [domicilioProvincia, setDomicilioProvincia] = useState('')
+  const [domicilioLat, setDomicilioLat] = useState<number | null>(null)
+  const [domicilioLng, setDomicilioLng] = useState<number | null>(null)
+  const [codigoReFeps, setCodigoReFeps] = useState('')
+  const [matriculaTipo, setMatriculaTipo] = useState('MN')
+  const [matriculaProvincia, setMatriculaProvincia] = useState('')
+  const [ofreceOnline, setOfreceOnline] = useState(true)
+  const [ofrecePresencial, setOfrecePresencial] = useState(false)
+  const [fotoUrl, setFotoUrl] = useState('')
+
+  const handleGoogleLogin = async (token: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const user = await api.loginGoogle(token)
+      localStorage.setItem('tranqui_user', JSON.stringify(user));
+      onLoginSuccess(user)
+    } catch (err: any) {
+      console.error('Error de autenticación Google:', err)
+      setError(err.message || 'No se pudo iniciar sesión. Por favor, intentá de nuevo.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Load Google Identity Services dynamically
+  useState(() => {
+    const scriptId = 'google-gsi-client'
+    const initGoogle = () => {
+      // @ts-ignore
+      if (window.google) {
+        // @ts-ignore
+        window.google.accounts.id.initialize({
+          client_id: "224301140079-2pa672f7sqcner9nut04j0g99md88n3p.apps.googleusercontent.com",
+          callback: (response: any) => {
+            handleGoogleLogin(response.credential)
+          }
+        })
+        // @ts-ignore
+        window.google.accounts.id.renderButton(
+          document.getElementById("google-signin-btn"),
+          { theme: "outline", size: "large", width: 376 }
+        )
+      }
+    }
+
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement('script')
+      script.id = scriptId
+      script.src = 'https://accounts.google.com/gsi/client'
+      script.async = true;
+      script.defer = true;
+      script.onload = initGoogle
+      document.body.appendChild(script)
+    } else {
+      setTimeout(initGoogle, 100)
+    }
+  })
+
+  const handleFormLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!loginEmail || !loginPassword) {
+      setError('Por favor, completá todos los campos.')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      const user = await api.login({ email: loginEmail, password: loginPassword })
+      localStorage.setItem('tranqui_user', JSON.stringify(user));
+      onLoginSuccess(user)
+    } catch (err: any) {
+      setError(err.message || 'Credenciales inválidas.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const totalSteps = role === 'PSIQUIATRA' || hasObraSocial ? 3 : 2;
+
+  const handleNextStep = () => {
+    setError(null)
+    if (regStep === 1) {
+      if (!email || !password || !confirmPassword) {
+        setError('Por favor, completá todos los campos.')
+        return
+      }
+      if (!email.includes('@')) {
+        setError('Por favor, ingresá un email válido.')
+        return
+      }
+      if (password !== confirmPassword) {
+        setError('Las contraseñas no coinciden.')
+        return
+      }
+      setRegStep(2)
+    } else if (regStep === 2) {
+      if (!nombre || !apellido || !fechaNacimiento || !numeroDocumento || !telefono) {
+        setError('Por favor, completá todos los datos personales obligatorios.')
+        return
+      }
+      if (totalSteps > 2) {
+        setRegStep(3)
+      }
+    }
+  }
+
+  const handlePrevStep = () => {
+    setError(null)
+    if (regStep > 1) {
+      setRegStep(regStep - 1)
+    }
+  }
+
+  const handleFormRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden.')
+      return
+    }
+
+    if (!email || !password || !nombre || !apellido || !numeroDocumento || !telefono) {
+      setError('Por favor, completá los datos obligatorios.')
+      return
+    }
+
+    const payload: any = {
+      email,
+      password,
+      rol: role,
+      nombre,
+      apellido,
+      sexo,
+      fechaNacimiento,
+      tipoDocumento,
+      numeroDocumento: Number(numeroDocumento),
+      telefono: `+54 ${telefono.trim()}`,
+    }
+
+    if (role === 'PACIENTE') {
+      if (hasObraSocial) {
+        if (!obraSocial || !numAfiliado) {
+          setError('Por favor, completá los datos de tu obra social.')
+          return
+        }
+        payload.obraSocial = obraSocial
+        payload.numAfiliado = numAfiliado
+      } else {
+        payload.obraSocial = null
+        payload.numAfiliado = null
+      }
+    } else {
+      if (!titulo || !specialty || !matricula || !codigoReFeps) {
+        setError('Por favor, completá los datos profesionales obligatorios.')
+        return
+      }
+      if (!ofreceOnline && !ofrecePresencial) {
+        setError('Seleccioná al menos una modalidad de consulta (Online o Presencial).')
+        return
+      }
+      if (ofrecePresencial && !domicilioAtencion) {
+        setError('Si ofrecés consultas presenciales, indicá el domicilio de atención.')
+        return
+      }
+      payload.matricula = matricula
+      payload.titulo = titulo
+      payload.specialty = specialty
+      payload.cuit = cuil
+      payload.cuil = cuil ? Number(cuil) : null
+      payload.domicilioAtencion = ofrecePresencial ? domicilioAtencion : null
+      payload.domicilioLat = ofrecePresencial ? domicilioLat : null
+      payload.domicilioLng = ofrecePresencial ? domicilioLng : null
+      payload.codigoReFeps = codigoReFeps ? Number(codigoReFeps) : null
+      payload.matriculaTipo = matriculaTipo
+      payload.matriculaProvincia = matriculaProvincia
+      payload.matriculaNumero = Number(matricula)
+      payload.ofreceOnline = ofreceOnline
+      payload.ofrecePresencial = ofrecePresencial
+    }
+
+    setLoading(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await api.register(payload)
+      setSuccess('¡Registro exitoso! Ya podés iniciar sesión con tus credenciales.')
+      setActiveTab('login')
+      setLoginEmail(email)
+      setLoginPassword(password)
+      setRegStep(1)
+      setConfirmPassword('')
+      setHasObraSocial(false)
+    } catch (err: any) {
+      setError(err.message || 'Error al intentar registrarse.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="login-container" style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '100vh',
+      backgroundColor: 'var(--color-bg)',
+      padding: 'var(--space-3)'
+    }}>
+      <div className="card" style={{
+        maxWidth: activeTab === 'register' ? '640px' : '440px',
+        width: '100%',
+        maxHeight: '94vh',
+        overflowY: 'auto',
+        padding: 'var(--space-3) var(--space-5)',
+        boxShadow: 'var(--shadow-lg)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        backgroundColor: 'var(--color-surface)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--space-2)',
+        transition: 'max-width 0.3s ease-in-out'
+      }}>
+        {/* Header / Logo */}
+        <div style={{ textAlign: 'center' }}>
+          <img
+            src="/tranqui-icon.webp"
+            alt="Tranqui Logo"
+            style={{
+              height: '28px',
+              margin: '0 auto 4px',
+              display: 'block'
+            }}
+          />
+          <h2 style={{
+            fontFamily: 'var(--font-heading)',
+            fontSize: 'var(--text-lg)',
+            fontWeight: 'var(--font-weight-bold)',
+            color: 'var(--color-text-primary)',
+            marginBottom: '2px'
+          }}>
+            {activeTab === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
+          </h2>
+          <p style={{
+            fontSize: 'var(--text-xs)',
+            color: 'var(--color-text-secondary)'
+          }}>
+            Gestioná tus turnos, agenda y pacientes en un solo lugar.
+          </p>
+        </div>
+
+        {/* Tab switchers */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          backgroundColor: 'var(--neutral-100)',
+          padding: '4px',
+          borderRadius: 'var(--radius-md)'
+        }}>
+          <button
+            onClick={() => { setActiveTab('login'); setError(null); }}
+            style={{
+              padding: '8px',
+              border: 'none',
+              borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '13px',
+              backgroundColor: activeTab === 'login' ? '#ffffff' : 'transparent',
+              color: activeTab === 'login' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              boxShadow: activeTab === 'login' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+            }}
+          >
+            Iniciar Sesión
+          </button>
+          <button
+            onClick={() => { setActiveTab('register'); setError(null); }}
+            style={{
+              padding: '8px',
+              border: 'none',
+              borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '13px',
+              backgroundColor: activeTab === 'register' ? '#ffffff' : 'transparent',
+              color: activeTab === 'register' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+              boxShadow: activeTab === 'register' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+            }}
+          >
+            Registrarse
+          </button>
+        </div>
+
+        {error && (
+          <div style={{
+            padding: 'var(--space-3) var(--space-4)',
+            backgroundColor: 'var(--color-error-bg)',
+            color: 'var(--color-error)',
+            borderRadius: 'var(--radius-sm)',
+            fontSize: 'var(--text-sm)',
+            border: '1px solid #fecaca',
+            lineHeight: 'var(--line-height-normal)'
+          }}>
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div style={{
+            padding: 'var(--space-3) var(--space-4)',
+            backgroundColor: '#f0fdf4',
+            color: '#15803d',
+            borderRadius: 'var(--radius-sm)',
+            fontSize: 'var(--text-sm)',
+            border: '1px solid #bbf7d0',
+            lineHeight: 'var(--line-height-normal)'
+          }}>
+            {success}
+          </div>
+        )}
+
+        {/* ── TAB 1: LOGIN ── */}
+        {activeTab === 'login' && (
+          <form onSubmit={handleFormLogin} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            <div className="form-group">
+              <label className="form-label" htmlFor="login-email">Email</label>
+              <input
+                id="login-email"
+                type="email"
+                className="form-input"
+                placeholder="ejemplo@correo.com"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="login-password">Contraseña</label>
+              <input
+                id="login-password"
+                type="password"
+                className="form-input"
+                placeholder="********"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn btn--primary"
+              style={{ width: '100%', padding: '10px' }}
+            >
+              {loading ? 'Accediendo...' : 'Iniciar Sesión'}
+            </button>
+
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: 'var(--space-2) 0',
+              color: 'var(--color-text-secondary)',
+              fontSize: '11px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em'
+            }}>
+              <span style={{ borderBottom: '1px solid var(--color-border)', flex: 1, marginRight: '10px' }}></span>
+              o continuar con
+              <span style={{ borderBottom: '1px solid var(--color-border)', flex: 1, marginLeft: '10px' }}></span>
+            </div>
+
+            {/* Real Google Button */}
+            <div id="google-signin-btn" style={{ display: 'flex', justifyContent: 'center' }}></div>
+          </form>
+        )}
+
+        {/* ── TAB 2: REGISTER ── */}
+        {activeTab === 'register' && (
+          <form onSubmit={handleFormRegister} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            
+            {/* Step Progress Indicator */}
+            <div className="checkout-progress" style={{ padding: '0 var(--space-6)' }}>
+              <div className={`checkout-progress__step ${regStep >= 1 ? 'active' : ''}`}>
+                <span className="checkout-progress__dot">1</span>
+                Credenciales
+              </div>
+              <div className="checkout-progress__line" />
+              <div className={`checkout-progress__step ${regStep >= 2 ? 'active' : ''}`}>
+                <span className="checkout-progress__dot">2</span>
+                Personales
+              </div>
+              {(role === 'PSIQUIATRA' || hasObraSocial) && (
+                <>
+                  <div className="checkout-progress__line" />
+                  <div className={`checkout-progress__step ${regStep >= 3 ? 'active' : ''}`}>
+                    <span className="checkout-progress__dot">3</span>
+                    {role === 'PSIQUIATRA' ? 'Profesionales' : 'Cobertura'}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* PASO 1: Credenciales & Rol */}
+            {regStep === 1 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                {/* Role select */}
+                <div className="form-group">
+                  <label className="form-label">Registrarme como:</label>
+                  <div className="role-select" role="radiogroup" aria-label="Registrarme como">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={role === 'PACIENTE'}
+                      className={`role-select__card ${role === 'PACIENTE' ? 'active' : ''}`}
+                      onClick={() => setRole('PACIENTE')}
+                    >
+                      <span className="role-select__icon"><IconPatient /></span>
+                      Paciente
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={role === 'PSIQUIATRA'}
+                      className={`role-select__card ${role === 'PSIQUIATRA' ? 'active' : ''}`}
+                      onClick={() => setRole('PSIQUIATRA')}
+                    >
+                      <span className="role-select__icon"><IconStethoscope /></span>
+                      Profesional
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                  <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: '12px', color: 'var(--color-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '4px' }}>
+                    Credenciales de Acceso
+                  </div>
+                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                    <label className="form-label form-label--required">Email</label>
+                    <input type="email" className="form-input" placeholder="ejemplo@correo.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label form-label--required">Contraseña</label>
+                    <input type="password" className="form-input" placeholder="********" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label form-label--required">Confirmar Contraseña</label>
+                    <input type="password" className="form-input" placeholder="********" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PASO 2: Datos Personales */}
+            {regStep === 2 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
+                  <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: '12px', color: 'var(--color-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '4px' }}>
+                    Datos Personales Básicos
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label form-label--required">Nombre</label>
+                    <input type="text" className="form-input" placeholder="Juan" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label form-label--required">Apellido</label>
+                    <input type="text" className="form-input" placeholder="Pérez" value={apellido} onChange={(e) => setApellido(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label form-label--required">Sexo</label>
+                    <select className="form-input" value={sexo} onChange={(e) => setSexo(e.target.value)}>
+                      <option value="M">Masculino (M)</option>
+                      <option value="F">Femenino (F)</option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label form-label--required">Fecha Nacimiento</label>
+                    <input type="date" className="form-input" value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label form-label--required">Tipo Documento</label>
+                    <select className="form-input" value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
+                      <option value="DNI">DNI</option>
+                      <option value="LC">Libreta Cívica (LC)</option>
+                      <option value="LE">Libreta de Enrolamiento (LE)</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label form-label--required">Número Documento</label>
+                    <input type="number" className="form-input" placeholder="12345678" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} required />
+                  </div>
+                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                    <label className="form-label form-label--required">Teléfono</label>
+                    <div className="phone-input">
+                      <span className="phone-input__prefix">+54</span>
+                      <input type="tel" className="form-input phone-input__field" placeholder="9 351 1234567" value={telefono} onChange={(e) => setTelefono(e.target.value)} required />
+                    </div>
+                  </div>
+
+                  {role === 'PACIENTE' && (
+                    <div className="form-group" style={{ gridColumn: 'span 2', marginTop: 'var(--space-2)' }}>
+                      <label className={`check-chip ${hasObraSocial ? 'active' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={hasObraSocial}
+                          onChange={(e) => setHasObraSocial(e.target.checked)}
+                        />
+                        ¿Poseés Obra Social o Prepaga?
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* PASO 3: Cobertura o Profesionales */}
+            {regStep === 3 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 'var(--space-3)'
+                }}>
+                  {role === 'PACIENTE' ? (
+                    <>
+                      <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: '12px', color: 'var(--color-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '4px' }}>
+                        Cobertura Médica
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label form-label--required">Obra Social / Prepaga</label>
+                        <input type="text" className="form-input" placeholder="Ej: OSDE" value={obraSocial} onChange={(e) => setObraSocial(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label form-label--required">Nro. Afiliado</label>
+                        <input type="text" className="form-input" placeholder="Ej: 123456789" value={numAfiliado} onChange={(e) => setNumAfiliado(e.target.value)} required />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: '12px', color: 'var(--color-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '4px' }}>
+                        Registro Nacional y Datos Profesionales
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label form-label--required">Título Profesional</label>
+                        <input type="text" className="form-input" placeholder="Ej: Médico Psiquiatra" value={titulo} onChange={(e) => setTitulo(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label form-label--required">Especialidad</label>
+                        <select className="form-input" value={specialty} onChange={(e) => setSpecialty(e.target.value)} required>
+                          <option value="">Seleccioná especialidad</option>
+                          {ESPECIALIDADES_GRUPOS.map(esp => (
+                            <option key={esp} value={esp}>{esp}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label form-label--required">CUIL / CUIT</label>
+                        <input type="number" className="form-input" placeholder="Ej: 20301234567" value={cuil} onChange={(e) => setCuil(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label form-label--required">Código ReFeps</label>
+                        <input type="number" className="form-input" placeholder="Ej: 123456" value={codigoReFeps} onChange={(e) => setCodigoReFeps(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label form-label--required">Número de Matrícula</label>
+                        <input type="number" className="form-input" placeholder="Ej: 49281" value={matricula} onChange={(e) => setMatricula(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label form-label--required">Tipo Matrícula</label>
+                        <input type="text" className="form-input" placeholder="Ej: MN o MP" value={matriculaTipo} onChange={(e) => setMatriculaTipo(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label form-label--required">Provincia de Matrícula</label>
+                        <select className="form-input" value={matriculaProvincia} onChange={(e) => setMatriculaProvincia(e.target.value)} required>
+                          <option value="">Seleccioná provincia</option>
+                          {PROVINCIAS_ARGENTINA.map(p => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                        <label className="form-label">Modalidades de Consulta</label>
+                        <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+                          <label className={`check-chip check-chip--auto ${ofreceOnline ? 'active' : ''}`}>
+                            <input type="checkbox" checked={ofreceOnline} onChange={(e) => setOfreceOnline(e.target.checked)} />
+                            <span className="check-chip__icon"><IconVideoCall /></span>
+                            Consulta Online
+                          </label>
+                          <label className={`check-chip check-chip--auto ${ofrecePresencial ? 'active' : ''}`}>
+                            <input type="checkbox" checked={ofrecePresencial} onChange={(e) => setOfrecePresencial(e.target.checked)} />
+                            <span className="check-chip__icon"><IconBuilding /></span>
+                            Consulta Presencial
+                          </label>
+                        </div>
+                      </div>
+
+                      {ofrecePresencial && (
+                        <AddressMapPicker
+                          provincia={domicilioProvincia}
+                          onProvinciaChange={setDomicilioProvincia}
+                          direccion={domicilioAtencion}
+                          onDireccionChange={setDomicilioAtencion}
+                          lat={domicilioLat}
+                          lng={domicilioLng}
+                          onLocationChange={(lat, lng) => { setDomicilioLat(lat); setDomicilioLng(lng) }}
+                          provinciasList={PROVINCIAS_ARGENTINA}
+                        />
+                      )}
+
+                      <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                        <label className="form-label">Foto de Perfil (Opcional - URL)</label>
+                        <input type="text" className="form-input" placeholder="https://ejemplo.com/foto.jpg" value={fotoUrl} onChange={(e) => setFotoUrl(e.target.value)} />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Wizard Navigation Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+              {regStep > 1 && (
+                <button
+                  type="button"
+                  onClick={handlePrevStep}
+                  className="btn btn--secondary"
+                  style={{ flex: 1, padding: '10px' }}
+                >
+                  Anterior
+                </button>
+              )}
+              {regStep < totalSteps ? (
+                <button
+                  type="button"
+                  onClick={handleNextStep}
+                  className="btn btn--primary"
+                  style={{ flex: 1, padding: '10px' }}
+                >
+                  Siguiente
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn btn--primary"
+                  style={{ flex: 1, padding: '10px' }}
+                >
+                  {loading ? 'Creando cuenta...' : 'Finalizar Registro'}
+                </button>
+              )}
+            </div>
+
+          </form>
+        )}
+
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          borderTop: '1px solid var(--color-border)',
+          paddingTop: '4px'
+        }}>
+          <button
+            onClick={onBack}
+            className="btn btn--ghost"
+            style={{
+              fontSize: 'var(--text-xs)',
+              color: 'var(--color-text-secondary)',
+              cursor: 'pointer'
+            }}
+          >
+            ← Volver al inicio
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

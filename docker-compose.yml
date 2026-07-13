@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  tranqui-db:
+    image: postgres:15-alpine
+    container_name: tranqui-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-tranqui_app}
+      POSTGRES_USER: ${DB_USER:-tomaskimmel}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-securepassword}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - tranqui-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  tranqui-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tranqui-backend
+    restart: always
+    ports:
+      - "8081:8080"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tranqui-backend.entrypoints=websecure"
+      - "traefik.http.routers.tranqui-backend.rule=Host(`subdom.cloud`) && (PathPrefix(`/api`) || PathPrefix(`/ws-tranqui`))"
+      - "traefik.http.routers.tranqui-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tranqui-backend.loadbalancer.server.port=8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://tranqui-db:5432/${DB_NAME:-tranqui_app}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-tomaskimmel}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-securepassword}
+      SPRING_PROFILES_ACTIVE: dev
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-masterdecryptionkey32charspart12}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-224301140079-2pa672f7sqcner9nut04j0g99md88n3p.apps.googleusercontent.com}
+      MERCADOPAGO_ENABLED: ${MERCADOPAGO_ENABLED:-false}
+      MERCADOPAGO_CLIENT_ID: ${MERCADOPAGO_CLIENT_ID:-}
+      MERCADOPAGO_CLIENT_SECRET: ${MERCADOPAGO_CLIENT_SECRET:-}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-}
+      MERCADOPAGO_SANDBOX: ${MERCADOPAGO_SANDBOX:-true}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:8081}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: DEBUG
+    depends_on:
+      tranqui-db:
+        condition: service_healthy
+    networks:
+      - tranqui-network
+
+  tranqui-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tranqui-frontend
+    restart: always
+    ports:
+      - "3000:80"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tranqui-frontend.entrypoints=websecure"
+      - "traefik.http.routers.tranqui-frontend.rule=Host(`subdom.cloud`)"
+      - "traefik.http.routers.tranqui-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tranqui-frontend.loadbalancer.server.port=80"
+    networks:
+      - tranqui-network
+    depends_on:
+      - tranqui-backend
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  tranqui-network:
+    driver: bridge
