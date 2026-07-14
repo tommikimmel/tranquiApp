@@ -39,8 +39,13 @@ export const api = {
   // Public
   getMedicos: () => apiFetch('/medicos'),
   
-  getTurnosDisponibles: (medicoId: number | string, fecha: string) => 
+  getTurnosDisponibles: (medicoId: number | string, fecha: string) =>
     apiFetch(`/medicos/${medicoId}/turnos-disponibles?fecha=${fecha}`),
+
+  // Batched counterpart of getTurnosDisponibles — one request for every médicoId's slot count
+  // instead of one request per professional (used by the homepage date filter).
+  getConteosDisponibilidad: (medicoIds: (number | string)[], fecha: string): Promise<Record<string, number>> =>
+    apiFetch(`/medicos/turnos-disponibles-conteo?fecha=${fecha}&${medicoIds.map(id => `medicoIds=${id}`).join('&')}`),
   
   reservarTurno: (data: {
     medicoId: number

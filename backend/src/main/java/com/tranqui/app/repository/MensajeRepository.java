@@ -71,4 +71,20 @@ public interface MensajeRepository extends JpaRepository<Mensaje, Long> {
            "GROUP BY u.id, u.nombre, u.email " +
            "ORDER BY ultimoMensaje DESC", nativeQuery = true)
     List<CanalPrioritarioDto> findVisitorChannels(@Param("medicoId") Long medicoId);
+
+    // Patient-side counterpart of findPrioritizedChannels: same shape, but looking for the
+    // patient's PSIQUIATRA messaging partners instead of a doctor's PACIENTE ones. No clinical
+    // priority concept applies from this side, so it's always reported as 'PRIORIDAD_BAJA'
+    // (mirrors findVisitorChannels above).
+    @Query(value = "SELECT u.id AS id, u.nombre AS nombre, u.email AS email, " +
+           "'PRIORIDAD_BAJA' AS prioridadClinica, " +
+           "MAX(m.fecha_envio) AS ultimoMensaje, " +
+           "CAST(COALESCE((SELECT COUNT(m2.id) FROM mensaje m2 WHERE m2.remitente_id = u.id AND m2.destinatario_id = :pacienteId AND m2.leido = false), 0) AS INTEGER) AS mensajesSinLeer " +
+           "FROM usuario u " +
+           "INNER JOIN mensaje m ON (m.remitente_id = u.id OR m.destinatario_id = u.id) " +
+           "WHERE (m.remitente_id = :pacienteId OR m.destinatario_id = :pacienteId) " +
+           "  AND u.rol = 'PSIQUIATRA' " +
+           "GROUP BY u.id, u.nombre, u.email " +
+           "ORDER BY ultimoMensaje DESC", nativeQuery = true)
+    List<CanalPrioritarioDto> findPatientChannels(@Param("pacienteId") Long pacienteId);
 }

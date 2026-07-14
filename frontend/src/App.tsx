@@ -1,16 +1,22 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
 import './styles/index.css'
 import './styles/dashboard.css'
+// LandingPage stays a static import — it's what almost every first-time visitor (anonymous
+// patients hitting "/") needs immediately, so there's nothing to gain from lazy-loading it.
+// Everything below is only needed by a subset of visitors (professionals, admins, someone
+// mid-checkout), so splitting them out of the main chunk shrinks what a random patient
+// downloads before first paint.
 import LandingPage from './components/LandingPage'
-import CheckoutFlow from './components/CheckoutFlow'
-import LoginPage from './components/LoginPage'
-import PatientsView from './components/PatientsView'
-import VisitorsView from './components/VisitorsView'
-import AdminDashboard from './components/AdminDashboard'
+const CheckoutFlow = lazy(() => import('./components/CheckoutFlow'))
+const LoginPage = lazy(() => import('./components/LoginPage'))
+const PatientsView = lazy(() => import('./components/PatientsView'))
+const VisitorsView = lazy(() => import('./components/VisitorsView'))
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
 import AddressMapPicker from './components/AddressMapPicker'
 import { api } from './api/api'
 import { useAlert } from './context/AlertContext'
+import { useDocumentTitle } from './hooks/useDocumentTitle'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 
@@ -187,8 +193,8 @@ const Icon = {
       <polyline points="20 6 9 17 4 12" />
     </svg>
   ),
-  AlertTriangle: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ width: 20, height: 20 }}>
+  AlertTriangle: ({ size = 20 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ width: size, height: size }}>
       <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
       <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
@@ -236,6 +242,72 @@ const Icon = {
       <path d="M9 15l2 2 4-4" />
     </svg>
   ),
+  Trash: ({ size = 14 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  ),
+  Activity: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  ),
+  Clipboard: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    </svg>
+  ),
+  FileText: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" />
+    </svg>
+  ),
+  CalendarCheck: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+      <path d="M9 16l2 2 4-4" />
+    </svg>
+  ),
+  CalendarX: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="10" y1="14" x2="14" y2="18" /><line x1="14" y1="14" x2="10" y2="18" />
+    </svg>
+  ),
+  MessageCircle: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  ),
+  BellSimple: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ width: size, height: size }}>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  ),
+}
+
+// Maps a persisted Notificacion's `tipo` (backend/.../NotificacionService.crearNotificacion
+// callers) to the icon + accent color shown in the notification bell dropdown.
+function getNotificationVisual(tipo: string | undefined): { Icon: (props: { size?: number }) => React.JSX.Element; color: string } {
+  switch (tipo) {
+    case 'TURNO_RESERVADO':
+    case 'TURNO_CONFIRMADO':
+      return { Icon: Icon.CalendarCheck, color: 'var(--color-success)' }
+    case 'TURNO_CANCELADO':
+      return { Icon: Icon.CalendarX, color: 'var(--color-danger)' }
+    case 'SEGUIMIENTO':
+      return { Icon: Icon.Activity, color: '#3b82f6' }
+    case 'INFORME':
+      return { Icon: Icon.FileText, color: '#8b5cf6' }
+    case 'NUEVO_MENSAJE':
+      return { Icon: Icon.MessageCircle, color: 'var(--color-primary)' }
+    default:
+      return { Icon: Icon.BellSimple, color: 'var(--color-primary)' }
+  }
 }
 
 // ── Sidebar Component ──────────────────────────────────────────
@@ -754,9 +826,9 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
                   cursor: 'pointer'
                 }}
               >
-                <option value="clinical">🩺 Nota Clínica</option>
-                <option value="admin">📋 Nota Administrativa</option>
-                <option value="urgent">⚠️ Prioridad Urgente</option>
+                <option value="clinical">Nota Clínica</option>
+                <option value="admin">Nota Administrativa</option>
+                <option value="urgent">Prioridad Urgente</option>
               </select>
             </div>
             <button type="submit" className="btn btn--primary" style={{ padding: 'var(--space-2) var(--space-4)', fontSize: 'var(--text-xs)', height: '36px' }}>
@@ -769,7 +841,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
           {tasks.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-text-secondary)' }}>
-              <span style={{ fontSize: '24px', display: 'block', marginBottom: 'var(--space-2)' }}>📝</span>
+              <span style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}><Icon.FileText size={24} /></span>
               <p style={{ fontSize: 'var(--text-xs)', fontStyle: 'italic', margin: 0 }}>No tenés notas pendientes.</p>
             </div>
           ) : (
@@ -781,7 +853,8 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
               const cardBg = isUrgent ? '#fff5f5' : isAdmin ? '#f0f7ff' : '#f0fdf4';
               const cardBorder = isUrgent ? '1px solid #fee2e2' : isAdmin ? '1px solid #e0f2fe' : '1px solid #dcfce7';
               const accentColor = isUrgent ? '#ef4444' : isAdmin ? '#3b82f6' : 'var(--color-primary)';
-              const badgeLabel = isUrgent ? '⚠️ Urgente' : isAdmin ? '📋 Admin' : '🩺 Clínica';
+              const BadgeIcon = isUrgent ? Icon.AlertTriangle : isAdmin ? Icon.Clipboard : Icon.Activity;
+              const badgeLabel = isUrgent ? 'Urgente' : isAdmin ? 'Admin' : 'Clínica';
               const badgeText = isUrgent ? '#991b1b' : isAdmin ? '#1d4ed8' : '#047857';
               const badgeBg = isUrgent ? '#fee2e2' : isAdmin ? '#dbeafe' : '#d1fae5';
 
@@ -828,6 +901,9 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
                       </span>
                       <span style={{
                         alignSelf: 'flex-start',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
                         backgroundColor: badgeBg,
                         color: badgeText,
                         fontSize: '9px',
@@ -837,6 +913,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
                         textTransform: 'uppercase',
                         letterSpacing: '0.02em'
                       }}>
+                        <BadgeIcon size={10} />
                         {badgeLabel}
                       </span>
                     </div>
@@ -848,7 +925,6 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
                       background: 'none',
                       cursor: 'pointer',
                       color: 'var(--color-danger)',
-                      fontSize: '14px',
                       padding: '2px',
                       lineHeight: 1,
                       display: 'flex',
@@ -859,7 +935,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
                     onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
                     title="Eliminar nota"
                   >
-                    🗑️
+                    <Icon.Trash size={14} />
                   </button>
                 </div>
               );
@@ -2943,6 +3019,9 @@ export default function App() {
   const activeNav = (location.pathname.startsWith('/panel')
     ? (location.pathname.split('/')[2] || 'dashboard')
     : 'dashboard') as NavSection
+  // LandingPage/LoginPage/AdminDashboard/CheckoutFlow each set their own title — this covers
+  // the remaining case, the professional dashboard shell rendered directly here in App().
+  useDocumentTitle(view === 'dashboard' ? 'Panel Profesional — Tranqui App' : 'Tranqui App')
   const [mpConnected, setMpConnected] = useState(false)
   const [googleConnected, setGoogleConnected] = useState(false)
   const [mpEnabled, setMpEnabled] = useState(false)
@@ -3611,31 +3690,37 @@ export default function App() {
                   </p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                    {notifications.map((n) => (
-                      <div key={n.id} style={{
-                        padding: 'var(--space-3)',
-                        borderRadius: 'var(--radius-md)',
-                        backgroundColor: n.leido ? '#ffffff' : '#f0fdf4',
-                        borderTop: '1px solid var(--color-border)',
-                        borderRight: '1px solid var(--color-border)',
-                        borderBottom: '1px solid var(--color-border)',
-                        borderLeft: n.leido ? '4px solid var(--color-border)' : '4px solid var(--color-primary)',
-                        fontSize: '11px',
-                        transition: 'all 0.2s',
-                        color: 'var(--color-text-primary)',
-                        boxShadow: 'var(--shadow-xs)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '2px'
-                      }}>
-                        <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', color: n.leido ? 'var(--color-text-secondary)' : 'var(--color-primary)' }}>
-                          🔔 {n.titulo}
+                    {notifications.map((n) => {
+                      const { Icon: NotifIcon, color: notifColor } = getNotificationVisual(n.tipo)
+                      return (
+                        <div key={n.id} style={{
+                          padding: 'var(--space-3)',
+                          borderRadius: 'var(--radius-md)',
+                          backgroundColor: n.leido ? '#ffffff' : '#f0fdf4',
+                          borderTop: '1px solid var(--color-border)',
+                          borderRight: '1px solid var(--color-border)',
+                          borderBottom: '1px solid var(--color-border)',
+                          borderLeft: `4px solid ${n.leido ? 'var(--color-border)' : notifColor}`,
+                          fontSize: '11px',
+                          transition: 'all 0.2s',
+                          color: 'var(--color-text-primary)',
+                          boxShadow: 'var(--shadow-xs)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px'
+                        }}>
+                          <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', color: n.leido ? 'var(--color-text-secondary)' : 'var(--color-primary)' }}>
+                            <span style={{ color: notifColor, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                              <NotifIcon size={14} />
+                            </span>
+                            {n.titulo}
+                          </div>
+                          <div style={{ color: 'var(--color-text-secondary)', fontSize: '10px' }}>
+                            {n.mensaje}
+                          </div>
                         </div>
-                        <div style={{ color: 'var(--color-text-secondary)', fontSize: '10px' }}>
-                          {n.mensaje}
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -3756,38 +3841,44 @@ export default function App() {
   )
 
   return (
-    <Routes>
-      <Route path="/" element={landingElement} />
-      <Route
-        path="/login"
-        element={
-          <LoginPage
-            onLoginSuccess={(user) => {
-              setCurrentUser(user)
-              if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
-                navigate('/panel')
-              } else {
-                navigate('/')
-              }
-            }}
-            onBack={() => navigate('/')}
-          />
-        }
-      />
-      <Route path="/reserva/:proId" element={<CheckoutRoute currentUser={currentUser} loadingSession={loadingSession} />} />
-      <Route
-        path="/panel/*"
-        element={
-          currentUser?.rol === 'ADMIN' ? (
-            <AdminDashboard currentUser={currentUser} onLogout={handleLogout} />
-          ) : !isPro ? (
-            <Navigate to="/" replace />
-          ) : (
-            proDashboardElement
-          )
-        }
-      />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Suspense fallback={
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div className="app-suspense-spinner" />
+      </div>
+    }>
+      <Routes>
+        <Route path="/" element={landingElement} />
+        <Route
+          path="/login"
+          element={
+            <LoginPage
+              onLoginSuccess={(user) => {
+                setCurrentUser(user)
+                if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
+                  navigate('/panel')
+                } else {
+                  navigate('/')
+                }
+              }}
+              onBack={() => navigate('/')}
+            />
+          }
+        />
+        <Route path="/reserva/:proId" element={<CheckoutRoute currentUser={currentUser} loadingSession={loadingSession} />} />
+        <Route
+          path="/panel/*"
+          element={
+            currentUser?.rol === 'ADMIN' ? (
+              <AdminDashboard currentUser={currentUser} onLogout={handleLogout} />
+            ) : !isPro ? (
+              <Navigate to="/" replace />
+            ) : (
+              proDashboardElement
+            )
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }

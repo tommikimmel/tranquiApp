@@ -46,14 +46,25 @@ public class MedicoService {
 
     @Transactional(readOnly = true)
     public List<MedicoDto> obtenerMedicosActivos() {
-        List<Usuario> medicos = usuarioRepository.findAll().stream()
-                .filter(u -> u.getRol() == Rol.PSIQUIATRA)
+        // Filter by role at the DB level (was findAll() + Java-side filtering, scanning every
+        // usuario row — patients included — on every public homepage load).
+        List<Usuario> medicos = usuarioRepository.findByRol(Rol.PSIQUIATRA).stream()
                 .filter(this::isMedicoVerificado)
                 .collect(Collectors.toList());
 
+        if (medicos.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // Batch-fetch every matching médico's tariffs in one query instead of one query per
+        // médico (the N+1 that used to run inside construirMedicoDto for each doctor).
+        List<Long> medicoIds = medicos.stream().map(Usuario::getId).collect(Collectors.toList());
+        Map<Long, List<TarifaMedico>> tarifasPorMedico = tarifaRepository.findByMedicoIdIn(medicoIds).stream()
+                .collect(Collectors.groupingBy(t -> t.getMedico().getId()));
+
         List<MedicoDto> dtos = new ArrayList<>();
         for (Usuario m : medicos) {
-            dtos.add(construirMedicoDto(m));
+            dtos.add(construirMedicoDto(m, tarifasPorMedico.getOrDefault(m.getId(), new ArrayList<>())));
         }
         return dtos;
     }
@@ -155,8 +166,10 @@ public class MedicoService {
     }
 
     private MedicoDto construirMedicoDto(Usuario m) {
-        List<TarifaMedico> tarifasDb = tarifaRepository.findByMedicoId(m.getId());
-        
+        return construirMedicoDto(m, tarifaRepository.findByMedicoId(m.getId()));
+    }
+
+    private MedicoDto construirMedicoDto(Usuario m, List<TarifaMedico> tarifasDb) {
         // If doctor has no tariffs in DB, initialize them with defaults
         if (tarifasDb.isEmpty()) {
             tarifasDb = new ArrayList<>();

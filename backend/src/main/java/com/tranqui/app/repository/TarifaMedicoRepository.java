@@ -9,5 +9,6 @@ import java.util.Optional;
 @Repository
 public interface TarifaMedicoRepository extends JpaRepository<TarifaMedico, Long> {
     List<TarifaMedico> findByMedicoId(Long medicoId);
+    List<TarifaMedico> findByMedicoIdIn(List<Long> medicoIds);
     Optional<TarifaMedico> findByMedicoIdAndServicioId(Long medicoId, String servicioId);
 }

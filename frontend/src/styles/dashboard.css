@@ -1,3 +1,19 @@
+/* ── App-level route Suspense fallback ────────────────────────
+   Lives here (loaded eagerly by App.tsx) rather than in checkout.css so it renders correctly
+   no matter which lazy-loaded route chunk (login/checkout/dashboard/admin) is still fetching. */
+@keyframes app-spin {
+  to { transform: rotate(360deg); }
+}
+
+.app-suspense-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: app-spin 0.7s linear infinite;
+}
+
 /* ── Dashboard Layout ──────────────────────────────────────── */
 .dashboard-layout {
   display: grid;

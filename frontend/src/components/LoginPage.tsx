@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api/api'
 import AddressMapPicker from './AddressMapPicker'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 interface LoginPageProps {
   onLoginSuccess: (user: any) => void
@@ -61,6 +62,7 @@ const ESPECIALIDADES_GRUPOS = [
 ];
 
 export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
+  useDocumentTitle('Iniciar sesión — Tranqui App')
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login')
   const [role, setRole] = useState<'PACIENTE' | 'PSIQUIATRA'>('PACIENTE')
   const [loading, setLoading] = useState(false)

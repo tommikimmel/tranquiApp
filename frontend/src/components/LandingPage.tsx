@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import '../styles/landing.css'
 import { api } from '../api/api'
 import { useChat } from '../hooks/useChat'
@@ -526,6 +527,7 @@ export default function LandingPage({
   onLogout: () => void;
   onGoToDashboard: () => void;
 }) {
+  useDocumentTitle('Tranqui App — Turnos con psicólogos y psiquiatras')
   const { showAlert } = useAlert()
   const [query, setQuery] = useState('')
   const [activeSpecialty, setActiveSpecialty] = useState('Todos')
@@ -567,7 +569,9 @@ export default function LandingPage({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Check real availability for every visible professional on the selected date
+  // Check real availability for every visible professional on the selected date — one batched
+  // request instead of one request per professional (used to fire N parallel HTTP calls every
+  // time the date filter changed).
   useEffect(() => {
     if (!availabilityDate || professionals.length === 0) {
       setAvailabilityMap({})
@@ -575,39 +579,42 @@ export default function LandingPage({
     }
     let cancelled = false
     setCheckingAvailability(true)
-    Promise.all(
-      professionals.map((pro) =>
-        api.getTurnosDisponibles(pro.id, availabilityDate)
-          .then((slots: string[]) => [pro.id, (slots || []).length] as const)
-          .catch(() => [pro.id, 0] as const)
-      )
-    ).then((entries) => {
-      if (cancelled) return
-      setAvailabilityMap(Object.fromEntries(entries))
-    }).finally(() => {
-      if (!cancelled) setCheckingAvailability(false)
-    })
+    api.getConteosDisponibilidad(professionals.map(p => p.id), availabilityDate)
+      .then((counts: Record<string, number>) => {
+        if (cancelled) return
+        setAvailabilityMap(counts || {})
+      })
+      .catch(() => {
+        if (!cancelled) setAvailabilityMap({})
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingAvailability(false)
+      })
     return () => { cancelled = true }
   }, [availabilityDate, professionals])
 
-  useEffect(() => {
-    if (currentUser && currentUser.rol === 'PACIENTE' && showFloatingChat) {
+  const refreshChatChannels = () => {
+    if (currentUser && currentUser.rol === 'PACIENTE') {
       api.getChatCanales()
         .then((res: any) => {
           setChatChannels(res || []);
         })
         .catch(err => console.error("Error loading chat channels:", err));
     }
-  }, [currentUser, showFloatingChat])
+  }
 
-  // Set default doctor ID (1 - Lic. Maria Paula Rossi) for patient demo chat
+  // Refresh the channel list whenever the widget opens and whenever the patient comes
+  // back from an individual chat to the list, so it never shows stale conversations.
   useEffect(() => {
-    if (currentUser && currentUser.rol === 'PACIENTE' && !activeDoctorId) {
-      setActiveDoctorId(1)
+    if (showFloatingChat && chatSubView === 'list') {
+      refreshChatChannels()
     }
-  }, [currentUser, activeDoctorId])
+  }, [currentUser, showFloatingChat, chatSubView])
 
-  const { messages: chatMessages, sendMessage: sendChatMessage } = useChat(activeDoctorId)
+  // Also refresh on every message this patient receives over the WebSocket — regardless of
+  // which chat (if any) is currently open — so a new conversation or a new last message
+  // shows up in the list without having to close and reopen the widget.
+  const { messages: chatMessages, sendMessage: sendChatMessage } = useChat(activeDoctorId, () => refreshChatChannels())
   const [chatInput, setChatInput] = useState('')
   const chatMessagesEndRef = useRef<HTMLDivElement | null>(null)
 
@@ -1560,9 +1567,12 @@ export default function LandingPage({
           {/* Floating Action Button (FAB) */}
           <button
             onClick={() => {
-              setShowFloatingChat(!showFloatingChat);
-              if (!showFloatingChat && !activeDoctorId && professionals.length > 0) {
-                // Default to list view
+              const opening = !showFloatingChat;
+              setShowFloatingChat(opening);
+              if (opening) {
+                // Always land on the conversation list when (re)opening the widget from
+                // its icon — same as WhatsApp itself. Only an explicit "Chatear" click
+                // (handleStartChat) or tapping a channel jumps straight into a chat.
                 setChatSubView('list');
               }
             }}

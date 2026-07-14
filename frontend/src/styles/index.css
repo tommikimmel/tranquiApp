@@ -4,7 +4,9 @@
    Primary: Verde Tranqui #1B8A5A (to confirm against real logo)
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+/* Sora/Inter are loaded via <link rel="preconnect"/"stylesheet"> in index.html instead of a
+   CSS @import here — @import blocks the browser from discovering the font URL until after
+   this entire stylesheet has downloaded and parsed, delaying the font fetch unnecessarily. */
 
 /* ── Design Tokens ─────────────────────────────────────────── */
 :root {
@@ -220,4 +222,11 @@ img, svg {
   background: var(--color-info-bg);
   color: var(--color-info);
   border: 1px solid #BFDBFE;
+}
+
+/* Toast notifications (AlertContext) can appear on any page, so this lives in the
+   globally-loaded stylesheet rather than a page-scoped one like dashboard.css/landing.css. */
+@keyframes slideInRight {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
