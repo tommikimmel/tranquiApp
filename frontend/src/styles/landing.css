@@ -840,3 +840,211 @@
 @media (min-width: 1024px) {
   .public-header__tagline { display: block; }
 }
+
+/* ── Rediseño de Tarjeta de Profesional (Flat Design Style) ── */
+.doc-card {
+  display: block;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 6px 24px rgba(30,122,60,.06);
+  padding: 22px;
+  cursor: pointer;
+  transition: box-shadow .2s, transform .2s, border-color .2s;
+  text-decoration: none;
+  color: inherit;
+  margin-bottom: var(--space-4);
+}
+
+.doc-card:hover {
+  box-shadow: 0 10px 32px rgba(30,122,60,.12);
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+}
+
+.doc-row {
+  display: flex;
+  gap: 18px;
+}
+
+.avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #7CC53E, #2FA84F);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 24px;
+}
+
+.avatar.lg {
+  width: 88px;
+  height: 88px;
+  font-size: 30px;
+  border-radius: 24px;
+}
+
+.doc-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.doc-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.doc-name {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.badge-mn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #E9F6EC;
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.badge-mn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.doc-spec {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.doc-bio {
+  font-size: 13.5px;
+  color: var(--color-text-secondary);
+  margin-top: 8px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.doc-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.tag.online {
+  background: #E7F1FB;
+  color: #1D6FB8;
+}
+
+.tag.presencial {
+  background: #FCF3DD;
+  color: #A87B1E;
+}
+
+.tag.next {
+  background: #E9F6EC;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.doc-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.price {
+  text-align: right;
+}
+
+.price .label {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.price .val {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--color-text-primary);
+}
+
+.price .per {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.go {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 11px 20px;
+  border-radius: var(--radius-md);
+  transition: all 0.15s ease;
+}
+
+.doc-card:hover .go {
+  background: var(--color-primary-dark);
+}
+
+.go svg {
+  width: 16px;
+  height: 16px;
+}
+
+.card-hint {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-border);
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 640px) {
+  .doc-row {
+    flex-wrap: wrap;
+  }
+  .doc-side {
+    flex-direction: row;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
