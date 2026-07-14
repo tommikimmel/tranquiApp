@@ -27,6 +27,17 @@ public class TurnoController {
         return ResponseEntity.ok(turnoService.obtenerHorariosDisponibles(medicoId, fecha));
     }
 
+    /**
+     * Batched counterpart used by the public homepage's date filter: instead of one request per
+     * visible professional, the frontend sends every médicoId once and gets back a count per id.
+     */
+    @GetMapping("/medicos/turnos-disponibles-conteo")
+    public ResponseEntity<java.util.Map<Long, Integer>> obtenerConteosDisponibilidad(
+            @RequestParam List<Long> medicoIds,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+        return ResponseEntity.ok(turnoService.obtenerConteosDisponibilidad(medicoIds, fecha));
+    }
+
     @PostMapping("/turnos/reservar")
     public ResponseEntity<TurnoResponseDto> reservarTurno(@RequestBody ReservaTurnoDto dto) {
         return ResponseEntity.ok(turnoService.reservarTurno(dto));

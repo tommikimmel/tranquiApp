@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import '../styles/checkout.css'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 let leafletLoadingPromise: Promise<void> | null = null
 function loadLeafletScript(): Promise<void> {
@@ -1094,6 +1095,7 @@ export default function CheckoutFlow({
   onBack: () => void
   onComplete: () => void
 }) {
+  useDocumentTitle(`Reservar turno con ${professional.name} — Tranqui App`)
   const { showAlert } = useAlert()
   const [step, setStep] = useState<CheckoutStep>('select')
   const [selectedDay, setSelectedDay] = useState<DayOption | null>(null)

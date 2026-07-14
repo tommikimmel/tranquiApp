@@ -59,23 +59,22 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
       {/* Toast Notification HUD */}
       <div style={{
         position: 'fixed',
-        bottom: '24px',
+        top: '24px',
         right: '24px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px',
+        gap: 'var(--space-3)',
         zIndex: 999999,
-        maxWidth: '380px',
+        maxWidth: '420px',
         width: '100%'
       }}>
         {alerts.map((a) => {
           const isError = a.type === 'error';
           const isWarning = a.type === 'warning';
           const isInfo = a.type === 'info';
-          
-          const accentColor = isError ? 'var(--color-danger)' : isWarning ? '#f59e0b' : isInfo ? '#0284c7' : 'var(--color-primary)';
-          const iconColor = accentColor;
-          const bg = '#ffffff';
+
+          const accentColor = isError ? 'var(--color-error)' : isWarning ? 'var(--color-warning)' : isInfo ? 'var(--color-info)' : 'var(--color-primary)';
+          const bg = isError ? 'var(--color-error-bg)' : isWarning ? 'var(--color-warning-bg)' : isInfo ? 'var(--color-info-bg)' : 'var(--green-50)';
 
           return (
             <div key={a.id} style={{
@@ -84,12 +83,12 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
               borderRight: '1px solid var(--color-border)',
               borderBottom: '1px solid var(--color-border)',
               borderLeft: `4px solid ${accentColor}`,
-              borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-3.5) var(--space-5)',
+              borderRadius: 'var(--radius-lg)',
+              padding: 'var(--space-4) var(--space-5)',
               color: 'var(--color-text-primary)',
               fontSize: 'var(--text-sm)',
               fontFamily: 'var(--font-body)',
-              fontWeight: '500',
+              fontWeight: 'var(--font-weight-medium)',
               boxShadow: 'var(--shadow-lg)',
               display: 'flex',
               alignItems: 'center',
@@ -99,26 +98,27 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
               position: 'relative'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                <span style={{ color: iconColor, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                  <AlertIcon type={a.type} size={18} />
+                <span style={{ color: accentColor, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                  <AlertIcon type={a.type} size={20} />
                 </span>
-                <span style={{ lineHeight: '1.4' }}>{a.message}</span>
+                <span style={{ lineHeight: 'var(--line-height-relaxed)' }}>{a.message}</span>
               </div>
               <button
                 onClick={() => removeAlert(a.id)}
-                style={{ 
-                  border: 'none', 
-                  background: 'none', 
-                  color: 'var(--color-text-secondary)', 
-                  cursor: 'pointer', 
-                  padding: '4px', 
-                  opacity: 0.6, 
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  color: 'var(--color-text-secondary)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  opacity: 0.6,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  transition: 'opacity 0.2s',
+                  transition: 'opacity var(--transition-fast)',
                   borderRadius: '50%',
-                  backgroundColor: 'transparent'
+                  backgroundColor: 'transparent',
+                  flexShrink: 0
                 }}
               >
                 <CloseIcon size={14} />
