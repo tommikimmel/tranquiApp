@@ -58,6 +58,19 @@ public class TurnoController {
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * Public counterpart of /cancelar, reachable without login since booking itself doesn't
+     * require an account. Only releases turnos still in PENDIENTE_PAGO (see
+     * TurnoService#abandonarReservaPendiente) so it can't be used to cancel a real, paid
+     * appointment by guessing an id — lets a patient who backs out of payment immediately
+     * free their slot instead of blocking themselves for 5 minutes until the cleanup job runs.
+     */
+    @PostMapping("/turnos/{turnoId}/abandonar-pago")
+    public ResponseEntity<Void> abandonarReservaPendiente(@PathVariable Long turnoId) {
+        turnoService.abandonarReservaPendiente(turnoId);
+        return ResponseEntity.ok().build();
+    }
+
     @PutMapping("/turnos/{turnoId}/asistencia")
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<Void> actualizarAsistencia(

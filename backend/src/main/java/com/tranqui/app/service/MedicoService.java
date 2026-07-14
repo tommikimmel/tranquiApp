@@ -77,7 +77,7 @@ public class MedicoService {
         Usuario medico = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
-        medico.setNombre(dto.getName());
+        medico.setNombre(dto.getNombre());
         medico.setApellido(dto.getApellido());
         medico.setSexo(dto.getSexo());
         medico.setFechaNacimiento(dto.getFechaNacimiento());
@@ -230,6 +230,7 @@ public class MedicoService {
         return MedicoDto.builder()
                 .id(m.getId())
                 .name(nombreCompleto)
+                .nombre(m.getNombre())
                 .email(m.getEmail())
                 .initials(initials)
                 .degree(m.getTitulo() != null ? m.getTitulo() : "Médico/a")

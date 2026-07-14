@@ -29,30 +29,47 @@ export function useChat(activeContactId: number | null, onMessageReceived?: (msg
 
   // Load chat history when active contact changes
   useEffect(() => {
-    if (activeContactId) {
+    if (!activeContactId) {
       setMessages([])
-      api.getChatHistorial(activeContactId)
-        .then((res: any) => {
-          // Page<Mensaje> is returned by the backend, so we look for res.content
-          if (res && res.content) {
-            // Backend returns messages sorted DESC (latest first) for pagination, 
-            // so we reverse them to display chronologically (oldest to newest)
-            const history = [...res.content].reverse().map((m: any) => ({
-              id: m.id,
-              remitenteId: m.remitente.id,
-              destinatarioId: m.destinatario.id,
-              contenido: m.contenido,
-              fechaEnvio: m.fechaEnvio
-            }))
-            setMessages(history)
-          }
-        })
-        .catch((err) => {
-          console.error("Error al cargar historial de chat:", err)
-        })
-    } else {
-      setMessages([])
+      return
     }
+
+    // Guards against out-of-order responses: if the user switches contacts again
+    // before this fetch resolves, a stale reply for the *previous* contact must not
+    // overwrite the messages of the one now active.
+    let cancelled = false
+    setMessages([])
+    api.getChatHistorial(activeContactId)
+      .then((res: any) => {
+        if (cancelled) return
+        // Page<Mensaje> is returned by the backend, so we look for res.content
+        if (res && res.content) {
+          // Backend returns messages sorted DESC (latest first) for pagination,
+          // so we reverse them to display chronologically (oldest to newest)
+          const history = [...res.content].reverse().map((m: any) => ({
+            id: m.id,
+            remitenteId: m.remitente.id,
+            destinatarioId: m.destinatario.id,
+            contenido: m.contenido,
+            fechaEnvio: m.fechaEnvio
+          }))
+          // A message can arrive over the WebSocket for this same contact while this
+          // request is still in flight (appended optimistically below). Since the DB
+          // snapshot this response reflects may predate that arrival, replacing the
+          // array outright would make it vanish again — keep any such live arrival
+          // that isn't already part of the fetched history.
+          setMessages((prev) => {
+            const historyIds = new Set(history.map((m) => m.id).filter((id) => id != null))
+            const liveOnly = prev.filter((m) => m.id == null || !historyIds.has(m.id))
+            return [...history, ...liveOnly]
+          })
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) console.error("Error al cargar historial de chat:", err)
+      })
+
+    return () => { cancelled = true }
   }, [activeContactId])
 
   // Connect to STOMP Broker

@@ -1150,7 +1150,15 @@ export default function CheckoutFlow({
       setPaymentStatus('idle')
       setCreatedTurn(res)
       if (res.checkoutUrl) {
-        setShowMockPaymentGateway(true)
+        // The backend returns this fixed mock URL when Mercado Pago isn't really
+        // configured (dev mode, or the professional hasn't linked a real account yet).
+        // A real preference URL sends the patient straight to mercadopago.com.ar instead
+        // of showing them our own sandbox-labeled simulator.
+        if (res.checkoutUrl.includes('mock-preference-id')) {
+          setShowMockPaymentGateway(true)
+        } else {
+          window.location.href = res.checkoutUrl
+        }
       } else {
         setStep('confirmed')
         window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -1313,7 +1321,15 @@ export default function CheckoutFlow({
 
               <button
                 disabled={simulatingWebhook}
-                onClick={() => {
+                onClick={async () => {
+                  try {
+                    // Release the PENDIENTE_PAGO turno now instead of leaving it to block
+                    // this same patient email from re-booking for the next 5 minutes
+                    // (until LiberarTurnosScheduler's cleanup pass runs).
+                    await api.abandonarReservaPendiente(createdTurn.turnoId)
+                  } catch (err) {
+                    console.error("Error al liberar la reserva pendiente:", err)
+                  }
                   setShowMockPaymentGateway(false);
                   setPaymentStatus('error');
                   setErrorMessage("Pago rechazado por el usuario en la simulación.");
@@ -1323,22 +1339,6 @@ export default function CheckoutFlow({
               >
                 Simular Pago Rechazado (Cancelar)
               </button>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', margin: 'var(--space-2) 0' }}>
-                <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }}></div>
-                <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>O bien</span>
-                <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }}></div>
-              </div>
-
-              <a
-                href={createdTurn.checkoutUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn--secondary"
-                style={{ justifyContent: 'center' }}
-              >
-                Abrir URL oficial de Mercado Pago
-              </a>
             </div>
           </div>
         </div>

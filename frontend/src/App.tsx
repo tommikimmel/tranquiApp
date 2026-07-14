@@ -308,80 +308,68 @@ function Sidebar({ activeNav, onNavChange, medicoInfo, hasUnreadChats }: { activ
 
 // ── MP Connect Banner ──────────────────────────────────────────
 function MPConnectBanner({ connected, onConnect, onDisconnect }: { connected: boolean; onConnect: () => void; onDisconnect: () => void }) {
-  if (connected) {
-    return (
-      <div className="mp-connect-banner mp-connect-banner--connected" role="status">
-        <div className="mp-connect-banner__icon">
-          <img src="/logo-mp.png" alt="Mercado Pago" className="mp-connect-banner__logo" />
-        </div>
-        <div className="mp-connect-banner__content">
-          <h2 className="mp-connect-banner__title">Mercado Pago conectado ✓</h2>
-          <p className="mp-connect-banner__body">
-            Tu cuenta está vinculada. Los pagos se acreditan automáticamente en tu cuenta de Mercado Pago
-            al confirmarse cada sesión. Tranqui es 100% libre de comisiones.
-          </p>
-        </div>
-        <button className="btn btn--ghost btn--sm" onClick={onDisconnect}>Desconectar</button>
-      </div>
-    )
-  }
-
   return (
-    <div className="mp-connect-banner" role="alert">
+    <div className={`mp-connect-banner ${connected ? 'mp-connect-banner--connected' : ''}`} role={connected ? 'status' : 'alert'}>
       <div className="mp-connect-banner__icon">
-          <img src="/logo-mp.png" alt="Mercado Pago" className="mp-connect-banner__logo" />
-        </div>
+        <img src="/logo-mp.png" alt="Mercado Pago" className="mp-connect-banner__logo" />
+      </div>
       <div className="mp-connect-banner__content">
-        <h2 className="mp-connect-banner__title">Conectá tu cuenta de Mercado Pago</h2>
+        <span className="mp-connect-banner__status">
+          <span className="mp-connect-banner__status-dot" />
+          {connected ? 'Conectado' : 'Desconectado'}
+        </span>
+        <h2 className="mp-connect-banner__title">
+          {connected ? 'Mercado Pago vinculado' : 'Conectá tu cuenta de Mercado Pago'}
+        </h2>
         <p className="mp-connect-banner__body">
-          Para que los pacientes puedan pagarte directamente, necesitás vincular tu cuenta de Mercado Pago.
-          El proceso toma menos de 2 minutos. Sin esto, tu perfil no aparece en las búsquedas públicas.
+          {connected
+            ? 'Los pagos se acreditan automáticamente en tu cuenta de Mercado Pago al confirmarse cada sesión. Tranqui es 100% libre de comisiones.'
+            : 'Para que los pacientes puedan pagarte directamente, necesitás vincular tu cuenta de Mercado Pago. El proceso toma menos de 2 minutos. Sin esto, tu perfil no aparece en las búsquedas públicas.'}
         </p>
       </div>
-      <button className="btn btn--primary" onClick={onConnect} id="btn-connect-mp">
-        Conectar Mercado Pago
-      </button>
+      <div className="mp-connect-banner__action">
+        {connected ? (
+          <button className="btn btn--ghost btn--sm" onClick={onDisconnect}>Desconectar</button>
+        ) : (
+          <button className="btn btn--primary btn--sm" onClick={onConnect} id="btn-connect-mp">Conectar Mercado Pago</button>
+        )}
+      </div>
     </div>
   )
 }
 
 // ── Google Calendar Connect Banner ──────────────────────────────
 function GoogleCalendarConnectBanner({ connected, onConnect, onDisconnect }: { connected: boolean; onConnect: () => void; onDisconnect: () => void }) {
-  if (connected) {
-    return (
-      <div className="mp-connect-banner mp-connect-banner--connected" role="status" style={{ borderLeft: '5px solid #4285F4', marginTop: 'var(--space-4)' }}>
-        <div className="mp-connect-banner__icon">
-          <svg viewBox="0 0 24 24" style={{ width: 32, height: 32 }}>
-            <path fill="#4285F4" d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
-          </svg>
-        </div>
-        <div className="mp-connect-banner__content">
-          <h2 className="mp-connect-banner__title" style={{ color: '#1a73e8' }}>Google Calendar conectado ✓</h2>
-          <p className="mp-connect-banner__body">
-            Tu Google Calendar está vinculado. Se crearán reuniones reales de Google Meet automáticamente en tu agenda para todas las videollamadas con pacientes de Tranqui App.
-          </p>
-        </div>
-        <button className="btn btn--ghost btn--sm" onClick={onDisconnect}>Desconectar</button>
-      </div>
-    )
-  }
-
   return (
-    <div className="mp-connect-banner" role="alert" style={{ borderLeft: '5px solid #bdc1c6', marginTop: 'var(--space-4)' }}>
+    <div className={`mp-connect-banner ${connected ? 'mp-connect-banner--connected' : ''}`} role={connected ? 'status' : 'alert'}>
       <div className="mp-connect-banner__icon">
-        <svg viewBox="0 0 24 24" style={{ width: 32, height: 32 }}>
-          <path fill="#70757a" d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
+        <svg viewBox="0 0 24 24" style={{ width: 28, height: 28 }}>
+          <path fill={connected ? '#4285F4' : '#70757a'} d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
         </svg>
       </div>
       <div className="mp-connect-banner__content">
-        <h2 className="mp-connect-banner__title">Vinculá tu Google Calendar / Google Meet</h2>
+        <span className="mp-connect-banner__status" style={connected ? { background: '#E8F0FE', color: '#1a73e8' } : undefined}>
+          <span className="mp-connect-banner__status-dot" />
+          {connected ? 'Conectado' : 'Desconectado'}
+        </span>
+        <h2 className="mp-connect-banner__title">
+          {connected ? 'Google Calendar vinculado' : 'Vinculá tu Google Calendar / Google Meet'}
+        </h2>
         <p className="mp-connect-banner__body">
-          Para que el sistema genere automáticamente enlaces reales de Google Meet en cada turno confirmado y se añadan a tu agenda de Google, necesitás conectar tu cuenta.
+          {connected
+            ? 'Se crean reuniones reales de Google Meet automáticamente en tu agenda de Google para todas las videollamadas con pacientes de Tranqui App.'
+            : 'Para que el sistema genere automáticamente enlaces reales de Google Meet en cada turno confirmado y se añadan a tu agenda de Google, necesitás conectar tu cuenta.'}
         </p>
       </div>
-      <button className="btn btn--primary" onClick={onConnect} id="btn-connect-google" style={{ backgroundColor: '#1a73e8', borderColor: '#1a73e8' }}>
-        Conectar Google Calendar
-      </button>
+      <div className="mp-connect-banner__action">
+        {connected ? (
+          <button className="btn btn--ghost btn--sm" onClick={onDisconnect}>Desconectar</button>
+        ) : (
+          <button className="btn btn--primary btn--sm" onClick={onConnect} id="btn-connect-google" style={{ backgroundColor: '#1a73e8', borderColor: '#1a73e8' }}>
+            Conectar Google Calendar
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -1353,17 +1341,23 @@ function SettingsView({
   onSave,
   mpConnected,
   onConnect,
-  onDisconnect
+  onDisconnect,
+  googleConnected,
+  onConnectGoogle,
+  onDisconnectGoogle
 }: {
   medicoInfo: any
   onSave: (updated: any) => Promise<void>
   mpConnected: boolean
   onConnect: () => void
   onDisconnect: () => void
+  googleConnected: boolean
+  onConnectGoogle: () => void
+  onDisconnectGoogle: () => void
 }) {
   const { showAlert } = useAlert();
   const [showUnmetList, setShowUnmetList] = useState(false);
-  const [name, setName] = useState(medicoInfo?.name || '')
+  const [name, setName] = useState(medicoInfo?.nombre || '')
   const [apellido, setApellido] = useState(medicoInfo?.apellido || '')
   const [sexo, setSexo] = useState(medicoInfo?.sexo || 'M')
   const [fechaNacimiento, setFechaNacimiento] = useState(medicoInfo?.fechaNacimiento || '')
@@ -1424,7 +1418,7 @@ function SettingsView({
     try {
       await onSave({
         ...medicoInfo,
-        name,
+        nombre: name,
         apellido,
         sexo,
         fechaNacimiento,
@@ -1961,54 +1955,20 @@ function SettingsView({
 
       {/* Mercado Pago Integration */}
       <div className="card">
-        <div className="card__header" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <img src="/logo-mp.png" alt="Mercado Pago" style={{ width: '32px', height: 'auto' }} />
-          <div>
-            <h2 className="card__title">Integración con Mercado Pago</h2>
-            <p className="card__subtitle">Vinculá tu cuenta para cobrar tus sesiones directamente en tu Mercado Pago, 100% libre de comisiones.</p>
-          </div>
+        <div className="card__header">
+          <h2 className="card__title">Integración con Mercado Pago</h2>
+          <p className="card__subtitle">Vinculá tu cuenta para cobrar tus sesiones directamente en tu Mercado Pago, 100% libre de comisiones.</p>
         </div>
-        <div style={{
-          padding: 'var(--space-4)',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--color-border)',
-          backgroundColor: mpConnected ? 'var(--green-50)' : '#fafaf9',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 'var(--space-4)'
-        }}>
-          <div>
-            <div style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {mpConnected ? (
-                <>
-                  <span style={{ color: 'var(--color-success)' }}>●</span> Conectado
-                </>
-              ) : (
-                <>
-                  <span style={{ color: 'var(--color-warning)' }}>●</span> Desconectado
-                </>
-              )}
-            </div>
-            <p style={{ margin: '4px 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', maxWidth: '480px', lineHeight: '1.4' }}>
-              {mpConnected 
-                ? 'Tu cuenta de Mercado Pago está vinculada y activa para recibir cobros en tu perfil público.' 
-                : 'Conectá tu cuenta para permitir a los pacientes abonar sus turnos de forma automatizada por Mercado Pago. Si no la vinculás, tu perfil no se mostrará en las búsquedas públicas.'}
-            </p>
-          </div>
-          <div>
-            {mpConnected ? (
-              <button className="btn btn--ghost btn--sm" onClick={onDisconnect} style={{ border: '1px solid var(--color-border)' }}>
-                Desconectar cuenta
-              </button>
-            ) : (
-              <button className="btn btn--primary btn--sm" onClick={onConnect}>
-                Vincular Mercado Pago
-              </button>
-            )}
-          </div>
+        <MPConnectBanner connected={mpConnected} onConnect={onConnect} onDisconnect={onDisconnect} />
+      </div>
+
+      {/* Google Calendar Integration */}
+      <div className="card">
+        <div className="card__header">
+          <h2 className="card__title">Integración con Google Calendar</h2>
+          <p className="card__subtitle">Vinculá tu cuenta para generar automáticamente reuniones de Google Meet en tu agenda.</p>
         </div>
+        <GoogleCalendarConnectBanner connected={googleConnected} onConnect={onConnectGoogle} onDisconnect={onDisconnectGoogle} />
       </div>
 
     </div>
@@ -3249,6 +3209,46 @@ export default function App() {
     window.history.replaceState({}, '', window.location.pathname + (newSearch ? `?${newSearch}` : ''))
   }, [])
 
+  const handleConnectGoogle = async () => {
+    try {
+      const { url } = await api.getGoogleCalendarConnectUrl()
+      window.location.href = url
+    } catch (err) {
+      console.error("Error al obtener la URL de conexión de Google Calendar:", err)
+      showAlert('No se pudo iniciar la conexión con Google Calendar. Intentá de nuevo.', 'error')
+    }
+  }
+
+  const handleDisconnectGoogle = async () => {
+    try {
+      await api.desconectarGoogleCalendar()
+      setGoogleConnected(false)
+      showAlert('Desvinculaste tu Google Calendar.', 'success')
+    } catch (err) {
+      console.error("Error al desvincular Google Calendar:", err)
+      showAlert('No se pudo desvincular la cuenta. Intentá de nuevo.', 'error')
+    }
+  }
+
+  // Handle the ?googleCalendar=success / ?googleCalendar=error redirect coming back from the Google OAuth callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const googleResult = params.get('googleCalendar')
+    if (!googleResult) return
+
+    if (googleResult === 'success') {
+      showAlert('¡Tu Google Calendar quedó vinculado!', 'success')
+      setGoogleConnected(true)
+    } else if (googleResult === 'error') {
+      showAlert('No se pudo vincular tu Google Calendar. Intentá de nuevo.', 'error')
+    }
+
+    params.delete('googleCalendar')
+    params.delete('reason')
+    const newSearch = params.toString()
+    window.history.replaceState({}, '', window.location.pathname + (newSearch ? `?${newSearch}` : ''))
+  }, [])
+
   const handleBook = (pro: CheckoutTarget) => {
     if (!currentUser) {
       showAlert("Para reservar un turno, debes iniciar sesión primero.", "warning");
@@ -3379,12 +3379,15 @@ export default function App() {
       )
       case 'settings': 
         return (
-          <SettingsView 
-            medicoInfo={medicoInfo} 
-            onSave={handleSaveSettings} 
+          <SettingsView
+            medicoInfo={medicoInfo}
+            onSave={handleSaveSettings}
             mpConnected={mpConnected}
             onConnect={handleConnect}
             onDisconnect={handleDisconnectMercadoPago}
+            googleConnected={googleConnected}
+            onConnectGoogle={handleConnectGoogle}
+            onDisconnectGoogle={handleDisconnectGoogle}
           />
         )
     }

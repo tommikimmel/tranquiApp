@@ -128,7 +128,8 @@ export const api = {
   }) => apiFetch('/recetas/enviar', { method: 'POST', body: data as any }),
 
   // Chat API
-  getChatHistorial: (destinatarioId: number | string) => apiFetch(`/chat/historial/${destinatarioId}`),
+  getChatHistorial: (destinatarioId: number | string, page = 0, size = 100) =>
+    apiFetch(`/chat/historial/${destinatarioId}?page=${page}&size=${size}`),
   getChatCanales: () => apiFetch('/chat/canales'),
   getTieneNoLeidos: (): Promise<boolean> => apiFetch('/chat/tiene-no-leidos'),
   getChatCanalesVisitadores: () => apiFetch('/chat/canales/visitadores'),
@@ -161,6 +162,7 @@ export const api = {
     apiFetch('/pacientes/me/seguimientos', { method: 'POST', body: data as any }),
   getMisInformes: () => apiFetch('/pacientes/me/informes'),
   cancelarTurno: (turnoId: number | string) => apiFetch(`/turnos/${turnoId}/cancelar`, { method: 'POST' }),
+  abandonarReservaPendiente: (turnoId: number | string) => apiFetch(`/turnos/${turnoId}/abandonar-pago`, { method: 'POST' }),
   actualizarAsistencia: (turnoId: number | string, asistencia: string) => 
     apiFetch(`/turnos/${turnoId}/asistencia?asistencia=${encodeURIComponent(asistencia)}`, { method: 'PUT' }),
   reprogramarTurno: (turnoId: number | string, fecha: string, hora: string) => 
