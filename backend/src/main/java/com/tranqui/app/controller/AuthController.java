@@ -51,6 +51,11 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El email ya está registrado");
         }
 
+        if (registerRequestDto.getFotoUrl() != null
+                && com.tranqui.app.util.ImageUtils.decodedByteSize(registerRequestDto.getFotoUrl()) > 3L * 1024 * 1024) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La foto de perfil es demasiado grande (máx. 3MB). Elegí una imagen más liviana.");
+        }
+
         Usuario usuario = Usuario.builder()
                 .email(registerRequestDto.getEmail())
                 .password(passwordEncoder.encode(registerRequestDto.getPassword()))

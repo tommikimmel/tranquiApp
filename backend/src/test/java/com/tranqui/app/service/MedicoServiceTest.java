@@ -142,6 +142,20 @@ class MedicoServiceTest {
     }
 
     @Test
+    void testActualizarPerfil_rejectsOversizedFotoUrl() {
+        String hugeFoto = "data:image/png;base64," + "A".repeat(5 * 1024 * 1024); // ~3.75MB decoded
+        MedicoDto dto = MedicoDto.builder()
+                .nombre("Marta").apellido("Rossi").fotoUrl(hugeFoto).build();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> medicoService.actualizarPerfil(medico.getEmail(), dto));
+        assertTrue(ex.getMessage().contains("demasiado grande"));
+
+        Usuario unchanged = usuarioRepository.findByEmail(medico.getEmail()).orElseThrow();
+        assertNotEquals(hugeFoto, unchanged.getFotoUrl());
+    }
+
+    @Test
     void testObtenerStats() {
         DashboardStatsDto stats = medicoService.obtenerStats(medico.getEmail());
         assertNotNull(stats);
