@@ -11,12 +11,24 @@ function loadLeafletScript(): Promise<void> {
   if (leafletLoadingPromise) return leafletLoadingPromise
 
   leafletLoadingPromise = new Promise((resolve, reject) => {
+    // Leaflet needs its stylesheet applied *before* L.map() runs, otherwise the
+    // map container has no position/overflow rules yet and tiles render
+    // misplaced/blank. Wait for both the CSS and the script, not just the script.
+    let cssReady = false
+    let scriptReady = false
+    const maybeResolve = () => { if (cssReady && scriptReady) resolve() }
+
     const linkId = 'leaflet-css'
-    if (!document.getElementById(linkId)) {
+    const existingLink = document.getElementById(linkId)
+    if (existingLink) {
+      cssReady = true
+    } else {
       const link = document.createElement('link')
       link.id = linkId
       link.rel = 'stylesheet'
       link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+      link.onload = () => { cssReady = true; maybeResolve() }
+      link.onerror = () => { cssReady = true; maybeResolve() }
       document.head.appendChild(link)
     }
 
@@ -25,9 +37,11 @@ function loadLeafletScript(): Promise<void> {
     script.id = scriptId
     script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
     script.async = true
-    script.onload = () => resolve()
+    script.onload = () => { scriptReady = true; maybeResolve() }
     script.onerror = () => reject(new Error('No se pudo cargar Leaflet'))
     document.body.appendChild(script)
+
+    maybeResolve()
   })
 
   return leafletLoadingPromise
@@ -228,7 +242,16 @@ function StepSelect({
 
     L.marker([lat, lng], { icon: customIcon }).addTo(map)
 
+    // Force a resize pass once the surrounding grid/panel layout has settled —
+    // Leaflet measures its container synchronously at init, and a wrong initial
+    // read (e.g. while web fonts are still swapping in) leaves the map blank.
+    const resizeTimer = setTimeout(() => map.invalidateSize(), 150)
+    const handleWindowResize = () => map.invalidateSize()
+    window.addEventListener('resize', handleWindowResize)
+
     return () => {
+      clearTimeout(resizeTimer)
+      window.removeEventListener('resize', handleWindowResize)
       map.remove()
     }
   }, [leafletLoaded, professional.domicilioLat, professional.domicilioLng])
@@ -720,13 +743,14 @@ function StepSelect({
                 }
               }}
             >
-              <div 
-                ref={mapContainerRef} 
-                style={{ 
-                  height: '150px', 
+              <div
+                ref={mapContainerRef}
+                style={{
+                  height: '190px',
+                  width: '100%',
                   backgroundColor: '#EAF2EA',
                   zIndex: 1
-                }} 
+                }}
               />
               <div style={{
                 position: 'absolute',
@@ -760,7 +784,7 @@ function StepSelect({
       </div>
 
       {/* SEO Sections below fold */}
-      <div className="panel" style={{ marginTop: '24px' }}>
+      <div className="panel">
         {professional.tags && professional.tags.length > 0 && (
           <>
             <div className="seo-title">Principales tratamientos</div>
