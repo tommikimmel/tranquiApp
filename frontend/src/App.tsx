@@ -275,7 +275,13 @@ function Sidebar({ activeNav, onNavChange, medicoInfo, hasUnreadChats }: { activ
       </nav>
 
       <div className="sidebar__footer">
-        <div className="sidebar__user" role="button" tabIndex={0}>
+        <div
+          className="sidebar__user"
+          role="button"
+          tabIndex={0}
+          onClick={() => onNavChange('settings')}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNavChange('settings') } }}
+        >
           {medicoInfo?.fotoUrl ? (
             <img 
               src={medicoInfo.fotoUrl} 
