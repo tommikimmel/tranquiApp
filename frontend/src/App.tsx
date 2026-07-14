@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
 import './styles/index.css'
 import './styles/dashboard.css'
 import LandingPage from './components/LandingPage'
@@ -13,8 +14,6 @@ import { useAlert } from './context/AlertContext'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 
-type AppView = 'landing' | 'checkout' | 'dashboard' | 'login'
-
 interface CheckoutTarget {
   id: string
   name: string
@@ -24,9 +23,78 @@ interface CheckoutTarget {
   price: number
   nextSlot: string
   nextSlotDay: string
+  fotoUrl?: string
   domicilioAtencion?: string
   domicilioLat?: number | null
   domicilioLng?: number | null
+}
+
+// ── /reserva/:proId route — resolves the professional either from the
+// navigation state (fast path, set by handleBook on click) or by fetching
+// the public medicos list and matching the id (direct URL load / refresh).
+function CheckoutRoute({ currentUser, loadingSession }: { currentUser: any; loadingSession: boolean }) {
+  const { proId } = useParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const stateTarget = (location.state as CheckoutTarget | null) || null
+  const [target, setTarget] = useState<CheckoutTarget | null>(stateTarget)
+  const [loading, setLoading] = useState(!stateTarget)
+  const [notFound, setNotFound] = useState(false)
+
+  useEffect(() => {
+    if (stateTarget) return
+    let cancelled = false
+    setLoading(true)
+    api.getMedicos()
+      .then((res: any[]) => {
+        if (cancelled) return
+        const m = (res || []).find((x: any) => String(x.id) === proId)
+        if (!m) {
+          setNotFound(true)
+          return
+        }
+        setTarget({
+          id: String(m.id),
+          name: m.name,
+          degree: m.degree,
+          specialty: m.specialty,
+          matricula: m.matricula,
+          price: m.price,
+          nextSlot: m.nextSlot || '16:00',
+          nextSlotDay: m.nextSlotDay || 'Hoy',
+          fotoUrl: m.fotoUrl,
+          domicilioAtencion: m.domicilioAtencion,
+          domicilioLat: m.domicilioLat,
+          domicilioLng: m.domicilioLng,
+        })
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proId])
+
+  if (loadingSession || loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: 'var(--space-20)' }}>
+        <div className="checkout-spinner" style={{ margin: '0 auto' }} />
+      </div>
+    )
+  }
+  if (!currentUser) {
+    return <Navigate to="/login" replace />
+  }
+  if (notFound || !target) {
+    return <Navigate to="/" replace />
+  }
+
+  return (
+    <CheckoutFlow
+      professional={target}
+      onBack={() => navigate('/')}
+      onComplete={() => navigate('/')}
+    />
+  )
 }
 
 // ── Types ──────────────────────────────────────────────────────
@@ -2767,12 +2835,21 @@ function DashboardHome({
 // ── Root App ───────────────────────────────────────────────────
 export default function App() {
   const { showAlert } = useAlert()
-  const [view, setView] = useState<AppView>('landing')
-  const [activeNav, setActiveNav] = useState<NavSection>('dashboard')
+  const navigate = useNavigate()
+  const location = useLocation()
+  // Derived from the URL instead of local state, so every "page" the SPA
+  // shows has its own real route (/, /login, /reserva/:proId, /panel/...).
+  const view: 'landing' | 'checkout' | 'dashboard' | 'login' =
+    location.pathname.startsWith('/panel') ? 'dashboard'
+    : location.pathname.startsWith('/reserva/') ? 'checkout'
+    : location.pathname === '/login' ? 'login'
+    : 'landing'
+  const activeNav = (location.pathname.startsWith('/panel')
+    ? (location.pathname.split('/')[2] || 'dashboard')
+    : 'dashboard') as NavSection
   const [mpConnected, setMpConnected] = useState(false)
   const [googleConnected, setGoogleConnected] = useState(false)
   const [mpEnabled, setMpEnabled] = useState(false)
-  const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null)
 
   // API states
   const [currentUser, setCurrentUser] = useState<any>(null)
@@ -2810,13 +2887,7 @@ export default function App() {
     const cachedUser = localStorage.getItem('tranqui_user')
     if (cachedUser) {
       try {
-        const user = JSON.parse(cachedUser)
-        setCurrentUser(user)
-        if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
-          setView('dashboard')
-        } else {
-          setView('landing')
-        }
+        setCurrentUser(JSON.parse(cachedUser))
       } catch (e) {
         localStorage.removeItem('tranqui_user')
       }
@@ -2827,21 +2898,14 @@ export default function App() {
         if (user) {
           setCurrentUser(user)
           localStorage.setItem('tranqui_user', JSON.stringify(user))
-          if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
-            setView('dashboard')
-          } else {
-            setView('landing')
-          }
         } else {
           setCurrentUser(null)
           localStorage.removeItem('tranqui_user')
-          setView('landing')
         }
       })
       .catch(() => {
         setCurrentUser(null)
         localStorage.removeItem('tranqui_user')
-        setView('landing')
       })
       .finally(() => {
         setLoadingSession(false)
@@ -2855,9 +2919,9 @@ export default function App() {
     if (currentUser) {
       const isPro = currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO' || currentUser.rol === 'ADMIN'
       if (isPro && (view === 'landing' || view === 'login')) {
-        setView('dashboard')
+        navigate('/panel', { replace: true })
       } else if (!isPro && view === 'dashboard') {
-        setView('landing')
+        navigate('/', { replace: true })
       }
     }
   }, [currentUser, view, loadingSession])
@@ -2873,7 +2937,7 @@ export default function App() {
       }
       const isPro = currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')
       if (!isPro) {
-        setView('landing')
+        navigate('/', { replace: true })
         return
       }
       setLoadingDashboard(true)
@@ -2901,7 +2965,7 @@ export default function App() {
         })
         .catch((err) => {
           console.error("Error al inicializar dashboard:", err)
-          setView('login')
+          navigate('/login', { replace: true })
         })
         .finally(() => {
           setLoadingDashboard(false)
@@ -3052,11 +3116,10 @@ export default function App() {
   const handleBook = (pro: CheckoutTarget) => {
     if (!currentUser) {
       showAlert("Para reservar un turno, debes iniciar sesión primero.", "warning");
-      setView('login');
+      navigate('/login');
       return;
     }
-    setCheckoutTarget(pro);
-    setView('checkout');
+    navigate(`/reserva/${pro.id}`, { state: pro });
   }
 
   const handleLogout = async () => {
@@ -3067,7 +3130,7 @@ export default function App() {
     }
     setCurrentUser(null)
     localStorage.removeItem('tranqui_user')
-    setView('landing')
+    navigate('/')
   }
 
   const handleMarkNotificationsRead = () => {
@@ -3161,7 +3224,7 @@ export default function App() {
             onCancelAppointment={handleCancelAppointment}
             onUpdateAttendance={handleUpdateAttendance}
             onRescheduleAppointment={handleRescheduleAppointment}
-            onNavigateSettings={() => setActiveNav('settings')}
+            onNavigateSettings={() => navigate('/panel/settings')}
           />
         )
       case 'agenda': 
@@ -3191,71 +3254,21 @@ export default function App() {
     }
   }
 
-  if (view === 'landing') {
-    return (
-      <LandingPage
-        currentUser={currentUser}
-        onNavigateToDashboard={() => setView('login')}
-        onBook={handleBook}
-        onLogout={handleLogout}
-        onGoToDashboard={() => setView('dashboard')}
-      />
-    )
-  }
-
-  if (view === 'login') {
-    return (
-      <LoginPage
-        onLoginSuccess={(user) => {
-          setCurrentUser(user)
-          if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
-            setView('dashboard')
-          } else {
-            setView('landing')
-          }
-        }}
-        onBack={() => setView('landing')}
-      />
-    )
-  }
-
-  if (view === 'checkout' && checkoutTarget) {
-    return (
-      <CheckoutFlow
-        professional={checkoutTarget}
-        onBack={() => setView('landing')}
-        onComplete={() => setView('landing')}
-      />
-    )
-  }
-
-  if (view === 'dashboard' && currentUser?.rol === 'ADMIN') {
-    return (
-      <AdminDashboard
-        currentUser={currentUser}
-        onLogout={handleLogout}
-      />
-    )
-  }
-
   const isPro = currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')
-  if (view === 'dashboard' && !isPro) {
-    return (
-      <LandingPage
-        currentUser={currentUser}
-        onNavigateToDashboard={() => setView('login')}
-        onBook={handleBook}
-        onLogout={handleLogout}
-        onGoToDashboard={() => setView('dashboard')}
-      />
-    )
-  }
-
   const unreadCount = notifications.filter(n => !n.leido).length
-
   const showBanner = view === 'dashboard' && medicoInfo && !medicoInfo.verificado && showUnverifiedAlert;
 
-  return (
+  const landingElement = (
+    <LandingPage
+      currentUser={currentUser}
+      onNavigateToDashboard={() => navigate('/login')}
+      onBook={handleBook}
+      onLogout={handleLogout}
+      onGoToDashboard={() => navigate('/panel')}
+    />
+  )
+
+  const proDashboardElement = (
     <div className="dashboard-layout">
       {showBanner && (
         <>
@@ -3372,7 +3385,7 @@ export default function App() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2px' }}>
               <button
                 onClick={() => {
-                  setActiveNav('settings')
+                  navigate('/panel/settings')
                   window.scrollTo({ top: 0, behavior: 'smooth' })
                 }}
                 className="btn btn--primary btn--sm"
@@ -3388,7 +3401,7 @@ export default function App() {
           </div>
         </>
       )}
-      <Sidebar activeNav={activeNav} onNavChange={setActiveNav} medicoInfo={medicoInfo} hasUnreadChats={hasUnreadChats} />
+      <Sidebar activeNav={activeNav} onNavChange={(section) => navigate('/panel/' + section)} medicoInfo={medicoInfo} hasUnreadChats={hasUnreadChats} />
 
       <header className="dashboard-header" role="banner" style={{ position: 'relative' }}>
         <h1 className="dashboard-header__title">{pageTitle[activeNav]}</h1>
@@ -3601,5 +3614,41 @@ export default function App() {
         </div>
       )}
     </div>
+  )
+
+  return (
+    <Routes>
+      <Route path="/" element={landingElement} />
+      <Route
+        path="/login"
+        element={
+          <LoginPage
+            onLoginSuccess={(user) => {
+              setCurrentUser(user)
+              if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
+                navigate('/panel')
+              } else {
+                navigate('/')
+              }
+            }}
+            onBack={() => navigate('/')}
+          />
+        }
+      />
+      <Route path="/reserva/:proId" element={<CheckoutRoute currentUser={currentUser} loadingSession={loadingSession} />} />
+      <Route
+        path="/panel/*"
+        element={
+          currentUser?.rol === 'ADMIN' ? (
+            <AdminDashboard currentUser={currentUser} onLogout={handleLogout} />
+          ) : !isPro ? (
+            <Navigate to="/" replace />
+          ) : (
+            proDashboardElement
+          )
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
