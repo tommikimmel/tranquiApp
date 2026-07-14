@@ -371,6 +371,21 @@ public class TurnoService {
     }
 
     @Transactional
+    public void abandonarReservaPendiente(Long turnoId) {
+        Turno turno = turnoRepository.findById(turnoId)
+                .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
+
+        // Only a still-unpaid reservation may be self-released through this unauthenticated
+        // endpoint; anything already confirmed/cancelled is left untouched.
+        if (turno.getEstado() != EstadoTurno.PENDIENTE_PAGO) {
+            return;
+        }
+
+        turno.setEstado(EstadoTurno.CANCELADO);
+        turnoRepository.save(turno);
+    }
+
+    @Transactional
     public void cancelarTurno(Long turnoId) {
         Turno turno = turnoRepository.findById(turnoId)
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));

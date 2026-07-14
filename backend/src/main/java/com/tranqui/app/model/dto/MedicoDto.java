@@ -11,7 +11,8 @@ import java.util.List;
 @Builder
 public class MedicoDto {
     private Long id;
-    private String name; // maps to name in frontend
+    private String name; // combined "nombre + apellido" for display, NOT for editing — see nombre
+    private String nombre; // raw first name only; the settings form reads/writes this
     private String email;
     private String initials;
     private String degree; // maps to degree in frontend
