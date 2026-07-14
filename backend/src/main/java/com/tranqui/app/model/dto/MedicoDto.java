@@ -40,6 +40,11 @@ public class MedicoDto {
     private boolean verificado;
     private Boolean verificadoAdmin;
 
+    private String descripcionPerfil;
+    private List<String> pacientesAtiende;
+    private String institucionFormacion;
+    private Integer aniosExperiencia;
+
     @Getter
     @Setter
     @NoArgsConstructor

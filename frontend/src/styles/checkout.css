@@ -880,6 +880,296 @@
   background: var(--verde-accent, #7CC53E);
 }
 
+/* ── Professional summary header ──────────────────────────── */
+.doc-head {
+  display: flex;
+  gap: 18px;
+}
+
+/* ── Tipo de turno ─────────────────────────────────────────── */
+.types {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.type {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: all var(--transition-fast);
+}
+
+.type:hover {
+  border-color: var(--green-300);
+  background: var(--green-50);
+}
+
+.type.selected {
+  border-color: var(--color-primary);
+  background: var(--green-50);
+  box-shadow: 0 0 0 2px rgba(47, 168, 79, .15);
+}
+
+.type .radio {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--neutral-300);
+  flex-shrink: 0;
+  transition: border-color var(--transition-fast);
+}
+
+.type.selected .radio {
+  border-color: var(--color-primary);
+}
+
+.type.selected .radio::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.t-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.t-desc {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.t-price {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+/* ── Calendario de día ─────────────────────────────────────── */
+.cal {
+  padding: 16px;
+  background: #FBFCFA;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  transition: all var(--transition-fast);
+}
+
+.cal-nav:hover:not(:disabled) {
+  background: var(--green-50);
+  border-color: var(--green-300);
+  color: var(--color-primary);
+}
+
+.cal-nav:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+.month {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.cal-dow {
+  padding-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--color-text-secondary);
+  opacity: .8;
+}
+
+.cal-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--neutral-300);
+  font-size: 13px;
+  font-family: inherit;
+  transition: all var(--transition-fast);
+}
+
+.cal-day.free {
+  background: #ffffff;
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.cal-day.free:hover {
+  border-color: var(--green-300);
+  background: var(--green-50);
+  transform: scale(1.06);
+}
+
+.cal-day.selected {
+  background: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+/* ── Horarios ──────────────────────────────────────────────── */
+.slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.slot {
+  padding: 9px 16px;
+  background: #ffffff;
+  border: 1.5px solid var(--green-300);
+  border-radius: var(--radius-md);
+  color: var(--green-700);
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: all var(--transition-fast);
+}
+
+.slot:hover {
+  background: var(--green-50);
+  border-color: var(--green-500);
+  transform: translateY(-1px);
+}
+
+.slot.selected {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+  box-shadow: var(--shadow-green);
+}
+
+/* ── Confirmar y pagar ─────────────────────────────────────── */
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pay {
+  width: 100%;
+  padding: 16px 24px;
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  color: #ffffff;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: var(--shadow-green);
+  transition: all var(--transition-fast);
+}
+
+.pay:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+.pay:disabled {
+  cursor: not-allowed;
+}
+
+.fine {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+/* ── Consultorio ───────────────────────────────────────────── */
+.map-box {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.map-addr {
+  padding: 14px 16px;
+  background: #ffffff;
+  border-top: 1px solid var(--color-border);
+}
+
+.map-addr .street {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.map-addr .city {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.map-addr a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
 .seo-title {
   font-family: var(--font-heading);
   font-weight: 600;

@@ -406,9 +406,9 @@
 }
 
 .results-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 /* ── Professional Card ─────────────────────────────────────── */
@@ -907,6 +907,10 @@
   color: var(--color-text-primary);
 }
 
+.sora {
+  font-family: var(--font-heading);
+}
+
 .badge-mn {
   display: inline-flex;
   align-items: center;
@@ -1017,7 +1021,7 @@
 }
 
 .doc-card:hover .go {
-  background: var(--color-primary-dark);
+  background: var(--color-primary-hover);
 }
 
 .go svg {

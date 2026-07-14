@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
 import './styles/index.css'
 import './styles/dashboard.css'
 import LandingPage from './components/LandingPage'
@@ -13,8 +14,6 @@ import { useAlert } from './context/AlertContext'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 
-type AppView = 'landing' | 'checkout' | 'dashboard' | 'login'
-
 interface CheckoutTarget {
   id: string
   name: string
@@ -24,9 +23,92 @@ interface CheckoutTarget {
   price: number
   nextSlot: string
   nextSlotDay: string
+  fotoUrl?: string
   domicilioAtencion?: string
   domicilioLat?: number | null
   domicilioLng?: number | null
+  ofreceOnline?: boolean
+  ofrecePresencial?: boolean
+  descripcionPerfil?: string
+  pacientesAtiende?: string[]
+  institucionFormacion?: string
+  aniosExperiencia?: number | null
+  tags?: string[]
+}
+
+// ── /reserva/:proId route — resolves the professional either from the
+// navigation state (fast path, set by handleBook on click) or by fetching
+// the public medicos list and matching the id (direct URL load / refresh).
+function CheckoutRoute({ currentUser, loadingSession }: { currentUser: any; loadingSession: boolean }) {
+  const { proId } = useParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const stateTarget = (location.state as CheckoutTarget | null) || null
+  const [target, setTarget] = useState<CheckoutTarget | null>(stateTarget)
+  const [loading, setLoading] = useState(!stateTarget)
+  const [notFound, setNotFound] = useState(false)
+
+  useEffect(() => {
+    if (stateTarget) return
+    let cancelled = false
+    setLoading(true)
+    api.getMedicos()
+      .then((res: any[]) => {
+        if (cancelled) return
+        const m = (res || []).find((x: any) => String(x.id) === proId)
+        if (!m) {
+          setNotFound(true)
+          return
+        }
+        setTarget({
+          id: String(m.id),
+          name: m.name,
+          degree: m.degree,
+          specialty: m.specialty,
+          matricula: m.matricula,
+          price: m.price,
+          nextSlot: m.nextSlot || '16:00',
+          nextSlotDay: m.nextSlotDay || 'Hoy',
+          fotoUrl: m.fotoUrl,
+          domicilioAtencion: m.domicilioAtencion,
+          domicilioLat: m.domicilioLat,
+          domicilioLng: m.domicilioLng,
+          ofreceOnline: m.ofreceOnline,
+          ofrecePresencial: m.ofrecePresencial,
+          descripcionPerfil: m.descripcionPerfil,
+          pacientesAtiende: m.pacientesAtiende,
+          institucionFormacion: m.institucionFormacion,
+          aniosExperiencia: m.aniosExperiencia,
+          tags: m.tags,
+        })
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proId])
+
+  if (loadingSession || loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: 'var(--space-20)' }}>
+        <div className="checkout-spinner" style={{ margin: '0 auto' }} />
+      </div>
+    )
+  }
+  if (!currentUser) {
+    return <Navigate to="/login" replace />
+  }
+  if (notFound || !target) {
+    return <Navigate to="/" replace />
+  }
+
+  return (
+    <CheckoutFlow
+      professional={target}
+      onBack={() => navigate('/')}
+      onComplete={() => navigate('/')}
+    />
+  )
 }
 
 // ── Types ──────────────────────────────────────────────────────
@@ -193,7 +275,13 @@ function Sidebar({ activeNav, onNavChange, medicoInfo, hasUnreadChats }: { activ
       </nav>
 
       <div className="sidebar__footer">
-        <div className="sidebar__user" role="button" tabIndex={0}>
+        <div
+          className="sidebar__user"
+          role="button"
+          tabIndex={0}
+          onClick={() => onNavChange('settings')}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNavChange('settings') } }}
+        >
           {medicoInfo?.fotoUrl ? (
             <img 
               src={medicoInfo.fotoUrl} 
@@ -1225,6 +1313,14 @@ const ESPECIALIDADES_GRUPOS = [
   }
 ];
 
+const TRATAMIENTOS_DISPONIBLES = [
+  'Ansiedad', 'Depresión', 'Trauma', 'Pareja', 'Psiquiatría', 'Adolescentes',
+  'Trastorno bipolar', 'Ataques de pánico', 'Insomnio', 'TDAH en adultos',
+  'Estrés postraumático', 'Trastorno obsesivo compulsivo',
+]
+
+const PACIENTES_ATIENDE_OPCIONES = ['Niños', 'Adolescentes', 'Adultos', 'Adultos mayores']
+
 function getMissingRequirements(m: any): string[] {
   const missing: string[] = []
   if (!m) return ["Cargando información del perfil..."]
@@ -1241,6 +1337,12 @@ function getMissingRequirements(m: any): string[] {
     missing.push("Datos completos de matrícula (tipo, provincia y número)")
   }
   if (!m.fotoUrl || !m.fotoUrl.trim()) missing.push("Foto de perfil profesional")
+  if (!m.descripcionPerfil || !m.descripcionPerfil.trim()) missing.push("Descripción de tu perfil profesional")
+  if (!m.tags || m.tags.length === 0) missing.push("Al menos un tratamiento/especialidad que atiendas")
+  if (!m.pacientesAtiende || m.pacientesAtiende.length === 0) missing.push("Al menos un tipo de paciente que atiendas")
+  if (!m.institucionFormacion || !m.institucionFormacion.trim()) missing.push("Institución donde te formaste")
+  if (m.aniosExperiencia === null || m.aniosExperiencia === undefined) missing.push("Años de experiencia clínica")
+  if (!m.ofreceOnline && !m.ofrecePresencial) missing.push("Al menos una modalidad de consulta (online o presencial)")
   if (!m.verificadoAdmin) missing.push("Verificación y validación de matrícula por el Administrador de Tranqui")
 
   return missing
@@ -1300,6 +1402,17 @@ function SettingsView({
   const [ofreceOnline, setOfreceOnline] = useState(medicoInfo?.ofreceOnline !== undefined ? medicoInfo.ofreceOnline : true)
   const [ofrecePresencial, setOfrecePresencial] = useState(medicoInfo?.ofrecePresencial !== undefined ? medicoInfo.ofrecePresencial : false)
 
+  // Public profile info (shown to patients on the booking page, required for account verification)
+  const [descripcionPerfil, setDescripcionPerfil] = useState(medicoInfo?.descripcionPerfil || '')
+  const [selectedTags, setSelectedTags] = useState<string[]>(medicoInfo?.tags || [])
+  const [pacientesAtiende, setPacientesAtiende] = useState<string[]>(medicoInfo?.pacientesAtiende || [])
+  const [institucionFormacion, setInstitucionFormacion] = useState(medicoInfo?.institucionFormacion || '')
+  const [aniosExperiencia, setAniosExperiencia] = useState(medicoInfo?.aniosExperiencia ?? '')
+
+  const toggleFromList = (list: string[], setList: (l: string[]) => void, value: string) => {
+    setList(list.includes(value) ? list.filter(v => v !== value) : [...list, value])
+  }
+
   const updateTariff = (id: string, field: 'price' | 'enabled', value: number | boolean) => {
     setTariffs(tariffs.map(t => t.id === id ? { ...t, [field]: value } : t))
   }
@@ -1341,9 +1454,13 @@ function SettingsView({
         cuit: cuil ? String(cuil) : '',
         tariffs,
         fotoUrl,
-        tags: specialty ? [specialty] : [],
+        tags: selectedTags,
         ofreceOnline,
-        ofrecePresencial
+        ofrecePresencial,
+        descripcionPerfil,
+        pacientesAtiende,
+        institucionFormacion,
+        aniosExperiencia: aniosExperiencia === '' ? null : Number(aniosExperiencia)
       })
       showAlert("Configuración guardada con éxito ✓", "success")
     } catch (err) {
@@ -1659,6 +1776,93 @@ function SettingsView({
         <div style={{ marginTop: 'var(--space-6)' }}>
           <button className="btn btn--primary" onClick={handleSave} disabled={saving} id="btn-save-profile">
             {saving ? 'Guardando...' : 'Guardar perfil'}
+          </button>
+        </div>
+      </div>
+
+      {/* Public profile — shown to patients on the booking page, required to get verified */}
+      <div className="card">
+        <div className="card__header">
+          <div>
+            <h2 className="card__title">Perfil público</h2>
+            <p className="card__subtitle">Esta información se muestra a los pacientes en tu página de reserva. Es obligatoria para obtener la verificación de tu cuenta.</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-descripcion-perfil">Descripción de tu perfil</label>
+            <textarea
+              id="input-descripcion-perfil"
+              className="form-input"
+              rows={4}
+              placeholder="Contales a tus pacientes tu enfoque profesional, experiencia y cómo trabajás..."
+              value={descripcionPerfil}
+              onChange={(e) => setDescripcionPerfil(e.target.value)}
+              style={{ resize: 'vertical', fontFamily: 'var(--font-body)' }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label form-label--required">Principales tratamientos</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+              {TRATAMIENTOS_DISPONIBLES.map((t) => (
+                <label key={t} className={`check-chip check-chip--auto ${selectedTags.includes(t) ? 'active' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={selectedTags.includes(t)}
+                    onChange={() => toggleFromList(selectedTags, setSelectedTags, t)}
+                  />
+                  {t}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label form-label--required">Pacientes que atendés</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+              {PACIENTES_ATIENDE_OPCIONES.map((p) => (
+                <label key={p} className={`check-chip check-chip--auto ${pacientesAtiende.includes(p) ? 'active' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={pacientesAtiende.includes(p)}
+                    onChange={() => toggleFromList(pacientesAtiende, setPacientesAtiende, p)}
+                  />
+                  {p}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+            <div className="form-group">
+              <label className="form-label form-label--required" htmlFor="input-institucion">Institución de formación</label>
+              <input
+                id="input-institucion"
+                className="form-input"
+                type="text"
+                placeholder="Ej. Universidad Nacional de Córdoba"
+                value={institucionFormacion}
+                onChange={(e) => setInstitucionFormacion(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label form-label--required" htmlFor="input-anios-experiencia">Años de experiencia clínica</label>
+              <input
+                id="input-anios-experiencia"
+                className="form-input"
+                type="number"
+                min={0}
+                placeholder="Ej. 15"
+                value={aniosExperiencia}
+                onChange={(e) => setAniosExperiencia(e.target.value === '' ? '' : Number(e.target.value))}
+              />
+            </div>
+          </div>
+        </div>
+        <div style={{ marginTop: 'var(--space-6)' }}>
+          <button className="btn btn--primary" onClick={handleSave} disabled={saving} id="btn-save-public-profile">
+            {saving ? 'Guardando...' : 'Guardar perfil público'}
           </button>
         </div>
       </div>
@@ -2767,12 +2971,21 @@ function DashboardHome({
 // ── Root App ───────────────────────────────────────────────────
 export default function App() {
   const { showAlert } = useAlert()
-  const [view, setView] = useState<AppView>('landing')
-  const [activeNav, setActiveNav] = useState<NavSection>('dashboard')
+  const navigate = useNavigate()
+  const location = useLocation()
+  // Derived from the URL instead of local state, so every "page" the SPA
+  // shows has its own real route (/, /login, /reserva/:proId, /panel/...).
+  const view: 'landing' | 'checkout' | 'dashboard' | 'login' =
+    location.pathname.startsWith('/panel') ? 'dashboard'
+    : location.pathname.startsWith('/reserva/') ? 'checkout'
+    : location.pathname === '/login' ? 'login'
+    : 'landing'
+  const activeNav = (location.pathname.startsWith('/panel')
+    ? (location.pathname.split('/')[2] || 'dashboard')
+    : 'dashboard') as NavSection
   const [mpConnected, setMpConnected] = useState(false)
   const [googleConnected, setGoogleConnected] = useState(false)
   const [mpEnabled, setMpEnabled] = useState(false)
-  const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null)
 
   // API states
   const [currentUser, setCurrentUser] = useState<any>(null)
@@ -2810,13 +3023,7 @@ export default function App() {
     const cachedUser = localStorage.getItem('tranqui_user')
     if (cachedUser) {
       try {
-        const user = JSON.parse(cachedUser)
-        setCurrentUser(user)
-        if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
-          setView('dashboard')
-        } else {
-          setView('landing')
-        }
+        setCurrentUser(JSON.parse(cachedUser))
       } catch (e) {
         localStorage.removeItem('tranqui_user')
       }
@@ -2827,21 +3034,14 @@ export default function App() {
         if (user) {
           setCurrentUser(user)
           localStorage.setItem('tranqui_user', JSON.stringify(user))
-          if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
-            setView('dashboard')
-          } else {
-            setView('landing')
-          }
         } else {
           setCurrentUser(null)
           localStorage.removeItem('tranqui_user')
-          setView('landing')
         }
       })
       .catch(() => {
         setCurrentUser(null)
         localStorage.removeItem('tranqui_user')
-        setView('landing')
       })
       .finally(() => {
         setLoadingSession(false)
@@ -2855,9 +3055,9 @@ export default function App() {
     if (currentUser) {
       const isPro = currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO' || currentUser.rol === 'ADMIN'
       if (isPro && (view === 'landing' || view === 'login')) {
-        setView('dashboard')
+        navigate('/panel', { replace: true })
       } else if (!isPro && view === 'dashboard') {
-        setView('landing')
+        navigate('/', { replace: true })
       }
     }
   }, [currentUser, view, loadingSession])
@@ -2873,7 +3073,7 @@ export default function App() {
       }
       const isPro = currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')
       if (!isPro) {
-        setView('landing')
+        navigate('/', { replace: true })
         return
       }
       setLoadingDashboard(true)
@@ -2901,7 +3101,7 @@ export default function App() {
         })
         .catch((err) => {
           console.error("Error al inicializar dashboard:", err)
-          setView('login')
+          navigate('/login', { replace: true })
         })
         .finally(() => {
           setLoadingDashboard(false)
@@ -3052,11 +3252,10 @@ export default function App() {
   const handleBook = (pro: CheckoutTarget) => {
     if (!currentUser) {
       showAlert("Para reservar un turno, debes iniciar sesión primero.", "warning");
-      setView('login');
+      navigate('/login');
       return;
     }
-    setCheckoutTarget(pro);
-    setView('checkout');
+    navigate(`/reserva/${pro.id}`, { state: pro });
   }
 
   const handleLogout = async () => {
@@ -3067,7 +3266,7 @@ export default function App() {
     }
     setCurrentUser(null)
     localStorage.removeItem('tranqui_user')
-    setView('landing')
+    navigate('/')
   }
 
   const handleMarkNotificationsRead = () => {
@@ -3161,7 +3360,7 @@ export default function App() {
             onCancelAppointment={handleCancelAppointment}
             onUpdateAttendance={handleUpdateAttendance}
             onRescheduleAppointment={handleRescheduleAppointment}
-            onNavigateSettings={() => setActiveNav('settings')}
+            onNavigateSettings={() => navigate('/panel/settings')}
           />
         )
       case 'agenda': 
@@ -3191,71 +3390,21 @@ export default function App() {
     }
   }
 
-  if (view === 'landing') {
-    return (
-      <LandingPage
-        currentUser={currentUser}
-        onNavigateToDashboard={() => setView('login')}
-        onBook={handleBook}
-        onLogout={handleLogout}
-        onGoToDashboard={() => setView('dashboard')}
-      />
-    )
-  }
-
-  if (view === 'login') {
-    return (
-      <LoginPage
-        onLoginSuccess={(user) => {
-          setCurrentUser(user)
-          if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
-            setView('dashboard')
-          } else {
-            setView('landing')
-          }
-        }}
-        onBack={() => setView('landing')}
-      />
-    )
-  }
-
-  if (view === 'checkout' && checkoutTarget) {
-    return (
-      <CheckoutFlow
-        professional={checkoutTarget}
-        onBack={() => setView('landing')}
-        onComplete={() => setView('landing')}
-      />
-    )
-  }
-
-  if (view === 'dashboard' && currentUser?.rol === 'ADMIN') {
-    return (
-      <AdminDashboard
-        currentUser={currentUser}
-        onLogout={handleLogout}
-      />
-    )
-  }
-
   const isPro = currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')
-  if (view === 'dashboard' && !isPro) {
-    return (
-      <LandingPage
-        currentUser={currentUser}
-        onNavigateToDashboard={() => setView('login')}
-        onBook={handleBook}
-        onLogout={handleLogout}
-        onGoToDashboard={() => setView('dashboard')}
-      />
-    )
-  }
-
   const unreadCount = notifications.filter(n => !n.leido).length
-
   const showBanner = view === 'dashboard' && medicoInfo && !medicoInfo.verificado && showUnverifiedAlert;
 
-  return (
+  const landingElement = (
+    <LandingPage
+      currentUser={currentUser}
+      onNavigateToDashboard={() => navigate('/login')}
+      onBook={handleBook}
+      onLogout={handleLogout}
+      onGoToDashboard={() => navigate('/panel')}
+    />
+  )
+
+  const proDashboardElement = (
     <div className="dashboard-layout">
       {showBanner && (
         <>
@@ -3372,7 +3521,7 @@ export default function App() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2px' }}>
               <button
                 onClick={() => {
-                  setActiveNav('settings')
+                  navigate('/panel/settings')
                   window.scrollTo({ top: 0, behavior: 'smooth' })
                 }}
                 className="btn btn--primary btn--sm"
@@ -3388,7 +3537,7 @@ export default function App() {
           </div>
         </>
       )}
-      <Sidebar activeNav={activeNav} onNavChange={setActiveNav} medicoInfo={medicoInfo} hasUnreadChats={hasUnreadChats} />
+      <Sidebar activeNav={activeNav} onNavChange={(section) => navigate('/panel/' + section)} medicoInfo={medicoInfo} hasUnreadChats={hasUnreadChats} />
 
       <header className="dashboard-header" role="banner" style={{ position: 'relative' }}>
         <h1 className="dashboard-header__title">{pageTitle[activeNav]}</h1>
@@ -3601,5 +3750,41 @@ export default function App() {
         </div>
       )}
     </div>
+  )
+
+  return (
+    <Routes>
+      <Route path="/" element={landingElement} />
+      <Route
+        path="/login"
+        element={
+          <LoginPage
+            onLoginSuccess={(user) => {
+              setCurrentUser(user)
+              if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
+                navigate('/panel')
+              } else {
+                navigate('/')
+              }
+            }}
+            onBack={() => navigate('/')}
+          />
+        }
+      />
+      <Route path="/reserva/:proId" element={<CheckoutRoute currentUser={currentUser} loadingSession={loadingSession} />} />
+      <Route
+        path="/panel/*"
+        element={
+          currentUser?.rol === 'ADMIN' ? (
+            <AdminDashboard currentUser={currentUser} onLogout={handleLogout} />
+          ) : !isPro ? (
+            <Navigate to="/" replace />
+          ) : (
+            proDashboardElement
+          )
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }

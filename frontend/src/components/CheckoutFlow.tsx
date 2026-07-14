@@ -57,6 +57,11 @@ interface Professional {
   domicilioAtencion?: string
   domicilioLat?: number | null
   domicilioLng?: number | null
+  descripcionPerfil?: string
+  pacientesAtiende?: string[]
+  institucionFormacion?: string
+  aniosExperiencia?: number | null
+  tags?: string[]
 }
 
 interface TimeSlot {
@@ -438,9 +443,11 @@ function StepSelect({
     )
   }
 
-  const proBio = professional.specialty.includes('Psiquiatra') || professional.specialty.includes('Psiquiatría')
-    ? "Más de 15 años acompañando tratamientos de ansiedad, depresión y trastornos del ánimo. Enfoque integral que combina farmacología con seguimiento cercano y comunicación clara con el paciente."
-    : "Psicólogo clínico con más de 12 años de trayectoria. Especializado en terapia cognitivo-conductual, tratamiento de ansiedad, ataques de pánico y desarrollo personal.";
+  const proBio = professional.descripcionPerfil?.trim() || (
+    professional.specialty.includes('Psiquiatra') || professional.specialty.includes('Psiquiatría')
+      ? "Más de 15 años acompañando tratamientos de ansiedad, depresión y trastornos del ánimo. Enfoque integral que combina farmacología con seguimiento cercano y comunicación clara con el paciente."
+      : "Psicólogo clínico con más de 12 años de trayectoria. Especializado en terapia cognitivo-conductual, tratamiento de ansiedad, ataques de pánico y desarrollo personal."
+  );
 
   return (
     <div className="checkout-body" style={{ maxWidth: '780px', margin: '0 auto' }}>
@@ -467,17 +474,7 @@ function StepSelect({
               </span>
             </div>
             <div className="doc-spec">{professional.degree} · {professional.specialty}</div>
-            
-            <div className="stars" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-              <span className="star-row" aria-hidden="true" style={{ display: 'inline-flex', gap: '1px' }}>
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <svg key={i} viewBox="0 0 24 24" fill="#F5B942" style={{ width: 14, height: 14 }}><path d="M12 2l3 6.6 7 .8-5.2 4.8 1.4 7-6.2-3.6L5.8 21l1.4-7L2 9.4l7-.8z"/></svg>
-                ))}
-              </span>
-              <span className="score" style={{ fontWeight: '700', fontSize: '13.5px', color: 'var(--color-text-primary)' }}>4.9</span>
-              <span className="count" style={{ fontSize: '12.5px', color: 'var(--color-text-secondary)' }}>(127 reseñas)</span>
-            </div>
-            
+
             <p className="doc-bio">{proBio}</p>
           </div>
         </div>
@@ -764,43 +761,47 @@ function StepSelect({
 
       {/* SEO Sections below fold */}
       <div className="panel" style={{ marginTop: '24px' }}>
-        <div className="seo-title">Principales tratamientos</div>
-        <div className="treat-chips">
-          <span className="t-chip">Ansiedad</span>
-          <span className="t-chip">Depresión</span>
-          <span className="t-chip">Trastorno bipolar</span>
-          <span className="t-chip">Ataques de pánico</span>
-          <span className="t-chip">Insomnio</span>
-          <span className="t-chip">TDAH en adultos</span>
-          <span className="t-chip">Estrés postraumático</span>
-          <span className="t-chip">Trastorno obsesivo compulsivo</span>
-          <button type="button" className="t-more">+12 más</button>
-        </div>
+        {professional.tags && professional.tags.length > 0 && (
+          <>
+            <div className="seo-title">Principales tratamientos</div>
+            <div className="treat-chips">
+              {professional.tags.map((t) => (
+                <span className="t-chip" key={t}>{t}</span>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="seo-grid">
           <div>
-            <div className="seo-title" style={{ fontSize: '14px' }}>Pacientes que atiende</div>
-            <ul className="info-list">
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#2FA84F" strokeWidth="2"><circle cx="12" cy="7" r="4"/><path d="M4 21v-1a7 7 0 0 1 14 0v1"/></svg>
-                <span>Adultos <span className="sub">(desde 18 años)</span></span>
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#2FA84F" strokeWidth="2"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="10" r="2.5"/><path d="M3 21v-1a6 6 0 0 1 11-2.5M14 21v-.5a4 4 0 0 1 7 0v.5"/></svg>
-                <span>Adultos mayores</span>
-              </li>
-            </ul>
+            {professional.pacientesAtiende && professional.pacientesAtiende.length > 0 && (
+              <>
+                <div className="seo-title" style={{ fontSize: '14px' }}>Pacientes que atiende</div>
+                <ul className="info-list">
+                  {professional.pacientesAtiende.map((p) => (
+                    <li key={p}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#2FA84F" strokeWidth="2"><circle cx="12" cy="7" r="4"/><path d="M4 21v-1a7 7 0 0 1 14 0v1"/></svg>
+                      <span>{p}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
 
             <div className="seo-title" style={{ fontSize: '14px', marginTop: '18px' }}>Formatos de consulta</div>
             <ul className="info-list">
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#2FA84F" strokeWidth="2"><rect x="2" y="5" width="14" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>
-                <span>Videoconsulta <span className="sub">· Google Meet, link automático</span></span>
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#2FA84F" strokeWidth="2"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
-                <span>En persona <span className="sub">· {professional.domicilioAtencion || "Av. Colón 1234, Córdoba"}</span></span>
-              </li>
+              {professional.ofreceOnline !== false && (
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#2FA84F" strokeWidth="2"><rect x="2" y="5" width="14" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>
+                  <span>Videoconsulta <span className="sub">· Google Meet, link automático</span></span>
+                </li>
+              )}
+              {professional.ofrecePresencial && (
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#2FA84F" strokeWidth="2"><path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                  <span>En persona <span className="sub">· {professional.domicilioAtencion || "Av. Colón 1234, Córdoba"}</span></span>
+                </li>
+              )}
             </ul>
           </div>
 
@@ -809,16 +810,18 @@ function StepSelect({
             <ul className="info-list">
               <li>
                 <svg viewBox="0 0 24 24" fill="none" stroke="#2FA84F" strokeWidth="2"><path d="m12 3 10 5-10 5L2 8l10-5Z"/><path d="M6 10.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-5.5"/></svg>
-                <span>{professional.degree} <span className="sub">· UNC</span></span>
+                <span>{professional.degree}{professional.institucionFormacion ? <span className="sub"> · {professional.institucionFormacion}</span> : null}</span>
               </li>
               <li>
                 <svg viewBox="0 0 24 24" fill="none" stroke="#2FA84F" strokeWidth="2"><circle cx="12" cy="9" r="6"/><path d="m9 14-2 7 5-3 5 3-2-7"/></svg>
                 <span>Matrícula {professional.matricula} <span className="sub">· verificada por Tranqui</span></span>
               </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="#2FA84F" strokeWidth="2"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>
-                <span>Más de 15 años de experiencia clínica</span>
-              </li>
+              {professional.aniosExperiencia != null && (
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#2FA84F" strokeWidth="2"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>
+                  <span>Más de {professional.aniosExperiencia} años de experiencia clínica</span>
+                </li>
+              )}
             </ul>
           </div>
         </div>

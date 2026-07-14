@@ -77,6 +77,10 @@ interface Professional {
   domicilioAtencion?: string
   domicilioLat?: number | null
   domicilioLng?: number | null
+  descripcionPerfil?: string
+  pacientesAtiende?: string[]
+  institucionFormacion?: string
+  aniosExperiencia?: number | null
 }
 
 // PROFESSIONALS mock array removed since values are loaded from API
@@ -155,9 +159,11 @@ function SkeletonCard() {
 
 // ── Professional Card ──────────────────────────────────────────
 function ProCard({ pro, onBook, onChat, currentUser, availabilityDateLabel, availabilityCount }: { pro: Professional; onBook: (p: Professional) => void; onChat: (p: Professional) => void; currentUser: any; availabilityDateLabel?: string | null; availabilityCount?: number }) {
-  const proBio = pro.specialty.includes('Psiquiatra') || pro.specialty.includes('Psiquiatría')
-    ? "Médico especialista con enfoque integral combinando psicoterapia y abordaje farmacológico de forma personalizada."
-    : "Profesional con enfoque clínico integral y seguimiento cercano del paciente para tratamientos de ansiedad, depresión y regulación emocional.";
+  const proBio = pro.descripcionPerfil?.trim() || (
+    pro.specialty.includes('Psiquiatra') || pro.specialty.includes('Psiquiatría')
+      ? "Médico especialista con enfoque integral combinando psicoterapia y abordaje farmacológico de forma personalizada."
+      : "Profesional con enfoque clínico integral y seguimiento cercano del paciente para tratamientos de ansiedad, depresión y regulación emocional."
+  );
 
   return (
     <article
@@ -188,16 +194,6 @@ function ProCard({ pro, onBook, onChat, currentUser, availabilityDateLabel, avai
             </span>
           </div>
           <div className="doc-spec">{pro.degree} · {pro.specialty}</div>
-          
-          <div className="stars" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
-            <span className="star-row" aria-hidden="true" style={{ display: 'inline-flex', gap: '1px' }}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <svg key={i} viewBox="0 0 24 24" fill="#F5B942" style={{ width: 14, height: 14 }}><path d="M12 2l3 6.6 7 .8-5.2 4.8 1.4 7-6.2-3.6L5.8 21l1.4-7L2 9.4l7-.8z"/></svg>
-              ))}
-            </span>
-            <span className="score" style={{ fontWeight: '700', fontSize: '13.5px', color: 'var(--color-text-primary)' }}>4.9</span>
-            <span className="count" style={{ fontSize: '12.5px', color: 'var(--color-text-secondary)' }}>(127 reseñas)</span>
-          </div>
 
           <p className="doc-bio">{proBio}</p>
           
@@ -508,9 +504,16 @@ interface BookTarget {
   domicilioAtencion?: string
   domicilioLat?: number | null
   domicilioLng?: number | null
+  ofreceOnline?: boolean
+  ofrecePresencial?: boolean
+  descripcionPerfil?: string
+  pacientesAtiende?: string[]
+  institucionFormacion?: string
+  aniosExperiencia?: number | null
+  tags?: string[]
 }
 
-export default function LandingPage({ 
+export default function LandingPage({
   currentUser, 
   onNavigateToDashboard, 
   onBook,
@@ -774,7 +777,14 @@ export default function LandingPage({
         fotoUrl: pro.fotoUrl,
         domicilioAtencion: pro.domicilioAtencion,
         domicilioLat: pro.domicilioLat,
-        domicilioLng: pro.domicilioLng
+        domicilioLng: pro.domicilioLng,
+        ofreceOnline: pro.ofreceOnline,
+        ofrecePresencial: pro.ofrecePresencial,
+        descripcionPerfil: pro.descripcionPerfil,
+        pacientesAtiende: pro.pacientesAtiende,
+        institucionFormacion: pro.institucionFormacion,
+        aniosExperiencia: pro.aniosExperiencia,
+        tags: pro.tags
       })
     }
   }
