@@ -1021,7 +1021,7 @@
 }
 
 .doc-card:hover .go {
-  background: var(--color-primary-dark);
+  background: var(--color-primary-hover);
 }
 
 .go svg {
