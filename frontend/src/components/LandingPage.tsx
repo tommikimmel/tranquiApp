@@ -155,17 +155,21 @@ function SkeletonCard() {
 
 // ── Professional Card ──────────────────────────────────────────
 function ProCard({ pro, onBook, onChat, currentUser, availabilityDateLabel, availabilityCount }: { pro: Professional; onBook: (p: Professional) => void; onChat: (p: Professional) => void; currentUser: any; availabilityDateLabel?: string | null; availabilityCount?: number }) {
+  const proBio = pro.specialty.includes('Psiquiatra') || pro.specialty.includes('Psiquiatría')
+    ? "Médico especialista con enfoque integral combinando psicoterapia y abordaje farmacológico de forma personalizada."
+    : "Profesional con enfoque clínico integral y seguimiento cercano del paciente para tratamientos de ansiedad, depresión y regulación emocional.";
+
   return (
     <article
-      className="pro-card"
+      className="doc-card"
       role="article"
       aria-label={`${pro.name}, ${pro.specialty}`}
       onClick={() => onBook(pro)}
     >
-      <div className="pro-card__header">
+      <div className="doc-row">
         <div
-          className="pro-card__avatar"
-          style={{ background: pro.fotoUrl ? 'none' : pro.color, color: 'var(--green-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+          className="avatar"
+          style={{ background: pro.fotoUrl ? 'none' : pro.color, overflow: 'hidden' }}
           aria-hidden="true"
         >
           {pro.fotoUrl ? (
@@ -173,79 +177,64 @@ function ProCard({ pro, onBook, onChat, currentUser, availabilityDateLabel, avai
           ) : (
             pro.initials
           )}
-          {pro.online && <span className="pro-card__online-dot" aria-label="Disponible ahora" />}
         </div>
-        <div className="pro-card__info">
-          <div className="pro-card__name">{pro.name}</div>
-          <div className="pro-card__specialty">{pro.degree} · {pro.specialty}</div>
-          <span className="pro-card__matricula">{pro.matricula} <IconCheck /></span>
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
-            {pro.ofreceOnline && <span className="badge badge--info pro-card__modality-badge">Online</span>}
-            {pro.ofrecePresencial && <span className="badge badge--warning pro-card__modality-badge">Presencial</span>}
+
+        <div className="doc-info">
+          <div className="doc-name-row">
+            <span className="doc-name sora">{pro.name}</span>
+            <span className="badge-mn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+              {pro.matricula}
+            </span>
+          </div>
+          <div className="doc-spec">{pro.degree} · {pro.specialty}</div>
+          
+          <div className="stars" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+            <span className="star-row" aria-hidden="true" style={{ display: 'inline-flex', gap: '1px' }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <svg key={i} viewBox="0 0 24 24" fill="#F5B942" style={{ width: 14, height: 14 }}><path d="M12 2l3 6.6 7 .8-5.2 4.8 1.4 7-6.2-3.6L5.8 21l1.4-7L2 9.4l7-.8z"/></svg>
+              ))}
+            </span>
+            <span className="score" style={{ fontWeight: '700', fontSize: '13.5px', color: 'var(--color-text-primary)' }}>4.9</span>
+            <span className="count" style={{ fontSize: '12.5px', color: 'var(--color-text-secondary)' }}>(127 reseñas)</span>
+          </div>
+
+          <p className="doc-bio">{proBio}</p>
+          
+          <div className="doc-tags">
+            {pro.ofreceOnline && <span className="tag online">Online</span>}
+            {pro.ofrecePresencial && <span className="tag presencial">Presencial</span>}
+            {pro.nextSlot && (
+              <span className="tag next">Próximo turno: {pro.nextSlotDay.toLowerCase()} {pro.nextSlot} hs</span>
+            )}
+          </div>
+        </div>
+
+        <div className="doc-side">
+          <div className="price">
+            <div className="label">Consulta</div>
+            <div className="val">Desde ${pro.price.toLocaleString('es-AR')}</div>
+            <div className="per">50 min · {pro.ofreceOnline ? 'Online' : 'Presencial'}</div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              className="btn btn--secondary btn--sm"
+              onClick={(e) => { e.stopPropagation(); onChat(pro) }}
+              style={{ whiteSpace: 'nowrap', padding: 'var(--space-2) var(--space-3)' }}
+            >
+              Chatear
+            </button>
+            <span className="go" id={`btn-book-${pro.id}`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 16, height: 16 }}><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+              Pedir turno
+            </span>
           </div>
         </div>
       </div>
 
-      <div className="pro-card__tags" aria-label="Especialidades">
-        {pro.tags.slice(0, 3).map((tag) => (
-          <span key={tag} className="pro-card__tag">{tag}</span>
-        ))}
-        {pro.tags.length > 3 && (
-          <span className="pro-card__tag">+{pro.tags.length - 3}</span>
-        )}
-      </div>
-
-      {availabilityDateLabel && (
-        <div className={`pro-card__availability ${!availabilityCount ? 'pro-card__availability--none' : ''}`}>
-          <IconCalendar size={14} />
-          {availabilityCount ? `${availabilityCount} turno${availabilityCount !== 1 ? 's' : ''} el ${availabilityDateLabel}` : `Sin turnos el ${availabilityDateLabel}`}
-        </div>
-      )}
-
-      <div className="pro-card__divider" aria-hidden="true" />
-
-      {/* Tariff table */}
-      <div className="pro-card__tariffs">
-        {pro.tariffs.map((t) => {
-          const isPrimera = t.label.toLowerCase().includes('primera');
-          const isParticular = t.label.toLowerCase().includes('particular') || t.label.toLowerCase() === 'consulta';
-
-          // Hide other service rows for unregistered/visitor users
-          if (!currentUser && !isParticular) {
-            return null;
-          }
-
-          return (
-            <div className="pro-card__tariff-row" key={t.label}>
-              <span className="pro-card__tariff-label">{t.label}</span>
-              <span className="pro-card__tariff-price">
-                {isPrimera ? 'Calculado (se avisa)' : `$${t.price.toLocaleString('es-AR')}`}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="pro-card__footer" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-        <div className="pro-card__price" style={{ marginRight: 'auto' }}>
-          <span className="pro-card__price-label">50 min · Online</span>
-        </div>
-        <button
-          className="btn btn--secondary btn--sm"
-          onClick={(e) => { e.stopPropagation(); onChat(pro) }}
-          style={{ whiteSpace: 'nowrap', padding: 'var(--space-2) var(--space-3)' }}
-        >
-          Chatear
-        </button>
-        <button
-          className="btn btn--primary btn--sm"
-          id={`btn-book-${pro.id}`}
-          onClick={(e) => { e.stopPropagation(); onBook(pro) }}
-          aria-label={`Reservar turno con ${pro.name}`}
-          style={{ whiteSpace: 'nowrap', padding: 'var(--space-2) var(--space-3)' }}
-        >
-          Pedir Turno
-        </button>
+      <div className="card-hint">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4A5E51" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+        Tocá para elegir día y horario
       </div>
     </article>
   )

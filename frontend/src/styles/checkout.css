@@ -844,3 +844,155 @@
 .calendar-day-btn.selected .calendar-dot {
   background-color: #ffffff;
 }
+
+/* ── Grid y Secciones SEO (Rediseño de Reserva) ───────────── */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 6px 24px rgba(30,122,60,.06);
+  padding: 24px;
+  margin-bottom: var(--space-4);
+}
+
+.book-title {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-primary);
+}
+
+.book-title .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--verde-accent, #7CC53E);
+}
+
+.seo-title {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 12px;
+  color: var(--color-text-primary);
+}
+
+.treat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.t-chip {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #E9F6EC;
+  color: var(--color-primary);
+  border: 1px solid #D6EEDC;
+}
+
+.t-more {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: inherit;
+  padding: 6px 4px;
+}
+
+.info-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.info-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--color-text-primary);
+}
+
+.info-list svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.info-list .sub {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.seo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 18px;
+}
+
+.review {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  background: var(--neutral-50);
+  margin-bottom: 12px;
+}
+
+.review-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.review-head .who {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--color-text-primary);
+}
+
+.review-head .when {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.review p {
+  font-size: 13.5px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.review .star-row svg {
+  width: 13px;
+  height: 13px;
+}
+
+@media (max-width: 768px) {
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+  .seo-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
