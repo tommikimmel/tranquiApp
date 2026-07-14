@@ -181,6 +181,18 @@ public class Usuario {
     @Column(name = "verificado_admin")
     private Boolean verificadoAdmin;
 
+    @Column(name = "descripcion_perfil", columnDefinition = "TEXT")
+    private String descripcionPerfil;
+
+    @Column(name = "pacientes_atiende", length = 255)
+    private String pacientesAtiende; // comma separated, e.g. "Adultos,Adultos mayores"
+
+    @Column(name = "institucion_formacion", length = 255)
+    private String institucionFormacion;
+
+    @Column(name = "anios_experiencia")
+    private Integer aniosExperiencia;
+
     @PrePersist
     protected void onCreate() {
         if (fechaRegistro == null) {

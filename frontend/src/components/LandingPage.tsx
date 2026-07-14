@@ -77,6 +77,10 @@ interface Professional {
   domicilioAtencion?: string
   domicilioLat?: number | null
   domicilioLng?: number | null
+  descripcionPerfil?: string
+  pacientesAtiende?: string[]
+  institucionFormacion?: string
+  aniosExperiencia?: number | null
 }
 
 // PROFESSIONALS mock array removed since values are loaded from API
@@ -155,9 +159,11 @@ function SkeletonCard() {
 
 // ── Professional Card ──────────────────────────────────────────
 function ProCard({ pro, onBook, onChat, currentUser, availabilityDateLabel, availabilityCount }: { pro: Professional; onBook: (p: Professional) => void; onChat: (p: Professional) => void; currentUser: any; availabilityDateLabel?: string | null; availabilityCount?: number }) {
-  const proBio = pro.specialty.includes('Psiquiatra') || pro.specialty.includes('Psiquiatría')
-    ? "Médico especialista con enfoque integral combinando psicoterapia y abordaje farmacológico de forma personalizada."
-    : "Profesional con enfoque clínico integral y seguimiento cercano del paciente para tratamientos de ansiedad, depresión y regulación emocional.";
+  const proBio = pro.descripcionPerfil?.trim() || (
+    pro.specialty.includes('Psiquiatra') || pro.specialty.includes('Psiquiatría')
+      ? "Médico especialista con enfoque integral combinando psicoterapia y abordaje farmacológico de forma personalizada."
+      : "Profesional con enfoque clínico integral y seguimiento cercano del paciente para tratamientos de ansiedad, depresión y regulación emocional."
+  );
 
   return (
     <article
@@ -508,9 +514,16 @@ interface BookTarget {
   domicilioAtencion?: string
   domicilioLat?: number | null
   domicilioLng?: number | null
+  ofreceOnline?: boolean
+  ofrecePresencial?: boolean
+  descripcionPerfil?: string
+  pacientesAtiende?: string[]
+  institucionFormacion?: string
+  aniosExperiencia?: number | null
+  tags?: string[]
 }
 
-export default function LandingPage({ 
+export default function LandingPage({
   currentUser, 
   onNavigateToDashboard, 
   onBook,
@@ -774,7 +787,14 @@ export default function LandingPage({
         fotoUrl: pro.fotoUrl,
         domicilioAtencion: pro.domicilioAtencion,
         domicilioLat: pro.domicilioLat,
-        domicilioLng: pro.domicilioLng
+        domicilioLng: pro.domicilioLng,
+        ofreceOnline: pro.ofreceOnline,
+        ofrecePresencial: pro.ofrecePresencial,
+        descripcionPerfil: pro.descripcionPerfil,
+        pacientesAtiende: pro.pacientesAtiende,
+        institucionFormacion: pro.institucionFormacion,
+        aniosExperiencia: pro.aniosExperiencia,
+        tags: pro.tags
       })
     }
   }

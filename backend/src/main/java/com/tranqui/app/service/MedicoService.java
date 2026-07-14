@@ -121,6 +121,13 @@ public class MedicoService {
             medico.setTags(String.join(",", dto.getTags()));
         }
 
+        medico.setDescripcionPerfil(dto.getDescripcionPerfil());
+        medico.setInstitucionFormacion(dto.getInstitucionFormacion());
+        medico.setAniosExperiencia(dto.getAniosExperiencia());
+        if (dto.getPacientesAtiende() != null) {
+            medico.setPacientesAtiende(String.join(",", dto.getPacientesAtiende()));
+        }
+
         usuarioRepository.save(medico);
 
         if (dto.getTariffs() != null) {
@@ -178,6 +185,11 @@ public class MedicoService {
         List<String> tagsList = new ArrayList<>();
         if (m.getTags() != null && !m.getTags().trim().isEmpty()) {
             tagsList = Arrays.asList(m.getTags().split(","));
+        }
+
+        List<String> pacientesAtiendeList = new ArrayList<>();
+        if (m.getPacientesAtiende() != null && !m.getPacientesAtiende().trim().isEmpty()) {
+            pacientesAtiendeList = Arrays.asList(m.getPacientesAtiende().split(","));
         }
 
         String initials = "";
@@ -244,6 +256,10 @@ public class MedicoService {
                 .matriculaInfo(matInfo)
                 .verificado(isMedicoVerificado(m))
                 .verificadoAdmin(m.getVerificadoAdmin())
+                .descripcionPerfil(m.getDescripcionPerfil())
+                .pacientesAtiende(pacientesAtiendeList)
+                .institucionFormacion(m.getInstitucionFormacion())
+                .aniosExperiencia(m.getAniosExperiencia())
                 .build();
     }
 
@@ -389,6 +405,12 @@ public class MedicoService {
                 && u.getMatriculaProvincia() != null && !u.getMatriculaProvincia().trim().isEmpty()
                 && u.getMatriculaNumero() != null
                 && u.getFotoUrl() != null && !u.getFotoUrl().trim().isEmpty()
+                && u.getDescripcionPerfil() != null && !u.getDescripcionPerfil().trim().isEmpty()
+                && u.getPacientesAtiende() != null && !u.getPacientesAtiende().trim().isEmpty()
+                && u.getInstitucionFormacion() != null && !u.getInstitucionFormacion().trim().isEmpty()
+                && u.getAniosExperiencia() != null
+                && u.getTags() != null && !u.getTags().trim().isEmpty()
+                && (u.isOfreceOnline() || u.isOfrecePresencial())
                 && Boolean.TRUE.equals(u.getVerificadoAdmin());
     }
 }
