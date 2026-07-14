@@ -4,7 +4,7 @@ set -e
 echo "Iniciando despliegue de Tranqui App..."
 
 # Navegar a la carpeta del proyecto
-cd /vps/projects/tranqui
+cd /app
 
 # Descargar cambios desde la rama principal estable
 echo "Obteniendo último código estable..."
