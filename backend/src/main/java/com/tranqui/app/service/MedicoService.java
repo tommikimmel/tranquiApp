@@ -35,6 +35,8 @@ public class MedicoService {
     @Autowired
     private TurnoRepository turnoRepository;
 
+    private static final long MAX_FOTO_BYTES = 3L * 1024 * 1024; // 3MB decoded
+
     private static final List<MedicoDto.TarifaDto> DEFAULT_TARIFFS = Arrays.asList(
             new MedicoDto.TarifaDto("particular", "Consulta particular", new BigDecimal("60000"), true),
             new MedicoDto.TarifaDto("sobreturno", "Sobreturno", new BigDecimal("90000"), true),
@@ -124,6 +126,11 @@ public class MedicoService {
         medico.setCuit(dto.getCuit());
         medico.setPrecio(dto.getPrice());
         medico.setColor(dto.getColor());
+
+        if (dto.getFotoUrl() != null && com.tranqui.app.util.ImageUtils.decodedByteSize(dto.getFotoUrl()) > MAX_FOTO_BYTES) {
+            throw new IllegalArgumentException(
+                    "La foto de perfil es demasiado grande (máx. " + (MAX_FOTO_BYTES / (1024 * 1024)) + "MB). Elegí una imagen más liviana.");
+        }
         medico.setFotoUrl(dto.getFotoUrl());
         medico.setOfreceOnline(dto.isOfreceOnline());
         medico.setOfrecePresencial(dto.isOfrecePresencial());

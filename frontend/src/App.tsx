@@ -1679,13 +1679,18 @@ function SettingsView({
                   style={{ display: 'none' }} 
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setFotoUrl(reader.result as string);
-                      };
-                      reader.readAsDataURL(file);
+                    if (!file) return;
+                    const MAX_FOTO_BYTES = 3 * 1024 * 1024
+                    if (file.size > MAX_FOTO_BYTES) {
+                      showAlert(`La foto pesa ${(file.size / (1024 * 1024)).toFixed(1)}MB — el máximo permitido es 3MB. Elegí una imagen más liviana.`, 'error')
+                      e.target.value = ''
+                      return
                     }
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setFotoUrl(reader.result as string);
+                    };
+                    reader.readAsDataURL(file);
                   }}
                 />
               </label>
