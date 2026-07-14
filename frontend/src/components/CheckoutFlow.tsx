@@ -435,15 +435,26 @@ function StepSelect({
     return basePrice
   }, [tipo, professional.price, isFirstTime])
 
-  const canPay = name.trim().length > 2 && 
-                  email.includes('@') && 
-                  phone.length >= 8 && 
+  const canPay = name.trim().length > 2 &&
+                  email.includes('@') &&
+                  phone.length >= 8 &&
                   selectedDayIdx !== null &&
                   (selectedSlot !== null || tipo === 'SOBRETUNO') &&
                   (tipo !== 'OSDE' || afiliado.trim().length > 4) &&
                   (tipo !== 'SOBRETUNO' || /^([01]\d|2[0-3]):[0-5]\d$/.test(customTime)) &&
-                  acceptedTerms && 
+                  acceptedTerms &&
                   paymentStatus !== 'processing';
+
+  // The button above is disabled (opacity 0.6) rather than hidden whenever any single
+  // condition in canPay isn't met — which reads as "the button isn't there" if it's not
+  // obvious which field is missing. Surface exactly what's left so it's never a mystery.
+  const missingRequirements: string[] = []
+  if (name.trim().length <= 2) missingRequirements.push('tu nombre completo')
+  if (!email.includes('@')) missingRequirements.push('un email válido')
+  if (phone.length < 8) missingRequirements.push('tu teléfono')
+  if (tipo === 'OSDE' && afiliado.trim().length <= 4) missingRequirements.push('tu número de afiliado OSDE')
+  if (tipo === 'SOBRETUNO' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(customTime)) missingRequirements.push('un horario válido (HH:MM)')
+  if (!acceptedTerms) missingRequirements.push('aceptar los términos de servicio')
 
   const handlePayClick = () => {
     if (canPay) {
@@ -709,6 +720,14 @@ function StepSelect({
               )}
 
               <div className="confirm show" style={{ marginTop: '8px' }}>
+                {!canPay && paymentStatus !== 'processing' && missingRequirements.length > 0 && (
+                  <div
+                    className="checkout-alert checkout-alert--warning"
+                    style={{ padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: '#fffbe6', border: '1px solid #ffe58f', fontSize: '12.5px', color: '#ad7c11', marginBottom: '8px' }}
+                  >
+                    Para poder pagar, falta: {missingRequirements.join(', ')}.
+                  </div>
+                )}
                 <button
                   type="button"
                   className="pay"
@@ -716,8 +735,8 @@ function StepSelect({
                   onClick={handlePayClick}
                   style={{ opacity: canPay ? 1 : 0.6 }}
                 >
-                  {paymentStatus === 'processing' 
-                    ? 'Procesando pago...' 
+                  {paymentStatus === 'processing'
+                    ? 'Procesando pago...'
                     : `Confirmar y pagar — $${currentPrice.toLocaleString('es-AR')}`
                   }
                 </button>
