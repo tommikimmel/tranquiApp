@@ -41,6 +41,10 @@ mercadopago:
   webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
   sandbox: ${MERCADOPAGO_SANDBOX:true}
 
+payment:
+  simulation:
+    enabled: ${PAYMENT_SIMULATION_ENABLED:false}
+
 app:
   public-url: ${APP_PUBLIC_URL:http://localhost:8081}
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
