@@ -19,7 +19,8 @@ import java.util.HexFormat;
  * check so the built-in "simulate webhook" dev tool and existing tests keep
  * working without a real signed request. When enabled=true (a real
  * integration is configured) we enforce Mercado Pago's real HMAC-SHA256
- * signature scheme, since real money is at stake.
+ * signature scheme, since real money is at stake. payment.simulation.enabled
+ * carves out one narrow exception to that even when enabled=true — see isValid().
  *
  * Docs: https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/webhooks#editor_5
  */
@@ -34,7 +35,19 @@ public class MercadoPagoWebhookValidator {
     @Value("${mercadopago.webhook-secret:}")
     private String webhookSecret;
 
+    @Value("${payment.simulation.enabled:false}")
+    private boolean paymentSimulationEnabled;
+
     public boolean isValid(String xSignature, String xRequestId, String dataId) {
+        // Lets the "Simular Pago" dev button push a mock webhook through even with a real
+        // integration configured (isEnabled=true). Deliberately narrow: only this exact literal
+        // signature is accepted here, nothing else is loosened, and it's a no-op unless
+        // payment.simulation.enabled is explicitly turned on (default off, see TurnoService).
+        if (paymentSimulationEnabled && "test-signature".equals(xSignature)) {
+            log.info("Simulación de webhook aceptada (payment.simulation.enabled=true).");
+            return true;
+        }
+
         if (!isEnabled) {
             // Legacy/dev behavior: accept the mock-webhook simulator and only reject requests
             // explicitly marked as invalid in tests/tooling. The "test-signature" bypass must

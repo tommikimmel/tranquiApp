@@ -7,6 +7,7 @@ import com.tranqui.app.model.Usuario;
 import com.tranqui.app.repository.TurnoRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
@@ -42,6 +43,14 @@ public class TurnoService {
 
     @Autowired
     private NotificacionService notificacionService;
+
+    // Off by default. Only turn this on temporarily while the real Mercado Pago integration
+    // is broken/unlinked and you need to exercise the rest of the booking flow (Google
+    // Calendar sync, notifications, etc). Never leave it "true" once real patients are paying —
+    // it lets a booking be confirmed without any real payment. See reservarTurno() below and
+    // MercadoPagoWebhookValidator for the other half of this.
+    @Value("${payment.simulation.enabled:false}")
+    private boolean paymentSimulationEnabled;
 
     @Transactional(readOnly = true)
     public List<java.time.LocalTime> obtenerHorariosDisponibles(Long medicoId, java.time.LocalDate fecha) {
@@ -225,9 +234,19 @@ public class TurnoService {
             turno.setCheckoutUrl(checkoutUrl);
             turno = turnoRepository.save(turno);
         } catch (IllegalStateException e) {
-            // Preserve the type so GlobalExceptionHandler maps it to a clean 409 with this
-            // exact message, instead of it getting wrapped below into an opaque 500.
-            throw e;
+            if (paymentSimulationEnabled) {
+                // Real Mercado Pago checkout isn't reachable (professional not linked, or the
+                // integration itself is broken) but simulation mode is explicitly on, so fall
+                // back to the same mock preference URL the frontend already knows how to render
+                // as a "Simular Pago" dialog instead of blocking the booking outright.
+                checkoutUrl = "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-preference-id";
+                turno.setCheckoutUrl(checkoutUrl);
+                turno = turnoRepository.save(turno);
+            } else {
+                // Preserve the type so GlobalExceptionHandler maps it to a clean 409 with this
+                // exact message, instead of it getting wrapped below into an opaque 500.
+                throw e;
+            }
         } catch (Exception e) {
             throw new RuntimeException("Error al conectar con la pasarela de Mercado Pago: " + e.getMessage(), e);
         }
