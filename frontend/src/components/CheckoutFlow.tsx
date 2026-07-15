@@ -648,11 +648,65 @@ function StepSelect({
             </div>
           )}
 
-          {/* Patient Form Fields (Integrated above checkout button) */}
+        </div>
+
+        {/* Derecha: consultorio */}
+        <div className="panel" style={{ height: 'fit-content' }}>
+          <div className="book-title sora"><span className="dot"></span>Consultorio</div>
+          
+          <div className="map-box">
+            <div 
+              style={{ position: 'relative', cursor: 'pointer' }}
+              onClick={() => {
+                if (professional.domicilioLat && professional.domicilioLng) {
+                  const url = `https://www.google.com/maps/search/?api=1&query=${professional.domicilioLat},${professional.domicilioLng}`;
+                  window.open(url, '_blank', 'noopener,noreferrer');
+                }
+              }}
+            >
+              <div
+                ref={mapContainerRef}
+                style={{
+                  height: '190px',
+                  width: '100%',
+                  backgroundColor: '#EAF2EA',
+                  zIndex: 1
+                }}
+              />
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 10,
+                backgroundColor: 'transparent'
+              }} />
+            </div>
+            
+            <div className="map-addr">
+              <div className="street">{professional.domicilioAtencion || "Av. Colón 1234, Piso 3, Of. B"}</div>
+              <div className="city">Centro, Córdoba Capital</div>
+              <a
+                href={
+                  professional.domicilioLat && professional.domicilioLng
+                    ? `https://www.google.com/maps/search/?api=1&query=${professional.domicilioLat},${professional.domicilioLng}`
+                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(professional.domicilioAtencion || "Av. Colón 1234, Córdoba")}`
+                }
+                target="_blank" 
+                rel="noopener noreferrer"
+              >
+                Cómo llegar
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 17 17 7M9 7h8v8"/></svg>
+              </a>
+            </div>
+          </div>
+
+          {/* Patient Form Fields + Pago (debajo del mapa para acortar la columna izquierda) */}
           {(selectedSlot || tipo === 'SOBRETUNO') && selectedDayIdx !== null && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-4)', animation: 'pop 0.25s ease' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderTop: '1px solid var(--color-border)', marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)', animation: 'pop 0.25s ease' }}>
               <div className="book-title sora"><span className="dot"></span>Tus datos personales</div>
-              
+
               <div className="checkout-form__group">
                 <label className="checkout-form__label">Nombre completo *</label>
                 <input
@@ -747,59 +801,6 @@ function StepSelect({
               </div>
             </div>
           )}
-        </div>
-
-        {/* Derecha: consultorio */}
-        <div className="panel" style={{ height: 'fit-content' }}>
-          <div className="book-title sora"><span className="dot"></span>Consultorio</div>
-          
-          <div className="map-box">
-            <div 
-              style={{ position: 'relative', cursor: 'pointer' }}
-              onClick={() => {
-                if (professional.domicilioLat && professional.domicilioLng) {
-                  const url = `https://www.google.com/maps/search/?api=1&query=${professional.domicilioLat},${professional.domicilioLng}`;
-                  window.open(url, '_blank', 'noopener,noreferrer');
-                }
-              }}
-            >
-              <div
-                ref={mapContainerRef}
-                style={{
-                  height: '190px',
-                  width: '100%',
-                  backgroundColor: '#EAF2EA',
-                  zIndex: 1
-                }}
-              />
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                zIndex: 10,
-                backgroundColor: 'transparent'
-              }} />
-            </div>
-            
-            <div className="map-addr">
-              <div className="street">{professional.domicilioAtencion || "Av. Colón 1234, Piso 3, Of. B"}</div>
-              <div className="city">Centro, Córdoba Capital</div>
-              <a
-                href={
-                  professional.domicilioLat && professional.domicilioLng
-                    ? `https://www.google.com/maps/search/?api=1&query=${professional.domicilioLat},${professional.domicilioLng}`
-                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(professional.domicilioAtencion || "Av. Colón 1234, Córdoba")}`
-                }
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
-                Cómo llegar
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 17 17 7M9 7h8v8"/></svg>
-              </a>
-            </div>
-          </div>
         </div>
       </div>
 

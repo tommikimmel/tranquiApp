@@ -714,6 +714,31 @@ export default function LandingPage({
     refreshPatientData()
   }, [currentUser])
 
+  // Handle the return redirect from Mercado Pago Checkout Pro after a patient pays for a turno.
+  // MP appends collection_status/status (approved/pending/rejected) to the back_url instead of
+  // calling us — without this the patient just lands back on a bare homepage with no feedback
+  // at all about whether the payment went through, pending, or failed.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const mpStatus = params.get('collection_status') || params.get('status')
+    if (!mpStatus) return
+
+    if (mpStatus === 'approved') {
+      showAlert('¡Pago acreditado! Tu turno quedó confirmado.', 'success')
+    } else if (mpStatus === 'pending' || mpStatus === 'in_process') {
+      showAlert('Tu pago está siendo procesado. Te avisaremos cuando se acredite.', 'warning')
+    } else {
+      showAlert('El pago no pudo completarse. Podés reintentarlo desde "Mis Turnos".', 'error')
+    }
+
+    refreshPatientData()
+
+    ;['collection_status', 'status', 'payment_id', 'collection_id', 'external_reference', 'payment_type', 'merchant_order_id', 'preference_id', 'site_id', 'processing_mode', 'merchant_account_id']
+      .forEach(key => params.delete(key))
+    const newSearch = params.toString()
+    window.history.replaceState({}, '', window.location.pathname + (newSearch ? `?${newSearch}` : ''))
+  }, [])
+
   const handleCancelAppointmentByPatient = (turnoId: number) => {
     setCancelTurnoId(turnoId)
   }

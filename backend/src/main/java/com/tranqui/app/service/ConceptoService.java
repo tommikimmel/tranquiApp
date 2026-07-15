@@ -50,6 +50,10 @@ public class ConceptoService {
     public String generarCheckoutUrl(SolicitudDocumento solicitud) {
         try {
             return mercadoPagoService.crearPreferenciaDocumento(solicitud);
+        } catch (IllegalStateException e) {
+            // Preserve the type so GlobalExceptionHandler maps it to a clean 409 with this
+            // exact message, instead of it getting wrapped below into an opaque 500.
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("Error al generar la preferencia de pago en Mercado Pago: " + e.getMessage(), e);
         }

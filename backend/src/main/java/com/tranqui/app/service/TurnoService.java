@@ -224,6 +224,10 @@ public class TurnoService {
             checkoutUrl = mercadoPagoService.crearPreferenciaPago(turno, medico);
             turno.setCheckoutUrl(checkoutUrl);
             turno = turnoRepository.save(turno);
+        } catch (IllegalStateException e) {
+            // Preserve the type so GlobalExceptionHandler maps it to a clean 409 with this
+            // exact message, instead of it getting wrapped below into an opaque 500.
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("Error al conectar con la pasarela de Mercado Pago: " + e.getMessage(), e);
         }
