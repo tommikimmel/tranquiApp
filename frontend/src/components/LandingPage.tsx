@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import '../styles/landing.css'
 import { api } from '../api/api'
 import { useChat } from '../hooks/useChat'
@@ -77,6 +78,10 @@ interface Professional {
   domicilioAtencion?: string
   domicilioLat?: number | null
   domicilioLng?: number | null
+  descripcionPerfil?: string
+  pacientesAtiende?: string[]
+  institucionFormacion?: string
+  aniosExperiencia?: number | null
 }
 
 // PROFESSIONALS mock array removed since values are loaded from API
@@ -155,17 +160,23 @@ function SkeletonCard() {
 
 // ── Professional Card ──────────────────────────────────────────
 function ProCard({ pro, onBook, onChat, currentUser, availabilityDateLabel, availabilityCount }: { pro: Professional; onBook: (p: Professional) => void; onChat: (p: Professional) => void; currentUser: any; availabilityDateLabel?: string | null; availabilityCount?: number }) {
+  const proBio = pro.descripcionPerfil?.trim() || (
+    pro.specialty.includes('Psiquiatra') || pro.specialty.includes('Psiquiatría')
+      ? "Médico especialista con enfoque integral combinando psicoterapia y abordaje farmacológico de forma personalizada."
+      : "Profesional con enfoque clínico integral y seguimiento cercano del paciente para tratamientos de ansiedad, depresión y regulación emocional."
+  );
+
   return (
     <article
-      className="pro-card"
+      className="doc-card"
       role="article"
       aria-label={`${pro.name}, ${pro.specialty}`}
       onClick={() => onBook(pro)}
     >
-      <div className="pro-card__header">
+      <div className="doc-row">
         <div
-          className="pro-card__avatar"
-          style={{ background: pro.fotoUrl ? 'none' : pro.color, color: 'var(--green-700)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+          className="avatar"
+          style={{ background: pro.fotoUrl ? 'none' : pro.color, overflow: 'hidden' }}
           aria-hidden="true"
         >
           {pro.fotoUrl ? (
@@ -173,79 +184,54 @@ function ProCard({ pro, onBook, onChat, currentUser, availabilityDateLabel, avai
           ) : (
             pro.initials
           )}
-          {pro.online && <span className="pro-card__online-dot" aria-label="Disponible ahora" />}
         </div>
-        <div className="pro-card__info">
-          <div className="pro-card__name">{pro.name}</div>
-          <div className="pro-card__specialty">{pro.degree} · {pro.specialty}</div>
-          <span className="pro-card__matricula">{pro.matricula} <IconCheck /></span>
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
-            {pro.ofreceOnline && <span className="badge badge--info pro-card__modality-badge">Online</span>}
-            {pro.ofrecePresencial && <span className="badge badge--warning pro-card__modality-badge">Presencial</span>}
+
+        <div className="doc-info">
+          <div className="doc-name-row">
+            <span className="doc-name sora">{pro.name}</span>
+            <span className="badge-mn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
+              {pro.matricula}
+            </span>
+          </div>
+          <div className="doc-spec">{pro.degree} · {pro.specialty}</div>
+
+          <p className="doc-bio">{proBio}</p>
+          
+          <div className="doc-tags">
+            {pro.ofreceOnline && <span className="tag online">Online</span>}
+            {pro.ofrecePresencial && <span className="tag presencial">Presencial</span>}
+            {pro.nextSlot && (
+              <span className="tag next">Próximo turno: {pro.nextSlotDay.toLowerCase()} {pro.nextSlot} hs</span>
+            )}
+          </div>
+        </div>
+
+        <div className="doc-side">
+          <div className="price">
+            <div className="label">Consulta</div>
+            <div className="val">Desde ${pro.price.toLocaleString('es-AR')}</div>
+            <div className="per">50 min · {pro.ofreceOnline ? 'Online' : 'Presencial'}</div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              className="btn btn--secondary btn--sm"
+              onClick={(e) => { e.stopPropagation(); onChat(pro) }}
+              style={{ whiteSpace: 'nowrap', padding: 'var(--space-2) var(--space-3)' }}
+            >
+              Chatear
+            </button>
+            <span className="go" id={`btn-book-${pro.id}`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 16, height: 16 }}><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+              Pedir turno
+            </span>
           </div>
         </div>
       </div>
 
-      <div className="pro-card__tags" aria-label="Especialidades">
-        {pro.tags.slice(0, 3).map((tag) => (
-          <span key={tag} className="pro-card__tag">{tag}</span>
-        ))}
-        {pro.tags.length > 3 && (
-          <span className="pro-card__tag">+{pro.tags.length - 3}</span>
-        )}
-      </div>
-
-      {availabilityDateLabel && (
-        <div className={`pro-card__availability ${!availabilityCount ? 'pro-card__availability--none' : ''}`}>
-          <IconCalendar size={14} />
-          {availabilityCount ? `${availabilityCount} turno${availabilityCount !== 1 ? 's' : ''} el ${availabilityDateLabel}` : `Sin turnos el ${availabilityDateLabel}`}
-        </div>
-      )}
-
-      <div className="pro-card__divider" aria-hidden="true" />
-
-      {/* Tariff table */}
-      <div className="pro-card__tariffs">
-        {pro.tariffs.map((t) => {
-          const isPrimera = t.label.toLowerCase().includes('primera');
-          const isParticular = t.label.toLowerCase().includes('particular') || t.label.toLowerCase() === 'consulta';
-
-          // Hide other service rows for unregistered/visitor users
-          if (!currentUser && !isParticular) {
-            return null;
-          }
-
-          return (
-            <div className="pro-card__tariff-row" key={t.label}>
-              <span className="pro-card__tariff-label">{t.label}</span>
-              <span className="pro-card__tariff-price">
-                {isPrimera ? 'Calculado (se avisa)' : `$${t.price.toLocaleString('es-AR')}`}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="pro-card__footer" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-        <div className="pro-card__price" style={{ marginRight: 'auto' }}>
-          <span className="pro-card__price-label">50 min · Online</span>
-        </div>
-        <button
-          className="btn btn--secondary btn--sm"
-          onClick={(e) => { e.stopPropagation(); onChat(pro) }}
-          style={{ whiteSpace: 'nowrap', padding: 'var(--space-2) var(--space-3)' }}
-        >
-          Chatear
-        </button>
-        <button
-          className="btn btn--primary btn--sm"
-          id={`btn-book-${pro.id}`}
-          onClick={(e) => { e.stopPropagation(); onBook(pro) }}
-          aria-label={`Reservar turno con ${pro.name}`}
-          style={{ whiteSpace: 'nowrap', padding: 'var(--space-2) var(--space-3)' }}
-        >
-          Pedir Turno
-        </button>
+      <div className="card-hint">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4A5E51" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+        Tocá para elegir día y horario
       </div>
     </article>
   )
@@ -519,9 +505,16 @@ interface BookTarget {
   domicilioAtencion?: string
   domicilioLat?: number | null
   domicilioLng?: number | null
+  ofreceOnline?: boolean
+  ofrecePresencial?: boolean
+  descripcionPerfil?: string
+  pacientesAtiende?: string[]
+  institucionFormacion?: string
+  aniosExperiencia?: number | null
+  tags?: string[]
 }
 
-export default function LandingPage({ 
+export default function LandingPage({
   currentUser, 
   onNavigateToDashboard, 
   onBook,
@@ -534,6 +527,7 @@ export default function LandingPage({
   onLogout: () => void;
   onGoToDashboard: () => void;
 }) {
+  useDocumentTitle('Tranqui App — Turnos con psicólogos y psiquiatras')
   const { showAlert } = useAlert()
   const [query, setQuery] = useState('')
   const [activeSpecialty, setActiveSpecialty] = useState('Todos')
@@ -575,7 +569,9 @@ export default function LandingPage({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Check real availability for every visible professional on the selected date
+  // Check real availability for every visible professional on the selected date — one batched
+  // request instead of one request per professional (used to fire N parallel HTTP calls every
+  // time the date filter changed).
   useEffect(() => {
     if (!availabilityDate || professionals.length === 0) {
       setAvailabilityMap({})
@@ -583,39 +579,42 @@ export default function LandingPage({
     }
     let cancelled = false
     setCheckingAvailability(true)
-    Promise.all(
-      professionals.map((pro) =>
-        api.getTurnosDisponibles(pro.id, availabilityDate)
-          .then((slots: string[]) => [pro.id, (slots || []).length] as const)
-          .catch(() => [pro.id, 0] as const)
-      )
-    ).then((entries) => {
-      if (cancelled) return
-      setAvailabilityMap(Object.fromEntries(entries))
-    }).finally(() => {
-      if (!cancelled) setCheckingAvailability(false)
-    })
+    api.getConteosDisponibilidad(professionals.map(p => p.id), availabilityDate)
+      .then((counts: Record<string, number>) => {
+        if (cancelled) return
+        setAvailabilityMap(counts || {})
+      })
+      .catch(() => {
+        if (!cancelled) setAvailabilityMap({})
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingAvailability(false)
+      })
     return () => { cancelled = true }
   }, [availabilityDate, professionals])
 
-  useEffect(() => {
-    if (currentUser && currentUser.rol === 'PACIENTE' && showFloatingChat) {
+  const refreshChatChannels = () => {
+    if (currentUser && currentUser.rol === 'PACIENTE') {
       api.getChatCanales()
         .then((res: any) => {
           setChatChannels(res || []);
         })
         .catch(err => console.error("Error loading chat channels:", err));
     }
-  }, [currentUser, showFloatingChat])
+  }
 
-  // Set default doctor ID (1 - Lic. Maria Paula Rossi) for patient demo chat
+  // Refresh the channel list whenever the widget opens and whenever the patient comes
+  // back from an individual chat to the list, so it never shows stale conversations.
   useEffect(() => {
-    if (currentUser && currentUser.rol === 'PACIENTE' && !activeDoctorId) {
-      setActiveDoctorId(1)
+    if (showFloatingChat && chatSubView === 'list') {
+      refreshChatChannels()
     }
-  }, [currentUser, activeDoctorId])
+  }, [currentUser, showFloatingChat, chatSubView])
 
-  const { messages: chatMessages, sendMessage: sendChatMessage } = useChat(activeDoctorId)
+  // Also refresh on every message this patient receives over the WebSocket — regardless of
+  // which chat (if any) is currently open — so a new conversation or a new last message
+  // shows up in the list without having to close and reopen the widget.
+  const { messages: chatMessages, sendMessage: sendChatMessage } = useChat(activeDoctorId, () => refreshChatChannels())
   const [chatInput, setChatInput] = useState('')
   const chatMessagesEndRef = useRef<HTMLDivElement | null>(null)
 
@@ -715,6 +714,31 @@ export default function LandingPage({
     refreshPatientData()
   }, [currentUser])
 
+  // Handle the return redirect from Mercado Pago Checkout Pro after a patient pays for a turno.
+  // MP appends collection_status/status (approved/pending/rejected) to the back_url instead of
+  // calling us — without this the patient just lands back on a bare homepage with no feedback
+  // at all about whether the payment went through, pending, or failed.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const mpStatus = params.get('collection_status') || params.get('status')
+    if (!mpStatus) return
+
+    if (mpStatus === 'approved') {
+      showAlert('¡Pago acreditado! Tu turno quedó confirmado.', 'success')
+    } else if (mpStatus === 'pending' || mpStatus === 'in_process') {
+      showAlert('Tu pago está siendo procesado. Te avisaremos cuando se acredite.', 'warning')
+    } else {
+      showAlert('El pago no pudo completarse. Podés reintentarlo desde "Mis Turnos".', 'error')
+    }
+
+    refreshPatientData()
+
+    ;['collection_status', 'status', 'payment_id', 'collection_id', 'external_reference', 'payment_type', 'merchant_order_id', 'preference_id', 'site_id', 'processing_mode', 'merchant_account_id']
+      .forEach(key => params.delete(key))
+    const newSearch = params.toString()
+    window.history.replaceState({}, '', window.location.pathname + (newSearch ? `?${newSearch}` : ''))
+  }, [])
+
   const handleCancelAppointmentByPatient = (turnoId: number) => {
     setCancelTurnoId(turnoId)
   }
@@ -785,7 +809,14 @@ export default function LandingPage({
         fotoUrl: pro.fotoUrl,
         domicilioAtencion: pro.domicilioAtencion,
         domicilioLat: pro.domicilioLat,
-        domicilioLng: pro.domicilioLng
+        domicilioLng: pro.domicilioLng,
+        ofreceOnline: pro.ofreceOnline,
+        ofrecePresencial: pro.ofrecePresencial,
+        descripcionPerfil: pro.descripcionPerfil,
+        pacientesAtiende: pro.pacientesAtiende,
+        institucionFormacion: pro.institucionFormacion,
+        aniosExperiencia: pro.aniosExperiencia,
+        tags: pro.tags
       })
     }
   }
@@ -1561,9 +1592,12 @@ export default function LandingPage({
           {/* Floating Action Button (FAB) */}
           <button
             onClick={() => {
-              setShowFloatingChat(!showFloatingChat);
-              if (!showFloatingChat && !activeDoctorId && professionals.length > 0) {
-                // Default to list view
+              const opening = !showFloatingChat;
+              setShowFloatingChat(opening);
+              if (opening) {
+                // Always land on the conversation list when (re)opening the widget from
+                // its icon — same as WhatsApp itself. Only an explicit "Chatear" click
+                // (handleStartChat) or tapping a channel jumps straight into a chat.
                 setChatSubView('list');
               }
             }}

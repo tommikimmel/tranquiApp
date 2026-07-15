@@ -108,6 +108,23 @@ public class TurnoService {
                 .collect(Collectors.toList());
     }
 
+    // Batched counterpart of obtenerHorariosDisponibles for the public homepage, which used to
+    // fire one HTTP request per visible professional every time a date filter changed. Reuses
+    // the exact same per-médico logic (including the Google Calendar overlay) unchanged — this
+    // only collapses the *transport* into a single request/response instead of N of them.
+    @Transactional(readOnly = true)
+    public java.util.Map<Long, Integer> obtenerConteosDisponibilidad(List<Long> medicoIds, java.time.LocalDate fecha) {
+        java.util.Map<Long, Integer> conteos = new java.util.LinkedHashMap<>();
+        for (Long medicoId : medicoIds) {
+            try {
+                conteos.put(medicoId, obtenerHorariosDisponibles(medicoId, fecha).size());
+            } catch (Exception e) {
+                conteos.put(medicoId, 0);
+            }
+        }
+        return conteos;
+    }
+
     @Transactional(readOnly = true)
     public boolean esPrimeraConsulta(String email) {
         return !turnoRepository.existsByPacienteEmailAndEstadoNot(email, EstadoTurno.CANCELADO);
@@ -205,6 +222,12 @@ public class TurnoService {
         String checkoutUrl = "";
         try {
             checkoutUrl = mercadoPagoService.crearPreferenciaPago(turno, medico);
+            turno.setCheckoutUrl(checkoutUrl);
+            turno = turnoRepository.save(turno);
+        } catch (IllegalStateException e) {
+            // Preserve the type so GlobalExceptionHandler maps it to a clean 409 with this
+            // exact message, instead of it getting wrapped below into an opaque 500.
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("Error al conectar con la pasarela de Mercado Pago: " + e.getMessage(), e);
         }
@@ -249,6 +272,8 @@ public class TurnoService {
         // Sort by start time
         turnos.sort(java.util.Comparator.comparing(Turno::getHoraInicio));
 
+        java.util.Set<String> emailsNoPrimeraConsulta = emailsConTurnoNoCancelado(turnos);
+
         return turnos.stream()
                 .map(t -> {
                     String status = "pending";
@@ -272,11 +297,25 @@ public class TurnoService {
                             .attendanceStatus(t.getAsistencia() != null ? t.getAsistencia().name() : "ESPERANDO")
                             .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
                             .fecha(t.getFecha().toString())
-                            .firstConsultation(esPrimeraConsulta(t.getPaciente().getEmail()))
+                            .firstConsultation(!emailsNoPrimeraConsulta.contains(t.getPaciente().getEmail()))
                             .patientInfo(construirPacienteDto(t.getPaciente()))
                             .build();
                 })
                 .collect(Collectors.toList());
+    }
+
+    // Replaces calling esPrimeraConsulta() once per turno (one exists-query per row) with a
+    // single batched lookup of which of this list's patient emails already have a non-cancelled
+    // turno — same semantics as esPrimeraConsulta, computed for many patients in one query.
+    private java.util.Set<String> emailsConTurnoNoCancelado(List<Turno> turnos) {
+        List<String> emails = turnos.stream()
+                .map(t -> t.getPaciente().getEmail())
+                .distinct()
+                .collect(Collectors.toList());
+        if (emails.isEmpty()) {
+            return new java.util.HashSet<>();
+        }
+        return new java.util.HashSet<>(turnoRepository.findPacienteEmailsConTurnoNoCancelado(emails));
     }
 
     @Transactional(readOnly = true)
@@ -287,6 +326,8 @@ public class TurnoService {
         List<Turno> turnos = turnoRepository.findByMedicoIdAndEstadoNot(medico.getId(), EstadoTurno.CANCELADO);
 
         turnos.sort(java.util.Comparator.comparing(Turno::getFecha).thenComparing(Turno::getHoraInicio));
+
+        java.util.Set<String> emailsNoPrimeraConsultaTodos = emailsConTurnoNoCancelado(turnos);
 
         return turnos.stream()
                 .map(t -> {
@@ -312,7 +353,7 @@ public class TurnoService {
                             .attendanceStatus(t.getAsistencia() != null ? t.getAsistencia().name() : "ESPERANDO")
                             .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
                             .fecha(t.getFecha().toString())
-                            .firstConsultation(esPrimeraConsulta(t.getPaciente().getEmail()))
+                            .firstConsultation(!emailsNoPrimeraConsultaTodos.contains(t.getPaciente().getEmail()))
                             .patientInfo(construirPacienteDto(t.getPaciente()))
                             .build();
                 })
@@ -342,14 +383,10 @@ public class TurnoService {
 
                     String typeLabel = t.getTipo() == TipoTurno.OSDE ? "Copago OSDE" : "Consulta particular";
 
-                    String checkoutUrl = "";
-                    if ("pending".equals(status)) {
-                        try {
-                            checkoutUrl = mercadoPagoService.crearPreferenciaPago(t, t.getMedico());
-                        } catch (Exception e) {
-                            // keep empty
-                        }
-                    }
+                    // The checkout URL is generated once at booking time (reservarTurno) and
+                    // persisted on the turno — re-generating it here on every list read used to
+                    // mean one synchronous external Mercado Pago call per pending turno.
+                    String checkoutUrl = t.getCheckoutUrl() != null ? t.getCheckoutUrl() : "";
 
                     return com.tranqui.app.model.dto.TurnoMedicoDto.builder()
                             .id(t.getId())
@@ -368,6 +405,21 @@ public class TurnoService {
                             .build();
                 })
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void abandonarReservaPendiente(Long turnoId) {
+        Turno turno = turnoRepository.findById(turnoId)
+                .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
+
+        // Only a still-unpaid reservation may be self-released through this unauthenticated
+        // endpoint; anything already confirmed/cancelled is left untouched.
+        if (turno.getEstado() != EstadoTurno.PENDIENTE_PAGO) {
+            return;
+        }
+
+        turno.setEstado(EstadoTurno.CANCELADO);
+        turnoRepository.save(turno);
     }
 
     @Transactional

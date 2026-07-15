@@ -83,8 +83,10 @@ class ChatControllerUnitTest {
     }
 
     @Test
-    void obtenerCanales_shouldDelegateToMensajeService() {
+    void obtenerCanales_shouldDelegateToMensajeService_forPsiquiatra() {
         UserDetails userDetails = new User("dra@mail.com", "x", Collections.emptyList());
+        Usuario medico = Usuario.builder().id(1L).email("dra@mail.com").rol(Rol.PSIQUIATRA).build();
+        when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico));
         List<CanalPrioritarioDto> canales = List.of();
         when(mensajeService.obtenerCanalesPrioritarios("dra@mail.com")).thenReturn(canales);
 
@@ -92,6 +94,22 @@ class ChatControllerUnitTest {
 
         assertEquals(200, response.getStatusCodeValue());
         assertEquals(canales, response.getBody());
+        verify(mensajeService, never()).obtenerCanalesPaciente(any());
+    }
+
+    @Test
+    void obtenerCanales_shouldDelegateToPatientChannels_forPaciente() {
+        UserDetails userDetails = new User("paciente@mail.com", "x", Collections.emptyList());
+        Usuario paciente = Usuario.builder().id(2L).email("paciente@mail.com").rol(Rol.PACIENTE).build();
+        when(usuarioRepository.findByEmail("paciente@mail.com")).thenReturn(Optional.of(paciente));
+        List<CanalPrioritarioDto> canales = List.of();
+        when(mensajeService.obtenerCanalesPaciente("paciente@mail.com")).thenReturn(canales);
+
+        var response = controller.obtenerCanales(userDetails);
+
+        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(canales, response.getBody());
+        verify(mensajeService, never()).obtenerCanalesPrioritarios(any());
     }
 
     @Test

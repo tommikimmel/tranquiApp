@@ -1,3 +1,19 @@
+/* ── App-level route Suspense fallback ────────────────────────
+   Lives here (loaded eagerly by App.tsx) rather than in checkout.css so it renders correctly
+   no matter which lazy-loaded route chunk (login/checkout/dashboard/admin) is still fetching. */
+@keyframes app-spin {
+  to { transform: rotate(360deg); }
+}
+
+.app-suspense-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: app-spin 0.7s linear infinite;
+}
+
 /* ── Dashboard Layout ──────────────────────────────────────── */
 .dashboard-layout {
   display: grid;
@@ -595,57 +611,89 @@
   border-color: var(--green-300);
 }
 
-/* ── MP Connect Banner ─────────────────────────────────────── */
+/* ── Integration Connect Banner (Mercado Pago, Google Calendar) ── */
 .mp-connect-banner {
-  background: linear-gradient(135deg, var(--green-50) 0%, var(--neutral-50) 100%);
-  border: 1.5px solid var(--green-200);
-  border-radius: var(--radius-xl);
-  padding: var(--space-8);
+  background: var(--neutral-50);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
   display: flex;
-  flex-direction: column;
   align-items: center;
-  text-align: center;
   gap: var(--space-5);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
 .mp-connect-banner--connected {
-  background: linear-gradient(135deg, var(--green-50) 0%, var(--green-100) 100%);
-  border-color: var(--green-300);
-}
-
-.mp-connect-banner__content {
-  max-width: 480px;
+  background: var(--green-50);
+  border-color: var(--green-200);
 }
 
 .mp-connect-banner__icon {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 
 .mp-connect-banner__logo {
-  width: 200px;
+  width: 32px;
   height: auto;
   display: block;
 }
 
 .mp-connect-banner__content {
   flex: 1;
+  min-width: 0;
+}
+
+.mp-connect-banner__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semi);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  margin-bottom: var(--space-2);
+  background: var(--neutral-200);
+  color: var(--neutral-600);
+}
+
+.mp-connect-banner--connected .mp-connect-banner__status {
+  background: var(--green-100);
+  color: var(--green-700);
+}
+
+.mp-connect-banner__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .mp-connect-banner__title {
   font-family: var(--font-heading);
-  font-size: var(--text-xl);
+  font-size: var(--text-base);
   font-weight: var(--font-weight-semi);
   color: var(--color-text-primary);
-  margin-bottom: var(--space-2);
+  margin-bottom: 2px;
 }
 
 .mp-connect-banner__body {
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   line-height: var(--line-height-relaxed);
-  max-width: 440px;
+  max-width: 480px;
+}
+
+.mp-connect-banner__action {
+  flex-shrink: 0;
 }
 
 /* ── Inputs ────────────────────────────────────────────────── */

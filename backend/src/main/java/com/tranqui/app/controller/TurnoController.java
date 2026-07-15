@@ -27,6 +27,17 @@ public class TurnoController {
         return ResponseEntity.ok(turnoService.obtenerHorariosDisponibles(medicoId, fecha));
     }
 
+    /**
+     * Batched counterpart used by the public homepage's date filter: instead of one request per
+     * visible professional, the frontend sends every médicoId once and gets back a count per id.
+     */
+    @GetMapping("/medicos/turnos-disponibles-conteo")
+    public ResponseEntity<java.util.Map<Long, Integer>> obtenerConteosDisponibilidad(
+            @RequestParam List<Long> medicoIds,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+        return ResponseEntity.ok(turnoService.obtenerConteosDisponibilidad(medicoIds, fecha));
+    }
+
     @PostMapping("/turnos/reservar")
     public ResponseEntity<TurnoResponseDto> reservarTurno(@RequestBody ReservaTurnoDto dto) {
         return ResponseEntity.ok(turnoService.reservarTurno(dto));
@@ -55,6 +66,19 @@ public class TurnoController {
     @PreAuthorize("hasAnyRole('PACIENTE', 'PSIQUIATRA')")
     public ResponseEntity<Void> cancelarTurno(@PathVariable Long turnoId) {
         turnoService.cancelarTurno(turnoId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Public counterpart of /cancelar, reachable without login since booking itself doesn't
+     * require an account. Only releases turnos still in PENDIENTE_PAGO (see
+     * TurnoService#abandonarReservaPendiente) so it can't be used to cancel a real, paid
+     * appointment by guessing an id — lets a patient who backs out of payment immediately
+     * free their slot instead of blocking themselves for 5 minutes until the cleanup job runs.
+     */
+    @PostMapping("/turnos/{turnoId}/abandonar-pago")
+    public ResponseEntity<Void> abandonarReservaPendiente(@PathVariable Long turnoId) {
+        turnoService.abandonarReservaPendiente(turnoId);
         return ResponseEntity.ok().build();
     }
 

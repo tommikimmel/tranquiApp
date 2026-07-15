@@ -59,6 +59,11 @@ class MedicoServiceTest {
                 .matriculaProvincia("Córdoba")
                 .matriculaNumero(12345)
                 .fotoUrl("http://example.com/foto.jpg")
+                .descripcionPerfil("Psiquiatra con enfoque integral.")
+                .pacientesAtiende("Adultos,Adultos mayores")
+                .institucionFormacion("UBA")
+                .aniosExperiencia(10)
+                .tags("Ansiedad,Depresión")
                 .verificadoAdmin(true)
                 .build();
         paciente = Usuario.builder()
@@ -116,7 +121,8 @@ class MedicoServiceTest {
                 .build();
 
         MedicoDto dto = MedicoDto.builder()
-                .name("Lic. Marta Rossi Mod")
+                .nombre("Marta Mod")
+                .apellido("Rossi")
                 .matricula("54321")
                 .degree("Psiquiatra")
                 .specialty("Ansiedad")
@@ -129,9 +135,24 @@ class MedicoServiceTest {
 
         MedicoDto result = medicoService.actualizarPerfil(medico.getEmail(), dto);
         assertNotNull(result);
-        assertEquals("Lic. Marta Rossi Mod", result.getName());
+        assertEquals("Marta Mod", result.getNombre());
+        assertEquals("Marta Mod Rossi", result.getName());
         assertEquals("54321", result.getMatricula());
         assertEquals(2, result.getTags().size());
+    }
+
+    @Test
+    void testActualizarPerfil_rejectsOversizedFotoUrl() {
+        String hugeFoto = "data:image/png;base64," + "A".repeat(5 * 1024 * 1024); // ~3.75MB decoded
+        MedicoDto dto = MedicoDto.builder()
+                .nombre("Marta").apellido("Rossi").fotoUrl(hugeFoto).build();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> medicoService.actualizarPerfil(medico.getEmail(), dto));
+        assertTrue(ex.getMessage().contains("demasiado grande"));
+
+        Usuario unchanged = usuarioRepository.findByEmail(medico.getEmail()).orElseThrow();
+        assertNotEquals(hugeFoto, unchanged.getFotoUrl());
     }
 
     @Test
@@ -173,7 +194,7 @@ class MedicoServiceTest {
                 .build();
 
         MedicoDto dto = MedicoDto.builder()
-                .name("Marta").matriculaInfo(matInfo).tariffs(List.of(tDto)).build();
+                .nombre("Marta").matriculaInfo(matInfo).tariffs(List.of(tDto)).build();
 
         medicoService.actualizarPerfil(medico.getEmail(), dto);
 

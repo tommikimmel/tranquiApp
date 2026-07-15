@@ -1,6 +1,7 @@
 package com.tranqui.app.controller;
 
 import com.tranqui.app.model.Mensaje;
+import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.model.dto.CanalPrioritarioDto;
 import com.tranqui.app.model.dto.MensajeDto;
@@ -100,7 +101,17 @@ public class ChatController {
     public ResponseEntity<List<CanalPrioritarioDto>> obtenerCanales(
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        List<CanalPrioritarioDto> canales = mensajeService.obtenerCanalesPrioritarios(userDetails.getUsername());
+        Usuario usuarioActual = usuarioRepository.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+
+        // findPrioritizedChannels is written from the doctor's point of view (it looks for
+        // PACIENTE messaging partners and computes clinical priority against their turnos), so
+        // it only makes sense when the caller is a PSIQUIATRA. A PACIENTE (or VISITADOR) calling
+        // this same endpoint needs the mirror-image query — their PSIQUIATRA partners — otherwise
+        // it silently returns zero channels regardless of real message history.
+        List<CanalPrioritarioDto> canales = usuarioActual.getRol() == Rol.PSIQUIATRA
+                ? mensajeService.obtenerCanalesPrioritarios(userDetails.getUsername())
+                : mensajeService.obtenerCanalesPaciente(userDetails.getUsername());
         return ResponseEntity.ok(canales);
     }
 

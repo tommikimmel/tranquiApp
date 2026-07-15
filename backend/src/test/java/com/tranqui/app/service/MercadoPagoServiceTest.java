@@ -49,8 +49,7 @@ class MercadoPagoServiceTest {
                 .precio(BigDecimal.valueOf(15000.00))
                 .build();
 
-        when(encryptionUtil.decrypt("encrypted-token")).thenReturn("dummy-token");
-
+        // isEnabled=false short-circuits before ever decrypting the token, so no stub needed here.
         String initPoint = mercadoPagoService.crearPreferenciaPago(turno, medico);
 
         assertNotNull(initPoint);
@@ -75,8 +74,7 @@ class MercadoPagoServiceTest {
                 .precio(BigDecimal.valueOf(15000.00))
                 .build();
 
-        when(encryptionUtil.decrypt("encrypted-token")).thenReturn("dummy-token");
-
+        // isEnabled=false short-circuits before ever decrypting the token, so no stub needed here.
         String initPoint = mercadoPagoService.crearPreferenciaDocumento(solicitud);
 
         assertNotNull(initPoint);

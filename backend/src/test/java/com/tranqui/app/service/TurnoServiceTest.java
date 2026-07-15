@@ -76,6 +76,9 @@ class TurnoServiceTest {
                 .horaFin(LocalTime.of(10, 45))
                 .tipo(TipoTurno.PARTICULAR)
                 .estado(EstadoTurno.PENDIENTE_PAGO)
+                // obtenerTurnosPaciente now reads the persisted checkoutUrl instead of calling
+                // Mercado Pago again on every read, so it must already be set here.
+                .checkoutUrl("https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-preference-id")
                 .build();
 
         turnoRepository.save(turno);

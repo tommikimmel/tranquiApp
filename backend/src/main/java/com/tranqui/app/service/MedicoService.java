@@ -35,6 +35,8 @@ public class MedicoService {
     @Autowired
     private TurnoRepository turnoRepository;
 
+    private static final long MAX_FOTO_BYTES = 3L * 1024 * 1024; // 3MB decoded
+
     private static final List<MedicoDto.TarifaDto> DEFAULT_TARIFFS = Arrays.asList(
             new MedicoDto.TarifaDto("particular", "Consulta particular", new BigDecimal("60000"), true),
             new MedicoDto.TarifaDto("sobreturno", "Sobreturno", new BigDecimal("90000"), true),
@@ -46,14 +48,25 @@ public class MedicoService {
 
     @Transactional(readOnly = true)
     public List<MedicoDto> obtenerMedicosActivos() {
-        List<Usuario> medicos = usuarioRepository.findAll().stream()
-                .filter(u -> u.getRol() == Rol.PSIQUIATRA)
+        // Filter by role at the DB level (was findAll() + Java-side filtering, scanning every
+        // usuario row — patients included — on every public homepage load).
+        List<Usuario> medicos = usuarioRepository.findByRol(Rol.PSIQUIATRA).stream()
                 .filter(this::isMedicoVerificado)
                 .collect(Collectors.toList());
 
+        if (medicos.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // Batch-fetch every matching médico's tariffs in one query instead of one query per
+        // médico (the N+1 that used to run inside construirMedicoDto for each doctor).
+        List<Long> medicoIds = medicos.stream().map(Usuario::getId).collect(Collectors.toList());
+        Map<Long, List<TarifaMedico>> tarifasPorMedico = tarifaRepository.findByMedicoIdIn(medicoIds).stream()
+                .collect(Collectors.groupingBy(t -> t.getMedico().getId()));
+
         List<MedicoDto> dtos = new ArrayList<>();
         for (Usuario m : medicos) {
-            dtos.add(construirMedicoDto(m));
+            dtos.add(construirMedicoDto(m, tarifasPorMedico.getOrDefault(m.getId(), new ArrayList<>())));
         }
         return dtos;
     }
@@ -77,7 +90,7 @@ public class MedicoService {
         Usuario medico = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
-        medico.setNombre(dto.getName());
+        medico.setNombre(dto.getNombre());
         medico.setApellido(dto.getApellido());
         medico.setSexo(dto.getSexo());
         medico.setFechaNacimiento(dto.getFechaNacimiento());
@@ -113,12 +126,24 @@ public class MedicoService {
         medico.setCuit(dto.getCuit());
         medico.setPrecio(dto.getPrice());
         medico.setColor(dto.getColor());
+
+        if (dto.getFotoUrl() != null && com.tranqui.app.util.ImageUtils.decodedByteSize(dto.getFotoUrl()) > MAX_FOTO_BYTES) {
+            throw new IllegalArgumentException(
+                    "La foto de perfil es demasiado grande (máx. " + (MAX_FOTO_BYTES / (1024 * 1024)) + "MB). Elegí una imagen más liviana.");
+        }
         medico.setFotoUrl(dto.getFotoUrl());
         medico.setOfreceOnline(dto.isOfreceOnline());
         medico.setOfrecePresencial(dto.isOfrecePresencial());
 
         if (dto.getTags() != null) {
             medico.setTags(String.join(",", dto.getTags()));
+        }
+
+        medico.setDescripcionPerfil(dto.getDescripcionPerfil());
+        medico.setInstitucionFormacion(dto.getInstitucionFormacion());
+        medico.setAniosExperiencia(dto.getAniosExperiencia());
+        if (dto.getPacientesAtiende() != null) {
+            medico.setPacientesAtiende(String.join(",", dto.getPacientesAtiende()));
         }
 
         usuarioRepository.save(medico);
@@ -148,8 +173,10 @@ public class MedicoService {
     }
 
     private MedicoDto construirMedicoDto(Usuario m) {
-        List<TarifaMedico> tarifasDb = tarifaRepository.findByMedicoId(m.getId());
-        
+        return construirMedicoDto(m, tarifaRepository.findByMedicoId(m.getId()));
+    }
+
+    private MedicoDto construirMedicoDto(Usuario m, List<TarifaMedico> tarifasDb) {
         // If doctor has no tariffs in DB, initialize them with defaults
         if (tarifasDb.isEmpty()) {
             tarifasDb = new ArrayList<>();
@@ -178,6 +205,11 @@ public class MedicoService {
         List<String> tagsList = new ArrayList<>();
         if (m.getTags() != null && !m.getTags().trim().isEmpty()) {
             tagsList = Arrays.asList(m.getTags().split(","));
+        }
+
+        List<String> pacientesAtiendeList = new ArrayList<>();
+        if (m.getPacientesAtiende() != null && !m.getPacientesAtiende().trim().isEmpty()) {
+            pacientesAtiendeList = Arrays.asList(m.getPacientesAtiende().split(","));
         }
 
         String initials = "";
@@ -218,6 +250,7 @@ public class MedicoService {
         return MedicoDto.builder()
                 .id(m.getId())
                 .name(nombreCompleto)
+                .nombre(m.getNombre())
                 .email(m.getEmail())
                 .initials(initials)
                 .degree(m.getTitulo() != null ? m.getTitulo() : "Médico/a")
@@ -244,6 +277,10 @@ public class MedicoService {
                 .matriculaInfo(matInfo)
                 .verificado(isMedicoVerificado(m))
                 .verificadoAdmin(m.getVerificadoAdmin())
+                .descripcionPerfil(m.getDescripcionPerfil())
+                .pacientesAtiende(pacientesAtiendeList)
+                .institucionFormacion(m.getInstitucionFormacion())
+                .aniosExperiencia(m.getAniosExperiencia())
                 .build();
     }
 
@@ -389,6 +426,12 @@ public class MedicoService {
                 && u.getMatriculaProvincia() != null && !u.getMatriculaProvincia().trim().isEmpty()
                 && u.getMatriculaNumero() != null
                 && u.getFotoUrl() != null && !u.getFotoUrl().trim().isEmpty()
+                && u.getDescripcionPerfil() != null && !u.getDescripcionPerfil().trim().isEmpty()
+                && u.getPacientesAtiende() != null && !u.getPacientesAtiende().trim().isEmpty()
+                && u.getInstitucionFormacion() != null && !u.getInstitucionFormacion().trim().isEmpty()
+                && u.getAniosExperiencia() != null
+                && u.getTags() != null && !u.getTags().trim().isEmpty()
+                && (u.isOfreceOnline() || u.isOfrecePresencial())
                 && Boolean.TRUE.equals(u.getVerificadoAdmin());
     }
 }

@@ -8,7 +8,12 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Entity
-@Table(name = "turno")
+@Table(name = "turno", indexes = {
+        @Index(name = "idx_turno_medico_id", columnList = "medico_id"),
+        @Index(name = "idx_turno_paciente_id", columnList = "paciente_id"),
+        @Index(name = "idx_turno_fecha", columnList = "fecha"),
+        @Index(name = "idx_turno_estado", columnList = "estado")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -62,6 +67,14 @@ public class Turno {
 
     @Column(name = "google_event_id", length = 255)
     private String googleEventId;
+
+    // Mercado Pago preference URL, generated once when the turno is created and reused from
+    // here on — crearPreferenciaPago() creates a brand new preference on Mercado Pago's side
+    // on every call, so re-calling it on every "Mis Turnos" read (as obtenerTurnosPaciente used
+    // to) was both slow (a synchronous external HTTP call per pending turno) and wasteful
+    // (orphaned duplicate preferences left on Mercado Pago).
+    @Column(name = "checkout_url", length = 500)
+    private String checkoutUrl;
 
     @OneToOne(mappedBy = "turno", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Pago pago;

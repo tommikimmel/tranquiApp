@@ -1,19 +1,24 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react'
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
 import './styles/index.css'
 import './styles/dashboard.css'
+// LandingPage stays a static import — it's what almost every first-time visitor (anonymous
+// patients hitting "/") needs immediately, so there's nothing to gain from lazy-loading it.
+// Everything below is only needed by a subset of visitors (professionals, admins, someone
+// mid-checkout), so splitting them out of the main chunk shrinks what a random patient
+// downloads before first paint.
 import LandingPage from './components/LandingPage'
-import CheckoutFlow from './components/CheckoutFlow'
-import LoginPage from './components/LoginPage'
-import PatientsView from './components/PatientsView'
-import VisitorsView from './components/VisitorsView'
-import AdminDashboard from './components/AdminDashboard'
+const CheckoutFlow = lazy(() => import('./components/CheckoutFlow'))
+const LoginPage = lazy(() => import('./components/LoginPage'))
+const PatientsView = lazy(() => import('./components/PatientsView'))
+const VisitorsView = lazy(() => import('./components/VisitorsView'))
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
 import AddressMapPicker from './components/AddressMapPicker'
 import { api } from './api/api'
 import { useAlert } from './context/AlertContext'
+import { useDocumentTitle } from './hooks/useDocumentTitle'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
-
-type AppView = 'landing' | 'checkout' | 'dashboard' | 'login'
 
 interface CheckoutTarget {
   id: string
@@ -24,9 +29,92 @@ interface CheckoutTarget {
   price: number
   nextSlot: string
   nextSlotDay: string
+  fotoUrl?: string
   domicilioAtencion?: string
   domicilioLat?: number | null
   domicilioLng?: number | null
+  ofreceOnline?: boolean
+  ofrecePresencial?: boolean
+  descripcionPerfil?: string
+  pacientesAtiende?: string[]
+  institucionFormacion?: string
+  aniosExperiencia?: number | null
+  tags?: string[]
+}
+
+// ── /reserva/:proId route — resolves the professional either from the
+// navigation state (fast path, set by handleBook on click) or by fetching
+// the public medicos list and matching the id (direct URL load / refresh).
+function CheckoutRoute({ currentUser, loadingSession }: { currentUser: any; loadingSession: boolean }) {
+  const { proId } = useParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const stateTarget = (location.state as CheckoutTarget | null) || null
+  const [target, setTarget] = useState<CheckoutTarget | null>(stateTarget)
+  const [loading, setLoading] = useState(!stateTarget)
+  const [notFound, setNotFound] = useState(false)
+
+  useEffect(() => {
+    if (stateTarget) return
+    let cancelled = false
+    setLoading(true)
+    api.getMedicos()
+      .then((res: any[]) => {
+        if (cancelled) return
+        const m = (res || []).find((x: any) => String(x.id) === proId)
+        if (!m) {
+          setNotFound(true)
+          return
+        }
+        setTarget({
+          id: String(m.id),
+          name: m.name,
+          degree: m.degree,
+          specialty: m.specialty,
+          matricula: m.matricula,
+          price: m.price,
+          nextSlot: m.nextSlot || '16:00',
+          nextSlotDay: m.nextSlotDay || 'Hoy',
+          fotoUrl: m.fotoUrl,
+          domicilioAtencion: m.domicilioAtencion,
+          domicilioLat: m.domicilioLat,
+          domicilioLng: m.domicilioLng,
+          ofreceOnline: m.ofreceOnline,
+          ofrecePresencial: m.ofrecePresencial,
+          descripcionPerfil: m.descripcionPerfil,
+          pacientesAtiende: m.pacientesAtiende,
+          institucionFormacion: m.institucionFormacion,
+          aniosExperiencia: m.aniosExperiencia,
+          tags: m.tags,
+        })
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proId])
+
+  if (loadingSession || loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: 'var(--space-20)' }}>
+        <div className="checkout-spinner" style={{ margin: '0 auto' }} />
+      </div>
+    )
+  }
+  if (!currentUser) {
+    return <Navigate to="/login" replace />
+  }
+  if (notFound || !target) {
+    return <Navigate to="/" replace />
+  }
+
+  return (
+    <CheckoutFlow
+      professional={target}
+      onBack={() => navigate('/')}
+      onComplete={() => navigate('/')}
+    />
+  )
 }
 
 // ── Types ──────────────────────────────────────────────────────
@@ -105,8 +193,8 @@ const Icon = {
       <polyline points="20 6 9 17 4 12" />
     </svg>
   ),
-  AlertTriangle: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ width: 20, height: 20 }}>
+  AlertTriangle: ({ size = 20 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ width: size, height: size }}>
       <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
       <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
@@ -154,6 +242,72 @@ const Icon = {
       <path d="M9 15l2 2 4-4" />
     </svg>
   ),
+  Trash: ({ size = 14 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  ),
+  Activity: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  ),
+  Clipboard: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    </svg>
+  ),
+  FileText: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" />
+    </svg>
+  ),
+  CalendarCheck: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+      <path d="M9 16l2 2 4-4" />
+    </svg>
+  ),
+  CalendarX: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="10" y1="14" x2="14" y2="18" /><line x1="14" y1="14" x2="10" y2="18" />
+    </svg>
+  ),
+  MessageCircle: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  ),
+  BellSimple: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ width: size, height: size }}>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  ),
+}
+
+// Maps a persisted Notificacion's `tipo` (backend/.../NotificacionService.crearNotificacion
+// callers) to the icon + accent color shown in the notification bell dropdown.
+function getNotificationVisual(tipo: string | undefined): { Icon: (props: { size?: number }) => React.JSX.Element; color: string } {
+  switch (tipo) {
+    case 'TURNO_RESERVADO':
+    case 'TURNO_CONFIRMADO':
+      return { Icon: Icon.CalendarCheck, color: 'var(--color-success)' }
+    case 'TURNO_CANCELADO':
+      return { Icon: Icon.CalendarX, color: 'var(--color-danger)' }
+    case 'SEGUIMIENTO':
+      return { Icon: Icon.Activity, color: '#3b82f6' }
+    case 'INFORME':
+      return { Icon: Icon.FileText, color: '#8b5cf6' }
+    case 'NUEVO_MENSAJE':
+      return { Icon: Icon.MessageCircle, color: 'var(--color-primary)' }
+    default:
+      return { Icon: Icon.BellSimple, color: 'var(--color-primary)' }
+  }
 }
 
 // ── Sidebar Component ──────────────────────────────────────────
@@ -193,7 +347,13 @@ function Sidebar({ activeNav, onNavChange, medicoInfo, hasUnreadChats }: { activ
       </nav>
 
       <div className="sidebar__footer">
-        <div className="sidebar__user" role="button" tabIndex={0}>
+        <div
+          className="sidebar__user"
+          role="button"
+          tabIndex={0}
+          onClick={() => onNavChange('settings')}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNavChange('settings') } }}
+        >
           {medicoInfo?.fotoUrl ? (
             <img 
               src={medicoInfo.fotoUrl} 
@@ -220,80 +380,68 @@ function Sidebar({ activeNav, onNavChange, medicoInfo, hasUnreadChats }: { activ
 
 // ── MP Connect Banner ──────────────────────────────────────────
 function MPConnectBanner({ connected, onConnect, onDisconnect }: { connected: boolean; onConnect: () => void; onDisconnect: () => void }) {
-  if (connected) {
-    return (
-      <div className="mp-connect-banner mp-connect-banner--connected" role="status">
-        <div className="mp-connect-banner__icon">
-          <img src="/logo-mp.png" alt="Mercado Pago" className="mp-connect-banner__logo" />
-        </div>
-        <div className="mp-connect-banner__content">
-          <h2 className="mp-connect-banner__title">Mercado Pago conectado ✓</h2>
-          <p className="mp-connect-banner__body">
-            Tu cuenta está vinculada. Los pagos se acreditan automáticamente en tu cuenta de Mercado Pago
-            al confirmarse cada sesión. Tranqui es 100% libre de comisiones.
-          </p>
-        </div>
-        <button className="btn btn--ghost btn--sm" onClick={onDisconnect}>Desconectar</button>
-      </div>
-    )
-  }
-
   return (
-    <div className="mp-connect-banner" role="alert">
+    <div className={`mp-connect-banner ${connected ? 'mp-connect-banner--connected' : ''}`} role={connected ? 'status' : 'alert'}>
       <div className="mp-connect-banner__icon">
-          <img src="/logo-mp.png" alt="Mercado Pago" className="mp-connect-banner__logo" />
-        </div>
+        <img src="/logo-mp.png" alt="Mercado Pago" className="mp-connect-banner__logo" />
+      </div>
       <div className="mp-connect-banner__content">
-        <h2 className="mp-connect-banner__title">Conectá tu cuenta de Mercado Pago</h2>
+        <span className="mp-connect-banner__status">
+          <span className="mp-connect-banner__status-dot" />
+          {connected ? 'Conectado' : 'Desconectado'}
+        </span>
+        <h2 className="mp-connect-banner__title">
+          {connected ? 'Mercado Pago vinculado' : 'Conectá tu cuenta de Mercado Pago'}
+        </h2>
         <p className="mp-connect-banner__body">
-          Para que los pacientes puedan pagarte directamente, necesitás vincular tu cuenta de Mercado Pago.
-          El proceso toma menos de 2 minutos. Sin esto, tu perfil no aparece en las búsquedas públicas.
+          {connected
+            ? 'Los pagos se acreditan automáticamente en tu cuenta de Mercado Pago al confirmarse cada sesión. Tranqui es 100% libre de comisiones.'
+            : 'Para que los pacientes puedan pagarte directamente, necesitás vincular tu cuenta de Mercado Pago. El proceso toma menos de 2 minutos. Sin esto, tu perfil no aparece en las búsquedas públicas.'}
         </p>
       </div>
-      <button className="btn btn--primary" onClick={onConnect} id="btn-connect-mp">
-        Conectar Mercado Pago
-      </button>
+      <div className="mp-connect-banner__action">
+        {connected ? (
+          <button className="btn btn--ghost btn--sm" onClick={onDisconnect}>Desconectar</button>
+        ) : (
+          <button className="btn btn--primary btn--sm" onClick={onConnect} id="btn-connect-mp">Conectar Mercado Pago</button>
+        )}
+      </div>
     </div>
   )
 }
 
 // ── Google Calendar Connect Banner ──────────────────────────────
 function GoogleCalendarConnectBanner({ connected, onConnect, onDisconnect }: { connected: boolean; onConnect: () => void; onDisconnect: () => void }) {
-  if (connected) {
-    return (
-      <div className="mp-connect-banner mp-connect-banner--connected" role="status" style={{ borderLeft: '5px solid #4285F4', marginTop: 'var(--space-4)' }}>
-        <div className="mp-connect-banner__icon">
-          <svg viewBox="0 0 24 24" style={{ width: 32, height: 32 }}>
-            <path fill="#4285F4" d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
-          </svg>
-        </div>
-        <div className="mp-connect-banner__content">
-          <h2 className="mp-connect-banner__title" style={{ color: '#1a73e8' }}>Google Calendar conectado ✓</h2>
-          <p className="mp-connect-banner__body">
-            Tu Google Calendar está vinculado. Se crearán reuniones reales de Google Meet automáticamente en tu agenda para todas las videollamadas con pacientes de Tranqui App.
-          </p>
-        </div>
-        <button className="btn btn--ghost btn--sm" onClick={onDisconnect}>Desconectar</button>
-      </div>
-    )
-  }
-
   return (
-    <div className="mp-connect-banner" role="alert" style={{ borderLeft: '5px solid #bdc1c6', marginTop: 'var(--space-4)' }}>
+    <div className={`mp-connect-banner ${connected ? 'mp-connect-banner--connected' : ''}`} role={connected ? 'status' : 'alert'}>
       <div className="mp-connect-banner__icon">
-        <svg viewBox="0 0 24 24" style={{ width: 32, height: 32 }}>
-          <path fill="#70757a" d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
+        <svg viewBox="0 0 24 24" style={{ width: 28, height: 28 }}>
+          <path fill={connected ? '#4285F4' : '#70757a'} d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
         </svg>
       </div>
       <div className="mp-connect-banner__content">
-        <h2 className="mp-connect-banner__title">Vinculá tu Google Calendar / Google Meet</h2>
+        <span className="mp-connect-banner__status" style={connected ? { background: '#E8F0FE', color: '#1a73e8' } : undefined}>
+          <span className="mp-connect-banner__status-dot" />
+          {connected ? 'Conectado' : 'Desconectado'}
+        </span>
+        <h2 className="mp-connect-banner__title">
+          {connected ? 'Google Calendar vinculado' : 'Vinculá tu Google Calendar / Google Meet'}
+        </h2>
         <p className="mp-connect-banner__body">
-          Para que el sistema genere automáticamente enlaces reales de Google Meet en cada turno confirmado y se añadan a tu agenda de Google, necesitás conectar tu cuenta.
+          {connected
+            ? 'Se crean reuniones reales de Google Meet automáticamente en tu agenda de Google para todas las videollamadas con pacientes de Tranqui App.'
+            : 'Para que el sistema genere automáticamente enlaces reales de Google Meet en cada turno confirmado y se añadan a tu agenda de Google, necesitás conectar tu cuenta.'}
         </p>
       </div>
-      <button className="btn btn--primary" onClick={onConnect} id="btn-connect-google" style={{ backgroundColor: '#1a73e8', borderColor: '#1a73e8' }}>
-        Conectar Google Calendar
-      </button>
+      <div className="mp-connect-banner__action">
+        {connected ? (
+          <button className="btn btn--ghost btn--sm" onClick={onDisconnect}>Desconectar</button>
+        ) : (
+          <button className="btn btn--primary btn--sm" onClick={onConnect} id="btn-connect-google" style={{ backgroundColor: '#1a73e8', borderColor: '#1a73e8' }}>
+            Conectar Google Calendar
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -678,9 +826,9 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
                   cursor: 'pointer'
                 }}
               >
-                <option value="clinical">🩺 Nota Clínica</option>
-                <option value="admin">📋 Nota Administrativa</option>
-                <option value="urgent">⚠️ Prioridad Urgente</option>
+                <option value="clinical">Nota Clínica</option>
+                <option value="admin">Nota Administrativa</option>
+                <option value="urgent">Prioridad Urgente</option>
               </select>
             </div>
             <button type="submit" className="btn btn--primary" style={{ padding: 'var(--space-2) var(--space-4)', fontSize: 'var(--text-xs)', height: '36px' }}>
@@ -693,7 +841,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
           {tasks.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-text-secondary)' }}>
-              <span style={{ fontSize: '24px', display: 'block', marginBottom: 'var(--space-2)' }}>📝</span>
+              <span style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}><Icon.FileText size={24} /></span>
               <p style={{ fontSize: 'var(--text-xs)', fontStyle: 'italic', margin: 0 }}>No tenés notas pendientes.</p>
             </div>
           ) : (
@@ -705,7 +853,8 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
               const cardBg = isUrgent ? '#fff5f5' : isAdmin ? '#f0f7ff' : '#f0fdf4';
               const cardBorder = isUrgent ? '1px solid #fee2e2' : isAdmin ? '1px solid #e0f2fe' : '1px solid #dcfce7';
               const accentColor = isUrgent ? '#ef4444' : isAdmin ? '#3b82f6' : 'var(--color-primary)';
-              const badgeLabel = isUrgent ? '⚠️ Urgente' : isAdmin ? '📋 Admin' : '🩺 Clínica';
+              const BadgeIcon = isUrgent ? Icon.AlertTriangle : isAdmin ? Icon.Clipboard : Icon.Activity;
+              const badgeLabel = isUrgent ? 'Urgente' : isAdmin ? 'Admin' : 'Clínica';
               const badgeText = isUrgent ? '#991b1b' : isAdmin ? '#1d4ed8' : '#047857';
               const badgeBg = isUrgent ? '#fee2e2' : isAdmin ? '#dbeafe' : '#d1fae5';
 
@@ -752,6 +901,9 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
                       </span>
                       <span style={{
                         alignSelf: 'flex-start',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
                         backgroundColor: badgeBg,
                         color: badgeText,
                         fontSize: '9px',
@@ -761,6 +913,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
                         textTransform: 'uppercase',
                         letterSpacing: '0.02em'
                       }}>
+                        <BadgeIcon size={10} />
                         {badgeLabel}
                       </span>
                     </div>
@@ -772,7 +925,6 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
                       background: 'none',
                       cursor: 'pointer',
                       color: 'var(--color-danger)',
-                      fontSize: '14px',
                       padding: '2px',
                       lineHeight: 1,
                       display: 'flex',
@@ -783,7 +935,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
                     onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
                     title="Eliminar nota"
                   >
-                    🗑️
+                    <Icon.Trash size={14} />
                   </button>
                 </div>
               );
@@ -1225,6 +1377,14 @@ const ESPECIALIDADES_GRUPOS = [
   }
 ];
 
+const TRATAMIENTOS_DISPONIBLES = [
+  'Ansiedad', 'Depresión', 'Trauma', 'Pareja', 'Psiquiatría', 'Adolescentes',
+  'Trastorno bipolar', 'Ataques de pánico', 'Insomnio', 'TDAH en adultos',
+  'Estrés postraumático', 'Trastorno obsesivo compulsivo',
+]
+
+const PACIENTES_ATIENDE_OPCIONES = ['Niños', 'Adolescentes', 'Adultos', 'Adultos mayores']
+
 function getMissingRequirements(m: any): string[] {
   const missing: string[] = []
   if (!m) return ["Cargando información del perfil..."]
@@ -1241,6 +1401,12 @@ function getMissingRequirements(m: any): string[] {
     missing.push("Datos completos de matrícula (tipo, provincia y número)")
   }
   if (!m.fotoUrl || !m.fotoUrl.trim()) missing.push("Foto de perfil profesional")
+  if (!m.descripcionPerfil || !m.descripcionPerfil.trim()) missing.push("Descripción de tu perfil profesional")
+  if (!m.tags || m.tags.length === 0) missing.push("Al menos un tratamiento/especialidad que atiendas")
+  if (!m.pacientesAtiende || m.pacientesAtiende.length === 0) missing.push("Al menos un tipo de paciente que atiendas")
+  if (!m.institucionFormacion || !m.institucionFormacion.trim()) missing.push("Institución donde te formaste")
+  if (m.aniosExperiencia === null || m.aniosExperiencia === undefined) missing.push("Años de experiencia clínica")
+  if (!m.ofreceOnline && !m.ofrecePresencial) missing.push("Al menos una modalidad de consulta (online o presencial)")
   if (!m.verificadoAdmin) missing.push("Verificación y validación de matrícula por el Administrador de Tranqui")
 
   return missing
@@ -1251,17 +1417,23 @@ function SettingsView({
   onSave,
   mpConnected,
   onConnect,
-  onDisconnect
+  onDisconnect,
+  googleConnected,
+  onConnectGoogle,
+  onDisconnectGoogle
 }: {
   medicoInfo: any
   onSave: (updated: any) => Promise<void>
   mpConnected: boolean
   onConnect: () => void
   onDisconnect: () => void
+  googleConnected: boolean
+  onConnectGoogle: () => void
+  onDisconnectGoogle: () => void
 }) {
   const { showAlert } = useAlert();
   const [showUnmetList, setShowUnmetList] = useState(false);
-  const [name, setName] = useState(medicoInfo?.name || '')
+  const [name, setName] = useState(medicoInfo?.nombre || '')
   const [apellido, setApellido] = useState(medicoInfo?.apellido || '')
   const [sexo, setSexo] = useState(medicoInfo?.sexo || 'M')
   const [fechaNacimiento, setFechaNacimiento] = useState(medicoInfo?.fechaNacimiento || '')
@@ -1300,6 +1472,17 @@ function SettingsView({
   const [ofreceOnline, setOfreceOnline] = useState(medicoInfo?.ofreceOnline !== undefined ? medicoInfo.ofreceOnline : true)
   const [ofrecePresencial, setOfrecePresencial] = useState(medicoInfo?.ofrecePresencial !== undefined ? medicoInfo.ofrecePresencial : false)
 
+  // Public profile info (shown to patients on the booking page, required for account verification)
+  const [descripcionPerfil, setDescripcionPerfil] = useState(medicoInfo?.descripcionPerfil || '')
+  const [selectedTags, setSelectedTags] = useState<string[]>(medicoInfo?.tags || [])
+  const [pacientesAtiende, setPacientesAtiende] = useState<string[]>(medicoInfo?.pacientesAtiende || [])
+  const [institucionFormacion, setInstitucionFormacion] = useState(medicoInfo?.institucionFormacion || '')
+  const [aniosExperiencia, setAniosExperiencia] = useState(medicoInfo?.aniosExperiencia ?? '')
+
+  const toggleFromList = (list: string[], setList: (l: string[]) => void, value: string) => {
+    setList(list.includes(value) ? list.filter(v => v !== value) : [...list, value])
+  }
+
   const updateTariff = (id: string, field: 'price' | 'enabled', value: number | boolean) => {
     setTariffs(tariffs.map(t => t.id === id ? { ...t, [field]: value } : t))
   }
@@ -1311,7 +1494,7 @@ function SettingsView({
     try {
       await onSave({
         ...medicoInfo,
-        name,
+        nombre: name,
         apellido,
         sexo,
         fechaNacimiento,
@@ -1341,9 +1524,13 @@ function SettingsView({
         cuit: cuil ? String(cuil) : '',
         tariffs,
         fotoUrl,
-        tags: specialty ? [specialty] : [],
+        tags: selectedTags,
         ofreceOnline,
-        ofrecePresencial
+        ofrecePresencial,
+        descripcionPerfil,
+        pacientesAtiende,
+        institucionFormacion,
+        aniosExperiencia: aniosExperiencia === '' ? null : Number(aniosExperiencia)
       })
       showAlert("Configuración guardada con éxito ✓", "success")
     } catch (err) {
@@ -1492,13 +1679,18 @@ function SettingsView({
                   style={{ display: 'none' }} 
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setFotoUrl(reader.result as string);
-                      };
-                      reader.readAsDataURL(file);
+                    if (!file) return;
+                    const MAX_FOTO_BYTES = 3 * 1024 * 1024
+                    if (file.size > MAX_FOTO_BYTES) {
+                      showAlert(`La foto pesa ${(file.size / (1024 * 1024)).toFixed(1)}MB — el máximo permitido es 3MB. Elegí una imagen más liviana.`, 'error')
+                      e.target.value = ''
+                      return
                     }
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setFotoUrl(reader.result as string);
+                    };
+                    reader.readAsDataURL(file);
                   }}
                 />
               </label>
@@ -1663,6 +1855,93 @@ function SettingsView({
         </div>
       </div>
 
+      {/* Public profile — shown to patients on the booking page, required to get verified */}
+      <div className="card">
+        <div className="card__header">
+          <div>
+            <h2 className="card__title">Perfil público</h2>
+            <p className="card__subtitle">Esta información se muestra a los pacientes en tu página de reserva. Es obligatoria para obtener la verificación de tu cuenta.</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-descripcion-perfil">Descripción de tu perfil</label>
+            <textarea
+              id="input-descripcion-perfil"
+              className="form-input"
+              rows={4}
+              placeholder="Contales a tus pacientes tu enfoque profesional, experiencia y cómo trabajás..."
+              value={descripcionPerfil}
+              onChange={(e) => setDescripcionPerfil(e.target.value)}
+              style={{ resize: 'vertical', fontFamily: 'var(--font-body)' }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label form-label--required">Principales tratamientos</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+              {TRATAMIENTOS_DISPONIBLES.map((t) => (
+                <label key={t} className={`check-chip check-chip--auto ${selectedTags.includes(t) ? 'active' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={selectedTags.includes(t)}
+                    onChange={() => toggleFromList(selectedTags, setSelectedTags, t)}
+                  />
+                  {t}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label form-label--required">Pacientes que atendés</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+              {PACIENTES_ATIENDE_OPCIONES.map((p) => (
+                <label key={p} className={`check-chip check-chip--auto ${pacientesAtiende.includes(p) ? 'active' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={pacientesAtiende.includes(p)}
+                    onChange={() => toggleFromList(pacientesAtiende, setPacientesAtiende, p)}
+                  />
+                  {p}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+            <div className="form-group">
+              <label className="form-label form-label--required" htmlFor="input-institucion">Institución de formación</label>
+              <input
+                id="input-institucion"
+                className="form-input"
+                type="text"
+                placeholder="Ej. Universidad Nacional de Córdoba"
+                value={institucionFormacion}
+                onChange={(e) => setInstitucionFormacion(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label form-label--required" htmlFor="input-anios-experiencia">Años de experiencia clínica</label>
+              <input
+                id="input-anios-experiencia"
+                className="form-input"
+                type="number"
+                min={0}
+                placeholder="Ej. 15"
+                value={aniosExperiencia}
+                onChange={(e) => setAniosExperiencia(e.target.value === '' ? '' : Number(e.target.value))}
+              />
+            </div>
+          </div>
+        </div>
+        <div style={{ marginTop: 'var(--space-6)' }}>
+          <button className="btn btn--primary" onClick={handleSave} disabled={saving} id="btn-save-public-profile">
+            {saving ? 'Guardando...' : 'Guardar perfil público'}
+          </button>
+        </div>
+      </div>
+
       {/* Tariffs */}
       <div className="card">
         <div className="card__header">
@@ -1757,54 +2036,20 @@ function SettingsView({
 
       {/* Mercado Pago Integration */}
       <div className="card">
-        <div className="card__header" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <img src="/logo-mp.png" alt="Mercado Pago" style={{ width: '32px', height: 'auto' }} />
-          <div>
-            <h2 className="card__title">Integración con Mercado Pago</h2>
-            <p className="card__subtitle">Vinculá tu cuenta para cobrar tus sesiones directamente en tu Mercado Pago, 100% libre de comisiones.</p>
-          </div>
+        <div className="card__header">
+          <h2 className="card__title">Integración con Mercado Pago</h2>
+          <p className="card__subtitle">Vinculá tu cuenta para cobrar tus sesiones directamente en tu Mercado Pago, 100% libre de comisiones.</p>
         </div>
-        <div style={{
-          padding: 'var(--space-4)',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--color-border)',
-          backgroundColor: mpConnected ? 'var(--green-50)' : '#fafaf9',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 'var(--space-4)'
-        }}>
-          <div>
-            <div style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {mpConnected ? (
-                <>
-                  <span style={{ color: 'var(--color-success)' }}>●</span> Conectado
-                </>
-              ) : (
-                <>
-                  <span style={{ color: 'var(--color-warning)' }}>●</span> Desconectado
-                </>
-              )}
-            </div>
-            <p style={{ margin: '4px 0 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', maxWidth: '480px', lineHeight: '1.4' }}>
-              {mpConnected 
-                ? 'Tu cuenta de Mercado Pago está vinculada y activa para recibir cobros en tu perfil público.' 
-                : 'Conectá tu cuenta para permitir a los pacientes abonar sus turnos de forma automatizada por Mercado Pago. Si no la vinculás, tu perfil no se mostrará en las búsquedas públicas.'}
-            </p>
-          </div>
-          <div>
-            {mpConnected ? (
-              <button className="btn btn--ghost btn--sm" onClick={onDisconnect} style={{ border: '1px solid var(--color-border)' }}>
-                Desconectar cuenta
-              </button>
-            ) : (
-              <button className="btn btn--primary btn--sm" onClick={onConnect}>
-                Vincular Mercado Pago
-              </button>
-            )}
-          </div>
+        <MPConnectBanner connected={mpConnected} onConnect={onConnect} onDisconnect={onDisconnect} />
+      </div>
+
+      {/* Google Calendar Integration */}
+      <div className="card">
+        <div className="card__header">
+          <h2 className="card__title">Integración con Google Calendar</h2>
+          <p className="card__subtitle">Vinculá tu cuenta para generar automáticamente reuniones de Google Meet en tu agenda.</p>
         </div>
+        <GoogleCalendarConnectBanner connected={googleConnected} onConnect={onConnectGoogle} onDisconnect={onDisconnectGoogle} />
       </div>
 
     </div>
@@ -2767,12 +3012,24 @@ function DashboardHome({
 // ── Root App ───────────────────────────────────────────────────
 export default function App() {
   const { showAlert } = useAlert()
-  const [view, setView] = useState<AppView>('landing')
-  const [activeNav, setActiveNav] = useState<NavSection>('dashboard')
+  const navigate = useNavigate()
+  const location = useLocation()
+  // Derived from the URL instead of local state, so every "page" the SPA
+  // shows has its own real route (/, /login, /reserva/:proId, /panel/...).
+  const view: 'landing' | 'checkout' | 'dashboard' | 'login' =
+    location.pathname.startsWith('/panel') ? 'dashboard'
+    : location.pathname.startsWith('/reserva/') ? 'checkout'
+    : location.pathname === '/login' ? 'login'
+    : 'landing'
+  const activeNav = (location.pathname.startsWith('/panel')
+    ? (location.pathname.split('/')[2] || 'dashboard')
+    : 'dashboard') as NavSection
+  // LandingPage/LoginPage/AdminDashboard/CheckoutFlow each set their own title — this covers
+  // the remaining case, the professional dashboard shell rendered directly here in App().
+  useDocumentTitle(view === 'dashboard' ? 'Panel Profesional — Tranqui App' : 'Tranqui App')
   const [mpConnected, setMpConnected] = useState(false)
   const [googleConnected, setGoogleConnected] = useState(false)
   const [mpEnabled, setMpEnabled] = useState(false)
-  const [checkoutTarget, setCheckoutTarget] = useState<CheckoutTarget | null>(null)
 
   // API states
   const [currentUser, setCurrentUser] = useState<any>(null)
@@ -2810,13 +3067,7 @@ export default function App() {
     const cachedUser = localStorage.getItem('tranqui_user')
     if (cachedUser) {
       try {
-        const user = JSON.parse(cachedUser)
-        setCurrentUser(user)
-        if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
-          setView('dashboard')
-        } else {
-          setView('landing')
-        }
+        setCurrentUser(JSON.parse(cachedUser))
       } catch (e) {
         localStorage.removeItem('tranqui_user')
       }
@@ -2827,21 +3078,14 @@ export default function App() {
         if (user) {
           setCurrentUser(user)
           localStorage.setItem('tranqui_user', JSON.stringify(user))
-          if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
-            setView('dashboard')
-          } else {
-            setView('landing')
-          }
         } else {
           setCurrentUser(null)
           localStorage.removeItem('tranqui_user')
-          setView('landing')
         }
       })
       .catch(() => {
         setCurrentUser(null)
         localStorage.removeItem('tranqui_user')
-        setView('landing')
       })
       .finally(() => {
         setLoadingSession(false)
@@ -2855,9 +3099,9 @@ export default function App() {
     if (currentUser) {
       const isPro = currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO' || currentUser.rol === 'ADMIN'
       if (isPro && (view === 'landing' || view === 'login')) {
-        setView('dashboard')
+        navigate('/panel', { replace: true })
       } else if (!isPro && view === 'dashboard') {
-        setView('landing')
+        navigate('/', { replace: true })
       }
     }
   }, [currentUser, view, loadingSession])
@@ -2873,7 +3117,7 @@ export default function App() {
       }
       const isPro = currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')
       if (!isPro) {
-        setView('landing')
+        navigate('/', { replace: true })
         return
       }
       setLoadingDashboard(true)
@@ -2901,7 +3145,7 @@ export default function App() {
         })
         .catch((err) => {
           console.error("Error al inicializar dashboard:", err)
-          setView('login')
+          navigate('/login', { replace: true })
         })
         .finally(() => {
           setLoadingDashboard(false)
@@ -3049,14 +3293,53 @@ export default function App() {
     window.history.replaceState({}, '', window.location.pathname + (newSearch ? `?${newSearch}` : ''))
   }, [])
 
+  const handleConnectGoogle = async () => {
+    try {
+      const { url } = await api.getGoogleCalendarConnectUrl()
+      window.location.href = url
+    } catch (err) {
+      console.error("Error al obtener la URL de conexión de Google Calendar:", err)
+      showAlert('No se pudo iniciar la conexión con Google Calendar. Intentá de nuevo.', 'error')
+    }
+  }
+
+  const handleDisconnectGoogle = async () => {
+    try {
+      await api.desconectarGoogleCalendar()
+      setGoogleConnected(false)
+      showAlert('Desvinculaste tu Google Calendar.', 'success')
+    } catch (err) {
+      console.error("Error al desvincular Google Calendar:", err)
+      showAlert('No se pudo desvincular la cuenta. Intentá de nuevo.', 'error')
+    }
+  }
+
+  // Handle the ?googleCalendar=success / ?googleCalendar=error redirect coming back from the Google OAuth callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const googleResult = params.get('googleCalendar')
+    if (!googleResult) return
+
+    if (googleResult === 'success') {
+      showAlert('¡Tu Google Calendar quedó vinculado!', 'success')
+      setGoogleConnected(true)
+    } else if (googleResult === 'error') {
+      showAlert('No se pudo vincular tu Google Calendar. Intentá de nuevo.', 'error')
+    }
+
+    params.delete('googleCalendar')
+    params.delete('reason')
+    const newSearch = params.toString()
+    window.history.replaceState({}, '', window.location.pathname + (newSearch ? `?${newSearch}` : ''))
+  }, [])
+
   const handleBook = (pro: CheckoutTarget) => {
     if (!currentUser) {
       showAlert("Para reservar un turno, debes iniciar sesión primero.", "warning");
-      setView('login');
+      navigate('/login');
       return;
     }
-    setCheckoutTarget(pro);
-    setView('checkout');
+    navigate(`/reserva/${pro.id}`, { state: pro });
   }
 
   const handleLogout = async () => {
@@ -3067,7 +3350,7 @@ export default function App() {
     }
     setCurrentUser(null)
     localStorage.removeItem('tranqui_user')
-    setView('landing')
+    navigate('/')
   }
 
   const handleMarkNotificationsRead = () => {
@@ -3161,7 +3444,7 @@ export default function App() {
             onCancelAppointment={handleCancelAppointment}
             onUpdateAttendance={handleUpdateAttendance}
             onRescheduleAppointment={handleRescheduleAppointment}
-            onNavigateSettings={() => setActiveNav('settings')}
+            onNavigateSettings={() => navigate('/panel/settings')}
           />
         )
       case 'agenda': 
@@ -3180,82 +3463,35 @@ export default function App() {
       )
       case 'settings': 
         return (
-          <SettingsView 
-            medicoInfo={medicoInfo} 
-            onSave={handleSaveSettings} 
+          <SettingsView
+            medicoInfo={medicoInfo}
+            onSave={handleSaveSettings}
             mpConnected={mpConnected}
             onConnect={handleConnect}
             onDisconnect={handleDisconnectMercadoPago}
+            googleConnected={googleConnected}
+            onConnectGoogle={handleConnectGoogle}
+            onDisconnectGoogle={handleDisconnectGoogle}
           />
         )
     }
   }
 
-  if (view === 'landing') {
-    return (
-      <LandingPage
-        currentUser={currentUser}
-        onNavigateToDashboard={() => setView('login')}
-        onBook={handleBook}
-        onLogout={handleLogout}
-        onGoToDashboard={() => setView('dashboard')}
-      />
-    )
-  }
-
-  if (view === 'login') {
-    return (
-      <LoginPage
-        onLoginSuccess={(user) => {
-          setCurrentUser(user)
-          if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
-            setView('dashboard')
-          } else {
-            setView('landing')
-          }
-        }}
-        onBack={() => setView('landing')}
-      />
-    )
-  }
-
-  if (view === 'checkout' && checkoutTarget) {
-    return (
-      <CheckoutFlow
-        professional={checkoutTarget}
-        onBack={() => setView('landing')}
-        onComplete={() => setView('landing')}
-      />
-    )
-  }
-
-  if (view === 'dashboard' && currentUser?.rol === 'ADMIN') {
-    return (
-      <AdminDashboard
-        currentUser={currentUser}
-        onLogout={handleLogout}
-      />
-    )
-  }
-
   const isPro = currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')
-  if (view === 'dashboard' && !isPro) {
-    return (
-      <LandingPage
-        currentUser={currentUser}
-        onNavigateToDashboard={() => setView('login')}
-        onBook={handleBook}
-        onLogout={handleLogout}
-        onGoToDashboard={() => setView('dashboard')}
-      />
-    )
-  }
-
   const unreadCount = notifications.filter(n => !n.leido).length
-
   const showBanner = view === 'dashboard' && medicoInfo && !medicoInfo.verificado && showUnverifiedAlert;
 
-  return (
+  const landingElement = (
+    <LandingPage
+      currentUser={currentUser}
+      onNavigateToDashboard={() => navigate('/login')}
+      onBook={handleBook}
+      onLogout={handleLogout}
+      onGoToDashboard={() => navigate('/panel')}
+    />
+  )
+
+  const proDashboardElement = (
     <div className="dashboard-layout">
       {showBanner && (
         <>
@@ -3372,7 +3608,7 @@ export default function App() {
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2px' }}>
               <button
                 onClick={() => {
-                  setActiveNav('settings')
+                  navigate('/panel/settings')
                   window.scrollTo({ top: 0, behavior: 'smooth' })
                 }}
                 className="btn btn--primary btn--sm"
@@ -3388,7 +3624,7 @@ export default function App() {
           </div>
         </>
       )}
-      <Sidebar activeNav={activeNav} onNavChange={setActiveNav} medicoInfo={medicoInfo} hasUnreadChats={hasUnreadChats} />
+      <Sidebar activeNav={activeNav} onNavChange={(section) => navigate('/panel/' + section)} medicoInfo={medicoInfo} hasUnreadChats={hasUnreadChats} />
 
       <header className="dashboard-header" role="banner" style={{ position: 'relative' }}>
         <h1 className="dashboard-header__title">{pageTitle[activeNav]}</h1>
@@ -3459,31 +3695,37 @@ export default function App() {
                   </p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                    {notifications.map((n) => (
-                      <div key={n.id} style={{
-                        padding: 'var(--space-3)',
-                        borderRadius: 'var(--radius-md)',
-                        backgroundColor: n.leido ? '#ffffff' : '#f0fdf4',
-                        borderTop: '1px solid var(--color-border)',
-                        borderRight: '1px solid var(--color-border)',
-                        borderBottom: '1px solid var(--color-border)',
-                        borderLeft: n.leido ? '4px solid var(--color-border)' : '4px solid var(--color-primary)',
-                        fontSize: '11px',
-                        transition: 'all 0.2s',
-                        color: 'var(--color-text-primary)',
-                        boxShadow: 'var(--shadow-xs)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '2px'
-                      }}>
-                        <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', color: n.leido ? 'var(--color-text-secondary)' : 'var(--color-primary)' }}>
-                          🔔 {n.titulo}
+                    {notifications.map((n) => {
+                      const { Icon: NotifIcon, color: notifColor } = getNotificationVisual(n.tipo)
+                      return (
+                        <div key={n.id} style={{
+                          padding: 'var(--space-3)',
+                          borderRadius: 'var(--radius-md)',
+                          backgroundColor: n.leido ? '#ffffff' : '#f0fdf4',
+                          borderTop: '1px solid var(--color-border)',
+                          borderRight: '1px solid var(--color-border)',
+                          borderBottom: '1px solid var(--color-border)',
+                          borderLeft: `4px solid ${n.leido ? 'var(--color-border)' : notifColor}`,
+                          fontSize: '11px',
+                          transition: 'all 0.2s',
+                          color: 'var(--color-text-primary)',
+                          boxShadow: 'var(--shadow-xs)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px'
+                        }}>
+                          <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', color: n.leido ? 'var(--color-text-secondary)' : 'var(--color-primary)' }}>
+                            <span style={{ color: notifColor, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                              <NotifIcon size={14} />
+                            </span>
+                            {n.titulo}
+                          </div>
+                          <div style={{ color: 'var(--color-text-secondary)', fontSize: '10px' }}>
+                            {n.mensaje}
+                          </div>
                         </div>
-                        <div style={{ color: 'var(--color-text-secondary)', fontSize: '10px' }}>
-                          {n.mensaje}
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -3601,5 +3843,47 @@ export default function App() {
         </div>
       )}
     </div>
+  )
+
+  return (
+    <Suspense fallback={
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div className="app-suspense-spinner" />
+      </div>
+    }>
+      <Routes>
+        <Route path="/" element={landingElement} />
+        <Route
+          path="/login"
+          element={
+            <LoginPage
+              onLoginSuccess={(user) => {
+                setCurrentUser(user)
+                if (user.rol === 'PSIQUIATRA' || user.rol === 'MEDICO' || user.rol === 'ADMIN') {
+                  navigate('/panel')
+                } else {
+                  navigate('/')
+                }
+              }}
+              onBack={() => navigate('/')}
+            />
+          }
+        />
+        <Route path="/reserva/:proId" element={<CheckoutRoute currentUser={currentUser} loadingSession={loadingSession} />} />
+        <Route
+          path="/panel/*"
+          element={
+            currentUser?.rol === 'ADMIN' ? (
+              <AdminDashboard currentUser={currentUser} onLogout={handleLogout} />
+            ) : !isPro ? (
+              <Navigate to="/" replace />
+            ) : (
+              proDashboardElement
+            )
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }

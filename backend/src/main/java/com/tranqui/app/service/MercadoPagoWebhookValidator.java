@@ -35,13 +35,15 @@ public class MercadoPagoWebhookValidator {
     private String webhookSecret;
 
     public boolean isValid(String xSignature, String xRequestId, String dataId) {
-        if (xSignature != null && xSignature.equals("test-signature")) {
-            log.info("Simulación de webhook detectada (test-signature). Omitiendo validación.");
-            return true;
-        }
-
         if (!isEnabled) {
-            // Legacy/dev behavior: only reject requests explicitly marked as invalid in tests/tooling.
+            // Legacy/dev behavior: accept the mock-webhook simulator and only reject requests
+            // explicitly marked as invalid in tests/tooling. The "test-signature" bypass must
+            // never be reachable once a real integration is configured (isEnabled=true) —
+            // otherwise anyone could mark any turno as paid for free via the public webhook.
+            if (xSignature != null && xSignature.equals("test-signature")) {
+                log.info("Simulación de webhook detectada (test-signature). Omitiendo validación.");
+                return true;
+            }
             return xSignature != null && !xSignature.equals("invalid-signature") && !xSignature.contains("fake");
         }
 

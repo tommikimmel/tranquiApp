@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 function IconVideoCall({ size = 13 }: { size?: number }) {
   return (
@@ -86,6 +87,7 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ currentUser, onLogout }: AdminDashboardProps) {
+  useDocumentTitle('Panel de Administración — Tranqui App')
   const { showAlert } = useAlert()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)

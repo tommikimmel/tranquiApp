@@ -75,6 +75,14 @@ public class MensajeService {
         return mensajeRepository.findVisitorChannels(medico.getId());
     }
 
+    @Transactional(readOnly = true)
+    public List<CanalPrioritarioDto> obtenerCanalesPaciente(String pacienteEmail) {
+        Usuario paciente = usuarioRepository.findByEmail(pacienteEmail)
+                .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
+
+        return mensajeRepository.findPatientChannels(paciente.getId());
+    }
+
     @Transactional
     public void marcarMensajesComoLeidos(Long remitenteId, String destinatarioEmail) {
         Usuario destinatario = usuarioRepository.findByEmail(destinatarioEmail)

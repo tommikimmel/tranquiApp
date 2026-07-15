@@ -1,3 +1,9 @@
+server:
+  compression:
+    enabled: true
+    mime-types: application/json,text/plain
+    min-response-size: 1024
+
 spring:
   application:
     name: tranqui-app
@@ -9,7 +15,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: ${JPA_SHOW_SQL:false}
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -25,6 +31,8 @@ twilio:
 google:
   client-id: ${GOOGLE_CLIENT_ID:dummy-client-id}
   client-secret: ${GOOGLE_CLIENT_SECRET:}
+  calendar:
+    enabled: ${GOOGLE_CALENDAR_ENABLED:false}
 
 mercadopago:
   enabled: ${MERCADOPAGO_ENABLED:false}

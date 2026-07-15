@@ -45,14 +45,20 @@ public class MercadoPagoService {
     }
 
     public String crearPreferenciaPago(Turno turno, Usuario medico) throws Exception {
+        if (!isEnabled) {
+            // Simulated return for local/offline dev environments where Mercado Pago isn't
+            // configured at all. Once mercadopago.enabled=true (any real deployment), a
+            // professional without a linked account must fail loudly below instead of
+            // silently falling back to this dev-only simulator in front of real patients.
+            return "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-preference-id";
+        }
+
         String rawToken = "dummy-token";
         if (medico.getMpAccessTokenEncrypted() != null) {
             rawToken = encryptionUtil.decrypt(medico.getMpAccessTokenEncrypted());
         }
-
-        if (!isEnabled || rawToken.startsWith("dummy") || rawToken.equals("test-token")) {
-            // Simulated return for test and offline environments
-            return "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-preference-id";
+        if (rawToken.startsWith("dummy") || rawToken.equals("test-token")) {
+            throw new IllegalStateException("El profesional todavía no vinculó su cuenta de Mercado Pago.");
         }
 
         String accessToken = oauthService.obtenerAccessTokenValido(medico);
@@ -92,13 +98,16 @@ public class MercadoPagoService {
 
     public String crearPreferenciaDocumento(com.tranqui.app.model.SolicitudDocumento solicitud) throws Exception {
         Usuario medico = solicitud.getMedico();
+        if (!isEnabled) {
+            return "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-doc-preference-id";
+        }
+
         String rawToken = "dummy-token";
         if (medico.getMpAccessTokenEncrypted() != null) {
             rawToken = encryptionUtil.decrypt(medico.getMpAccessTokenEncrypted());
         }
-
-        if (!isEnabled || rawToken.startsWith("dummy") || rawToken.equals("test-token")) {
-            return "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-doc-preference-id";
+        if (rawToken.startsWith("dummy") || rawToken.equals("test-token")) {
+            throw new IllegalStateException("El profesional todavía no vinculó su cuenta de Mercado Pago.");
         }
 
         String accessToken = oauthService.obtenerAccessTokenValido(medico);
