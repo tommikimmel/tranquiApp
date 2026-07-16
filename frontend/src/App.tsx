@@ -2060,18 +2060,23 @@ function DashboardHome({
   mpConnected,
   onConnect,
   onDisconnect,
+  googleConnected,
+  onConnectGoogle,
+  onDisconnectGoogle,
   appointments,
   allAppointments,
   availability,
   stats,
   onCancelAppointment,
   onUpdateAttendance,
-  onRescheduleAppointment,
-  onNavigateSettings
+  onRescheduleAppointment
 }: {
   mpConnected: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
+  googleConnected: boolean;
+  onConnectGoogle: () => void;
+  onDisconnectGoogle: () => void;
   appointments: Appointment[];
   allAppointments: any[];
   availability: any[];
@@ -2079,7 +2084,6 @@ function DashboardHome({
   onCancelAppointment: (id: number) => void;
   onUpdateAttendance: (id: number, status: string) => void;
   onRescheduleAppointment: (id: number, date: string, hour: string) => void;
-  onNavigateSettings?: () => void;
 }) {
   const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
   const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
@@ -2302,33 +2306,19 @@ function DashboardHome({
 
   return (
     <>
-      {!mpConnected && (
+      {(!mpConnected || !googleConnected) && (
         <div style={{
-          backgroundColor: '#fffbeb',
-          border: '1px solid #fef3c7',
-          borderLeft: '4px solid #f59e0b',
-          borderRadius: 'var(--radius-md)',
-          padding: 'var(--space-3) var(--space-4)',
-          color: 'var(--neutral-800)',
-          fontSize: 'var(--text-sm)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 'var(--space-3)',
-          marginBottom: 'var(--space-4)',
-          boxShadow: 'var(--shadow-sm)'
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: 'var(--space-4)',
+          marginBottom: 'var(--space-4)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: '18px', height: '18px', color: '#f59e0b', flexShrink: 0 }}>
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-              <line x1="12" y1="9" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            <span style={{ textAlign: 'left' }}>
-              <strong>Mercado Pago no conectado:</strong> Vinculá tu cuenta desde <a href="#" onClick={(e) => { e.preventDefault(); onNavigateSettings?.(); }} style={{ color: 'var(--color-primary)', fontWeight: 'bold', textDecoration: 'underline' }}>Configuración</a> para recibir cobros de tus pacientes.
-            </span>
-          </div>
+          {!mpConnected && (
+            <MPConnectBanner connected={mpConnected} onConnect={onConnect} onDisconnect={onDisconnect} />
+          )}
+          {!googleConnected && (
+            <GoogleCalendarConnectBanner connected={googleConnected} onConnect={onConnectGoogle} onDisconnect={onDisconnectGoogle} />
+          )}
         </div>
       )}
 
@@ -3437,6 +3427,9 @@ export default function App() {
             mpConnected={mpConnected}
             onConnect={handleConnect}
             onDisconnect={handleDisconnectMercadoPago}
+            googleConnected={googleConnected}
+            onConnectGoogle={handleConnectGoogle}
+            onDisconnectGoogle={handleDisconnectGoogle}
             appointments={todayAppointments}
             allAppointments={allAppointments}
             availability={availability}
@@ -3444,10 +3437,9 @@ export default function App() {
             onCancelAppointment={handleCancelAppointment}
             onUpdateAttendance={handleUpdateAttendance}
             onRescheduleAppointment={handleRescheduleAppointment}
-            onNavigateSettings={() => navigate('/panel/settings')}
           />
         )
-      case 'agenda': 
+      case 'agenda':
         return <AgendaView initialAvailability={availability} onSave={handleSaveAvailability} />
       case 'patients': 
         return <PatientsView onUnreadChatsChange={refreshUnreadChatsStatus} />
