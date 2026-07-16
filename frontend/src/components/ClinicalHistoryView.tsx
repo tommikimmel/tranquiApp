@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 import { downloadReportPDF } from '../utils/pdfGenerator'
@@ -139,9 +140,22 @@ function MoodSelect({ value, onChange }: { value: string; onChange: (v: string) 
 
 export default function ClinicalHistoryView() {
   const { showAlert } = useAlert()
+  const location = useLocation()
+  const navigate = useNavigate()
   const { patients, loadingPatients, searchQuery, setSearchQuery, filteredPatients, setPatients } = usePatients()
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [activeTab, setActiveTab] = useState<'ficha' | 'seguimiento' | 'informes'>('ficha')
+
+  // Deep-link from PatientsView's "Historia Clínica" button: navigate(..., { state: { patientId } })
+  // pre-selects that patient once the roster has loaded, then clears the nav state so it doesn't
+  // re-trigger on later visits (e.g. via the sidebar) or override a manual search.
+  useEffect(() => {
+    const targetId = (location.state as { patientId?: number } | null)?.patientId
+    if (targetId == null || loadingPatients) return
+    const found = patients.find((p) => p.id === targetId)
+    if (found) setSelectedPatient(found)
+    navigate(location.pathname, { replace: true, state: null })
+  }, [location.state, location.pathname, patients, loadingPatients, navigate])
 
   // Tracking states
   const [trackings, setTrackings] = useState<TrackingEntry[]>([])

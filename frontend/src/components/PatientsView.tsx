@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useChat } from '../hooks/useChat'
 import { type Patient, usePatients } from '../hooks/usePatients'
 import PatientDirectorySidebar from './PatientDirectorySidebar'
 
 export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsChange?: () => void }) {
+  const navigate = useNavigate()
   const { patients, loadingPatients, searchQuery, setSearchQuery, filteredPatients } = usePatients()
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [unreadCounts, setUnreadCounts] = useState<Record<number, number>>({})
@@ -118,6 +120,19 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
                     </svg>
                     Chat
                   </span>
+                  <button
+                    type="button"
+                    className="btn btn--sm btn--secondary"
+                    style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
+                    onClick={() => navigate('/panel/clinical-history', { state: { patientId: selectedPatient.id } })}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}>
+                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                      <line x1="9" y1="12" x2="15" y2="12" /><line x1="9" y1="16" x2="13" y2="16" />
+                    </svg>
+                    Historia Clínica
+                  </button>
                 </div>
               </div>
 
