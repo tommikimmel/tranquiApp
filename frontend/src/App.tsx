@@ -1590,8 +1590,44 @@ function SettingsView({
     setList(list.includes(value) ? list.filter(v => v !== value) : [...list, value])
   }
 
-  const updateTariff = (id: string, field: 'price' | 'enabled', value: number | boolean) => {
+  const updateTariff = (id: string, field: 'price' | 'enabled' | 'label', value: number | boolean | string) => {
     setTariffs(tariffs.map(t => t.id === id ? { ...t, [field]: value } : t))
+  }
+
+  // New tariffs need a unique id (the backend's natural key for upsert/delete) — slugify the
+  // label and disambiguate against whatever ids already exist so two similarly-named services
+  // don't collide into the same row.
+  const slugifyTariffId = (label: string) => {
+    const base = label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-+|-+$)/g, '') || 'servicio'
+    let id = base
+    let n = 2
+    while (tariffs.some(t => t.id === id)) { id = `${base}-${n}`; n++ }
+    return id
+  }
+
+  const addTariff = (label: string, price: number) => {
+    setTariffs([...tariffs, { id: slugifyTariffId(label), label, price, enabled: true }])
+  }
+
+  const deleteTariff = (id: string) => {
+    setTariffs(tariffs.filter(t => t.id !== id))
+  }
+
+  const [showAddTariff, setShowAddTariff] = useState(false)
+  const [newTariffName, setNewTariffName] = useState('')
+  const [newTariffPrice, setNewTariffPrice] = useState('')
+
+  const handleAddTariff = () => {
+    const name = newTariffName.trim()
+    const price = Number(newTariffPrice)
+    if (!name || newTariffPrice.trim() === '' || Number.isNaN(price)) return
+    addTariff(name, price)
+    setNewTariffName('')
+    setNewTariffPrice('')
+    setShowAddTariff(false)
   }
 
   const [saving, setSaving] = useState(false)
@@ -2091,6 +2127,7 @@ function SettingsView({
               <th style={{ width: '44px' }}></th>
               <th>Servicio</th>
               <th>Valor (ARS)</th>
+              <th style={{ width: '40px' }}></th>
             </tr>
           </thead>
           <tbody>
@@ -2107,7 +2144,13 @@ function SettingsView({
                   </label>
                 </td>
                 <td>
-                  <span className="settings-fee-name">{t.label}</span>
+                  <input
+                    className="form-input settings-fee-name"
+                    type="text"
+                    value={t.label}
+                    onChange={(e) => updateTariff(t.id, 'label', e.target.value)}
+                    disabled={!t.enabled}
+                  />
                 </td>
                 <td className="settings-fee-val">
                   <input
@@ -2118,10 +2161,55 @@ function SettingsView({
                     disabled={!t.enabled}
                   />
                 </td>
+                <td>
+                  <button
+                    type="button"
+                    className="settings-fee-delete"
+                    onClick={() => deleteTariff(t.id)}
+                    aria-label={`Eliminar ${t.label}`}
+                    title="Eliminar servicio"
+                  >
+                    <Icon.Trash size={14} />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+
+        {showAddTariff ? (
+          <div className="settings-fee-add-row">
+            <input
+              className="form-input"
+              type="text"
+              placeholder="Nombre del servicio (ej. Consulta domiciliaria)"
+              value={newTariffName}
+              onChange={(e) => setNewTariffName(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <input
+              className="form-input"
+              type="number"
+              placeholder="Valor ARS"
+              value={newTariffPrice}
+              onChange={(e) => setNewTariffPrice(e.target.value)}
+              style={{ width: '140px' }}
+            />
+            <button type="button" className="btn btn--primary btn--sm" onClick={handleAddTariff}>Agregar</button>
+            <button
+              type="button"
+              className="btn btn--secondary btn--sm"
+              onClick={() => { setShowAddTariff(false); setNewTariffName(''); setNewTariffPrice('') }}
+            >
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          <button type="button" className="btn btn--secondary btn--sm" style={{ marginTop: 'var(--space-4)' }} onClick={() => setShowAddTariff(true)}>
+            <Icon.Plus /> Agregar servicio nuevo
+          </button>
+        )}
+
         <div style={{ marginTop: 'var(--space-5)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           <button className="btn btn--primary" onClick={handleSave} disabled={saving} id="btn-save-tariffs">
             {saving ? 'Guardando...' : 'Guardar honorarios'}

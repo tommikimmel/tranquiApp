@@ -214,6 +214,25 @@ class MedicoServiceTest {
     }
 
     @Test
+    void testActualizarPerfil_renamesExistingTarifaAndDeletesOmittedOne() {
+        TarifaMedico conservada = tarifaRepository.save(TarifaMedico.builder()
+                .medico(medico).servicioId("particular").label("Consulta particular").precio(new BigDecimal("60000")).habilitado(true).build());
+        TarifaMedico aEliminar = tarifaRepository.save(TarifaMedico.builder()
+                .medico(medico).servicioId("sobreturno").label("Sobreturno").precio(new BigDecimal("90000")).habilitado(true).build());
+
+        MedicoDto.TarifaDto renombrada = MedicoDto.TarifaDto.builder()
+                .id("particular").label("Consulta individual").price(new BigDecimal("60000")).enabled(true).build();
+
+        MedicoDto dto = MedicoDto.builder().nombre("Marta").tariffs(List.of(renombrada)).build();
+
+        medicoService.actualizarPerfil(medico.getEmail(), dto);
+
+        TarifaMedico actualizada = tarifaRepository.findById(conservada.getId()).orElseThrow();
+        assertEquals("Consulta individual", actualizada.getLabel());
+        assertTrue(tarifaRepository.findById(aEliminar.getId()).isEmpty());
+    }
+
+    @Test
     void testConstruirMedicoDto_initialsFallbackWhenNameIsOnlyATitle() {
         Usuario soloTitulo = usuarioRepository.save(Usuario.builder()
                 .nombre("Dr.").email("solo.titulo@gmail.com").rol(Rol.PSIQUIATRA).build());

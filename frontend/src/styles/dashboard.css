@@ -1831,7 +1831,7 @@
   padding-bottom: var(--space-2);
 }
 
-.settings-fees-table th:last-child {
+.settings-fees-table th:nth-child(3) {
   text-align: right;
 }
 
@@ -1844,6 +1844,7 @@
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
+  width: 100%;
 }
 
 .settings-fee-val {
@@ -1856,6 +1857,33 @@
   text-align: right;
   font-weight: var(--font-weight-semi);
   color: var(--color-primary-hover);
+}
+
+.settings-fee-delete {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--neutral-400);
+  cursor: pointer;
+  margin-left: auto;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.settings-fee-delete:hover {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.settings-fee-add-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
 }
 
 /* "Presencia y contenido" — extended profile placeholder tab */

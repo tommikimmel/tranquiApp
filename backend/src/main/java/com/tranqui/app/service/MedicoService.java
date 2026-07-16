@@ -154,11 +154,16 @@ public class MedicoService {
         usuarioRepository.save(medico);
 
         if (dto.getTariffs() != null) {
+            Set<String> submittedIds = dto.getTariffs().stream()
+                    .map(MedicoDto.TarifaDto::getId)
+                    .collect(Collectors.toSet());
+
             for (MedicoDto.TarifaDto tDto : dto.getTariffs()) {
                 Optional<TarifaMedico> tarifaOpt = tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), tDto.getId());
                 TarifaMedico tarifa;
                 if (tarifaOpt.isPresent()) {
                     tarifa = tarifaOpt.get();
+                    tarifa.setLabel(tDto.getLabel());
                     tarifa.setPrecio(tDto.getPrice());
                     tarifa.setHabilitado(tDto.isEnabled());
                 } else {
@@ -171,6 +176,16 @@ public class MedicoService {
                             .build();
                 }
                 tarifaRepository.save(tarifa);
+            }
+
+            // Any tariff the médico had before that isn't in this submission was removed via
+            // the "eliminar" action on the frontend — delete it so it doesn't reappear on the
+            // next profile load.
+            List<TarifaMedico> tarifasAEliminar = tarifaRepository.findByMedicoId(medico.getId()).stream()
+                    .filter(t -> !submittedIds.contains(t.getServicioId()))
+                    .collect(Collectors.toList());
+            if (!tarifasAEliminar.isEmpty()) {
+                tarifaRepository.deleteAll(tarifasAEliminar);
             }
         }
 
