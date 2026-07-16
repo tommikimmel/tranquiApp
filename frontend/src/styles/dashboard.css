@@ -1267,38 +1267,6 @@
   border-color: var(--av-verde);
 }
 
-/* Weekly block-chip list */
-.agenda-view-blocks-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.agenda-view-day-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.agenda-view-day-label {
-  width: 40px;
-  flex-shrink: 0;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--av-verde-dark);
-  padding-top: 8px;
-}
-
-.agenda-view-day-blocks {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: flex-start;
-  min-width: 0;
-}
-
 .agenda-view-copy-row {
   margin-bottom: 14px;
 }
@@ -1320,133 +1288,7 @@
   background: #EAF6EC;
 }
 
-.agenda-view-range-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.agenda-view-range-main {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.agenda-view-range-inputs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--av-cream);
-  border: 1px solid var(--av-line);
-  border-radius: 10px;
-  padding: 6px 10px;
-}
-
-.agenda-view-time-input {
-  border: none;
-  background: none;
-  font-size: 12.5px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--av-verde-deep);
-  font-family: 'Inter', sans-serif;
-  width: 88px;
-}
-
-.agenda-view-time-input:focus {
-  outline: none;
-}
-
-.agenda-view-time-input--invalid {
-  color: #B85C4A;
-}
-
-.agenda-view-range-sep {
-  color: var(--av-ink-faint);
-  font-weight: 600;
-}
-
-.agenda-view-range-remove {
-  width: 13px;
-  height: 13px;
-  color: var(--av-ink-faint);
-  opacity: 0.7;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.agenda-view-range-remove:hover {
-  opacity: 1;
-  color: #B85C4A;
-}
-
-.agenda-view-range-error {
-  font-size: 11px;
-  color: #B85C4A;
-  font-weight: 600;
-}
-
-.agenda-view-block-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #EAF6EC;
-  border: 1px solid #CDEAD2;
-  border-radius: 10px;
-  padding: 7px 8px 7px 12px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--av-verde-deep);
-  font-variant-numeric: tabular-nums;
-}
-
-.agenda-view-block-chip svg {
-  width: 13px;
-  height: 13px;
-  color: var(--av-verde-deep);
-  opacity: 0.55;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.agenda-view-block-chip svg:hover {
-  opacity: 1;
-  color: #B85C4A;
-}
-
-.agenda-view-add-block {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 700;
-  font-family: 'Inter', sans-serif;
-  color: var(--av-ink-faint);
-  border: 1px dashed var(--av-line);
-  border-radius: 10px;
-  padding: 7px 12px;
-  cursor: pointer;
-  background: none;
-}
-
-.agenda-view-add-block svg {
-  width: 12px;
-  height: 12px;
-}
-
-.agenda-view-add-block:hover {
-  color: var(--av-verde-deep);
-  border-color: var(--av-verde-brote);
-}
-
-.agenda-view-day-off {
-  font-size: 12px;
-  color: var(--av-ink-faint);
-  font-weight: 600;
-  padding-top: 9px;
-}
-
-/* Vista previa timeline */
+/* Vista previa timeline — also the interactive slot editor: each cell is clickable */
 .agenda-view-preview {
   margin-top: 22px;
   padding-top: 20px;
@@ -1457,6 +1299,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 14px;
 }
 
@@ -1464,6 +1308,34 @@
   font-size: 12.5px;
   font-weight: 700;
   color: var(--av-ink-soft);
+}
+
+.agenda-view-preview-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.agenda-view-preview-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--av-ink-faint);
+}
+
+.agenda-view-preview-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 1.5px dashed var(--av-line);
+  flex-shrink: 0;
+}
+
+.agenda-view-preview-legend-swatch--on {
+  border: 1px solid #BFE6C8;
+  background: linear-gradient(135deg, #E3F5E7, #D6EFDB);
 }
 
 .agenda-view-agenda {
@@ -1559,7 +1431,10 @@
   border: 1px solid #BFE6C8;
   padding: 3px 5px;
   overflow: hidden;
-  transition: background var(--transition-fast, 150ms ease);
+  cursor: pointer;
+  text-align: left;
+  font-family: 'Inter', sans-serif;
+  transition: background var(--transition-fast, 150ms ease), border-color var(--transition-fast, 150ms ease);
 }
 
 .agenda-view-agenda-slot:hover {
@@ -1573,6 +1448,30 @@
   color: var(--av-verde-deep);
   font-variant-numeric: tabular-nums;
   line-height: 1.25;
+}
+
+/* Unselected candidate slot: dashed outline, click to add. Time label stays hidden until
+   hover/focus so the grid doesn't get cluttered with dozens of faint labels at a glance. */
+.agenda-view-agenda-slot--empty {
+  background: transparent;
+  border: 1.5px dashed var(--av-line);
+}
+
+.agenda-view-agenda-slot--empty:hover,
+.agenda-view-agenda-slot--empty:focus-visible {
+  background: rgba(124, 197, 62, 0.1);
+  border-color: var(--av-verde-brote);
+}
+
+.agenda-view-agenda-slot--empty .agenda-view-agenda-slot-time {
+  color: var(--av-ink-faint);
+  opacity: 0;
+  transition: opacity var(--transition-fast, 150ms ease);
+}
+
+.agenda-view-agenda-slot--empty:hover .agenda-view-agenda-slot-time,
+.agenda-view-agenda-slot--empty:focus-visible .agenda-view-agenda-slot-time {
+  opacity: 1;
 }
 
 /* Notes / pendientes panel */

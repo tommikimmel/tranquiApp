@@ -642,23 +642,13 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
     { name: 'Jueves', abbr: 'Jue', num: 4 },
     { name: 'Viernes', abbr: 'Vie', num: 5 },
   ]
-  // Per-day list of arbitrary { start, end } time ranges (HH:mm), populated directly from
-  // the médico's saved availability — no more whole-hour bucketing. Supports split shifts
-  // (multiple ranges the same day, e.g. 09:00–13:00 and 15:00–19:00) and arbitrary minute
-  // boundaries via native <input type="time">.
-  const [dayRanges, setDayRanges] = useState<{ [key: number]: { start: string; end: string }[] }>(() => {
-    const state: { [key: number]: { start: string; end: string }[] } = { 1: [], 2: [], 3: [], 4: [], 5: [] }
-
-    initialAvailability.forEach((disp) => {
-      const dayNum = disp.diaSemana
-      if (dayNum >= 1 && dayNum <= 5) {
-        state[dayNum].push({ start: disp.horaInicio, end: disp.horaFin })
-      }
-    })
-    Object.keys(state).forEach((k) => {
-      state[Number(k)].sort((a, b) => a.start.localeCompare(b.start))
-    })
-    return state
+  // Per-day set of selected bookable-slot start times ("HH:mm"). Each slot is duracionTurno
+  // minutes long; consecutive slots are spaced duracionTurno+intervaloTurno minutes apart —
+  // so the grid of clickable positions (and therefore what's selectable) changes whenever
+  // either setting changes. There's no separate "franja horaria" editor anymore: the grid
+  // below (formerly a read-only preview) IS the editor.
+  const [selectedSlots, setSelectedSlots] = useState<{ [key: number]: Set<string> }>({
+    1: new Set(), 2: new Set(), 3: new Set(), 4: new Set(), 5: new Set()
   })
 
   // "Duración de turno" / "Intervalo entre turnos" — per-médico agenda settings. Loaded from
@@ -668,6 +658,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
   // before the profile fetch resolves.
   const [duracionTurno, setDuracionTurno] = useState(45)
   const [intervaloTurno, setIntervaloTurno] = useState(10)
+  const [perfilLoaded, setPerfilLoaded] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -678,6 +669,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
         if (perfil.intervaloEntreTurnosMinutos != null) setIntervaloTurno(perfil.intervaloEntreTurnosMinutos)
       })
       .catch((err) => console.error('Error cargando configuración de agenda', err))
+      .finally(() => { if (!cancelled) setPerfilLoaded(true) })
     return () => { cancelled = true }
   }, [])
 
@@ -742,60 +734,124 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
 
   const [saving, setSaving] = useState(false)
 
-  // Returns a day's ranges sorted by start time. Used by the read-only preview timeline;
-  // the editable rows below iterate dayRanges[day.num] directly (unsorted) so that each
-  // row's index stays stable while the user is typing.
-  const getDayBlocks = (dayNum: number): { start: string; end: string }[] => {
-    return [...(dayRanges[dayNum] || [])].sort((a, b) => a.start.localeCompare(b.start))
+  const toMinutes = (t: string) => {
+    const [h, m] = t.split(':').map(Number)
+    return h * 60 + m
+  }
+  const toTimeStr = (mins: number) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
+
+  // ── Bookable-slot grid geometry ──────────────────────────────────────────
+  // The grid spans a fixed 07:00–21:00 window, generous enough for virtually any clinical
+  // schedule. Candidate slot start times are anchored to GRID_START_HOUR and stepped by
+  // duracionTurno+intervaloTurno ("paso") — this is the actual set of times a médico can
+  // toggle on/off, so it reflows whenever either setting changes.
+  const GRID_START_HOUR = 7
+  const GRID_END_HOUR = 21
+  const HOUR_PX = 46
+  const pxPerMinute = HOUR_PX / 60
+  const gridHeightPx = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_PX
+  const gridHours = Array.from({ length: GRID_END_HOUR - GRID_START_HOUR + 1 }, (_, i) => GRID_START_HOUR + i)
+
+  const paso = duracionTurno + intervaloTurno
+  const candidateStarts: string[] = []
+  if (paso > 0) {
+    let cursor = GRID_START_HOUR * 60
+    const limit = GRID_END_HOUR * 60
+    while (cursor + duracionTurno <= limit) {
+      candidateStarts.push(toTimeStr(cursor))
+      cursor += paso
+    }
   }
 
-  const addRange = (dayNum: number) => {
-    setDayRanges(prev => ({
-      ...prev,
-      [dayNum]: [...(prev[dayNum] || []), { start: '09:00', end: '10:00' }]
-    }))
+  // One-time import: once we know the médico's real duración/intervalo, translate their
+  // previously saved availability ranges into the equivalent set of selected grid slots.
+  // Any saved boundary that doesn't line up with the fixed grid is naturally dropped —
+  // expected, since availability is now defined purely by toggling grid slots.
+  const importedRef = React.useRef(false)
+  useEffect(() => {
+    if (!perfilLoaded || importedRef.current) return
+    importedRef.current = true
+    const next: { [key: number]: Set<string> } = { 1: new Set(), 2: new Set(), 3: new Set(), 4: new Set(), 5: new Set() }
+    initialAvailability.forEach((disp: any) => {
+      const dayNum = disp.diaSemana
+      if (dayNum < 1 || dayNum > 5) return
+      const startMin = toMinutes(disp.horaInicio)
+      const endMin = toMinutes(disp.horaFin)
+      candidateStarts.forEach((cand) => {
+        const candMin = toMinutes(cand)
+        if (candMin >= startMin && candMin + duracionTurno <= endMin) next[dayNum].add(cand)
+      })
+    })
+    setSelectedSlots(next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perfilLoaded, duracionTurno, intervaloTurno])
+
+  // Whenever duración/intervalo change AFTER the initial import (i.e. the médico tweaks the
+  // selects mid-session), the grid's candidate positions shift — drop any previously selected
+  // slot that no longer lines up with the new grid, keep the ones that still do.
+  useEffect(() => {
+    if (!importedRef.current) return
+    const candidateSet = new Set(candidateStarts)
+    setSelectedSlots((prev) => {
+      const next: { [key: number]: Set<string> } = {}
+      weekdays.forEach((d) => {
+        next[d.num] = new Set([...(prev[d.num] || [])].filter((t) => candidateSet.has(t)))
+      })
+      return next
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duracionTurno, intervaloTurno])
+
+  const toggleSlot = (dayNum: number, slotStart: string) => {
+    setSelectedSlots((prev) => {
+      const daySet = new Set(prev[dayNum])
+      if (daySet.has(slotStart)) daySet.delete(slotStart)
+      else daySet.add(slotStart)
+      return { ...prev, [dayNum]: daySet }
+    })
   }
 
-  const updateRange = (dayNum: number, idx: number, field: 'start' | 'end', value: string) => {
-    setDayRanges(prev => ({
-      ...prev,
-      [dayNum]: prev[dayNum].map((r, i) => i === idx ? { ...r, [field]: value } : r)
-    }))
+  // Merges a day's individually-toggled slots back into contiguous { start, end } ranges for
+  // saving — e.g. three consecutive selected slots collapse into one range dto, which the
+  // backend re-expands into the same slots via the same duración+intervalo stepping.
+  const buildRangesForDay = (dayNum: number): { start: string; end: string }[] => {
+    const daySet = selectedSlots[dayNum] || new Set<string>()
+    const ranges: { start: string; end: string }[] = []
+    let runStart: string | null = null
+    candidateStarts.forEach((cand, idx) => {
+      const isSelected = daySet.has(cand)
+      if (isSelected && runStart === null) runStart = cand
+      const nextSelected = isSelected && candidateStarts[idx + 1] !== undefined && daySet.has(candidateStarts[idx + 1])
+      if (isSelected && !nextSelected && runStart !== null) {
+        ranges.push({ start: runStart, end: toTimeStr(toMinutes(cand) + duracionTurno) })
+        runStart = null
+      }
+    })
+    return ranges
   }
 
-  const removeRange = (dayNum: number, idx: number) => {
-    setDayRanges(prev => ({
-      ...prev,
-      [dayNum]: prev[dayNum].filter((_, i) => i !== idx)
-    }))
-  }
-
-  // "Copiar horario a todos los días": overwrites every weekday's range list with a copy of
-  // the given day's ranges — a one-click way to avoid re-entering the same schedule 5 times.
-  const copyRangesToAllDays = (dayNum: number) => {
-    const source = dayRanges[dayNum]
-    if (!source || source.length === 0) return
-    setDayRanges(prev => {
-      const next: { [key: number]: { start: string; end: string }[] } = { ...prev }
-      weekdays.forEach((d) => { next[d.num] = source.map(r => ({ ...r })) })
+  // "Copiar horario a todos los días": overwrites every weekday's selection with a copy of the
+  // given day's selected slots — a one-click way to avoid re-toggling the same schedule 5 times.
+  const copySlotsToAllDays = (dayNum: number) => {
+    const source = selectedSlots[dayNum]
+    if (!source || source.size === 0) return
+    setSelectedSlots((prev) => {
+      const next: { [key: number]: Set<string> } = { ...prev }
+      weekdays.forEach((d) => { next[d.num] = new Set(source) })
       return next
     })
   }
 
-  const isRangeInvalid = (range: { start: string; end: string }) => !range.start || !range.end || range.end <= range.start
-  const hasInvalidRanges = weekdays.some((day) => (dayRanges[day.num] || []).some(isRangeInvalid))
-
-  // The day whose ranges the "copy to all days" action would use — the first weekday (in
+  // The day whose slots the "copy to all days" action would use — the first weekday (in
   // Lun→Vie order) that already has a schedule defined, defaulting to Lunes.
-  const copySourceDay = weekdays.find((d) => (dayRanges[d.num] || []).length > 0) || weekdays[0]
+  const copySourceDay = weekdays.find((d) => (selectedSlots[d.num]?.size || 0) > 0) || weekdays[0]
 
   const handleSave = async () => {
-    if (hasInvalidRanges) return
     setSaving(true)
     const dtos: any[] = []
 
     weekdays.forEach((day) => {
-      (dayRanges[day.num] || []).forEach((range) => {
+      buildRangesForDay(day.num).forEach((range) => {
         dtos.push({
           diaSemana: day.num,
           horaInicio: range.start,
@@ -818,47 +874,6 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
     }
   }
 
-  // ── "Vista previa de horarios reservables" timeline geometry ──────────────
-  // Purely visual: recomputes, on the frontend, an approximation of what
-  // AgendaService.calcularBloquesDisponibles will generate on the backend (same
-  // duracion+intervalo stepping logic) so the doctor can see the effect of the two
-  // settings before saving.
-  const toMinutes = (t: string) => {
-    const [h, m] = t.split(':').map(Number)
-    return h * 60 + m
-  }
-  const toTimeStr = (mins: number) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
-
-  // Grid bounds are computed from the actual ranges the doctor has set (with ~1h padding,
-  // clamped to 0–24h) so the preview isn't locked to the old fixed 9–18 window — the whole
-  // point of moving off whole-hour slots is that doctors can work outside it.
-  const allCompleteRanges = weekdays.flatMap((d) => (dayRanges[d.num] || []).filter((r) => !isRangeInvalid(r)))
-  const GRID_START_HOUR = allCompleteRanges.length
-    ? Math.max(0, Math.floor(Math.min(...allCompleteRanges.map((r) => toMinutes(r.start))) / 60) - 1)
-    : 9
-  const GRID_END_HOUR = allCompleteRanges.length
-    ? Math.min(24, Math.ceil(Math.max(...allCompleteRanges.map((r) => toMinutes(r.end))) / 60) + 1)
-    : 18
-  const HOUR_PX = 46
-  const pxPerMinute = HOUR_PX / 60
-  const gridHeightPx = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_PX
-  const gridHours = Array.from({ length: GRID_END_HOUR - GRID_START_HOUR + 1 }, (_, i) => GRID_START_HOUR + i)
-
-  const computePreviewSlots = (dayNum: number): { start: string }[] => {
-    const slots: { start: string }[] = []
-    const paso = duracionTurno + intervaloTurno
-    if (paso <= 0) return slots
-    getDayBlocks(dayNum).filter((block) => !isRangeInvalid(block)).forEach((block) => {
-      let cursor = toMinutes(block.start)
-      const end = toMinutes(block.end)
-      while (cursor + duracionTurno <= end) {
-        slots.push({ start: toTimeStr(cursor) })
-        cursor += paso
-      }
-    })
-    return slots
-  }
-
   return (
     <div className="agenda-view">
       {/* Weekly availability panel */}
@@ -868,7 +883,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
             <div className="agenda-view-panel__title">Disponibilidad semanal</div>
             <p className="agenda-view-panel__subtitle">Definí tus franjas horarias y la duración del turno. Los horarios reservables se calculan solos.</p>
           </div>
-          <button className="agenda-view-btn-primary" onClick={handleSave} disabled={saving || hasInvalidRanges} id="btn-save-availability">
+          <button className="agenda-view-btn-primary" onClick={handleSave} disabled={saving} id="btn-save-availability">
             {saving ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>
@@ -898,68 +913,25 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
           </div>
         </div>
 
-        {copySourceDay && (dayRanges[copySourceDay.num] || []).length > 0 && (
+        {copySourceDay && (selectedSlots[copySourceDay.num]?.size || 0) > 0 && (
           <div className="agenda-view-copy-row">
-            <button type="button" className="agenda-view-copy-btn" onClick={() => copyRangesToAllDays(copySourceDay.num)}>
+            <button type="button" className="agenda-view-copy-btn" onClick={() => copySlotsToAllDays(copySourceDay.num)}>
               Copiar horario de {copySourceDay.name} a todos los días
             </button>
           </div>
         )}
 
-        <div className="agenda-view-blocks-list">
-          {weekdays.map((day) => {
-            const ranges = dayRanges[day.num] || []
-            return (
-              <div className="agenda-view-day-row" key={day.num}>
-                <div className="agenda-view-day-label">{day.abbr}</div>
-                <div className="agenda-view-day-blocks">
-                  {ranges.length === 0 && <span className="agenda-view-day-off">Sin turnos este día</span>}
-                  {ranges.map((range, idx) => {
-                    const invalid = isRangeInvalid(range)
-                    return (
-                      <div className="agenda-view-range-row" key={idx}>
-                        <div className="agenda-view-range-main">
-                          <div className="agenda-view-range-inputs">
-                            <input
-                              type="time"
-                              step={300}
-                              value={range.start}
-                              onChange={(e) => updateRange(day.num, idx, 'start', e.target.value)}
-                              className={`agenda-view-time-input${invalid ? ' agenda-view-time-input--invalid' : ''}`}
-                              aria-label={`Hora de inicio, horario ${idx + 1} de ${day.name}`}
-                            />
-                            <span className="agenda-view-range-sep">–</span>
-                            <input
-                              type="time"
-                              step={300}
-                              value={range.end}
-                              onChange={(e) => updateRange(day.num, idx, 'end', e.target.value)}
-                              className={`agenda-view-time-input${invalid ? ' agenda-view-time-input--invalid' : ''}`}
-                              aria-label={`Hora de fin, horario ${idx + 1} de ${day.name}`}
-                            />
-                          </div>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                            className="agenda-view-range-remove"
-                            onClick={() => removeRange(day.num, idx)} role="button" aria-label={`Quitar horario ${idx + 1} de ${day.name}`}>
-                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
-                        </div>
-                        {invalid && <span className="agenda-view-range-error">La hora de fin debe ser posterior a la de inicio</span>}
-                      </div>
-                    )
-                  })}
-                  <button type="button" className="agenda-view-add-block" onClick={() => addRange(day.num)}>
-                    <Icon.Plus /> Agregar horario
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
         <div className="agenda-view-preview">
           <div className="agenda-view-preview-head">
-            <div className="agenda-view-preview-title">Vista previa de horarios reservables</div>
+            <div className="agenda-view-preview-title">Horarios reservables</div>
+            <div className="agenda-view-preview-legend">
+              <span className="agenda-view-preview-legend-item">
+                <span className="agenda-view-preview-legend-swatch agenda-view-preview-legend-swatch--on" /> Disponible
+              </span>
+              <span className="agenda-view-preview-legend-item">
+                <span className="agenda-view-preview-legend-swatch" /> Clic para agregar
+              </span>
+            </div>
           </div>
           <div className="agenda-view-agenda">
             <div className="agenda-view-agenda-headrow">
@@ -978,7 +950,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
               </div>
               <div className="agenda-view-agenda-days">
                 {weekdays.map((day) => {
-                  const slots = computePreviewSlots(day.num)
+                  const daySet = selectedSlots[day.num] || new Set<string>()
                   return (
                     <div
                       key={day.num}
@@ -988,18 +960,25 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
                         backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR_PX - 1}px, var(--av-line) ${HOUR_PX - 1}px, var(--av-line) ${HOUR_PX}px)`
                       }}
                     >
-                      {slots.map((slot) => (
-                        <div
-                          key={slot.start}
-                          className="agenda-view-agenda-slot"
-                          style={{
-                            top: `${(toMinutes(slot.start) - GRID_START_HOUR * 60) * pxPerMinute}px`,
-                            height: `${Math.max(duracionTurno * pxPerMinute, 20)}px`
-                          }}
-                        >
-                          <div className="agenda-view-agenda-slot-time">{slot.start}</div>
-                        </div>
-                      ))}
+                      {candidateStarts.map((slotStart) => {
+                        const isSelected = daySet.has(slotStart)
+                        return (
+                          <button
+                            key={slotStart}
+                            type="button"
+                            className={`agenda-view-agenda-slot${isSelected ? '' : ' agenda-view-agenda-slot--empty'}`}
+                            style={{
+                              top: `${(toMinutes(slotStart) - GRID_START_HOUR * 60) * pxPerMinute}px`,
+                              height: `${Math.max(duracionTurno * pxPerMinute, 20)}px`
+                            }}
+                            onClick={() => toggleSlot(day.num, slotStart)}
+                            aria-pressed={isSelected}
+                            aria-label={`${isSelected ? 'Quitar' : 'Agregar'} horario ${slotStart} de ${day.name}`}
+                          >
+                            <div className="agenda-view-agenda-slot-time">{slotStart}</div>
+                          </button>
+                        )
+                      })}
                     </div>
                   )
                 })}
