@@ -73,6 +73,21 @@ public class MedicoController {
         return ResponseEntity.ok(medicoService.obtenerStats(userDetails.getUsername()));
     }
 
+    /**
+     * Updates only the médico's agenda settings (turno duration + gap between bookable
+     * slots, "Duración de turno" / "Intervalo entre turnos" in the Agenda page). Kept
+     * separate from PUT /perfil since that endpoint replaces the whole profile and the
+     * Agenda page never has the rest of the profile fields loaded.
+     */
+    @PutMapping("/disponibilidad-config")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<MedicoDto> actualizarConfigAgenda(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody MedicoDto dto) {
+        return ResponseEntity.ok(medicoService.actualizarConfigAgenda(
+                userDetails.getUsername(), dto.getDuracionTurnoMinutos(), dto.getIntervaloEntreTurnosMinutos()));
+    }
+
     @GetMapping("/disponibilidad")
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<List<com.tranqui.app.model.dto.DisponibilidadDto>> obtenerDisponibilidad(

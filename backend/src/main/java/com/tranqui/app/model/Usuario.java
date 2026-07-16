@@ -195,6 +195,17 @@ public class Usuario {
     @Column(name = "anios_experiencia")
     private Integer aniosExperiencia;
 
+    // Per-médico agenda settings: how long each appointment slot lasts, and how much gap
+    // to leave between the end of one bookable slot and the start of the next when
+    // AgendaService walks through an availability window generating candidate start times.
+    // Null means "not configured yet" — callers fall back to the historical defaults
+    // (45 / 10) so existing doctors keep their current behavior until they opt in.
+    @Column(name = "duracion_turno_minutos")
+    private Integer duracionTurnoMinutos;
+
+    @Column(name = "intervalo_entre_turnos_minutos")
+    private Integer intervaloEntreTurnosMinutos;
+
     @PrePersist
     protected void onCreate() {
         if (fechaRegistro == null) {
