@@ -96,6 +96,12 @@ export const api = {
   actualizarDisponibilidad: (data: any[]) =>
     apiFetch('/medicos/disponibilidad', { method: 'PUT', body: data as any }),
 
+  // Agenda settings ("Duración de turno" / "Intervalo entre turnos"). Current values also
+  // come back on getPerfil() (duracionTurnoMinutos / intervaloEntreTurnosMinutos), so this
+  // is only needed to persist changes.
+  actualizarConfigAgenda: (data: { duracionTurnoMinutos: number; intervaloEntreTurnosMinutos: number }) =>
+    apiFetch('/medicos/disponibilidad-config', { method: 'PUT', body: data as any }),
+
   getMercadoPagoStatus: (): Promise<{ connected: boolean; mpUserId: string; mercadopagoEnabled: boolean }> =>
     apiFetch('/medicos/mercadopago/status'),
 

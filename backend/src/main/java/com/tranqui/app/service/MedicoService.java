@@ -37,6 +37,11 @@ public class MedicoService {
 
     private static final long MAX_FOTO_BYTES = 3L * 1024 * 1024; // 3MB decoded
 
+    // Fallback values for médicos who haven't configured their agenda settings yet —
+    // 45 matches the historical hardcoded turno duration, 10 matches the mockup's default.
+    private static final int DEFAULT_DURACION_TURNO_MINUTOS = 45;
+    private static final int DEFAULT_INTERVALO_ENTRE_TURNOS_MINUTOS = 10;
+
     private static final List<MedicoDto.TarifaDto> DEFAULT_TARIFFS = Arrays.asList(
             new MedicoDto.TarifaDto("particular", "Consulta particular", new BigDecimal("60000"), true),
             new MedicoDto.TarifaDto("sobreturno", "Sobreturno", new BigDecimal("90000"), true),
@@ -281,7 +286,36 @@ public class MedicoService {
                 .pacientesAtiende(pacientesAtiendeList)
                 .institucionFormacion(m.getInstitucionFormacion())
                 .aniosExperiencia(m.getAniosExperiencia())
+                .duracionTurnoMinutos(m.getDuracionTurnoMinutos() != null ? m.getDuracionTurnoMinutos() : DEFAULT_DURACION_TURNO_MINUTOS)
+                .intervaloEntreTurnosMinutos(m.getIntervaloEntreTurnosMinutos() != null ? m.getIntervaloEntreTurnosMinutos() : DEFAULT_INTERVALO_ENTRE_TURNOS_MINUTOS)
                 .build();
+    }
+
+    /**
+     * Updates only the médico's agenda settings (turno duration + gap between bookable
+     * slots) without touching the rest of the profile — keeps this independent from
+     * actualizarPerfil, which does a full-replace of every profile field.
+     */
+    @Transactional
+    public MedicoDto actualizarConfigAgenda(String email, Integer duracionTurnoMinutos, Integer intervaloEntreTurnosMinutos) {
+        Usuario medico = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
+
+        if (duracionTurnoMinutos != null) {
+            if (duracionTurnoMinutos <= 0) {
+                throw new IllegalArgumentException("La duración del turno debe ser mayor a 0 minutos.");
+            }
+            medico.setDuracionTurnoMinutos(duracionTurnoMinutos);
+        }
+        if (intervaloEntreTurnosMinutos != null) {
+            if (intervaloEntreTurnosMinutos < 0) {
+                throw new IllegalArgumentException("El intervalo entre turnos no puede ser negativo.");
+            }
+            medico.setIntervaloEntreTurnosMinutos(intervaloEntreTurnosMinutos);
+        }
+
+        usuarioRepository.save(medico);
+        return construirMedicoDto(medico);
     }
 
     @Transactional(readOnly = true)

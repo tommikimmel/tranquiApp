@@ -56,9 +56,13 @@ public class TurnoService {
     public List<java.time.LocalTime> obtenerHorariosDisponibles(Long medicoId, java.time.LocalDate fecha) {
         List<com.tranqui.app.model.Disponibilidad> disponibilidades = disponibilidadRepository.findByMedicoId(medicoId);
         List<Turno> turnosExistentes = turnoRepository.findByMedicoIdAndFechaAndEstadoNot(medicoId, fecha, EstadoTurno.CANCELADO);
-        List<java.time.LocalTime> locales = agendaService.calcularBloquesDisponibles(disponibilidades, turnosExistentes, fecha);
 
         Usuario medico = usuarioRepository.findById(medicoId).orElse(null);
+        int duracionTurnoMinutos = (medico != null && medico.getDuracionTurnoMinutos() != null) ? medico.getDuracionTurnoMinutos() : 45;
+        int intervaloEntreTurnosMinutos = (medico != null && medico.getIntervaloEntreTurnosMinutos() != null) ? medico.getIntervaloEntreTurnosMinutos() : 10;
+        List<java.time.LocalTime> locales = agendaService.calcularBloquesDisponibles(
+                disponibilidades, turnosExistentes, fecha, duracionTurnoMinutos, intervaloEntreTurnosMinutos);
+
         if (medico == null) {
             return locales;
         }

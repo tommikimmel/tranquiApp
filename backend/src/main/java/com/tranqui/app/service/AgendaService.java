@@ -11,12 +11,35 @@ import java.util.List;
 @Service
 public class AgendaService {
 
+    // Historical fixed defaults, kept only to back the legacy 3-arg overload below so callers
+    // (and tests) that don't pass a médico's configured values keep seeing the exact same
+    // behavior as before per-médico agenda settings existed.
     private static final int DURACION_TURNO_MINUTOS = 45;
     private static final int BLOQUE_AGENDA_MINUTOS = 60;
 
+    /**
+     * @deprecated kept for backward compatibility with callers that haven't been threaded
+     * through with a médico's configured duración/intervalo yet. Prefer the overload that
+     * takes duracionTurnoMinutos and intervaloEntreTurnosMinutos explicitly.
+     */
+    @Deprecated
     public List<LocalTime> calcularBloquesDisponibles(List<Disponibilidad> disponibilidades, List<Turno> turnosExistentes, LocalDate fecha) {
+        return calcularBloquesDisponibles(disponibilidades, turnosExistentes, fecha,
+                DURACION_TURNO_MINUTOS, BLOQUE_AGENDA_MINUTOS - DURACION_TURNO_MINUTOS);
+    }
+
+    /**
+     * @param duracionTurnoMinutos how long each bookable slot lasts — used both as the step
+     *                             length checked for collisions against existing bookings.
+     * @param intervaloEntreTurnosMinutos gap left between the end of one candidate slot and
+     *                             the start of the next; the walk step through each
+     *                             availability window is duracionTurnoMinutos + intervaloEntreTurnosMinutos.
+     */
+    public List<LocalTime> calcularBloquesDisponibles(List<Disponibilidad> disponibilidades, List<Turno> turnosExistentes, LocalDate fecha,
+            int duracionTurnoMinutos, int intervaloEntreTurnosMinutos) {
         List<LocalTime> bloquesDisponibles = new ArrayList<>();
         int dayOfWeek = fecha.getDayOfWeek().getValue();
+        int pasoMinutos = duracionTurnoMinutos + intervaloEntreTurnosMinutos;
 
         LocalDate hoy = LocalDate.now(java.time.ZoneId.of("America/Argentina/Cordoba"));
         LocalTime ahora = LocalTime.now(java.time.ZoneId.of("America/Argentina/Cordoba"));
@@ -30,14 +53,14 @@ public class AgendaService {
             LocalTime inicio = disp.getHoraInicio();
             LocalTime fin = disp.getHoraFin();
 
-            while (inicio.plusMinutes(BLOQUE_AGENDA_MINUTOS).isBefore(fin) || inicio.plusMinutes(BLOQUE_AGENDA_MINUTOS).equals(fin)) {
-                LocalTime finalBloque = inicio.plusMinutes(BLOQUE_AGENDA_MINUTOS);
-                
+            while (inicio.plusMinutes(pasoMinutos).isBefore(fin) || inicio.plusMinutes(pasoMinutos).equals(fin)) {
+                LocalTime finalBloque = inicio.plusMinutes(pasoMinutos);
+
                 // If the target date is today, ensure the slot starts in the future
                 boolean enElPasado = fecha.equals(hoy) && inicio.isBefore(ahora);
 
                 // Verify if it overlaps with an existing booking
-                boolean ocupado = comprobarChoqueTurno(inicio, inicio.plusMinutes(DURACION_TURNO_MINUTOS), turnosExistentes);
+                boolean ocupado = comprobarChoqueTurno(inicio, inicio.plusMinutes(duracionTurnoMinutos), turnosExistentes);
                 if (!ocupado && !enElPasado) {
                     bloquesDisponibles.add(inicio);
                 }
