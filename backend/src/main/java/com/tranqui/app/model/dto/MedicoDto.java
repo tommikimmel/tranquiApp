@@ -46,6 +46,10 @@ public class MedicoDto {
     private String institucionFormacion;
     private Integer aniosExperiencia;
 
+    // Agenda settings — see Usuario.duracionTurnoMinutos / intervaloEntreTurnosMinutos.
+    private Integer duracionTurnoMinutos;
+    private Integer intervaloEntreTurnosMinutos;
+
     @Getter
     @Setter
     @NoArgsConstructor

@@ -625,14 +625,14 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
   // Internal state of active slots per day
   const [activeSlots, setActiveSlots] = useState<{ [key: number]: { [key: string]: boolean } }>(() => {
     const state: { [key: number]: { [key: string]: boolean } } = { 1: {}, 2: {}, 3: {}, 4: {}, 5: {} }
-    
+
     // Populate active slots from API availability
     initialAvailability.forEach((disp) => {
       const dayNum = disp.diaSemana
       if (dayNum >= 1 && dayNum <= 5) {
         const start = parseInt(disp.horaInicio.split(':')[0])
         const end = parseInt(disp.horaFin.split(':')[0])
-        
+
         baseSlots.forEach((slot) => {
           const hour = parseInt(slot.split(':')[0])
           if (hour >= start && hour < end) {
@@ -643,6 +643,26 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
     })
     return state
   })
+
+  // "Duración de turno" / "Intervalo entre turnos" — per-médico agenda settings. Loaded from
+  // the existing profile endpoint (which now also returns these two fields) and persisted
+  // through a small dedicated endpoint so we don't have to send the whole profile DTO from
+  // here. Backend defaults (45 / 10) are mirrored here so the selects have a sane value
+  // before the profile fetch resolves.
+  const [duracionTurno, setDuracionTurno] = useState(45)
+  const [intervaloTurno, setIntervaloTurno] = useState(10)
+
+  useEffect(() => {
+    let cancelled = false
+    api.getPerfil()
+      .then((perfil: any) => {
+        if (cancelled || !perfil) return
+        if (perfil.duracionTurnoMinutos != null) setDuracionTurno(perfil.duracionTurnoMinutos)
+        if (perfil.intervaloEntreTurnosMinutos != null) setIntervaloTurno(perfil.intervaloEntreTurnosMinutos)
+      })
+      .catch((err) => console.error('Error cargando configuración de agenda', err))
+    return () => { cancelled = true }
+  }, [])
 
   // To-Do List state and hooks
   const [tasks, setTasks] = useState<{ id: string; text: string; completed: boolean; category: 'clinical' | 'admin' | 'urgent' }[]>(() => {
@@ -715,10 +735,52 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
     }))
   }
 
+  // Derives the mockup's "block-chip" ranges from activeSlots: contiguous runs of active
+  // hours on a given day collapse into a single { start, end } range (e.g. 09:00,10:00,11:00
+  // active → one chip "09:00 – 12:00"). Purely a display concern — activeSlots (and the DTO
+  // shape handleSave produces from it) is unchanged.
+  const getDayBlocks = (dayNum: number): { start: string; end: string }[] => {
+    const blocks: { start: string; end: string }[] = []
+    let blockStart: string | null = null
+    baseSlots.forEach((slot, idx) => {
+      const isActive = !!activeSlots[dayNum][slot]
+      if (isActive && blockStart === null) blockStart = slot
+      const nextSlot = baseSlots[idx + 1]
+      const continuesIntoNext = isActive && !!nextSlot && !!activeSlots[dayNum][nextSlot]
+      if (isActive && !continuesIntoNext && blockStart !== null) {
+        const endHour = parseInt(slot.split(':')[0]) + 1
+        blocks.push({ start: blockStart, end: `${String(endHour).padStart(2, '0')}:00` })
+        blockStart = null
+      }
+    })
+    return blocks
+  }
+
+  const removeBlock = (dayNum: number, block: { start: string; end: string }) => {
+    const startHour = parseInt(block.start.split(':')[0])
+    const endHour = parseInt(block.end.split(':')[0])
+    setActiveSlots(prev => {
+      const dayState = { ...prev[dayNum] }
+      for (let h = startHour; h < endHour; h++) {
+        delete dayState[`${String(h).padStart(2, '0')}:00`]
+      }
+      return { ...prev, [dayNum]: dayState }
+    })
+  }
+
+  // Adds a one-hour block at the earliest free hour of the day (merges visually into an
+  // adjacent chip if it's contiguous with one). Keeps the "add" interaction simple while
+  // still building on the same hourly activeSlots model the rest of the page/save flow uses.
+  const addBlock = (dayNum: number) => {
+    const nextFree = baseSlots.find(slot => !activeSlots[dayNum][slot])
+    if (!nextFree) return
+    setActiveSlots(prev => ({ ...prev, [dayNum]: { ...prev[dayNum], [nextFree]: true } }))
+  }
+
   const handleSave = async () => {
     setSaving(true)
     const dtos: any[] = []
-    
+
     weekdays.forEach((day) => {
       baseSlots.forEach((slot) => {
         if (activeSlots[day.num][slot]) {
@@ -726,7 +788,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
           const endHour = startHour + 1
           const startStr = `${String(startHour).padStart(2, '0')}:00`
           const endStr = `${String(endHour).padStart(2, '0')}:00`
-          
+
           dtos.push({
             diaSemana: day.num,
             horaInicio: startStr,
@@ -737,7 +799,10 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
     })
 
     try {
-      await onSave(dtos)
+      await Promise.all([
+        onSave(dtos),
+        api.actualizarConfigAgenda({ duracionTurnoMinutos: duracionTurno, intervaloEntreTurnosMinutos: intervaloTurno })
+      ])
       showAlert("Disponibilidad guardada correctamente ✓", "success")
     } catch (err) {
       console.error(err)
@@ -747,238 +812,245 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
     }
   }
 
+  // ── "Vista previa de horarios reservables" timeline geometry ──────────────
+  // Purely visual: recomputes, on the frontend, an approximation of what
+  // AgendaService.calcularBloquesDisponibles will generate on the backend (same
+  // duracion+intervalo stepping logic) so the doctor can see the effect of the two
+  // settings before saving. The grid spans 09:00–18:00 to fit baseSlots (09:00–17:00).
+  const GRID_START_HOUR = 9
+  const GRID_END_HOUR = 18
+  const HOUR_PX = 46
+  const pxPerMinute = HOUR_PX / 60
+  const gridHeightPx = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_PX
+  const gridHours = Array.from({ length: GRID_END_HOUR - GRID_START_HOUR + 1 }, (_, i) => GRID_START_HOUR + i)
+  const toMinutes = (t: string) => {
+    const [h, m] = t.split(':').map(Number)
+    return h * 60 + m
+  }
+  const toTimeStr = (mins: number) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
+
+  const computePreviewSlots = (dayNum: number): { start: string }[] => {
+    const slots: { start: string }[] = []
+    const paso = duracionTurno + intervaloTurno
+    if (paso <= 0) return slots
+    getDayBlocks(dayNum).forEach((block) => {
+      let cursor = toMinutes(block.start)
+      const end = toMinutes(block.end)
+      while (cursor + duracionTurno <= end) {
+        slots.push({ start: toTimeStr(cursor) })
+        cursor += paso
+      }
+    })
+    return slots
+  }
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-6)', alignItems: 'start', width: '100%' }}>
-      {/* Availability Grid */}
-      <div className="card" style={{ width: '100%', maxWidth: 'none', margin: 0 }}>
-        <div className="card__header">
+    <div className="agenda-view">
+      {/* Weekly availability panel */}
+      <div className="agenda-view-panel">
+        <div className="agenda-view-panel__head">
           <div>
-            <h2 className="card__title">Disponibilidad semanal</h2>
-            <p className="card__subtitle">Hacé clic en un horario para habilitarlo o deshabilitarlo</p>
+            <div className="agenda-view-panel__title">Disponibilidad semanal</div>
+            <p className="agenda-view-panel__subtitle">Definí tus franjas horarias y la duración del turno. Los horarios reservables se calculan solos.</p>
           </div>
-          <button className="btn btn--primary btn--sm" onClick={handleSave} disabled={saving} id="btn-save-availability">
+          <button className="agenda-view-btn-primary" onClick={handleSave} disabled={saving} id="btn-save-availability">
             {saving ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>
 
-        <div className="availability-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', width: '100%' }}>
+        <div className="agenda-view-settings-row">
+          <div className="agenda-view-setting">
+            <label>Duración de turno</label>
+            <div className="agenda-view-select-wrap">
+              <select value={duracionTurno} onChange={(e) => setDuracionTurno(Number(e.target.value))}>
+                <option value={30}>30 min</option>
+                <option value={45}>45 min</option>
+                <option value={50}>50 min</option>
+                <option value={60}>60 min</option>
+              </select>
+            </div>
+          </div>
+          <div className="agenda-view-setting">
+            <label>Intervalo entre turnos</label>
+            <div className="agenda-view-select-wrap">
+              <select value={intervaloTurno} onChange={(e) => setIntervaloTurno(Number(e.target.value))}>
+                <option value={0}>Sin intervalo</option>
+                <option value={5}>5 min</option>
+                <option value={10}>10 min</option>
+                <option value={15}>15 min</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="agenda-view-blocks-list">
           {weekdays.map((day) => {
-            const isActive = baseSlots.some(slot => activeSlots[day.num][slot])
+            const blocks = getDayBlocks(day.num)
             return (
-              <div className="day-column" key={day.num}>
-                <div className={`day-column__header ${isActive ? 'day-column__active' : ''}`}>
-                  {day.abbr}
-                </div>
-                {baseSlots.map((slot) => {
-                  const isSlotActive = !!activeSlots[day.num][slot]
-                  return (
-                    <button
-                      key={slot}
-                      className={`time-slot ${isSlotActive ? 'time-slot--available' : 'time-slot--booked'}`}
-                      onClick={() => toggleSlot(day.num, slot)}
-                      style={{ cursor: 'pointer' }}
-                      aria-label={`${day.name} ${slot} ${isSlotActive ? '- disponible' : '- inactivo'}`}
-                    >
-                      {slot}
+              <div className="agenda-view-day-row" key={day.num}>
+                <div className="agenda-view-day-label">{day.abbr}</div>
+                <div className="agenda-view-day-blocks">
+                  {blocks.length === 0 && <span className="agenda-view-day-off">Sin turnos este día</span>}
+                  {blocks.map((block) => (
+                    <span className="agenda-view-block-chip" key={`${block.start}-${block.end}`}>
+                      {block.start} – {block.end}
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                        onClick={() => removeBlock(day.num, block)} role="button" aria-label={`Quitar horario ${block.start} a ${block.end} de ${day.name}`}>
+                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </span>
+                  ))}
+                  {blocks.length < baseSlots.length && (
+                    <button type="button" className="agenda-view-add-block" onClick={() => addBlock(day.num)}>
+                      <Icon.Plus /> Agregar
                     </button>
-                  )
-                })}
+                  )}
+                </div>
               </div>
             )
           })}
         </div>
+
+        <div className="agenda-view-preview">
+          <div className="agenda-view-preview-head">
+            <div className="agenda-view-preview-title">Vista previa de horarios reservables</div>
+          </div>
+          <div className="agenda-view-agenda">
+            <div className="agenda-view-agenda-headrow">
+              <div className="agenda-view-agenda-corner" />
+              <div className="agenda-view-agenda-daynames">
+                {weekdays.map((day) => <div key={day.num}>{day.abbr}</div>)}
+              </div>
+            </div>
+            <div className="agenda-view-agenda-body">
+              <div className="agenda-view-agenda-hours" style={{ height: `${gridHeightPx}px` }}>
+                {gridHours.map((h) => (
+                  <div key={h} className="agenda-view-agenda-hour-label" style={{ top: `${(h - GRID_START_HOUR) * HOUR_PX}px` }}>
+                    {String(h).padStart(2, '0')}:00
+                  </div>
+                ))}
+              </div>
+              <div className="agenda-view-agenda-days">
+                {weekdays.map((day) => {
+                  const slots = computePreviewSlots(day.num)
+                  return (
+                    <div
+                      key={day.num}
+                      className="agenda-view-agenda-day-col"
+                      style={{
+                        height: `${gridHeightPx}px`,
+                        backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR_PX - 1}px, var(--av-line) ${HOUR_PX - 1}px, var(--av-line) ${HOUR_PX}px)`
+                      }}
+                    >
+                      {slots.map((slot) => (
+                        <div
+                          key={slot.start}
+                          className="agenda-view-agenda-slot"
+                          style={{
+                            top: `${(toMinutes(slot.start) - GRID_START_HOUR * 60) * pxPerMinute}px`,
+                            height: `${Math.max(duracionTurno * pxPerMinute, 20)}px`
+                          }}
+                        >
+                          <div className="agenda-view-agenda-slot-time">{slot.start}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* To-Do List Card */}
-      <div className="card" style={{ width: '100%', maxWidth: 'none', margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', boxShadow: 'var(--shadow-md)' }}>
-        <div className="card__header" style={{ paddingBottom: 'var(--space-2)', borderBottom: '1px solid var(--color-border)' }}>
+      {/* Notes / pendientes panel */}
+      <div className="agenda-view-panel">
+        <div className="agenda-view-panel__head">
           <div>
-            <h2 className="card__title" style={{ fontSize: 'var(--text-md)', fontWeight: 'bold' }}>Notas y Pendientes</h2>
-            <p className="card__subtitle" style={{ fontSize: 'var(--text-xs)' }}>Recordatorios clínicos y administrativos</p>
+            <div className="agenda-view-panel__title">Notas y pendientes</div>
+            <p className="agenda-view-panel__subtitle">Recordatorios clínicos y administrativos</p>
           </div>
         </div>
 
-        {/* Add Task Form */}
-        <form onSubmit={handleAddTask} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', backgroundColor: 'var(--neutral-50)', padding: 'var(--space-4)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Descripción de la nota</label>
-            <input 
-              type="text" 
-              className="form-input" 
-              placeholder="Ej. Llamar a prepaga Rossi..." 
-              value={newTaskText} 
+        <form onSubmit={handleAddTask}>
+          <div className="agenda-view-field">
+            <label>Descripción de la nota</label>
+            <input
+              type="text"
+              placeholder="Ej. Llamar a prepaga Rossi..."
+              value={newTaskText}
               onChange={(e) => setNewTaskText(e.target.value)}
-              style={{ fontSize: 'var(--text-sm)', backgroundColor: '#ffffff' }}
             />
           </div>
-          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-end' }}>
-            <div className="form-group" style={{ margin: 0, flex: 1 }}>
-              <label className="form-label" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Categoría</label>
-              <select 
-                className="form-input" 
-                value={newTaskCategory} 
-                onChange={(e: any) => setNewTaskCategory(e.target.value)}
-                style={{ 
-                  fontSize: 'var(--text-xs)', 
-                  padding: 'var(--space-2)', 
-                  backgroundColor: '#ffffff',
-                  border: '1px solid var(--color-border)',
-                  cursor: 'pointer'
-                }}
-              >
-                <option value="clinical">Nota Clínica</option>
-                <option value="admin">Nota Administrativa</option>
-                <option value="urgent">Prioridad Urgente</option>
-              </select>
+          <div className="agenda-view-row-inline">
+            <div className="agenda-view-field" style={{ flex: 1, marginBottom: 0 }}>
+              <label>Categoría</label>
+              <div className="agenda-view-select-wrap">
+                <select value={newTaskCategory} onChange={(e: any) => setNewTaskCategory(e.target.value)}>
+                  <option value="clinical">Nota Clínica</option>
+                  <option value="admin">Nota Administrativa</option>
+                  <option value="urgent">Prioridad Urgente</option>
+                </select>
+              </div>
             </div>
-            <button type="submit" className="btn btn--primary" style={{ padding: 'var(--space-2) var(--space-4)', fontSize: 'var(--text-xs)', height: '36px' }}>
-              Añadir
-            </button>
+            <button type="submit" className="agenda-view-btn-primary">Añadir</button>
           </div>
         </form>
 
-        {/* Tasks List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+        <div className="agenda-view-notes-list">
           {tasks.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-text-secondary)' }}>
-              <span style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}><Icon.FileText size={24} /></span>
-              <p style={{ fontSize: 'var(--text-xs)', fontStyle: 'italic', margin: 0 }}>No tenés notas pendientes.</p>
+            <div className="agenda-view-empty">
+              <Icon.FileText size={24} />
+              <p>No tenés notas pendientes.</p>
             </div>
           ) : (
             paginatedTasks.map((task) => {
-              // Premium note card design based on category
               const isUrgent = task.category === 'urgent';
               const isAdmin = task.category === 'admin';
-
-              const cardBg = isUrgent ? '#fff5f5' : isAdmin ? '#f0f7ff' : '#f0fdf4';
-              const cardBorder = isUrgent ? '1px solid #fee2e2' : isAdmin ? '1px solid #e0f2fe' : '1px solid #dcfce7';
-              const accentColor = isUrgent ? '#ef4444' : isAdmin ? '#3b82f6' : 'var(--color-primary)';
               const BadgeIcon = isUrgent ? Icon.AlertTriangle : isAdmin ? Icon.Clipboard : Icon.Activity;
               const badgeLabel = isUrgent ? 'Urgente' : isAdmin ? 'Admin' : 'Clínica';
-              const badgeText = isUrgent ? '#991b1b' : isAdmin ? '#1d4ed8' : '#047857';
-              const badgeBg = isUrgent ? '#fee2e2' : isAdmin ? '#dbeafe' : '#d1fae5';
+              const categoryClass = isUrgent ? 'agenda-view-note-item--urgent' : isAdmin ? 'agenda-view-note-item--admin' : 'agenda-view-note-item--clinical';
 
               return (
-                <div 
-                  key={task.id} 
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    justifyContent: 'space-between',
-                    padding: 'var(--space-3) var(--space-4)',
-                    backgroundColor: cardBg,
-                    border: cardBorder,
-                    borderLeft: `4px solid ${accentColor}`,
-                    borderRadius: 'var(--radius-lg)',
-                    gap: 'var(--space-3)',
-                    transition: 'all 0.2s ease',
-                    opacity: task.completed ? 0.55 : 1,
-                    textDecoration: task.completed ? 'line-through' : 'none',
-                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.02)'
-                  }}
+                <div
+                  key={task.id}
+                  className={`agenda-view-note-item ${categoryClass} ${task.completed ? 'agenda-view-note-item--done' : ''}`}
                 >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', flex: 1 }}>
-                    <input 
-                      type="checkbox" 
-                      checked={task.completed} 
-                      onChange={() => handleToggleTask(task.id)}
-                      style={{ 
-                        cursor: 'pointer', 
-                        width: '18px', 
-                        height: '18px', 
-                        marginTop: '2px',
-                        accentColor: accentColor
-                      }}
-                    />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <span style={{ 
-                        fontSize: 'var(--text-sm)', 
-                        color: 'var(--color-text-primary)',
-                        fontWeight: '600',
-                        lineHeight: '1.4'
-                      }}>
-                        {task.text}
-                      </span>
-                      <span style={{
-                        alignSelf: 'flex-start',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '3px',
-                        backgroundColor: badgeBg,
-                        color: badgeText,
-                        fontSize: '9px',
-                        fontWeight: 'bold',
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.02em'
-                      }}>
-                        <BadgeIcon size={10} />
-                        {badgeLabel}
-                      </span>
+                  <input
+                    type="checkbox"
+                    className="agenda-view-note-check"
+                    checked={task.completed}
+                    onChange={() => handleToggleTask(task.id)}
+                  />
+                  <div className="agenda-view-note-body">
+                    <span className="agenda-view-note-title">{task.text}</span>
+                    <div className="agenda-view-note-meta">
+                      <span className="agenda-view-note-tag"><BadgeIcon size={10} /> {badgeLabel}</span>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => handleDeleteTask(task.id)}
-                    style={{
-                      border: 'none',
-                      background: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--color-danger)',
-                      padding: '2px',
-                      lineHeight: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      opacity: 0.7
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                    onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
-                    title="Eliminar nota"
-                  >
+                  <span className="agenda-view-note-del" onClick={() => handleDeleteTask(task.id)} title="Eliminar nota">
                     <Icon.Trash size={14} />
-                  </button>
+                  </span>
                 </div>
               );
             })
           )}
         </div>
 
-        {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingTop: 'var(--space-3)',
-            borderTop: '1px solid var(--color-border)',
-            marginTop: 'var(--space-2)'
-          }}>
+          <div className="agenda-view-pagination">
             <button
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={validCurrentPage === 1}
-              className="btn btn--secondary btn--sm"
-              style={{
-                fontSize: '11px',
-                padding: 'var(--space-1.5) var(--space-3)',
-                opacity: validCurrentPage === 1 ? 0.5 : 1,
-                cursor: validCurrentPage === 1 ? 'not-allowed' : 'pointer'
-              }}
+              className="agenda-view-page-btn"
             >
               ◀ Anterior
             </button>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontWeight: '600' }}>
-              Página {validCurrentPage} de {totalPages}
-            </span>
+            <span>Página {validCurrentPage} de {totalPages}</span>
             <button
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={validCurrentPage === totalPages}
-              className="btn btn--secondary btn--sm"
-              style={{
-                fontSize: '11px',
-                padding: 'var(--space-1.5) var(--space-3)',
-                opacity: validCurrentPage === totalPages ? 0.5 : 1,
-                cursor: validCurrentPage === totalPages ? 'not-allowed' : 'pointer'
-              }}
+              className="agenda-view-page-btn"
             >
               Siguiente ▶
             </button>
