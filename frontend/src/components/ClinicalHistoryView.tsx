@@ -3,7 +3,7 @@ import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 import { downloadReportPDF } from '../utils/pdfGenerator'
 import { type Patient, usePatients } from '../hooks/usePatients'
-import PatientDirectorySidebar from './PatientDirectorySidebar'
+import PatientSearchBar from './PatientSearchBar'
 
 interface TrackingEntry {
   id: number
@@ -141,6 +141,7 @@ export default function ClinicalHistoryView() {
   const { showAlert } = useAlert()
   const { patients, loadingPatients, searchQuery, setSearchQuery, filteredPatients, setPatients } = usePatients()
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
+  const [activeTab, setActiveTab] = useState<'ficha' | 'seguimiento' | 'informes'>('ficha')
 
   // Tracking states
   const [trackings, setTrackings] = useState<TrackingEntry[]>([])
@@ -289,6 +290,7 @@ export default function ClinicalHistoryView() {
   useEffect(() => {
     if (selectedPatient) {
       loadClinicalDetails(selectedPatient.id)
+      setActiveTab('ficha')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPatient?.id])
@@ -440,59 +442,94 @@ export default function ClinicalHistoryView() {
     })
   }
 
+  const tabs: { key: 'ficha' | 'seguimiento' | 'informes'; label: string }[] = [
+    { key: 'ficha', label: 'Ficha de Datos del Paciente' },
+    { key: 'seguimiento', label: 'Seguimiento Diario' },
+    { key: 'informes', label: 'Informes Clínicos' },
+  ]
+
   return (
     <div className="card" style={{
       padding: 0,
-      display: 'grid',
-      gridTemplateColumns: '320px 1fr',
+      display: 'flex',
+      flexDirection: 'column',
       height: '100%',
       minHeight: 0,
       overflow: 'hidden'
     }}>
-      <PatientDirectorySidebar
-        title="Historia Clínica"
-        searchPlaceholder="Buscar por nombre o DNI..."
-        patients={patients}
-        filteredPatients={filteredPatients}
-        loadingPatients={loadingPatients}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        selectedPatient={selectedPatient}
-        onSelectPatient={setSelectedPatient}
-      />
-
-      {/* Main Clinical Workspace */}
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', backgroundColor: '#fcfcfc' }}>
-        {selectedPatient ? (
-          <>
-            {/* Header: Patient Bio Details */}
-            <div style={{
-              padding: 'var(--space-4) var(--space-6)',
-              borderBottom: '1px solid var(--color-border)',
-              backgroundColor: 'var(--color-surface)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--space-2)'
-            }}>
-              <div>
-                <h3 style={{
-                  fontFamily: 'var(--font-heading)',
-                  fontSize: 'var(--text-lg)',
-                  fontWeight: 'var(--font-weight-bold)',
-                  margin: 0
-                }}>
-                  {selectedPatient.nombre}
-                </h3>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-                  {selectedPatient.email} · {selectedPatient.telefono || 'Sin teléfono'}
-                </span>
-              </div>
+      {selectedPatient ? (
+        <>
+          {/* Header: Patient Bio Details + persistent compact search */}
+          <div style={{
+            padding: 'var(--space-4) var(--space-6)',
+            borderBottom: '1px solid var(--color-border)',
+            backgroundColor: 'var(--color-surface)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 'var(--space-4)',
+            flexWrap: 'wrap'
+          }}>
+            <div>
+              <h3 style={{
+                fontFamily: 'var(--font-heading)',
+                fontSize: 'var(--text-lg)',
+                fontWeight: 'var(--font-weight-bold)',
+                margin: 0
+              }}>
+                {selectedPatient.nombre}
+              </h3>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                {selectedPatient.email} · {selectedPatient.telefono || 'Sin teléfono'}
+              </span>
             </div>
+            <PatientSearchBar
+              compact
+              placeholder="Buscar otro paciente..."
+              patients={patients}
+              filteredPatients={filteredPatients}
+              loadingPatients={loadingPatients}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              selectedPatient={selectedPatient}
+              onSelectPatient={setSelectedPatient}
+            />
+          </div>
 
-            {/* Clinical History Content */}
-            <div style={{ flex: 1, padding: 'var(--space-6)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+          {/* Tab switcher */}
+          <div style={{
+            display: 'flex',
+            gap: 'var(--space-1)',
+            padding: '0 var(--space-6)',
+            borderBottom: '1px solid var(--color-border)',
+            backgroundColor: 'var(--color-surface)'
+          }}>
+            {tabs.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  padding: 'var(--space-3) var(--space-4)',
+                  border: 'none',
+                  borderBottom: activeTab === tab.key ? '2px solid var(--color-primary)' : '2px solid transparent',
+                  backgroundColor: 'transparent',
+                  color: activeTab === tab.key ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  fontWeight: activeTab === tab.key ? 'var(--font-weight-bold)' : 'var(--font-weight-medium)',
+                  fontSize: 'var(--text-sm)',
+                  cursor: 'pointer',
+                  transition: 'color 0.15s, border-color 0.15s'
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-              {/* Section: Ficha de Datos del Paciente (Editable) */}
+          {/* Clinical History Content: one tab at a time */}
+          <div style={{ flex: 1, padding: 'var(--space-6)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', backgroundColor: '#fcfcfc' }}>
+
+            {activeTab === 'ficha' && (
+              /* Section: Ficha de Datos del Paciente (Editable) */
               <div className="card" style={{ padding: 'var(--space-5)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isEditingPatient ? 'var(--space-4)' : 'var(--space-2)' }}>
                   <div>
@@ -827,8 +864,10 @@ export default function ClinicalHistoryView() {
                   </div>
                 )}
               </div>
+            )}
 
-              {/* Section: Seguimiento Diario */}
+            {activeTab === 'seguimiento' && (
+              /* Section: Seguimiento Diario */
               <div className="card" style={{ padding: 'var(--space-5)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
                   <div>
@@ -930,8 +969,10 @@ export default function ClinicalHistoryView() {
                   </div>
                 )}
               </div>
+            )}
 
-              {/* Section: Informes Clínicos */}
+            {activeTab === 'informes' && (
+              /* Section: Informes Clínicos */
               <div className="card" style={{ padding: 'var(--space-5)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
                   <div>
@@ -1173,29 +1214,46 @@ export default function ClinicalHistoryView() {
                   </div>
                 )}
               </div>
+            )}
 
-            </div>
-          </>
-        ) : (
-          <div style={{
-            margin: 'auto',
-            textAlign: 'center',
-            color: 'var(--color-text-secondary)',
-            padding: 'var(--space-8)'
-          }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: 48, height: 48, margin: '0 auto var(--space-4)', opacity: 0.4 }}>
-              <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-            </svg>
-            <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-primary)' }}>
-              Historia Clínica de Pacientes
-            </h3>
-            <p style={{ fontSize: 'var(--text-sm)', marginTop: 'var(--space-1)' }}>
-              Buscá un paciente por nombre o DNI en el directorio para ver su ficha médica, seguimiento diario e informes clínicos.
-            </p>
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          color: 'var(--color-text-secondary)',
+          padding: 'var(--space-8)',
+          backgroundColor: '#fcfcfc'
+        }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: 48, height: 48, margin: '0 auto var(--space-4)', opacity: 0.4 }}>
+            <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+          </svg>
+          <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 'var(--font-weight-medium)', color: 'var(--color-text-primary)' }}>
+            Historia Clínica de Pacientes
+          </h3>
+          <p style={{ fontSize: 'var(--text-sm)', marginTop: 'var(--space-1)', maxWidth: '440px' }}>
+            Buscá un paciente por nombre o DNI para ver su ficha médica, seguimiento diario e informes clínicos.
+          </p>
+          <div style={{ marginTop: 'var(--space-6)', width: '100%', display: 'flex', justifyContent: 'center' }}>
+            <PatientSearchBar
+              placeholder="Buscar por nombre o DNI..."
+              patients={patients}
+              filteredPatients={filteredPatients}
+              loadingPatients={loadingPatients}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
+              selectedPatient={selectedPatient}
+              onSelectPatient={setSelectedPatient}
+            />
+          </div>
+        </div>
+      )}
       <ConfirmModal
         isOpen={confirmModalConfig.isOpen}
         title={confirmModalConfig.title}

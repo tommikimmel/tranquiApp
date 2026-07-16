@@ -296,6 +296,36 @@ const Icon = {
       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
     </svg>
   ),
+  User: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+    </svg>
+  ),
+  Globe: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  ),
+  DollarSign: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <line x1="12" y1="1" x2="12" y2="23" />
+      <path d="M17 5.5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H7" />
+    </svg>
+  ),
+  Plug: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M9 2v5" /><path d="M15 2v5" />
+      <path d="M6 7h12v5a6 6 0 0 1-6 6 6 6 0 0 1-6-6V7z" />
+      <path d="M12 18v4" />
+    </svg>
+  ),
+  Star: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  ),
 }
 
 // Maps a persisted Notificacion's `tipo` (backend/.../NotificacionService.crearNotificacion
@@ -470,18 +500,36 @@ function StatsOverview({ stats }: { stats: any }) {
     )
   }
 
+  // "igual que..." (parity) strings come straight from the backend (MedicoService) for both
+  // sessionsToday and noShows — surfaced here as a neutral "flat" badge instead of forcing an
+  // up/down arrow onto a change that isn't actually up or down.
   const getChangeCls = (changeStr: string) => {
-    return changeStr && changeStr.startsWith('-') ? 'stat-card__change--down' : 'stat-card__change--up'
+    if (!changeStr) return 'stat-card__change--up'
+    if (changeStr.includes('igual')) return 'stat-card__change--flat'
+    return changeStr.startsWith('-') ? 'stat-card__change--down' : 'stat-card__change--up'
   }
 
   const renderIcon = (changeStr: string) => {
-    if (!changeStr) return null
+    if (!changeStr || changeStr.includes('igual')) return null
     if (changeStr.includes('Política')) return <Icon.ArrowUp />
     return changeStr.startsWith('-') ? <Icon.ArrowDown /> : <Icon.ArrowUp />
   }
 
   return (
     <div className="stats-grid">
+      <article className="stat-card stat-card--primary">
+        <div className="stat-card__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" style={{ width: 22, height: 22 }}>
+            <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+        </div>
+        <div className="stat-card__value">${(stats.earningsThisWeek || 0).toLocaleString('es-AR')}</div>
+        <div className="stat-card__label">Liquidado esta semana</div>
+        <div className={`stat-card__change ${getChangeCls(stats.earningsThisWeekChange)}`}>
+          {renderIcon(stats.earningsThisWeekChange)} {stats.earningsThisWeekChange}
+        </div>
+      </article>
+
       <article className="stat-card">
         <div className="stat-card__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" style={{ width: 22, height: 22 }}>
@@ -493,19 +541,6 @@ function StatsOverview({ stats }: { stats: any }) {
         <div className="stat-card__label">Sesiones hoy</div>
         <div className={`stat-card__change ${getChangeCls(stats.sessionsTodayChange)}`}>
           {renderIcon(stats.sessionsTodayChange)} {stats.sessionsTodayChange}
-        </div>
-      </article>
-
-      <article className="stat-card">
-        <div className="stat-card__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" style={{ width: 22, height: 22 }}>
-            <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-          </svg>
-        </div>
-        <div className="stat-card__value">${(stats.earningsThisWeek || 0).toLocaleString('es-AR')}</div>
-        <div className="stat-card__label">Liquidado esta semana</div>
-        <div className={`stat-card__change ${getChangeCls(stats.earningsThisWeekChange)}`}>
-          {renderIcon(stats.earningsThisWeekChange)} {stats.earningsThisWeekChange}
         </div>
       </article>
 
@@ -530,8 +565,8 @@ function StatsOverview({ stats }: { stats: any }) {
         </div>
         <div className="stat-card__value">{stats.noShowsThisMonth}</div>
         <div className="stat-card__label">No-shows este mes</div>
-        <div className="stat-card__change stat-card__change--up">
-          <Icon.ArrowUp /> {stats.noShowsChange}
+        <div className={`stat-card__change ${getChangeCls(stats.noShowsChange)}`}>
+          {renderIcon(stats.noShowsChange)} {stats.noShowsChange}
         </div>
       </article>
     </div>
@@ -539,83 +574,61 @@ function StatsOverview({ stats }: { stats: any }) {
 }
 
 // ── Appointment Item ───────────────────────────────────────────
-function AppointmentCard({ appt }: { appt: Appointment }) {
+// `compact` renders the slimmer "upcoming turnos" row (side panel on Inicio); the default
+// (non-compact) rendering keeps the fuller boxed row used by the "Diario" calendar tab.
+function AppointmentCard({ appt, compact }: { appt: Appointment; compact?: boolean }) {
   const statusMap = {
     confirmed: { label: 'Confirmado', cls: 'badge--success' },
     pending: { label: 'Pago pendiente', cls: 'badge--warning' },
     completed: { label: 'Completado', cls: 'badge--neutral' },
   }
   const st = statusMap[appt.status] || { label: appt.status, cls: 'badge--neutral' }
+  // No explicit modality field on the appointment — a Meet link is only ever generated for
+  // online consultations (see TurnoService#crearEventoReunion), so its presence is a reliable,
+  // real signal for the online/presencial tag rather than fabricated data.
+  const isOnline = !!appt.meetLink
 
   return (
-    <li className="card" style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: 'var(--space-4)',
-      marginBottom: 'var(--space-3)',
-      borderLeft: appt.status === 'confirmed' 
-        ? '4px solid var(--color-primary)' 
-        : appt.status === 'completed' 
-          ? '4px solid var(--color-text-secondary)' 
-          : '4px solid var(--color-warning)',
-      backgroundColor: 'var(--color-surface)',
-      borderTop: '1px solid var(--color-border)',
-      borderRight: '1px solid var(--color-border)',
-      borderBottom: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-lg)'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'var(--neutral-50)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-md)',
-          padding: 'var(--space-2) var(--space-3)',
-          minWidth: '70px'
-        }}>
-          <span style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--color-primary)' }}>{appt.hour}:00</span>
-          <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>{appt.ampm || 'hs'}</span>
-        </div>
-
-        <div>
-          <h4 style={{ margin: 0, fontSize: 'var(--text-base)', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-            {appt.patientName}
-          </h4>
-          <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              🩺 {appt.type}
-            </span>
-            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>·</span>
-            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>⏱️ 50 min</span>
-            <span className={`badge ${st.cls}`} style={{ fontSize: '9px', padding: '1px 6px', marginLeft: '4px' }}>
-              {st.label}
-            </span>
-          </div>
+    <li className={`appointment-item ${compact ? 'appointment-item--compact' : ''}`}>
+      <div className="appointment-item__time">
+        <div className="appointment-item__hour">{appt.hour}</div>
+        <div className="appointment-item__ampm">{appt.ampm || 'hs'}</div>
+      </div>
+      <div className="appointment-item__divider" />
+      <div className="appointment-item__info">
+        <div className="appointment-item__name">{appt.patientName}</div>
+        <div className="appointment-item__meta">
+          {appt.type}
+          {!compact && (
+            <>
+              {' · '}<span className={`badge ${st.cls}`} style={{ fontSize: '9px', padding: '1px 6px' }}>{st.label}</span>
+            </>
+          )}
         </div>
       </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-        {appt.meetLink && appt.status === 'confirmed' && (
-          <a
-            href={appt.meetLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn--primary btn--sm"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}
-          >
-            <Icon.Video /> Unirse
-          </a>
-        )}
-        {appt.status === 'pending' && (
-          <span style={{ fontSize: '11px', color: 'var(--color-warning)', fontWeight: 'bold' }}>
-            Esperando pago
-          </span>
-        )}
-      </div>
+      <span className={`appointment-item__tag appointment-item__tag--${isOnline ? 'online' : 'presencial'}`}>
+        {isOnline ? 'Online' : 'Presencial'}
+      </span>
+      {!compact && (
+        <div className="appointment-item__actions">
+          {appt.meetLink && appt.status === 'confirmed' && (
+            <a
+              href={appt.meetLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn--primary btn--sm"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}
+            >
+              <Icon.Video /> Unirse
+            </a>
+          )}
+          {appt.status === 'pending' && (
+            <span style={{ fontSize: '11px', color: 'var(--color-warning)', fontWeight: 'bold' }}>
+              Esperando pago
+            </span>
+          )}
+        </div>
+      )}
     </li>
   )
 }
@@ -629,26 +642,21 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
     { name: 'Jueves', abbr: 'Jue', num: 4 },
     { name: 'Viernes', abbr: 'Vie', num: 5 },
   ]
-  const baseSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00']
+  // Per-day list of arbitrary { start, end } time ranges (HH:mm), populated directly from
+  // the médico's saved availability — no more whole-hour bucketing. Supports split shifts
+  // (multiple ranges the same day, e.g. 09:00–13:00 and 15:00–19:00) and arbitrary minute
+  // boundaries via native <input type="time">.
+  const [dayRanges, setDayRanges] = useState<{ [key: number]: { start: string; end: string }[] }>(() => {
+    const state: { [key: number]: { start: string; end: string }[] } = { 1: [], 2: [], 3: [], 4: [], 5: [] }
 
-  // Internal state of active slots per day
-  const [activeSlots, setActiveSlots] = useState<{ [key: number]: { [key: string]: boolean } }>(() => {
-    const state: { [key: number]: { [key: string]: boolean } } = { 1: {}, 2: {}, 3: {}, 4: {}, 5: {} }
-
-    // Populate active slots from API availability
     initialAvailability.forEach((disp) => {
       const dayNum = disp.diaSemana
       if (dayNum >= 1 && dayNum <= 5) {
-        const start = parseInt(disp.horaInicio.split(':')[0])
-        const end = parseInt(disp.horaFin.split(':')[0])
-
-        baseSlots.forEach((slot) => {
-          const hour = parseInt(slot.split(':')[0])
-          if (hour >= start && hour < end) {
-            state[dayNum][slot] = true
-          }
-        })
+        state[dayNum].push({ start: disp.horaInicio, end: disp.horaFin })
       }
+    })
+    Object.keys(state).forEach((k) => {
+      state[Number(k)].sort((a, b) => a.start.localeCompare(b.start))
     })
     return state
   })
@@ -734,76 +742,65 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
 
   const [saving, setSaving] = useState(false)
 
-  const toggleSlot = (dayNum: number, slot: string) => {
-    setActiveSlots(prev => ({
+  // Returns a day's ranges sorted by start time. Used by the read-only preview timeline;
+  // the editable rows below iterate dayRanges[day.num] directly (unsorted) so that each
+  // row's index stays stable while the user is typing.
+  const getDayBlocks = (dayNum: number): { start: string; end: string }[] => {
+    return [...(dayRanges[dayNum] || [])].sort((a, b) => a.start.localeCompare(b.start))
+  }
+
+  const addRange = (dayNum: number) => {
+    setDayRanges(prev => ({
       ...prev,
-      [dayNum]: {
-        ...prev[dayNum],
-        [slot]: !prev[dayNum][slot]
-      }
+      [dayNum]: [...(prev[dayNum] || []), { start: '09:00', end: '10:00' }]
     }))
   }
 
-  // Derives the mockup's "block-chip" ranges from activeSlots: contiguous runs of active
-  // hours on a given day collapse into a single { start, end } range (e.g. 09:00,10:00,11:00
-  // active → one chip "09:00 – 12:00"). Purely a display concern — activeSlots (and the DTO
-  // shape handleSave produces from it) is unchanged.
-  const getDayBlocks = (dayNum: number): { start: string; end: string }[] => {
-    const blocks: { start: string; end: string }[] = []
-    let blockStart: string | null = null
-    baseSlots.forEach((slot, idx) => {
-      const isActive = !!activeSlots[dayNum][slot]
-      if (isActive && blockStart === null) blockStart = slot
-      const nextSlot = baseSlots[idx + 1]
-      const continuesIntoNext = isActive && !!nextSlot && !!activeSlots[dayNum][nextSlot]
-      if (isActive && !continuesIntoNext && blockStart !== null) {
-        const endHour = parseInt(slot.split(':')[0]) + 1
-        blocks.push({ start: blockStart, end: `${String(endHour).padStart(2, '0')}:00` })
-        blockStart = null
-      }
-    })
-    return blocks
+  const updateRange = (dayNum: number, idx: number, field: 'start' | 'end', value: string) => {
+    setDayRanges(prev => ({
+      ...prev,
+      [dayNum]: prev[dayNum].map((r, i) => i === idx ? { ...r, [field]: value } : r)
+    }))
   }
 
-  const removeBlock = (dayNum: number, block: { start: string; end: string }) => {
-    const startHour = parseInt(block.start.split(':')[0])
-    const endHour = parseInt(block.end.split(':')[0])
-    setActiveSlots(prev => {
-      const dayState = { ...prev[dayNum] }
-      for (let h = startHour; h < endHour; h++) {
-        delete dayState[`${String(h).padStart(2, '0')}:00`]
-      }
-      return { ...prev, [dayNum]: dayState }
+  const removeRange = (dayNum: number, idx: number) => {
+    setDayRanges(prev => ({
+      ...prev,
+      [dayNum]: prev[dayNum].filter((_, i) => i !== idx)
+    }))
+  }
+
+  // "Copiar horario a todos los días": overwrites every weekday's range list with a copy of
+  // the given day's ranges — a one-click way to avoid re-entering the same schedule 5 times.
+  const copyRangesToAllDays = (dayNum: number) => {
+    const source = dayRanges[dayNum]
+    if (!source || source.length === 0) return
+    setDayRanges(prev => {
+      const next: { [key: number]: { start: string; end: string }[] } = { ...prev }
+      weekdays.forEach((d) => { next[d.num] = source.map(r => ({ ...r })) })
+      return next
     })
   }
 
-  // Adds a one-hour block at the earliest free hour of the day (merges visually into an
-  // adjacent chip if it's contiguous with one). Keeps the "add" interaction simple while
-  // still building on the same hourly activeSlots model the rest of the page/save flow uses.
-  const addBlock = (dayNum: number) => {
-    const nextFree = baseSlots.find(slot => !activeSlots[dayNum][slot])
-    if (!nextFree) return
-    setActiveSlots(prev => ({ ...prev, [dayNum]: { ...prev[dayNum], [nextFree]: true } }))
-  }
+  const isRangeInvalid = (range: { start: string; end: string }) => !range.start || !range.end || range.end <= range.start
+  const hasInvalidRanges = weekdays.some((day) => (dayRanges[day.num] || []).some(isRangeInvalid))
+
+  // The day whose ranges the "copy to all days" action would use — the first weekday (in
+  // Lun→Vie order) that already has a schedule defined, defaulting to Lunes.
+  const copySourceDay = weekdays.find((d) => (dayRanges[d.num] || []).length > 0) || weekdays[0]
 
   const handleSave = async () => {
+    if (hasInvalidRanges) return
     setSaving(true)
     const dtos: any[] = []
 
     weekdays.forEach((day) => {
-      baseSlots.forEach((slot) => {
-        if (activeSlots[day.num][slot]) {
-          const startHour = parseInt(slot.split(':')[0])
-          const endHour = startHour + 1
-          const startStr = `${String(startHour).padStart(2, '0')}:00`
-          const endStr = `${String(endHour).padStart(2, '0')}:00`
-
-          dtos.push({
-            diaSemana: day.num,
-            horaInicio: startStr,
-            horaFin: endStr
-          })
-        }
+      (dayRanges[day.num] || []).forEach((range) => {
+        dtos.push({
+          diaSemana: day.num,
+          horaInicio: range.start,
+          horaFin: range.end
+        })
       })
     })
 
@@ -825,24 +822,33 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
   // Purely visual: recomputes, on the frontend, an approximation of what
   // AgendaService.calcularBloquesDisponibles will generate on the backend (same
   // duracion+intervalo stepping logic) so the doctor can see the effect of the two
-  // settings before saving. The grid spans 09:00–18:00 to fit baseSlots (09:00–17:00).
-  const GRID_START_HOUR = 9
-  const GRID_END_HOUR = 18
-  const HOUR_PX = 46
-  const pxPerMinute = HOUR_PX / 60
-  const gridHeightPx = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_PX
-  const gridHours = Array.from({ length: GRID_END_HOUR - GRID_START_HOUR + 1 }, (_, i) => GRID_START_HOUR + i)
+  // settings before saving.
   const toMinutes = (t: string) => {
     const [h, m] = t.split(':').map(Number)
     return h * 60 + m
   }
   const toTimeStr = (mins: number) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
 
+  // Grid bounds are computed from the actual ranges the doctor has set (with ~1h padding,
+  // clamped to 0–24h) so the preview isn't locked to the old fixed 9–18 window — the whole
+  // point of moving off whole-hour slots is that doctors can work outside it.
+  const allCompleteRanges = weekdays.flatMap((d) => (dayRanges[d.num] || []).filter((r) => !isRangeInvalid(r)))
+  const GRID_START_HOUR = allCompleteRanges.length
+    ? Math.max(0, Math.floor(Math.min(...allCompleteRanges.map((r) => toMinutes(r.start))) / 60) - 1)
+    : 9
+  const GRID_END_HOUR = allCompleteRanges.length
+    ? Math.min(24, Math.ceil(Math.max(...allCompleteRanges.map((r) => toMinutes(r.end))) / 60) + 1)
+    : 18
+  const HOUR_PX = 46
+  const pxPerMinute = HOUR_PX / 60
+  const gridHeightPx = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_PX
+  const gridHours = Array.from({ length: GRID_END_HOUR - GRID_START_HOUR + 1 }, (_, i) => GRID_START_HOUR + i)
+
   const computePreviewSlots = (dayNum: number): { start: string }[] => {
     const slots: { start: string }[] = []
     const paso = duracionTurno + intervaloTurno
     if (paso <= 0) return slots
-    getDayBlocks(dayNum).forEach((block) => {
+    getDayBlocks(dayNum).filter((block) => !isRangeInvalid(block)).forEach((block) => {
       let cursor = toMinutes(block.start)
       const end = toMinutes(block.end)
       while (cursor + duracionTurno <= end) {
@@ -862,7 +868,7 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
             <div className="agenda-view-panel__title">Disponibilidad semanal</div>
             <p className="agenda-view-panel__subtitle">Definí tus franjas horarias y la duración del turno. Los horarios reservables se calculan solos.</p>
           </div>
-          <button className="agenda-view-btn-primary" onClick={handleSave} disabled={saving} id="btn-save-availability">
+          <button className="agenda-view-btn-primary" onClick={handleSave} disabled={saving || hasInvalidRanges} id="btn-save-availability">
             {saving ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>
@@ -892,28 +898,59 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
           </div>
         </div>
 
+        {copySourceDay && (dayRanges[copySourceDay.num] || []).length > 0 && (
+          <div className="agenda-view-copy-row">
+            <button type="button" className="agenda-view-copy-btn" onClick={() => copyRangesToAllDays(copySourceDay.num)}>
+              Copiar horario de {copySourceDay.name} a todos los días
+            </button>
+          </div>
+        )}
+
         <div className="agenda-view-blocks-list">
           {weekdays.map((day) => {
-            const blocks = getDayBlocks(day.num)
+            const ranges = dayRanges[day.num] || []
             return (
               <div className="agenda-view-day-row" key={day.num}>
                 <div className="agenda-view-day-label">{day.abbr}</div>
                 <div className="agenda-view-day-blocks">
-                  {blocks.length === 0 && <span className="agenda-view-day-off">Sin turnos este día</span>}
-                  {blocks.map((block) => (
-                    <span className="agenda-view-block-chip" key={`${block.start}-${block.end}`}>
-                      {block.start} – {block.end}
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                        onClick={() => removeBlock(day.num, block)} role="button" aria-label={`Quitar horario ${block.start} a ${block.end} de ${day.name}`}>
-                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </span>
-                  ))}
-                  {blocks.length < baseSlots.length && (
-                    <button type="button" className="agenda-view-add-block" onClick={() => addBlock(day.num)}>
-                      <Icon.Plus /> Agregar
-                    </button>
-                  )}
+                  {ranges.length === 0 && <span className="agenda-view-day-off">Sin turnos este día</span>}
+                  {ranges.map((range, idx) => {
+                    const invalid = isRangeInvalid(range)
+                    return (
+                      <div className="agenda-view-range-row" key={idx}>
+                        <div className="agenda-view-range-main">
+                          <div className="agenda-view-range-inputs">
+                            <input
+                              type="time"
+                              step={300}
+                              value={range.start}
+                              onChange={(e) => updateRange(day.num, idx, 'start', e.target.value)}
+                              className={`agenda-view-time-input${invalid ? ' agenda-view-time-input--invalid' : ''}`}
+                              aria-label={`Hora de inicio, horario ${idx + 1} de ${day.name}`}
+                            />
+                            <span className="agenda-view-range-sep">–</span>
+                            <input
+                              type="time"
+                              step={300}
+                              value={range.end}
+                              onChange={(e) => updateRange(day.num, idx, 'end', e.target.value)}
+                              className={`agenda-view-time-input${invalid ? ' agenda-view-time-input--invalid' : ''}`}
+                              aria-label={`Hora de fin, horario ${idx + 1} de ${day.name}`}
+                            />
+                          </div>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                            className="agenda-view-range-remove"
+                            onClick={() => removeRange(day.num, idx)} role="button" aria-label={`Quitar horario ${idx + 1} de ${day.name}`}>
+                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </div>
+                        {invalid && <span className="agenda-view-range-error">La hora de fin debe ser posterior a la de inicio</span>}
+                      </div>
+                    )
+                  })}
+                  <button type="button" className="agenda-view-add-block" onClick={() => addRange(day.num)}>
+                    <Icon.Plus /> Agregar horario
+                  </button>
                 </div>
               </div>
             )
@@ -1466,6 +1503,17 @@ const TRATAMIENTOS_DISPONIBLES = [
 
 const PACIENTES_ATIENDE_OPCIONES = ['Niños', 'Adolescentes', 'Adultos', 'Adultos mayores']
 
+type SettingsTab = 'perfil-pro' | 'perfil-publico' | 'honorarios' | 'notificaciones' | 'integraciones' | 'extendido'
+
+const SETTINGS_TABS: { id: SettingsTab; label: string; Icon: (props: { size?: number }) => React.JSX.Element }[] = [
+  { id: 'perfil-pro', label: 'Perfil profesional', Icon: Icon.User },
+  { id: 'perfil-publico', label: 'Perfil público', Icon: Icon.Globe },
+  { id: 'honorarios', label: 'Honorarios y servicios', Icon: Icon.DollarSign },
+  { id: 'notificaciones', label: 'Notificaciones', Icon: Icon.BellSimple },
+  { id: 'integraciones', label: 'Integraciones', Icon: Icon.Plug },
+  { id: 'extendido', label: 'Presencia y contenido', Icon: Icon.Star },
+]
+
 function getMissingRequirements(m: any): string[] {
   const missing: string[] = []
   if (!m) return ["Cargando información del perfil..."]
@@ -1477,7 +1525,6 @@ function getMissingRequirements(m: any): string[] {
   if (!m.cuil) missing.push("CUIL profesional")
   if (!m.tipoDocumento || !m.numeroDocumento) missing.push("Tipo y número de documento")
   if (!m.domicilioAtencion || !m.domicilioAtencion.trim()) missing.push("Dirección física del consultorio")
-  if (!m.codigoReFeps) missing.push("Código de registro nacional ReFePS")
   if (!m.matriculaInfo?.tipo || !m.matriculaInfo?.provincia || !m.matriculaInfo?.numero) {
     missing.push("Datos completos de matrícula (tipo, provincia y número)")
   }
@@ -1569,6 +1616,7 @@ function SettingsView({
   }
 
   const [saving, setSaving] = useState(false)
+  const [activeTab, setActiveTab] = useState<SettingsTab>('perfil-pro')
 
   const handleSave = async () => {
     setSaving(true)
@@ -1622,29 +1670,37 @@ function SettingsView({
     }
   }
 
+  const perfilProComplete = Boolean(name && apellido && sexo && fechaNacimiento && cuil && tipoDocumento && numeroDocumento && degree && matTipo && matProvincia && specialty && matricula)
+  const perfilPublicoComplete = Boolean(descripcionPerfil && selectedTags.length > 0 && pacientesAtiende.length > 0 && institucionFormacion && aniosExperiencia !== '')
+  const honorariosComplete = tariffs.some((t: any) => t.enabled)
+  const integracionesPendientes = (mpConnected ? 0 : 1) + (googleConnected ? 0 : 1)
+
+  const tabStatus: Record<SettingsTab, { label: string; tone: 'ok' | 'warn' }> = {
+    'perfil-pro': perfilProComplete ? { label: 'Completo', tone: 'ok' } : { label: 'Incompleto', tone: 'warn' },
+    'perfil-publico': perfilPublicoComplete ? { label: 'Completo', tone: 'ok' } : { label: 'Incompleto', tone: 'warn' },
+    'honorarios': honorariosComplete ? { label: 'Completo', tone: 'ok' } : { label: 'Sin configurar', tone: 'warn' },
+    'notificaciones': { label: 'Activas', tone: 'ok' },
+    'integraciones': integracionesPendientes === 0
+      ? { label: 'Completo', tone: 'ok' }
+      : { label: `${integracionesPendientes} pendiente${integracionesPendientes > 1 ? 's' : ''}`, tone: 'warn' },
+    'extendido': { label: 'Sin completar', tone: 'warn' },
+  }
+
+  const notImplementedYet = () => showAlert('Esta función va a estar disponible próximamente.', 'info')
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+      <p className="settings-intro">Gestioná tu perfil profesional, honorarios e integraciones.</p>
+
       {/* Verification status banner */}
       {medicoInfo?.verificado ? (
-        <div style={{
-          backgroundColor: 'var(--green-50)',
-          border: '1px solid var(--green-200)',
-          borderLeft: '5px solid var(--color-success)',
-          borderRadius: 'var(--radius-md)',
-          padding: 'var(--space-4) var(--space-5)',
-          color: 'var(--neutral-800)',
-          fontSize: 'var(--text-sm)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 'var(--space-3)',
-          boxShadow: 'var(--shadow-sm)'
-        }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px', color: 'var(--color-success)', flexShrink: 0 }}>
+        <div className="settings-verified-strip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
             <polyline points="22 4 12 14.01 9 11.01" />
           </svg>
-          <span style={{ lineHeight: 'var(--line-height-normal)' }}>
-            <strong style={{ color: 'var(--green-700)' }}>Cuenta Verificada:</strong> Tu perfil profesional cumple con todos los requisitos y es visible públicamente para reserva de turnos.
+          <span>
+            <strong style={{ color: 'var(--green-900)' }}>Cuenta verificada:</strong> tu perfil profesional cumple con todos los requisitos y es visible públicamente para reserva de turnos.
           </span>
         </div>
       ) : (
@@ -1717,10 +1773,37 @@ function SettingsView({
         </div>
       )}
 
-      {/* Profile */}
+      <div className="settings-layout">
+        {/* Sub-navigation within the settings content area (not the app's global sidebar) */}
+        <nav className="settings-submenu" aria-label="Secciones de configuración">
+          {SETTINGS_TABS.map(({ id, label, Icon: TabIcon }) => {
+            const status = tabStatus[id]
+            return (
+              <button
+                key={id}
+                type="button"
+                className={`settings-submenu-item ${activeTab === id ? 'active' : ''}`}
+                onClick={() => setActiveTab(id)}
+                aria-current={activeTab === id ? 'true' : undefined}
+              >
+                <span className="settings-submenu-icon"><TabIcon /></span>
+                <span className="settings-submenu-text">
+                  <span className="settings-submenu-label">{label}</span>
+                  <span className={`settings-submenu-status settings-submenu-status--${status.tone}`}>{status.label}</span>
+                </span>
+              </button>
+            )
+          })}
+        </nav>
+
+        <div className="settings-content">
+      {activeTab === 'perfil-pro' && (
       <div className="card">
         <div className="card__header">
-          <h2 className="card__title">Perfil profesional</h2>
+          <div>
+            <h2 className="card__title">Perfil profesional</h2>
+            <p className="card__subtitle">Tu foto es lo primero que ve un paciente al buscar turno — usá una imagen real y de buena calidad.</p>
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
           {/* Profile Photo Uploader */}
@@ -1787,9 +1870,7 @@ function SettingsView({
             </div>
           </div>
 
-          <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', marginTop: 'var(--space-2)' }}>
-            Datos Demográficos Básicos
-          </div>
+          <div className="settings-section-label">Datos demográficos básicos</div>
 
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-name">Nombre</label>
@@ -1864,21 +1945,11 @@ function SettingsView({
               provinciasList={PROVINCIAS_ARGENTINA}
             />
           )}
+
+          <div className="settings-section-label">Título y matrícula</div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-degree">Título profesional</label>
             <input id="input-degree" className="form-input" type="text" value={degree} onChange={(e) => setDegree(e.target.value)} />
-          </div>
-
-          <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', marginTop: 'var(--space-2)' }}>
-            Registro Nacional (ReFeps)
-          </div>
-          <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-refeps">Código ReFeps</label>
-            <input id="input-refeps" className="form-input" type="number" placeholder="Ej. 123456789012" value={codigoReFeps} onChange={(e) => setCodigoReFeps(e.target.value)} />
-          </div>
-
-          <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', marginTop: 'var(--space-2)' }}>
-            Matrícula
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-mat-tipo">Tipo de Matrícula</label>
@@ -1935,8 +2006,10 @@ function SettingsView({
           </button>
         </div>
       </div>
+      )}
 
       {/* Public profile — shown to patients on the booking page, required to get verified */}
+      {activeTab === 'perfil-publico' && (
       <div className="card">
         <div className="card__header">
           <div>
@@ -2022,8 +2095,10 @@ function SettingsView({
           </button>
         </div>
       </div>
+      )}
 
       {/* Tariffs */}
+      {activeTab === 'honorarios' && (
       <div className="card">
         <div className="card__header">
           <div>
@@ -2031,55 +2106,43 @@ function SettingsView({
             <p className="card__subtitle">Configurá los precios de cada tipo de consulta. Solo los servicios habilitados se muestran al paciente.</p>
           </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-          {/* Table header */}
-          <div style={{
-            display: 'grid', gridTemplateColumns: '44px 1fr 140px',
-            gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)',
-            fontSize: 'var(--text-xs)', fontWeight: 'var(--font-weight-semi)',
-            color: 'var(--color-text-secondary)', textTransform: 'uppercase' as const,
-            letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)',
-          }}>
-            <span></span>
-            <span>Servicio</span>
-            <span>Valor (ARS)</span>
-          </div>
-          {tariffs.map((t) => (
-            <div
-              key={t.id}
-              style={{
-                display: 'grid', gridTemplateColumns: '44px 1fr 140px',
-                gap: 'var(--space-3)', padding: 'var(--space-3)',
-                alignItems: 'center', borderBottom: '1px solid var(--color-border)',
-                opacity: t.enabled ? 1 : 0.5,
-                transition: 'opacity 150ms',
-              }}
-            >
-              <label className="toggle" style={{ transform: 'scale(0.8)' }}>
-                <input
-                  type="checkbox"
-                  checked={t.enabled}
-                  onChange={(e) => updateTariff(t.id, 'enabled', e.target.checked)}
-                />
-                <span className="toggle__track" />
-              </label>
-              <span style={{
-                fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)',
-                fontWeight: t.enabled ? 'var(--font-weight-medium)' : 'var(--font-weight-regular)',
-              }}>
-                {t.label}
-              </span>
-              <input
-                className="form-input"
-                type="number"
-                value={t.price}
-                onChange={(e) => updateTariff(t.id, 'price', Number(e.target.value))}
-                disabled={!t.enabled}
-                style={{ padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--text-sm)' }}
-              />
-            </div>
-          ))}
-        </div>
+        <table className="settings-fees-table">
+          <thead>
+            <tr>
+              <th style={{ width: '44px' }}></th>
+              <th>Servicio</th>
+              <th>Valor (ARS)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tariffs.map((t) => (
+              <tr key={t.id} style={{ opacity: t.enabled ? 1 : 0.5, transition: 'opacity 150ms' }}>
+                <td>
+                  <label className="toggle" style={{ transform: 'scale(0.8)' }}>
+                    <input
+                      type="checkbox"
+                      checked={t.enabled}
+                      onChange={(e) => updateTariff(t.id, 'enabled', e.target.checked)}
+                    />
+                    <span className="toggle__track" />
+                  </label>
+                </td>
+                <td>
+                  <span className="settings-fee-name">{t.label}</span>
+                </td>
+                <td className="settings-fee-val">
+                  <input
+                    className="form-input"
+                    type="number"
+                    value={t.price}
+                    onChange={(e) => updateTariff(t.id, 'price', Number(e.target.value))}
+                    disabled={!t.enabled}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
         <div style={{ marginTop: 'var(--space-5)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           <button className="btn btn--primary" onClick={handleSave} disabled={saving} id="btn-save-tariffs">
             {saving ? 'Guardando...' : 'Guardar honorarios'}
@@ -2089,8 +2152,10 @@ function SettingsView({
           </span>
         </div>
       </div>
+      )}
 
       {/* Notifications */}
+      {activeTab === 'notificaciones' && (
       <div className="card">
         <div className="card__header">
           <h2 className="card__title">Notificaciones</h2>
@@ -2114,8 +2179,11 @@ function SettingsView({
           ))}
         </div>
       </div>
+      )}
 
-      {/* Mercado Pago Integration */}
+      {/* Integrations */}
+      {activeTab === 'integraciones' && (
+      <>
       <div className="card">
         <div className="card__header">
           <h2 className="card__title">Integración con Mercado Pago</h2>
@@ -2124,7 +2192,6 @@ function SettingsView({
         <MPConnectBanner connected={mpConnected} onConnect={onConnect} onDisconnect={onDisconnect} />
       </div>
 
-      {/* Google Calendar Integration */}
       <div className="card">
         <div className="card__header">
           <h2 className="card__title">Integración con Google Calendar</h2>
@@ -2132,7 +2199,84 @@ function SettingsView({
         </div>
         <GoogleCalendarConnectBanner connected={googleConnected} onConnect={onConnectGoogle} onDisconnect={onDisconnectGoogle} />
       </div>
+      </>
+      )}
 
+      {/* Presencia y contenido — extended public profile. Not backed by any persisted
+          data/API today; these are honest empty-state placeholders (see report). */}
+      {activeTab === 'extendido' && (
+      <div className="card">
+        <div className="card__header">
+          <div>
+            <h2 className="card__title">Presencia y contenido</h2>
+            <p className="card__subtitle">Sumá fotos, tu experiencia y redes para que los pacientes te conozcan mejor antes de reservar.</p>
+          </div>
+        </div>
+
+        <div className="settings-ext-row">
+          <div className="settings-ext-desc">
+            <h3>Fotos y video</h3>
+            <p>Mostrá tu consultorio y presentate en video para generar más confianza antes de la primera consulta.</p>
+          </div>
+          <div className="settings-ext-card">
+            <div className="settings-ext-card-title">
+              <span className="settings-ext-card-title-text">Fotos y video de presentación</span>
+              <button className="btn btn--secondary btn--sm" onClick={notImplementedYet}>Editar</button>
+            </div>
+            <div className="settings-media-grid">
+              <div className="settings-media-box">
+                <div className="settings-media-box-label">Fotos del consultorio</div>
+                <div className="settings-media-box-val">Sin cargar</div>
+              </div>
+              <div className="settings-media-box">
+                <div className="settings-media-box-label">Video de presentación</div>
+                <div className="settings-media-box-val">Sin cargar</div>
+              </div>
+            </div>
+            <div className="settings-tip-box">
+              <div className="settings-tip-box-title">Consejo</div>
+              <p>Los perfiles con fotos reales del consultorio suelen recibir más reservas.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-ext-row">
+          <div className="settings-ext-desc">
+            <h3>Tu experiencia</h3>
+            <p>Contá tu trayectoria, publicaciones o certificaciones destacadas para que los pacientes conozcan tu recorrido.</p>
+          </div>
+          <div className="settings-ext-card">
+            <div className="settings-ext-card-title">
+              <span className="settings-ext-card-title-text">Trayectoria y certificaciones</span>
+              <button className="btn btn--secondary btn--sm" onClick={notImplementedYet}>Editar</button>
+            </div>
+            <div className="settings-ext-field">
+              <div className="settings-ext-field-label">Estado</div>
+              <div className="settings-ext-field-val">Sin completar</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-ext-row">
+          <div className="settings-ext-desc">
+            <h3>Redes sociales</h3>
+            <p>Vinculá tus redes para que los pacientes puedan conocer más sobre tu trabajo.</p>
+          </div>
+          <div className="settings-ext-card">
+            <div className="settings-ext-card-title">
+              <span className="settings-ext-card-title-text">Instagram, LinkedIn y sitio web</span>
+              <button className="btn btn--secondary btn--sm" onClick={notImplementedYet}>Editar</button>
+            </div>
+            <div className="settings-ext-field">
+              <div className="settings-ext-field-label">Estado</div>
+              <div className="settings-ext-field-val">Sin completar</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -2150,7 +2294,9 @@ function DashboardHome({
   stats,
   onCancelAppointment,
   onUpdateAttendance,
-  onRescheduleAppointment
+  onRescheduleAppointment,
+  medicoInfo,
+  onNavigate
 }: {
   mpConnected: boolean;
   onConnect: () => void;
@@ -2165,10 +2311,14 @@ function DashboardHome({
   onCancelAppointment: (id: number) => void;
   onUpdateAttendance: (id: number, status: string) => void;
   onRescheduleAppointment: (id: number, date: string, hour: string) => void;
+  medicoInfo?: any;
+  onNavigate?: (section: NavSection) => void;
 }) {
   const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
   const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
-  
+  const fullDateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const capitalizedFullDate = fullDateStr.charAt(0).toUpperCase() + fullDateStr.slice(1);
+
   const [calendarView, setCalendarView] = useState<'monthly' | 'weekly' | 'today'>('monthly');
   const [showInactiveSlots, setShowInactiveSlots] = useState(false);
   const [selectedAppt, setSelectedAppt] = useState<any | null>(null);
@@ -2215,6 +2365,16 @@ function DashboardHome({
       }
       return a.fecha > todayStr;
     }) || upcoming[0];
+  }, [allAppointments, currentTime]);
+
+  // Real "today" (independent of calendar navigation) — used for the "Próximos turnos" side panel
+  const todaysAppointments = useMemo(() => {
+    const now = currentTime;
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    if (!allAppointments) return [];
+    return allAppointments
+      .filter(a => a.fecha === todayStr && a.status !== 'cancelled')
+      .sort((a, b) => a.hour.localeCompare(b.hour));
   }, [allAppointments, currentTime]);
 
   const formatDate = (dateStr: string) => {
@@ -2387,6 +2547,31 @@ function DashboardHome({
 
   return (
     <>
+      <div className="dashboard-home-greeting">
+        <div>
+          <h1>Hola, {medicoInfo?.name ? medicoInfo.name : 'Doctor/a'} 👋</h1>
+          <p>Este es el resumen de tu consultorio hoy</p>
+        </div>
+        <div className="dashboard-home-date-pill">{capitalizedFullDate}</div>
+      </div>
+
+      {(mpConnected || googleConnected) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+          {mpConnected && (
+            <div className="dashboard-home-status-strip">
+              <span className="dashboard-home-status-dot" />
+              Mercado Pago conectado — tus próximos cobros se liquidan automáticamente cada semana.
+            </div>
+          )}
+          {googleConnected && (
+            <div className="dashboard-home-status-strip">
+              <span className="dashboard-home-status-dot" />
+              Google Calendar conectado — tus videollamadas generan un Meet real automáticamente.
+            </div>
+          )}
+        </div>
+      )}
+
       {(!mpConnected || !googleConnected) && (
         <div style={{
           display: 'grid',
@@ -2485,24 +2670,25 @@ function DashboardHome({
 
       <StatsOverview stats={stats} />
 
-      <div className="card" style={{ width: '100%', maxWidth: 'none' }}>
+      <div className="dashboard-home-maingrid">
+      <div className="card dashboard-home-cal-panel">
         <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
           <div>
             <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
               <span>
                 {calendarView === 'monthly' ? 'Calendario Mensual' : calendarView === 'weekly' ? 'Calendario Semanal' : 'Sesiones del Día'}
               </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontWeight: 'normal' }}>
-                <button className="btn btn--icon btn--ghost" onClick={handlePrevPeriod} style={{ padding: '2px', height: '24px', width: '24px' }}>←</button>
-                <span style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>{getPeriodLabel()}</span>
-                <button className="btn btn--icon btn--ghost" onClick={handleNextPeriod} style={{ padding: '2px', height: '24px', width: '24px' }}>→</button>
+              <div className="dashboard-home-month-nav">
+                <button onClick={handlePrevPeriod} aria-label="Período anterior">‹</button>
+                <span>{getPeriodLabel()}</span>
+                <button onClick={handleNextPeriod} aria-label="Período siguiente">›</button>
               </div>
             </h2>
             <p className="card__subtitle">
-              {calendarView === 'monthly' 
+              {calendarView === 'monthly'
                 ? 'Vista de distribución de turnos mensual'
                 : calendarView === 'weekly'
-                  ? 'Cronograma de turnos por día y horario' 
+                  ? 'Cronograma de turnos por día y horario'
                   : `${capitalizedDate} · ${dayAppointments.length} sesiones programadas`
               }
             </p>
@@ -2510,12 +2696,12 @@ function DashboardHome({
 
           <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
             {calendarView === 'weekly' && (
-              <button 
-                onClick={() => setShowInactiveSlots(!showInactiveSlots)} 
+              <button
+                onClick={() => setShowInactiveSlots(!showInactiveSlots)}
                 className="btn btn--secondary btn--sm"
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: 'var(--space-2)',
                   borderColor: showInactiveSlots ? 'var(--color-primary)' : 'var(--color-border)',
                   backgroundColor: showInactiveSlots ? 'var(--green-50)' : 'transparent',
@@ -2526,42 +2712,25 @@ function DashboardHome({
                 {showInactiveSlots ? 'Ocultar no laborables' : 'Ver inactivos'}
               </button>
             )}
-            <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-              <button 
-                onClick={() => setCalendarView('monthly')} 
-                className={`btn btn--sm`} 
-                style={{ 
-                  borderRadius: 0, 
-                  backgroundColor: calendarView === 'monthly' ? 'var(--color-primary)' : 'transparent',
-                  color: calendarView === 'monthly' ? 'white' : 'var(--color-text-primary)'
-                }}
+            <div className="dashboard-home-seg">
+              <span
+                onClick={() => setCalendarView('monthly')}
+                className={calendarView === 'monthly' ? 'active' : ''}
               >
                 Mensual
-              </button>
-              <button 
-                onClick={() => setCalendarView('weekly')} 
-                className={`btn btn--sm`} 
-                style={{ 
-                  borderRadius: 0, 
-                  backgroundColor: calendarView === 'weekly' ? 'var(--color-primary)' : 'transparent',
-                  color: calendarView === 'weekly' ? 'white' : 'var(--color-text-primary)',
-                  borderLeft: '1px solid var(--color-border)',
-                  borderRight: '1px solid var(--color-border)'
-                }}
+              </span>
+              <span
+                onClick={() => setCalendarView('weekly')}
+                className={calendarView === 'weekly' ? 'active' : ''}
               >
                 Semanal
-              </button>
-              <button 
-                onClick={() => setCalendarView('today')} 
-                className={`btn btn--sm`}
-                style={{ 
-                  borderRadius: 0, 
-                  backgroundColor: calendarView === 'today' ? 'var(--color-primary)' : 'transparent',
-                  color: calendarView === 'today' ? 'white' : 'var(--color-text-primary)'
-                }}
+              </span>
+              <span
+                onClick={() => setCalendarView('today')}
+                className={calendarView === 'today' ? 'active' : ''}
               >
                 Diario
-              </button>
+              </span>
             </div>
           </div>
         </div>
@@ -2631,7 +2800,7 @@ function DashboardHome({
                     justifyContent: 'center',
                     backgroundColor: 'var(--neutral-50)',
                     borderRight: '1px solid var(--color-border)',
-                    borderBottom: '1px solid #f0f2f5',
+                    borderBottom: '1px solid var(--color-border)',
                     fontSize: '11px',
                     fontWeight: 'bold',
                     color: 'var(--color-text-secondary)'
@@ -2653,14 +2822,14 @@ function DashboardHome({
                     return (
                       <div key={day.num} style={{
                         padding: 'var(--space-2)',
-                        borderRight: day.num < 5 ? '1px solid #f0f2f5' : 'none',
-                        borderBottom: '1px solid #f0f2f5',
+                        borderRight: day.num < 5 ? '1px solid var(--color-border)' : 'none',
+                        borderBottom: '1px solid var(--color-border)',
                         minHeight: '80px',
-                        backgroundColor: !isCellVisible 
-                          ? '#fafafa' 
-                          : appt 
-                            ? '#ffffff'
-                            : '#f6fbf8', // Light green for active empty slots
+                        backgroundColor: !isCellVisible
+                          ? 'var(--neutral-50)'
+                          : appt
+                            ? 'var(--color-surface)'
+                            : 'var(--green-50)', // Light green for active empty slots
                         display: 'flex',
                         flexDirection: 'column',
                         justifyContent: 'center'
@@ -2671,7 +2840,7 @@ function DashboardHome({
                             style={{
                               padding: 'var(--space-3)',
                               borderRadius: 'var(--radius-lg)',
-                              backgroundColor: '#ffffff',
+                              backgroundColor: 'var(--color-surface)',
                               border: '1px solid var(--color-border)',
                               borderLeft: appt.status === 'confirmed' 
                                 ? '4px solid var(--color-primary)' 
@@ -2732,7 +2901,7 @@ function DashboardHome({
                           <div style={{
                             textAlign: 'center',
                             fontSize: '10px',
-                            color: '#94a3b8',
+                            color: 'var(--neutral-400)',
                             fontStyle: 'italic'
                           }}>
                             —
@@ -2747,92 +2916,99 @@ function DashboardHome({
           </div>
         ) : (
           /* Monthly Calendar Grid */
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            gap: '1px',
-            backgroundColor: 'var(--color-border)',
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            marginTop: 'var(--space-4)'
-          }}>
-            {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((dName) => (
-              <div key={dName} style={{
-                backgroundColor: 'var(--green-50)',
-                color: 'var(--color-primary)',
-                padding: 'var(--space-2)',
-                textAlign: 'center',
-                fontWeight: 'bold',
-                fontSize: '11px',
-                textTransform: 'uppercase'
-              }}>
-                {dName}
-              </div>
-            ))}
-            {monthDays.map((d, index) => {
-              const isCurrentMonth = d.getMonth() === currentDate.getMonth();
-              const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-              const dayAppts = allAppointments.filter(a => a.fecha === dateStr && a.status !== 'cancelled');
+          <table className="dashboard-home-cal">
+            <thead>
+              <tr>
+                {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((dName) => (
+                  <th key={dName}>{dName}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 5 }).map((_, weekIdx) => (
+                <tr key={weekIdx}>
+                  {monthDays.slice(weekIdx * 7, weekIdx * 7 + 7).map((d, index) => {
+                    const isCurrentMonth = d.getMonth() === currentDate.getMonth();
+                    const isToday = d.toDateString() === new Date().toDateString();
+                    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    const dayAppts = allAppointments.filter(a => a.fecha === dateStr && a.status !== 'cancelled');
 
-              return (
-                <div key={index} style={{
-                  backgroundColor: '#ffffff',
-                  minHeight: '90px',
-                  padding: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  opacity: isCurrentMonth ? 1 : 0.4,
-                  borderBottom: '1px solid #f0f2f5',
-                  borderRight: '1px solid #f0f2f5'
-                }}>
-                  <div style={{
-                    fontWeight: 'bold',
-                    fontSize: '11px',
-                    color: d.toDateString() === new Date().toDateString() ? 'var(--color-primary)' : 'var(--color-text-primary)',
-                    alignSelf: 'flex-start',
-                    backgroundColor: d.toDateString() === new Date().toDateString() ? 'var(--green-100)' : 'transparent',
-                    borderRadius: '50%',
-                    width: '20px',
-                    height: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    {d.getDate()}
-                  </div>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
-                    {dayAppts.slice(0, 2).map((a) => (
-                      <div 
-                        key={a.id} 
-                        onClick={() => setSelectedAppt(a)}
-                        style={{
-                          fontSize: '9px',
-                          padding: '2px 4px',
-                          borderRadius: 'var(--radius-sm)',
-                          backgroundColor: a.status === 'confirmed' ? 'var(--green-50)' : '#fffbeb',
-                          color: a.status === 'confirmed' ? 'var(--color-primary)' : '#b45309',
-                          borderLeft: a.status === 'confirmed' ? '2px solid var(--color-primary)' : '2px solid #f59e0b',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {a.hour} {a.patientName}
-                      </div>
-                    ))}
-                    {dayAppts.length > 2 && (
-                      <div style={{ fontSize: '9px', color: 'var(--color-text-secondary)', paddingLeft: '4px', fontWeight: 'bold' }}>
-                        +{dayAppts.length - 2} más
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                    return (
+                      <td key={index}>
+                        <span className={`dashboard-home-daynum ${isToday ? 'dashboard-home-daynum--today' : isCurrentMonth ? '' : 'dashboard-home-daynum--muted'}`}>
+                          {d.getDate()}
+                        </span>
+                        {dayAppts.length > 0 && (
+                          <div className="dashboard-home-day-appts">
+                            {dayAppts.slice(0, 2).map((a) => (
+                              <div
+                                key={a.id}
+                                onClick={() => setSelectedAppt(a)}
+                                className={`dashboard-home-day-appt ${a.status === 'confirmed' ? 'dashboard-home-day-appt--confirmed' : 'dashboard-home-day-appt--pending'}`}
+                              >
+                                {a.hour} {a.patientName}
+                              </div>
+                            ))}
+                            {dayAppts.length > 2 && (
+                              <div className="dashboard-home-day-more">+{dayAppts.length - 2} más</div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
+      </div>
+
+      <div className="dashboard-home-side-stack">
+        <div className="card">
+          <div className="card__header">
+            <div>
+              <h2 className="card__title">Próximos turnos</h2>
+              <p className="card__subtitle">Hoy, {capitalizedDate.replace(/^\w+ /, '')}</p>
+            </div>
+          </div>
+          {todaysAppointments.length === 0 ? (
+            <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: 'var(--space-4) 0' }}>
+              No tenés más sesiones programadas para hoy.
+            </p>
+          ) : (
+            <ul className="appointment-list appointment-list--compact" role="list" aria-label="Próximos turnos de hoy">
+              {todaysAppointments.map((appt) => (
+                <AppointmentCard key={appt.id} appt={appt} compact />
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="card">
+          <div className="card__header">
+            <h2 className="card__title">Acciones rápidas</h2>
+          </div>
+          <div className="dashboard-home-quick-actions">
+            <button className="dashboard-home-qa-btn" onClick={() => onNavigate?.('agenda')}>
+              <span className="dashboard-home-qa-icon"><Icon.Calendar /></span>
+              <span className="dashboard-home-qa-label">Nuevo turno</span>
+            </button>
+            <button className="dashboard-home-qa-btn" onClick={() => onNavigate?.('prescriptions')}>
+              <span className="dashboard-home-qa-icon"><Icon.Prescription /></span>
+              <span className="dashboard-home-qa-label">Emitir receta</span>
+            </button>
+            <button className="dashboard-home-qa-btn" onClick={() => onNavigate?.('clinical-history')}>
+              <span className="dashboard-home-qa-icon"><Icon.ClinicalRecord /></span>
+              <span className="dashboard-home-qa-label">Historia clínica</span>
+            </button>
+            <button className="dashboard-home-qa-btn" onClick={() => onNavigate?.('patients')}>
+              <span className="dashboard-home-qa-icon"><Icon.MessageCircle /></span>
+              <span className="dashboard-home-qa-label">Ver mensajes</span>
+            </button>
+          </div>
+        </div>
+      </div>
       </div>
 
       {/* Appointment Detail Popup Modal */}
@@ -3519,6 +3695,8 @@ export default function App() {
             onCancelAppointment={handleCancelAppointment}
             onUpdateAttendance={handleUpdateAttendance}
             onRescheduleAppointment={handleRescheduleAppointment}
+            medicoInfo={medicoInfo}
+            onNavigate={(section) => navigate('/panel/' + section)}
           />
         )
       case 'agenda':
