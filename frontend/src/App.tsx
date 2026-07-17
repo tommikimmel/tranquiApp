@@ -422,7 +422,7 @@ function MPConnectBanner({ connected, onConnect, onDisconnect }: { connected: bo
   return (
     <div className={`mp-connect-banner ${connected ? 'mp-connect-banner--connected' : ''}`} role={connected ? 'status' : 'alert'}>
       <div className="mp-connect-banner__icon">
-        <img src="/logo-mp.png" alt="Mercado Pago" className="mp-connect-banner__logo" />
+        <img src="/logo-mp.svg" alt="Mercado Pago" className="mp-connect-banner__logo" />
       </div>
       <div className="mp-connect-banner__content">
         <span className="mp-connect-banner__status">
@@ -454,9 +454,7 @@ function GoogleCalendarConnectBanner({ connected, onConnect, onDisconnect }: { c
   return (
     <div className={`mp-connect-banner ${connected ? 'mp-connect-banner--connected' : ''}`} role={connected ? 'status' : 'alert'}>
       <div className="mp-connect-banner__icon">
-        <svg viewBox="0 0 24 24" style={{ width: 28, height: 28 }}>
-          <path fill={connected ? '#4285F4' : '#70757a'} d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/>
-        </svg>
+        <img src="/logo-google-calendar.svg" alt="Google Calendar" className="mp-connect-banner__logo" />
       </div>
       <div className="mp-connect-banner__content">
         <span className="mp-connect-banner__status" style={connected ? { background: '#E8F0FE', color: '#1a73e8' } : undefined}>

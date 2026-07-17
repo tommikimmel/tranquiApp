@@ -42,6 +42,16 @@ function IconCalendar({ size = 16 }: { size?: number }) {
   )
 }
 
+function IconClipboard({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1Z" />
+      <rect x="5" y="6" width="14" height="16" rx="2" />
+      <line x1="8" y1="12" x2="16" y2="12" /><line x1="8" y1="16" x2="16" y2="16" />
+    </svg>
+  )
+}
+
 function IconHelp({ size = 16 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
@@ -956,6 +966,28 @@ export default function LandingPage({
               </button>
             ))}
           </div>
+
+          {/* Quick access to the patient's own appointments and clinical history */}
+          {currentUser && currentUser.rol === 'PACIENTE' && (
+            <div style={{ display: 'flex', gap: 'var(--space-3)', margin: '0 auto' }}>
+              <button
+                type="button"
+                className="btn btn--secondary"
+                onClick={() => setShowAppointmentsModal(true)}
+              >
+                <IconCalendar />
+                Mis Turnos
+              </button>
+              <button
+                type="button"
+                className="btn btn--secondary"
+                onClick={() => setShowReportsModal(true)}
+              >
+                <IconClipboard />
+                Mi Historia Clínica
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -1608,10 +1640,10 @@ export default function LandingPage({
               right: '24px',
               width: '60px',
               height: '60px',
-              borderRadius: '50%',
-              backgroundColor: '#25D366',
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: 'var(--color-primary)',
               border: 'none',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+              boxShadow: 'var(--shadow-lg)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1622,11 +1654,11 @@ export default function LandingPage({
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'scale(1.08)';
-              e.currentTarget.style.backgroundColor = '#20ba5a';
+              e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.backgroundColor = '#25D366';
+              e.currentTarget.style.backgroundColor = 'var(--color-primary)';
             }}
             aria-label="Abrir chat con profesionales"
           >
