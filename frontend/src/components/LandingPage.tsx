@@ -52,6 +52,14 @@ function IconClipboard({ size = 16 }: { size?: number }) {
   )
 }
 
+function IconChevronRight({ size = 18 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  )
+}
+
 function IconHelp({ size = 16 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
@@ -969,22 +977,30 @@ export default function LandingPage({
 
           {/* Quick access to the patient's own appointments and clinical history */}
           {currentUser && currentUser.rol === 'PACIENTE' && (
-            <div style={{ display: 'flex', gap: 'var(--space-3)', margin: '0 auto' }}>
+            <div className="quick-access-grid">
               <button
                 type="button"
-                className="btn btn--secondary"
+                className="quick-access-card"
                 onClick={() => setShowAppointmentsModal(true)}
               >
-                <IconCalendar />
-                Mis Turnos
+                <span className="quick-access-card__icon"><IconCalendar size={22} /></span>
+                <span className="quick-access-card__body">
+                  <span className="quick-access-card__title">Mis Turnos</span>
+                  <span className="quick-access-card__subtitle">Ver y gestionar tus sesiones agendadas</span>
+                </span>
+                <span className="quick-access-card__arrow"><IconChevronRight /></span>
               </button>
               <button
                 type="button"
-                className="btn btn--secondary"
+                className="quick-access-card"
                 onClick={() => setShowReportsModal(true)}
               >
-                <IconClipboard />
-                Mi Historia Clínica
+                <span className="quick-access-card__icon"><IconClipboard size={22} /></span>
+                <span className="quick-access-card__body">
+                  <span className="quick-access-card__title">Mi Historia Clínica</span>
+                  <span className="quick-access-card__subtitle">Consultá tus informes y documentos</span>
+                </span>
+                <span className="quick-access-card__arrow"><IconChevronRight /></span>
               </button>
             </div>
           )}
@@ -1633,7 +1649,7 @@ export default function LandingPage({
                 setChatSubView('list');
               }
             }}
-            className="whatsapp-fab"
+            className="chat-fab"
             style={{
               position: 'fixed',
               bottom: '24px',
@@ -1641,58 +1657,61 @@ export default function LandingPage({
               width: '60px',
               height: '60px',
               borderRadius: 'var(--radius-full)',
-              backgroundColor: 'var(--color-primary)',
+              background: 'linear-gradient(180deg, var(--green-400), var(--color-primary))',
               border: 'none',
-              boxShadow: 'var(--shadow-lg)',
+              boxShadow: 'var(--shadow-green)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
               zIndex: 1000,
-              transition: 'transform 0.2s ease, background-color 0.2s ease',
+              transition: 'transform var(--transition-fast), box-shadow var(--transition-fast)',
               color: 'white'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'scale(1.08)';
-              e.currentTarget.style.backgroundColor = 'var(--color-primary-hover)';
+              e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.backgroundColor = 'var(--color-primary)';
+              e.currentTarget.style.boxShadow = 'var(--shadow-green)';
             }}
             aria-label="Abrir chat con profesionales"
           >
-            {/* WhatsApp Icon */}
-            <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 32, height: 32 }}>
-              <path d="M12.012 2c-5.506 0-9.988 4.482-9.988 9.988 0 1.76.459 3.414 1.261 4.86L2 22l5.304-1.392a9.92 9.92 0 0 0 4.708 1.18c5.507 0 9.988-4.482 9.988-9.988C22 6.482 17.519 2 12.012 2zm0 17.15c-1.572 0-3.111-.422-4.46-1.222l-.32-.19-3.32.871.887-3.238-.208-.332A8.106 8.106 0 0 1 3.82 11.99c0-4.483 3.65-8.132 8.192-8.132 4.542 0 8.192 3.65 8.192 8.133 0 4.483-3.65 8.132-8.192 8.132z" />
-              <path d="M15.932 13.918c-.216-.108-1.282-.633-1.48-.705-.198-.072-.342-.108-.487.108-.144.216-.558.704-.683.848-.126.144-.252.162-.468.054a5.9 5.9 0 0 1-1.737-1.071c-.559-.499-.937-1.115-1.047-1.303-.109-.188-.012-.29.078-.396.082-.095.18-.216.27-.324.09-.108.12-.18.18-.306.06-.126.03-.234-.015-.342-.045-.108-.432-1.04-.594-1.429-.158-.383-.33-.33-.487-.33-.126 0-.27 0-.414.018a1.69 1.69 0 0 0-1.127.534c-.382.396-.983.968-.983 2.361 0 1.393 1.013 2.738 1.155 2.928.143.189 1.994 3.045 4.831 4.269.675.291 1.202.465 1.613.596.677.216 1.293.185 1.78.112.544-.081 1.66-.679 1.895-1.336.236-.657.236-1.221.166-1.336-.072-.115-.252-.18-.468-.288z" />
+            {/* Tranqui chat icon: speech bubble with a calm pulse, not a borrowed brand mark */}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 28, height: 28 }}>
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />
+              <circle cx="8.5" cy="11.5" r="1" fill="currentColor" stroke="none" />
+              <circle cx="12" cy="11.5" r="1" fill="currentColor" stroke="none" />
+              <circle cx="15.5" cy="11.5" r="1" fill="currentColor" stroke="none" />
             </svg>
           </button>
 
           {/* Chat Window */}
           {showFloatingChat && (
             <div
-              className="whatsapp-window"
+              className="chat-window"
               style={{
                 position: 'fixed',
                 bottom: '96px',
                 right: '24px',
                 width: '380px',
                 height: '520px',
-                borderRadius: '16px',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-                backgroundColor: '#efeae2', // WhatsApp beige background
+                borderRadius: 'var(--radius-lg)',
+                boxShadow: 'var(--shadow-lg)',
+                backgroundColor: 'var(--color-bg)',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
                 zIndex: 1000,
-                fontFamily: 'var(--font-body)'
+                fontFamily: 'var(--font-body)',
+                border: '1px solid var(--color-border)'
               }}
             >
               {/* Header */}
               <div
                 style={{
-                  backgroundColor: '#008069', // WhatsApp green
+                  background: 'linear-gradient(135deg, var(--green-400), var(--color-primary-hover))',
                   color: 'white',
                   padding: 'var(--space-3) var(--space-4)',
                   display: 'flex',
@@ -1732,8 +1751,8 @@ export default function LandingPage({
                         <div style={{
                           width: '36px',
                           height: '36px',
-                          borderRadius: '50%',
-                          backgroundColor: '#128c7e',
+                          borderRadius: 'var(--radius-full)',
+                          backgroundColor: 'rgba(255,255,255,0.22)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1752,8 +1771,8 @@ export default function LandingPage({
                 ) : (
                   // List view header
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '14px', fontWeight: 'bold' }}>Mis Chats</span>
-                    <span style={{ fontSize: '10px', opacity: 0.85 }}>Tranqui App · WhatsApp Style</span>
+                    <span style={{ fontSize: '14px', fontWeight: 'bold', fontFamily: 'var(--font-heading)' }}>Mis Chats</span>
+                    <span style={{ fontSize: '10px', opacity: 0.85 }}>Conversación segura y cifrada</span>
                   </div>
                 )}
 
@@ -1778,7 +1797,7 @@ export default function LandingPage({
               {/* Body */}
               {chatSubView === 'list' ? (
                 // Chat List View
-                <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#ffffff' }}>
+                <div style={{ flex: 1, overflowY: 'auto', backgroundColor: 'var(--color-surface)' }}>
                   {chatChannels.length === 0 ? (
                     <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--space-8)', fontSize: '12px' }}>
                       No tenés chats activos aún. ¡Iniciá un chat desde el perfil de un profesional!
@@ -1799,11 +1818,11 @@ export default function LandingPage({
                               alignItems: 'center',
                               gap: 'var(--space-3)',
                               padding: 'var(--space-3) var(--space-4)',
-                              borderBottom: '1px solid #f0f2f5',
+                              borderBottom: '1px solid var(--color-border)',
                               cursor: 'pointer',
-                              transition: 'background-color 0.15s ease'
+                              transition: 'background-color var(--transition-fast)'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f6f6'}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--green-50)'}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                           >
                             <div style={{
@@ -1847,14 +1866,14 @@ export default function LandingPage({
                     {chatMessages.length === 0 ? (
                       <div style={{
                         margin: 'auto',
-                        backgroundColor: '#ffeec1',
+                        backgroundColor: 'var(--green-50)',
                         padding: '8px 12px',
-                        borderRadius: '8px',
+                        borderRadius: 'var(--radius-md)',
                         fontSize: '11px',
-                        color: '#6b5315',
+                        color: 'var(--color-primary-hover)',
                         textAlign: 'center',
                         maxWidth: '85%',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                        boxShadow: 'var(--shadow-sm)'
                       }}>
                         Las conversaciones en Tranqui están cifradas. Escribí un mensaje para iniciar la consulta.
                       </div>
@@ -1867,11 +1886,11 @@ export default function LandingPage({
                             style={{
                               alignSelf: isMe ? 'flex-end' : 'flex-start',
                               maxWidth: '75%',
-                              backgroundColor: isMe ? '#d9fdd3' : '#f0f2f5', // WhatsApp bubbles
-                              color: 'black',
-                              padding: '6px 10px',
-                              borderRadius: isMe ? '8px 8px 0 8px' : '8px 8px 8px 0',
-                              boxShadow: '0 1px 1px rgba(0,0,0,0.1)',
+                              background: isMe ? 'linear-gradient(180deg, var(--green-400), var(--color-primary))' : 'var(--neutral-100)',
+                              color: isMe ? 'var(--color-text-on-primary)' : 'var(--color-text-primary)',
+                              padding: '7px 12px',
+                              borderRadius: 'var(--radius-md)',
+                              boxShadow: 'var(--shadow-sm)',
                               fontSize: '12px',
                               lineHeight: '1.4',
                               wordBreak: 'break-word',
@@ -1892,7 +1911,8 @@ export default function LandingPage({
                     onSubmit={handleSendPatientChat}
                     style={{
                       padding: '8px 12px',
-                      backgroundColor: '#f0f2f5',
+                      backgroundColor: 'var(--color-bg)',
+                      borderTop: '1px solid var(--color-border)',
                       display: 'flex',
                       gap: 'var(--space-2)',
                       alignItems: 'center'
@@ -1906,20 +1926,20 @@ export default function LandingPage({
                       style={{
                         flex: 1,
                         padding: '8px 16px',
-                        borderRadius: '20px',
-                        border: 'none',
+                        borderRadius: 'var(--radius-full)',
+                        border: '1px solid var(--color-border)',
                         fontSize: '12px',
                         outline: 'none',
-                        backgroundColor: '#ffffff'
+                        backgroundColor: 'var(--color-surface)'
                       }}
                     />
                     <button
                       type="submit"
                       style={{
-                        backgroundColor: '#008069',
+                        background: 'linear-gradient(180deg, var(--green-400), var(--color-primary))',
                         color: 'white',
                         border: 'none',
-                        borderRadius: '50%',
+                        borderRadius: 'var(--radius-full)',
                         width: '32px',
                         height: '32px',
                         display: 'flex',

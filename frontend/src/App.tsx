@@ -750,16 +750,64 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
   const gridHeightPx = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_PX
   const gridHours = Array.from({ length: GRID_END_HOUR - GRID_START_HOUR + 1 }, (_, i) => GRID_START_HOUR + i)
 
-  const paso = duracionTurno + intervaloTurno
-  const candidateStarts: string[] = []
-  if (paso > 0) {
-    let cursor = GRID_START_HOUR * 60
-    const limit = GRID_END_HOUR * 60
-    while (cursor + duracionTurno <= limit) {
-      candidateStarts.push(toTimeStr(cursor))
-      cursor += paso
+  const computeCandidateStarts = (dur: number, interval: number): string[] => {
+    const starts: string[] = []
+    const step = dur + interval
+    if (step > 0) {
+      let cursor = GRID_START_HOUR * 60
+      const limit = GRID_END_HOUR * 60
+      while (cursor + dur <= limit) {
+        starts.push(toTimeStr(cursor))
+        cursor += step
+      }
     }
+    return starts
   }
+
+  const paso = duracionTurno + intervaloTurno
+  const candidateStarts = computeCandidateStarts(duracionTurno, intervaloTurno)
+
+  // Collapses a day's individually-toggled slots (picked from `candidates`, each `dur` minutes
+  // long) back into contiguous { start, end } ranges — the inverse of slotsFromRanges below.
+  const rangesFromDaySlots = (daySet: Set<string>, candidates: string[], dur: number): { start: string; end: string }[] => {
+    const ranges: { start: string; end: string }[] = []
+    let runStart: string | null = null
+    candidates.forEach((cand, idx) => {
+      const isSelected = daySet.has(cand)
+      if (isSelected && runStart === null) runStart = cand
+      const nextSelected = isSelected && candidates[idx + 1] !== undefined && daySet.has(candidates[idx + 1])
+      if (isSelected && !nextSelected && runStart !== null) {
+        ranges.push({ start: runStart, end: toTimeStr(toMinutes(cand) + dur) })
+        runStart = null
+      }
+    })
+    return ranges
+  }
+
+  // Selects every candidate grid slot that fully fits inside one of the given ranges — used
+  // both to import saved availability and to re-fit existing ranges onto a new grid.
+  const slotsFromRanges = (ranges: { horaInicio?: string; horaFin?: string; start?: string; end?: string }[], candidates: string[], dur: number): Set<string> => {
+    const set = new Set<string>()
+    candidates.forEach((cand) => {
+      const candMin = toMinutes(cand)
+      const fits = ranges.some((r) => {
+        const startMin = toMinutes((r.horaInicio ?? r.start)!)
+        const endMin = toMinutes((r.horaFin ?? r.end)!)
+        return candMin >= startMin && candMin + dur <= endMin
+      })
+      if (fits) set.add(cand)
+    })
+    return set
+  }
+
+  // Tracks the duración/intervalo the grid was last built against, so a later change can diff
+  // against it. Set by the import effect below as soon as real data lands — NOT lazily from
+  // seeing duracionTurno/intervaloTurno "change", because when the médico's saved settings
+  // equal the hook's own default state (45/10, the same values the backend defaults to), the
+  // setDuracionTurno/setIntervaloTurno calls during profile load are no-ops (same value in,
+  // same value out) and React never re-renders for them — so an effect keyed off those values
+  // "changing" would never fire and this would stay uninitialized.
+  const prevGridRef = React.useRef<{ duracion: number; intervalo: number } | null>(null)
 
   // One-time import: once we know the médico's real duración/intervalo, translate their
   // previously saved availability ranges into the equivalent set of selected grid slots.
@@ -769,34 +817,39 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
   useEffect(() => {
     if (!perfilLoaded || importedRef.current) return
     importedRef.current = true
-    const next: { [key: number]: Set<string> } = { 1: new Set(), 2: new Set(), 3: new Set(), 4: new Set(), 5: new Set() }
+    const byDay: { [key: number]: any[] } = { 1: [], 2: [], 3: [], 4: [], 5: [] }
     initialAvailability.forEach((disp: any) => {
       const dayNum = disp.diaSemana
       if (dayNum < 1 || dayNum > 5) return
-      const startMin = toMinutes(disp.horaInicio)
-      const endMin = toMinutes(disp.horaFin)
-      candidateStarts.forEach((cand) => {
-        const candMin = toMinutes(cand)
-        if (candMin >= startMin && candMin + duracionTurno <= endMin) next[dayNum].add(cand)
-      })
+      byDay[dayNum].push(disp)
     })
+    const next: { [key: number]: Set<string> } = { 1: new Set(), 2: new Set(), 3: new Set(), 4: new Set(), 5: new Set() }
+    weekdays.forEach((d) => { next[d.num] = slotsFromRanges(byDay[d.num], candidateStarts, duracionTurno) })
     setSelectedSlots(next)
+    prevGridRef.current = { duracion: duracionTurno, intervalo: intervaloTurno }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perfilLoaded, duracionTurno, intervaloTurno])
 
   // Whenever duración/intervalo change AFTER the initial import (i.e. the médico tweaks the
-  // selects mid-session), the grid's candidate positions shift — drop any previously selected
-  // slot that no longer lines up with the new grid, keep the ones that still do.
+  // selects mid-session), the grid's candidate positions shift. Rather than dropping every
+  // selected slot that no longer lines up (wiping out the whole schedule), we translate the
+  // previously selected slots into { start, end } ranges under the OLD grid, then re-fit those
+  // same ranges onto the NEW grid — the médico's franjas horarias survive the change.
   useEffect(() => {
-    if (!importedRef.current) return
-    const candidateSet = new Set(candidateStarts)
+    if (!importedRef.current || prevGridRef.current === null) return
+    const { duracion: prevDuracion, intervalo: prevIntervalo } = prevGridRef.current
+    if (prevDuracion === duracionTurno && prevIntervalo === intervaloTurno) return
+    const prevCandidates = computeCandidateStarts(prevDuracion, prevIntervalo)
     setSelectedSlots((prev) => {
       const next: { [key: number]: Set<string> } = {}
       weekdays.forEach((d) => {
-        next[d.num] = new Set([...(prev[d.num] || [])].filter((t) => candidateSet.has(t)))
+        const daySet = prev[d.num] || new Set<string>()
+        const ranges = rangesFromDaySlots(daySet, prevCandidates, prevDuracion)
+        next[d.num] = slotsFromRanges(ranges, candidateStarts, duracionTurno)
       })
       return next
     })
+    prevGridRef.current = { duracion: duracionTurno, intervalo: intervaloTurno }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [duracionTurno, intervaloTurno])
 
@@ -812,21 +865,8 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
   // Merges a day's individually-toggled slots back into contiguous { start, end } ranges for
   // saving — e.g. three consecutive selected slots collapse into one range dto, which the
   // backend re-expands into the same slots via the same duración+intervalo stepping.
-  const buildRangesForDay = (dayNum: number): { start: string; end: string }[] => {
-    const daySet = selectedSlots[dayNum] || new Set<string>()
-    const ranges: { start: string; end: string }[] = []
-    let runStart: string | null = null
-    candidateStarts.forEach((cand, idx) => {
-      const isSelected = daySet.has(cand)
-      if (isSelected && runStart === null) runStart = cand
-      const nextSelected = isSelected && candidateStarts[idx + 1] !== undefined && daySet.has(candidateStarts[idx + 1])
-      if (isSelected && !nextSelected && runStart !== null) {
-        ranges.push({ start: runStart, end: toTimeStr(toMinutes(cand) + duracionTurno) })
-        runStart = null
-      }
-    })
-    return ranges
-  }
+  const buildRangesForDay = (dayNum: number): { start: string; end: string }[] =>
+    rangesFromDaySlots(selectedSlots[dayNum] || new Set<string>(), candidateStarts, duracionTurno)
 
   // "Copiar horario a todos los días": overwrites every weekday's selection with a copy of the
   // given day's selected slots — a one-click way to avoid re-toggling the same schedule 5 times.
