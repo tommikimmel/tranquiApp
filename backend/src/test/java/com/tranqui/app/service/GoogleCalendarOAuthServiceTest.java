@@ -34,6 +34,7 @@ class GoogleCalendarOAuthServiceTest {
 
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private EncryptionUtil encryptionUtil;
+    @Mock private com.tranqui.app.repository.GoogleCalendarEventoExternoRepository eventoExternoRepository;
 
     private GoogleCalendarOAuthService buildService() {
         GoogleCalendarOAuthService service = new GoogleCalendarOAuthService();
@@ -43,6 +44,7 @@ class GoogleCalendarOAuthServiceTest {
         ReflectionTestUtils.setField(service, "stateSigningKey", "masterdecryptionkey32charspart12");
         ReflectionTestUtils.setField(service, "usuarioRepository", usuarioRepository);
         ReflectionTestUtils.setField(service, "encryptionUtil", encryptionUtil);
+        ReflectionTestUtils.setField(service, "eventoExternoRepository", eventoExternoRepository);
         return service;
     }
 

@@ -36,6 +36,9 @@ public class GoogleCalendarOAuthService {
     @Autowired
     private EncryptionUtil encryptionUtil;
 
+    @Autowired
+    private com.tranqui.app.repository.GoogleCalendarEventoExternoRepository eventoExternoRepository;
+
     @Value("${google.client-id:dummy-client-id}")
     private String clientId;
 
@@ -196,7 +199,11 @@ public class GoogleCalendarOAuthService {
         medico.setGoogleRefreshTokenEncrypted(null);
         medico.setGoogleTokenExpiresAt(null);
         medico.setGoogleCalendarConnected(false);
+        medico.setGoogleSyncToken(null);
         usuarioRepository.save(medico);
+        // Drop cached external events too — they'd otherwise keep showing stale personal
+        // events in the calendar after the médico revokes access.
+        eventoExternoRepository.deleteByMedicoId(medico.getId());
     }
 
     private String urlEncode(String value) {

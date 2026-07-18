@@ -140,6 +140,15 @@ public class MedicoService {
         medico.setOfreceOnline(dto.isOfreceOnline());
         medico.setOfrecePresencial(dto.isOfrecePresencial());
 
+        if (dto.getFirmaUrl() != null && com.tranqui.app.util.ImageUtils.decodedByteSize(dto.getFirmaUrl()) > MAX_FOTO_BYTES) {
+            throw new IllegalArgumentException(
+                    "La imagen de firma es demasiado grande (máx. " + (MAX_FOTO_BYTES / (1024 * 1024)) + "MB). Elegí una imagen más liviana.");
+        }
+        medico.setFirmaUrl(dto.getFirmaUrl());
+        medico.setSelloLinea1(dto.getSelloLinea1());
+        medico.setSelloLinea2(dto.getSelloLinea2());
+        medico.setSelloLinea3(dto.getSelloLinea3());
+
         if (dto.getTags() != null) {
             medico.setTags(String.join(",", dto.getTags()));
         }
@@ -222,6 +231,15 @@ public class MedicoService {
                         .build())
                 .collect(Collectors.toList());
 
+        // The public "Desde $X" price must reflect what the médico actually configured in
+        // "Honorarios y servicios" (the "particular" tariff), not the legacy Usuario.precio
+        // field, which is only ever set once on account creation and never kept in sync.
+        BigDecimal price = tarifasDto.stream()
+                .filter(t -> "particular".equals(t.getId()) && t.isEnabled())
+                .map(MedicoDto.TarifaDto::getPrice)
+                .findFirst()
+                .orElse(m.getPrecio() != null ? m.getPrecio() : new BigDecimal("60000"));
+
         List<String> tagsList = new ArrayList<>();
         if (m.getTags() != null && !m.getTags().trim().isEmpty()) {
             tagsList = Arrays.asList(m.getTags().split(","));
@@ -277,7 +295,7 @@ public class MedicoService {
                 .specialty(m.getSpecialty() != null ? m.getSpecialty() : "General")
                 .matricula(m.getMatricula())
                 .cuit(m.getCuit())
-                .price(m.getPrecio() != null ? m.getPrecio() : new BigDecimal("60000"))
+                .price(price)
                 .tags(tagsList)
                 .color(m.getColor() != null ? m.getColor() : "#E8F5EE")
                 .fotoUrl(m.getFotoUrl())
@@ -303,6 +321,10 @@ public class MedicoService {
                 .aniosExperiencia(m.getAniosExperiencia())
                 .duracionTurnoMinutos(m.getDuracionTurnoMinutos() != null ? m.getDuracionTurnoMinutos() : DEFAULT_DURACION_TURNO_MINUTOS)
                 .intervaloEntreTurnosMinutos(m.getIntervaloEntreTurnosMinutos() != null ? m.getIntervaloEntreTurnosMinutos() : DEFAULT_INTERVALO_ENTRE_TURNOS_MINUTOS)
+                .firmaUrl(m.getFirmaUrl())
+                .selloLinea1(m.getSelloLinea1())
+                .selloLinea2(m.getSelloLinea2())
+                .selloLinea3(m.getSelloLinea3())
                 .build();
     }
 

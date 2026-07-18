@@ -31,6 +31,15 @@ public class GoogleCalendarService {
     @Autowired
     private GoogleCalendarOAuthService googleCalendarOAuthService;
 
+    // Shared client builder, reused by GoogleCalendarSyncService so it doesn't need its own
+    // copy of the NetHttpTransport/GsonFactory boilerplate every method here already repeats.
+    public static Calendar construirCliente(String accessToken) {
+        HttpRequestInitializer requestInitializer = request -> request.getHeaders().setAuthorization("Bearer " + accessToken);
+        return new Calendar.Builder(new NetHttpTransport(), GsonFactory.getDefaultInstance(), requestInitializer)
+                .setApplicationName("TranquiApp")
+                .build();
+    }
+
     private String generarMeetUrl() {
         java.util.Random random = new java.util.Random();
         StringBuilder sb = new StringBuilder("https://meet.google.com/");

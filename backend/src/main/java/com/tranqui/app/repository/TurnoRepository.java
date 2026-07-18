@@ -34,4 +34,6 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
     List<Usuario> findDistinctPacientesByMedicoId(@org.springframework.data.repository.query.Param("medicoId") Long medicoId);
 
     List<Turno> findByPacienteIdAndEstadoNot(Long pacienteId, EstadoTurno estado);
+
+    boolean existsByMedicoIdAndGoogleEventId(Long medicoId, String googleEventId);
 }

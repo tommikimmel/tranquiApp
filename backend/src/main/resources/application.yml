@@ -33,6 +33,8 @@ google:
   client-secret: ${GOOGLE_CLIENT_SECRET:}
   calendar:
     enabled: ${GOOGLE_CALENDAR_ENABLED:false}
+    watch:
+      enabled: ${GOOGLE_CALENDAR_WATCH_ENABLED:false}
 
 mercadopago:
   enabled: ${MERCADOPAGO_ENABLED:false}
@@ -44,6 +46,15 @@ mercadopago:
 payment:
   simulation:
     enabled: ${PAYMENT_SIMULATION_ENABLED:false}
+
+qbi2:
+  recipe:
+    enabled: ${QBI2_RECIPE_ENABLED:false}
+    environment: ${QBI2_RECIPE_ENV:hml}
+    base-url-hml: https://apirecipe.hml.qbitos.com
+    base-url-prod: https://apirecipe.qbitos.com
+    cliente-app-id: ${QBI2_CLIENTE_APP_ID:}
+    token: ${QBI2_RECIPE_TOKEN:}
 
 app:
   public-url: ${APP_PUBLIC_URL:http://localhost:8081}

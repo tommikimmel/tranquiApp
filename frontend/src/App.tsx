@@ -129,6 +129,17 @@ interface Appointment {
   meetLink: string
 }
 
+// A médico's personal Google Calendar event (read-only, never a Turno) — see
+// GoogleCalendarSyncService.obtenerEventosExternosCacheados on the backend.
+interface ExternalEvent {
+  id: string
+  title: string
+  fecha: string
+  hour: string
+  endHour: string
+  allDay: boolean
+}
+
 
 
 type NavSection = 'dashboard' | 'agenda' | 'patients' | 'clinical-history' | 'prescriptions' | 'visitors' | 'payments' | 'settings'
@@ -630,6 +641,25 @@ function AppointmentCard({ appt, compact }: { appt: Appointment; compact?: boole
           )}
         </div>
       )}
+    </li>
+  )
+}
+
+// Compact, read-only counterpart to AppointmentCard for a médico's personal Google Calendar
+// events — same row layout so both list types stack cleanly in "Próximos Eventos", but no
+// status badge, meet link, or click action since these events aren't editable from the app.
+function ExternalEventCard({ event, compact }: { event: ExternalEvent; compact?: boolean }) {
+  return (
+    <li className={`appointment-item appointment-item--external ${compact ? 'appointment-item--compact' : ''}`}>
+      <div className="appointment-item__time">
+        <div className="appointment-item__hour">{event.allDay ? '' : event.hour}</div>
+        <div className="appointment-item__ampm">{event.allDay ? 'Todo el día' : 'hs'}</div>
+      </div>
+      <div className="appointment-item__divider" />
+      <div className="appointment-item__info">
+        <div className="appointment-item__name">{event.title}</div>
+        <div className="appointment-item__meta">Evento personal · Google Calendar</div>
+      </div>
     </li>
   )
 }
@@ -2398,6 +2428,7 @@ function DashboardHome({
   onDisconnectGoogle,
   appointments,
   allAppointments,
+  externalEvents,
   availability,
   stats,
   onCancelAppointment,
@@ -2414,6 +2445,7 @@ function DashboardHome({
   onDisconnectGoogle: () => void;
   appointments: Appointment[];
   allAppointments: any[];
+  externalEvents: ExternalEvent[];
   availability: any[];
   stats: any;
   onCancelAppointment: (id: number) => void;
@@ -2475,7 +2507,7 @@ function DashboardHome({
     }) || upcoming[0];
   }, [allAppointments, currentTime]);
 
-  // Real "today" (independent of calendar navigation) — used for the "Próximos turnos" side panel
+  // Real "today" (independent of calendar navigation) — used for the "Próximos Eventos" side panel
   const todaysAppointments = useMemo(() => {
     const now = currentTime;
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -2484,6 +2516,23 @@ function DashboardHome({
       .filter(a => a.fecha === todayStr && a.status !== 'cancelled')
       .sort((a, b) => a.hour.localeCompare(b.hour));
   }, [allAppointments, currentTime]);
+
+  const todaysExternalEvents = useMemo(() => {
+    const now = currentTime;
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    if (!externalEvents) return [];
+    return externalEvents
+      .filter(e => e.fecha === todayStr)
+      .sort((a, b) => a.hour.localeCompare(b.hour));
+  }, [externalEvents, currentTime]);
+
+  // "Próximos Eventos": turnos + personal Google Calendar events for today, merged into one
+  // chronological list (all-day Google events are pinned first since they have no real hour).
+  const todaysCombinedEvents = useMemo(() => {
+    const turnoItems = todaysAppointments.map(a => ({ kind: 'turno' as const, sortKey: a.hour, data: a }));
+    const externalItems = todaysExternalEvents.map(e => ({ kind: 'external' as const, sortKey: e.allDay ? '' : e.hour, data: e }));
+    return [...turnoItems, ...externalItems].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  }, [todaysAppointments, todaysExternalEvents]);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -2652,6 +2701,7 @@ function DashboardHome({
   // Appointments for the selected day in Diario view
   const selectedDayStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
   const dayAppointments = allAppointments.filter(a => a.fecha === selectedDayStr && a.status !== 'cancelled');
+  const dayExternalEvents = externalEvents.filter(e => e.fecha === selectedDayStr);
 
   return (
     <>
@@ -2797,7 +2847,7 @@ function DashboardHome({
                 ? 'Vista de distribución de turnos mensual'
                 : calendarView === 'weekly'
                   ? 'Cronograma de turnos por día y horario'
-                  : `${capitalizedDate} · ${dayAppointments.length} sesiones programadas`
+                  : `${capitalizedDate} · ${dayAppointments.length} sesiones programadas${dayExternalEvents.length ? ` · ${dayExternalEvents.length} eventos personales` : ''}`
               }
             </p>
           </div>
@@ -2844,7 +2894,7 @@ function DashboardHome({
         </div>
 
         {calendarView === 'today' ? (
-          dayAppointments.length === 0 ? (
+          dayAppointments.length === 0 && dayExternalEvents.length === 0 ? (
             <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', padding: 'var(--space-6)', textAlign: 'center' }}>
               No tenés sesiones programadas para este día.
             </p>
@@ -2852,6 +2902,9 @@ function DashboardHome({
             <ul className="appointment-list" role="list" aria-label="Sesiones de hoy">
               {dayAppointments.map((appt) => (
                 <AppointmentCard key={appt.id} appt={appt} />
+              ))}
+              {dayExternalEvents.map((event) => (
+                <ExternalEventCard key={event.id} event={event} />
               ))}
             </ul>
           )
@@ -2896,7 +2949,12 @@ function DashboardHome({
                 const apptHour = parseInt(a.hour);
                 return weekdaysWithDates.some(d => d.dateStr === a.fecha) && apptHour === slotHour && a.status !== 'cancelled';
               });
-              return hasActiveAvailability || hasAppointment;
+              const hasExternalEvent = externalEvents.some((e) => {
+                if (e.allDay) return false;
+                const eventHour = parseInt(e.hour);
+                return weekdaysWithDates.some(d => d.dateStr === e.fecha) && eventHour === slotHour;
+              });
+              return hasActiveAvailability || hasAppointment || hasExternalEvent;
             }).map((slot) => {
               const slotHour = parseInt(slot.split(':')[0]);
               return (
@@ -2922,10 +2980,15 @@ function DashboardHome({
                       const apptHour = parseInt(a.hour);
                       return a.fecha === day.dateStr && apptHour === slotHour && a.status !== 'cancelled';
                     });
+                    const externalEvent = externalEvents.find(e => {
+                      if (e.allDay) return false;
+                      const eventHour = parseInt(e.hour);
+                      return e.fecha === day.dateStr && eventHour === slotHour;
+                    });
                     const isActive = isSlotAvailable(day.num, slot);
 
-                    // If not active and not appt, and showInactiveSlots is false, render empty/neutral cell
-                    const isCellVisible = appt || isActive || showInactiveSlots;
+                    // If not active and not appt/externalEvent, and showInactiveSlots is false, render empty/neutral cell
+                    const isCellVisible = appt || externalEvent || isActive || showInactiveSlots;
 
                     return (
                       <div key={day.num} style={{
@@ -2935,13 +2998,28 @@ function DashboardHome({
                         minHeight: '80px',
                         backgroundColor: !isCellVisible
                           ? 'var(--neutral-50)'
-                          : appt
+                          : appt || externalEvent
                             ? 'var(--color-surface)'
                             : 'var(--green-50)', // Light green for active empty slots
                         display: 'flex',
                         flexDirection: 'column',
-                        justifyContent: 'center'
+                        justifyContent: 'center',
+                        gap: 'var(--space-1)'
                       }}>
+                        {externalEvent && (
+                          <div style={{
+                            padding: '6px 10px',
+                            borderRadius: 'var(--radius-lg)',
+                            backgroundColor: '#eef4fe',
+                            border: '1px solid #c9dcfb',
+                            borderLeft: '3px solid #4285f4',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            color: 'var(--color-text-primary)'
+                          }}>
+                            {externalEvent.title}
+                          </div>
+                        )}
                         {appt ? (
                           <div 
                             onClick={() => setSelectedAppt(appt)}
@@ -3040,13 +3118,15 @@ function DashboardHome({
                     const isToday = d.toDateString() === new Date().toDateString();
                     const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                     const dayAppts = allAppointments.filter(a => a.fecha === dateStr && a.status !== 'cancelled');
+                    const dayExternalEvts = externalEvents.filter(e => e.fecha === dateStr);
+                    const dayItemsTotal = dayAppts.length + dayExternalEvts.length;
 
                     return (
                       <td key={index}>
                         <span className={`dashboard-home-daynum ${isToday ? 'dashboard-home-daynum--today' : isCurrentMonth ? '' : 'dashboard-home-daynum--muted'}`}>
                           {d.getDate()}
                         </span>
-                        {dayAppts.length > 0 && (
+                        {dayItemsTotal > 0 && (
                           <div className="dashboard-home-day-appts">
                             {dayAppts.slice(0, 2).map((a) => (
                               <div
@@ -3057,8 +3137,17 @@ function DashboardHome({
                                 {a.hour} {a.patientName}
                               </div>
                             ))}
-                            {dayAppts.length > 2 && (
-                              <div className="dashboard-home-day-more">+{dayAppts.length - 2} más</div>
+                            {dayAppts.length < 2 && dayExternalEvts.slice(0, 2 - dayAppts.length).map((e) => (
+                              <div
+                                key={e.id}
+                                className="dashboard-home-day-appt dashboard-home-day-appt--external"
+                                title={e.title}
+                              >
+                                {e.allDay ? e.title : `${e.hour} ${e.title}`}
+                              </div>
+                            ))}
+                            {dayItemsTotal > 2 && (
+                              <div className="dashboard-home-day-more">+{dayItemsTotal - 2} más</div>
                             )}
                           </div>
                         )}
@@ -3076,18 +3165,20 @@ function DashboardHome({
         <div className="card">
           <div className="card__header">
             <div>
-              <h2 className="card__title">Próximos turnos</h2>
+              <h2 className="card__title">Próximos Eventos</h2>
               <p className="card__subtitle">Hoy, {capitalizedDate.replace(/^\w+ /, '')}</p>
             </div>
           </div>
-          {todaysAppointments.length === 0 ? (
+          {todaysCombinedEvents.length === 0 ? (
             <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: 'var(--space-4) 0' }}>
-              No tenés más sesiones programadas para hoy.
+              No tenés más sesiones ni eventos programados para hoy.
             </p>
           ) : (
-            <ul className="appointment-list appointment-list--compact" role="list" aria-label="Próximos turnos de hoy">
-              {todaysAppointments.map((appt) => (
-                <AppointmentCard key={appt.id} appt={appt} compact />
+            <ul className="appointment-list appointment-list--compact" role="list" aria-label="Próximos eventos de hoy">
+              {todaysCombinedEvents.map((item) => (
+                item.kind === 'turno'
+                  ? <AppointmentCard key={`turno-${item.data.id}`} appt={item.data} compact />
+                  : <ExternalEventCard key={`gcal-${item.data.id}`} event={item.data} compact />
               ))}
             </ul>
           )}
@@ -3391,6 +3482,7 @@ export default function App() {
   const [medicoInfo, setMedicoInfo] = useState<any>(null)
   const [todayAppointments, setTodayAppointments] = useState<any[]>([])
   const [allAppointments, setAllAppointments] = useState<any[]>([])
+  const [externalEvents, setExternalEvents] = useState<ExternalEvent[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
   const [showNotifications, setShowNotifications] = useState(false)
   const [newPatientAlert, setNewPatientAlert] = useState<{ nombre: string; fecha: string; hora: string } | null>(null)
@@ -3485,9 +3577,10 @@ export default function App() {
         api.getNotificaciones(),
         api.getMercadoPagoStatus().catch(() => ({ connected: false })),
         api.getGoogleCalendarStatus().catch(() => ({ connected: false })),
-        api.getTieneNoLeidos().catch(() => false)
+        api.getTieneNoLeidos().catch(() => false),
+        api.getEventosExternosGoogleCalendar().catch(() => [])
       ])
-        .then(([perfil, turnos, disp, statsData, allTurnos, notifData, mpStatus, googleStatus, unreadStatus]) => {
+        .then(([perfil, turnos, disp, statsData, allTurnos, notifData, mpStatus, googleStatus, unreadStatus, eventosExternos]) => {
           setMedicoInfo(perfil)
           setTodayAppointments(turnos || [])
           setAvailability(disp || [])
@@ -3497,6 +3590,7 @@ export default function App() {
           setMpConnected(!!mpStatus?.connected)
           setMpEnabled(!!(mpStatus as any)?.mercadopagoEnabled)
           setGoogleConnected(!!googleStatus?.connected)
+          setExternalEvents((eventosExternos as ExternalEvent[]) || [])
         })
         .catch((err) => {
           console.error("Error al inicializar dashboard:", err)
@@ -3798,6 +3892,7 @@ export default function App() {
             onDisconnectGoogle={handleDisconnectGoogle}
             appointments={todayAppointments}
             allAppointments={allAppointments}
+            externalEvents={externalEvents}
             availability={availability}
             stats={stats} 
             onCancelAppointment={handleCancelAppointment}

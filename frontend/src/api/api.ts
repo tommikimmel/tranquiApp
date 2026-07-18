@@ -123,6 +123,9 @@ export const api = {
   desconectarGoogleCalendar: () =>
     apiFetch('/medicos/google-calendar/disconnect', { method: 'POST' }),
 
+  getEventosExternosGoogleCalendar: () =>
+    apiFetch('/medicos/google-calendar/eventos'),
+
   getTurnosHoy: () => apiFetch('/medicos/turnos/hoy'),
   getTurnos: () => apiFetch('/medicos/turnos'),
   

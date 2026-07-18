@@ -604,6 +604,28 @@
   color: var(--color-warning);
 }
 
+/* Personal Google Calendar events merged into the same lists as turnos — a distinct blue
+   (Google's brand color, not the app's green) so they read as "not a patient session" at a
+   glance, both in the full appointment-item and compact variants. */
+.appointment-item--external {
+  border-left: 3px solid #4285f4;
+}
+
+.appointment-item--external:hover {
+  background: #eef4fe;
+  border-color: var(--color-border);
+  border-left-color: #4285f4;
+}
+
+.appointment-item--external .appointment-item__hour {
+  color: #4285f4;
+}
+
+.appointment-item--compact.appointment-item--external .appointment-item__hour {
+  color: #4285f4;
+  background: #eef4fe;
+}
+
 /* Compact rows for the "Próximos turnos" side panel on Inicio — no box/border, just a
    bottom-divider list, closer to the mockup's minimal .upcoming-item styling. */
 .appointment-list--compact {
@@ -2230,6 +2252,13 @@
   background: var(--color-warning-bg);
   color: var(--color-warning);
   border-left: 2px solid var(--color-warning);
+}
+
+.dashboard-home-day-appt--external {
+  background: #eef4fe;
+  color: #3367d6;
+  border-left: 2px solid #4285f4;
+  cursor: default;
 }
 
 .dashboard-home-day-more {

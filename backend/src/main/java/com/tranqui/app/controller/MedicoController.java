@@ -41,6 +41,12 @@ public class MedicoController {
     @Autowired
     private com.tranqui.app.service.GoogleCalendarOAuthService googleCalendarOAuthService;
 
+    @Autowired
+    private com.tranqui.app.service.GoogleCalendarSyncService googleCalendarSyncService;
+
+    @Autowired
+    private com.tranqui.app.service.GoogleCalendarWatchService googleCalendarWatchService;
+
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
 
@@ -206,8 +212,56 @@ public class MedicoController {
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<Void> desvincularGoogleCalendar(@AuthenticationPrincipal UserDetails userDetails) {
         Usuario medico = obtenerMedicoAutenticado(userDetails);
+        googleCalendarWatchService.detenerCanal(medico);
         googleCalendarOAuthService.desvincular(medico);
         return ResponseEntity.noContent().build();
+    }
+
+    // Google's push notification for a change on the médico's calendar — no body, just headers.
+    // Never returns an error status for a stale/unrecognized channel: Google retries with backoff
+    // on non-2xx responses and eventually kills a channel it can't deliver to, so "not our
+    // problem anymore" is a 200 no-op here, not a 4xx/5xx.
+    @PostMapping("/google-calendar/webhook")
+    public ResponseEntity<Void> recibirNotificacionGoogleCalendar(
+            @RequestHeader(value = "X-Goog-Channel-ID", required = false) String channelId,
+            @RequestHeader(value = "X-Goog-Resource-ID", required = false) String resourceId,
+            @RequestHeader(value = "X-Goog-Resource-State", required = false) String resourceState,
+            @RequestHeader(value = "X-Goog-Channel-Token", required = false) String channelToken) {
+
+        if ("sync".equals(resourceState)) {
+            // The initial confirmation ping Google sends right after the channel is created —
+            // no calendar change happened, nothing to sync.
+            return ResponseEntity.ok().build();
+        }
+
+        Long medicoId = googleCalendarWatchService.verificarChannelToken(channelToken);
+        if (medicoId == null) {
+            return ResponseEntity.ok().build();
+        }
+
+        usuarioRepository.findById(medicoId).ifPresent(medico -> {
+            boolean channelMatches = channelId != null && channelId.equals(medico.getGoogleWatchChannelId())
+                    && resourceId != null && resourceId.equals(medico.getGoogleWatchResourceId());
+            if (!channelMatches) {
+                // Stale notification from a channel we already renewed/stopped — ignore it.
+                return;
+            }
+            try {
+                googleCalendarSyncService.sincronizarIncremental(medico);
+            } catch (Exception e) {
+                log.error("Fallo al procesar el webhook de Google Calendar para médico ID {}", medicoId, e);
+            }
+        });
+
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/google-calendar/eventos")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<List<com.tranqui.app.model.dto.EventoExternoDto>> obtenerEventosExternosGoogleCalendar(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Usuario medico = obtenerMedicoAutenticado(userDetails);
+        return ResponseEntity.ok(googleCalendarSyncService.obtenerEventosExternosCacheados(medico));
     }
 
     @GetMapping("/google-calendar/callback")
@@ -229,7 +283,8 @@ public class MedicoController {
         }
 
         try {
-            googleCalendarOAuthService.procesarCallback(medicoId, code);
+            Usuario medico = googleCalendarOAuthService.procesarCallback(medicoId, code);
+            googleCalendarWatchService.registrarCanal(medico); // best-effort — see registrarCanal's own try/catch
             response.sendRedirect(frontendUrl + "/?googleCalendar=success");
         } catch (Exception e) {
             log.error("Error al procesar el callback de OAuth de Google Calendar", e);
