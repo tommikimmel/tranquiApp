@@ -321,6 +321,9 @@ const Icon = {
       <path d="M12 18v4" />
     </svg>
   ),
+  MercadoPago: ({ size = 16 }: { size?: number } = {}) => (
+    <img src="/logo-mp.svg" alt="" style={{ width: size, height: size, display: 'block' }} />
+  ),
   Star: ({ size = 16 }: { size?: number } = {}) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
@@ -422,7 +425,7 @@ function MPConnectBanner({ connected, onConnect, onDisconnect }: { connected: bo
   return (
     <div className={`mp-connect-banner ${connected ? 'mp-connect-banner--connected' : ''}`} role={connected ? 'status' : 'alert'}>
       <div className="mp-connect-banner__icon">
-        <img src="/logo-mp.svg" alt="Mercado Pago" className="mp-connect-banner__logo" />
+        <img src="/logo-mp-icon.png" alt="Mercado Pago" className="mp-connect-banner__logo" />
       </div>
       <div className="mp-connect-banner__content">
         <span className="mp-connect-banner__status">
@@ -1527,7 +1530,7 @@ const SETTINGS_TABS: { id: SettingsTab; label: string; Icon: (props: { size?: nu
   { id: 'perfil-publico', label: 'Perfil público', Icon: Icon.Globe },
   { id: 'honorarios', label: 'Honorarios y servicios', Icon: Icon.DollarSign },
   { id: 'notificaciones', label: 'Notificaciones', Icon: Icon.BellSimple },
-  { id: 'integraciones', label: 'Integraciones', Icon: Icon.Plug },
+  { id: 'integraciones', label: 'Integraciones', Icon: Icon.MercadoPago },
   { id: 'extendido', label: 'Presencia y contenido', Icon: Icon.Star },
 ]
 
