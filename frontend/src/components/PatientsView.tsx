@@ -63,28 +63,28 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
   }
 
   return (
-    <div className="card" style={{
+    <div className="card patients-master-detail" data-selected={selectedPatient ? 'true' : 'false'} style={{
       padding: 0,
-      display: 'grid',
-      gridTemplateColumns: '320px 1fr',
       height: '100%',
       minHeight: 0,
       overflow: 'hidden'
     }}>
-      <PatientDirectorySidebar
-        title="Mis Pacientes"
-        patients={patients}
-        filteredPatients={filteredPatients}
-        loadingPatients={loadingPatients}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        selectedPatient={selectedPatient}
-        onSelectPatient={handleSelectPatient}
-        unreadCounts={unreadCounts}
-      />
+      <div className="patients-master-detail__sidebar">
+        <PatientDirectorySidebar
+          title="Mis Pacientes"
+          patients={patients}
+          filteredPatients={filteredPatients}
+          loadingPatients={loadingPatients}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          selectedPatient={selectedPatient}
+          onSelectPatient={handleSelectPatient}
+          unreadCounts={unreadCounts}
+        />
+      </div>
 
       {/* Main Chat Workspace */}
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', backgroundColor: '#fcfcfc' }}>
+      <div className="patients-master-detail__main" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', backgroundColor: '#fcfcfc' }}>
         {selectedPatient ? (
           <>
             {/* Header: Patient Bio Details */}
@@ -97,18 +97,30 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
               gap: 'var(--space-2)'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h3 style={{
-                    fontFamily: 'var(--font-heading)',
-                    fontSize: 'var(--text-lg)',
-                    fontWeight: 'var(--font-weight-bold)',
-                    margin: 0
-                  }}>
-                    {selectedPatient.nombre}
-                  </h3>
-                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-                    {selectedPatient.email} · {selectedPatient.telefono || 'Sin teléfono'}
-                  </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                  <button
+                    type="button"
+                    className="patients-master-detail__back"
+                    onClick={() => setSelectedPatient(null)}
+                    aria-label="Volver al listado de pacientes"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 18, height: 18 }}>
+                      <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                  </button>
+                  <div>
+                    <h3 style={{
+                      fontFamily: 'var(--font-heading)',
+                      fontSize: 'var(--text-lg)',
+                      fontWeight: 'var(--font-weight-bold)',
+                      margin: 0
+                    }}>
+                      {selectedPatient.nombre}
+                    </h3>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                      {selectedPatient.email} · {selectedPatient.telefono || 'Sin teléfono'}
+                    </span>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
@@ -122,9 +134,8 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
               </div>
 
               {/* Patient metadata ribbon */}
-              <div style={{
+              <div className="patients-master-detail__meta-grid" style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
                 gap: 'var(--space-4)',
                 backgroundColor: 'var(--neutral-50)',
                 padding: 'var(--space-2) var(--space-4)',

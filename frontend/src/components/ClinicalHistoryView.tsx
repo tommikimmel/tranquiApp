@@ -441,28 +441,28 @@ export default function ClinicalHistoryView() {
   }
 
   return (
-    <div className="card" style={{
+    <div className="card patients-master-detail" data-selected={selectedPatient ? 'true' : 'false'} style={{
       padding: 0,
-      display: 'grid',
-      gridTemplateColumns: '320px 1fr',
       height: '100%',
       minHeight: 0,
       overflow: 'hidden'
     }}>
-      <PatientDirectorySidebar
-        title="Historia Clínica"
-        searchPlaceholder="Buscar por nombre o DNI..."
-        patients={patients}
-        filteredPatients={filteredPatients}
-        loadingPatients={loadingPatients}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        selectedPatient={selectedPatient}
-        onSelectPatient={setSelectedPatient}
-      />
+      <div className="patients-master-detail__sidebar">
+        <PatientDirectorySidebar
+          title="Historia Clínica"
+          searchPlaceholder="Buscar por nombre o DNI..."
+          patients={patients}
+          filteredPatients={filteredPatients}
+          loadingPatients={loadingPatients}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          selectedPatient={selectedPatient}
+          onSelectPatient={setSelectedPatient}
+        />
+      </div>
 
       {/* Main Clinical Workspace */}
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', backgroundColor: '#fcfcfc' }}>
+      <div className="patients-master-detail__main" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, overflow: 'hidden', backgroundColor: '#fcfcfc' }}>
         {selectedPatient ? (
           <>
             {/* Header: Patient Bio Details */}
@@ -474,18 +474,30 @@ export default function ClinicalHistoryView() {
               flexDirection: 'column',
               gap: 'var(--space-2)'
             }}>
-              <div>
-                <h3 style={{
-                  fontFamily: 'var(--font-heading)',
-                  fontSize: 'var(--text-lg)',
-                  fontWeight: 'var(--font-weight-bold)',
-                  margin: 0
-                }}>
-                  {selectedPatient.nombre}
-                </h3>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-                  {selectedPatient.email} · {selectedPatient.telefono || 'Sin teléfono'}
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                <button
+                  type="button"
+                  className="patients-master-detail__back"
+                  onClick={() => setSelectedPatient(null)}
+                  aria-label="Volver al listado de pacientes"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: 18, height: 18 }}>
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                </button>
+                <div>
+                  <h3 style={{
+                    fontFamily: 'var(--font-heading)',
+                    fontSize: 'var(--text-lg)',
+                    fontWeight: 'var(--font-weight-bold)',
+                    margin: 0
+                  }}>
+                    {selectedPatient.nombre}
+                  </h3>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                    {selectedPatient.email} · {selectedPatient.telefono || 'Sin teléfono'}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -525,7 +537,7 @@ export default function ClinicalHistoryView() {
                       <div style={{ fontWeight: 'bold', fontSize: 'var(--text-xs)', color: 'var(--color-primary)', textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>
                         1. Datos Demográficos Básicos
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 'var(--space-3)' }}>
+                      <div className="form-grid-auto" style={{ gap: 'var(--space-3)' }}>
                         <div className="form-group">
                           <label className="form-label">Nombre</label>
                           <input
@@ -571,7 +583,7 @@ export default function ClinicalHistoryView() {
                       <div style={{ fontWeight: 'bold', fontSize: 'var(--text-xs)', color: 'var(--color-primary)', textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>
                         2. Documentación e Identificación
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 'var(--space-3)' }}>
+                      <div className="form-grid-auto" style={{ gap: 'var(--space-3)' }}>
                         <div className="form-group">
                           <label className="form-label">Tipo Documento</label>
                           <select value={editTipoDocumento} onChange={(e) => setEditTipoDocumento(e.target.value)} className="form-input">
@@ -615,7 +627,7 @@ export default function ClinicalHistoryView() {
                       <div style={{ fontWeight: 'bold', fontSize: 'var(--text-xs)', color: 'var(--color-primary)', textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>
                         3. Ubicación y Contacto
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-3)' }}>
+                      <div className="form-grid-auto" style={{ gap: 'var(--space-3)' }}>
                         <div className="form-group">
                           <label className="form-label">Dirección</label>
                           <input
@@ -658,7 +670,7 @@ export default function ClinicalHistoryView() {
                           <div style={{ fontWeight: 'bold', fontSize: 'var(--text-xs)', color: 'var(--color-primary)', textTransform: 'uppercase', marginBottom: 'var(--space-1)' }}>
                             4. Cobertura y Obra Social
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 'var(--space-3)' }}>
+                          <div className="form-grid-auto" style={{ gap: 'var(--space-3)' }}>
                             <div className="form-group">
                               <label className="form-label">Obra Social</label>
                               <input
@@ -691,7 +703,7 @@ export default function ClinicalHistoryView() {
                             </div>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+                          <div className="form-grid-auto" style={{ gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
                             <div className="form-group">
                               <label className="form-label">Nro. Credencial / Afiliado</label>
                               <input
@@ -754,9 +766,7 @@ export default function ClinicalHistoryView() {
                     </div>
                   </form>
                 ) : (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(4, 1fr)',
+                  <div className="form-grid-auto" style={{
                     gap: 'var(--space-4)',
                     backgroundColor: 'var(--neutral-50)',
                     padding: 'var(--space-5)',
@@ -854,7 +864,7 @@ export default function ClinicalHistoryView() {
                     flexDirection: 'column',
                     gap: 'var(--space-3)'
                   }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--space-3)' }}>
+                    <div className="form-grid-auto" style={{ gap: 'var(--space-3)' }}>
                       <div className="form-group">
                         <label className="form-label form-label--required">Estado de Animo</label>
                         <MoodSelect
@@ -972,7 +982,7 @@ export default function ClinicalHistoryView() {
                       {selectedPatient.obraSocial && <span>, <strong> Afiliado: {selectedPatient.numAfiliado || 'No especificado'}</strong></span>}.
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                    <div className="form-grid-auto" style={{ gap: 'var(--space-3)' }}>
                       <div className="form-group">
                         <label className="form-label form-label--required">Tipo de Informe</label>
                         <select

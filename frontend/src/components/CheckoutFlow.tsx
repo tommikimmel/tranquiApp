@@ -687,57 +687,79 @@ function StepSelect({
 
         </div>
 
-        {/* Derecha: consultorio */}
+        {/* Derecha: consultorio (solo si el profesional atiende presencial) */}
         <div className="panel" style={{ height: 'fit-content' }}>
-          <div className="book-title sora"><span className="dot"></span>Consultorio</div>
-          
-          <div className="map-box">
-            <div 
-              style={{ position: 'relative', cursor: 'pointer' }}
-              onClick={() => {
-                if (professional.domicilioLat && professional.domicilioLng) {
-                  const url = `https://www.google.com/maps/search/?api=1&query=${professional.domicilioLat},${professional.domicilioLng}`;
-                  window.open(url, '_blank', 'noopener,noreferrer');
-                }
-              }}
-            >
-              <div
-                ref={mapContainerRef}
-                style={{
-                  height: '190px',
-                  width: '100%',
-                  backgroundColor: '#EAF2EA',
-                  zIndex: 1
-                }}
-              />
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                zIndex: 10,
-                backgroundColor: 'transparent'
-              }} />
-            </div>
-            
-            <div className="map-addr">
-              <div className="street">{professional.domicilioAtencion || "Av. Colón 1234, Piso 3, Of. B"}</div>
-              <div className="city">Centro, Córdoba Capital</div>
-              <a
-                href={
-                  professional.domicilioLat && professional.domicilioLng
-                    ? `https://www.google.com/maps/search/?api=1&query=${professional.domicilioLat},${professional.domicilioLng}`
-                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(professional.domicilioAtencion || "Av. Colón 1234, Córdoba")}`
-                }
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
-                Cómo llegar
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 17 17 7M9 7h8v8"/></svg>
-              </a>
-            </div>
-          </div>
+          {professional.ofrecePresencial && (
+            <>
+              <div className="book-title sora"><span className="dot"></span>Consultorio</div>
+
+              <div className="map-box">
+                {professional.domicilioLat && professional.domicilioLng ? (
+                  <div
+                    style={{ position: 'relative', cursor: 'pointer' }}
+                    onClick={() => {
+                      const url = `https://www.google.com/maps/search/?api=1&query=${professional.domicilioLat},${professional.domicilioLng}`;
+                      window.open(url, '_blank', 'noopener,noreferrer');
+                    }}
+                  >
+                    <div
+                      ref={mapContainerRef}
+                      style={{
+                        height: '190px',
+                        width: '100%',
+                        backgroundColor: '#EAF2EA',
+                        zIndex: 1
+                      }}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      zIndex: 10,
+                      backgroundColor: 'transparent'
+                    }} />
+                  </div>
+                ) : (
+                  <div style={{
+                    height: '190px',
+                    width: '100%',
+                    backgroundColor: '#EAF2EA',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    color: 'var(--color-text-secondary)'
+                  }}>
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.75">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+                    </svg>
+                    <span style={{ fontSize: '12px' }}>Mapa no disponible</span>
+                  </div>
+                )}
+
+                {professional.domicilioAtencion && (
+                  <div className="map-addr">
+                    <div className="street">{professional.domicilioAtencion}</div>
+                    <a
+                      href={
+                        professional.domicilioLat && professional.domicilioLng
+                          ? `https://www.google.com/maps/search/?api=1&query=${professional.domicilioLat},${professional.domicilioLng}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(professional.domicilioAtencion)}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Cómo llegar
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M7 17 17 7M9 7h8v8"/></svg>
+                    </a>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Patient Form Fields + Pago (debajo del mapa para acortar la columna izquierda) */}
           {(selectedSlot || tipo === 'SOBRETUNO') && selectedDayIdx !== null && (

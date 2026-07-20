@@ -23,4 +23,5 @@ public class TurnoMedicoDto {
     private String domicilioAtencion;
     private Double domicilioLat;
     private Double domicilioLng;
+    private String metadataAfiliado;
 }

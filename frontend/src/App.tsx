@@ -2649,13 +2649,14 @@ function DashboardHome({
             </ul>
           )
         ) : calendarView === 'weekly' ? (
-          /* Weekly Calendar Matrix Grid */
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: '80px repeat(5, 1fr)', 
-            gap: 'var(--space-2)', 
+          /* Weekly Calendar Matrix Grid — horizontally scrollable on mobile/tablet so no column gets squished or hidden */
+          <div style={{ width: '100%', overflowX: 'auto', marginTop: 'var(--space-4)' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '80px repeat(5, minmax(140px, 1fr))',
+            gap: 'var(--space-2)',
             width: '100%',
-            marginTop: 'var(--space-4)',
+            minWidth: '760px',
             border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-lg)',
             overflow: 'hidden',
@@ -2815,16 +2816,18 @@ function DashboardHome({
               );
             })}
           </div>
+          </div>
         ) : (
-          /* Monthly Calendar Grid */
+          /* Monthly Calendar Grid — horizontally scrollable on mobile/tablet so no column gets squished or hidden */
+          <div style={{ width: '100%', overflowX: 'auto', marginTop: 'var(--space-4)' }}>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
+            gridTemplateColumns: 'repeat(7, minmax(110px, 1fr))',
+            minWidth: '700px',
             gap: '1px',
             backgroundColor: 'var(--color-border)',
             borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            marginTop: 'var(--space-4)'
+            overflow: 'hidden'
           }}>
             {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((dName) => (
               <div key={dName} style={{
@@ -2902,6 +2905,7 @@ function DashboardHome({
               );
             })}
           </div>
+          </div>
         )}
       </div>
 
@@ -2974,11 +2978,8 @@ function DashboardHome({
                 <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
                   Información del Paciente
                 </label>
-                <div style={{
+                <div className="turno-modal-grid" style={{
                   marginTop: 'var(--space-2)',
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: 'var(--space-3)',
                   backgroundColor: 'var(--neutral-50)',
                   padding: 'var(--space-4)',
                   borderRadius: 'var(--radius-lg)',
@@ -2993,19 +2994,19 @@ function DashboardHome({
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Email</label>
                     <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500' }}>
-                      {selectedAppt.patientEmail || '-'}
+                      {selectedAppt.patientInfo?.email || '-'}
                     </span>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>DNI</label>
                     <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500' }}>
-                      {selectedAppt.patientDni || '-'}
+                      {selectedAppt.patientInfo?.dni || '-'}
                     </span>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Dato de Contacto</label>
                     <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500' }}>
-                      {selectedAppt.patientPhone || '-'}
+                      {selectedAppt.patientInfo?.telefono || '-'}
                     </span>
                   </div>
                 </div>
@@ -3016,11 +3017,8 @@ function DashboardHome({
                 <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
                   Detalles de Cobertura
                 </label>
-                <div style={{
+                <div className="turno-modal-grid" style={{
                   marginTop: 'var(--space-2)',
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: 'var(--space-3)',
                   backgroundColor: 'var(--neutral-50)',
                   padding: 'var(--space-4)',
                   borderRadius: 'var(--radius-lg)',
@@ -3028,12 +3026,18 @@ function DashboardHome({
                 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Obra Social</label>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>{selectedAppt.obraSocial || 'Particular'}</span>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>{selectedAppt.patientInfo?.obraSocial || 'Particular'}</span>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Plan</label>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>{selectedAppt.plan || '-'}</span>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>{selectedAppt.patientInfo?.credencial?.plan || '-'}</span>
                   </div>
+                  {selectedAppt.metadataAfiliado && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>N° de Afiliado OSDE (copago)</label>
+                      <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>{selectedAppt.metadataAfiliado}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -3070,11 +3074,7 @@ function DashboardHome({
                 </div>
 
                 {isRescheduling && (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1.2fr 0.8fr 1fr',
-                    gap: 'var(--space-2)',
-                    alignItems: 'flex-end',
+                  <div className="turno-modal-reschedule-grid" style={{
                     backgroundColor: 'var(--neutral-50)',
                     padding: 'var(--space-3)',
                     borderRadius: 'var(--radius-md)',

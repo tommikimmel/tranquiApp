@@ -322,6 +322,7 @@ public class TurnoService {
                             .fecha(t.getFecha().toString())
                             .firstConsultation(!emailsNoPrimeraConsulta.contains(t.getPaciente().getEmail()))
                             .patientInfo(construirPacienteDto(t.getPaciente()))
+                            .metadataAfiliado(t.getMetadataAfiliado())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -378,6 +379,7 @@ public class TurnoService {
                             .fecha(t.getFecha().toString())
                             .firstConsultation(!emailsNoPrimeraConsultaTodos.contains(t.getPaciente().getEmail()))
                             .patientInfo(construirPacienteDto(t.getPaciente()))
+                            .metadataAfiliado(t.getMetadataAfiliado())
                             .build();
                 })
                 .collect(Collectors.toList());
