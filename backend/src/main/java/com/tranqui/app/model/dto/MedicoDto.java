@@ -40,6 +40,20 @@ public class MedicoDto {
     private MatriculaInfoDto matriculaInfo;
     private boolean verificado;
     private Boolean verificadoAdmin;
+    private String experiencia;
+    private RedesSocialesDto redesSociales;
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class RedesSocialesDto {
+        private String instagram;
+        private String facebook;
+        private String linkedin;
+        private String sitioWeb;
+    }
 
     private String descripcionPerfil;
     private List<String> pacientesAtiende;

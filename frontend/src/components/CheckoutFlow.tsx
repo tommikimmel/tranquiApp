@@ -57,6 +57,13 @@ function IconCheck({ size = 12 }: { size?: number }) {
 }
 
 // ── Types ──────────────────────────────────────────────────────
+interface RedesSociales {
+  instagram?: string
+  facebook?: string
+  linkedin?: string
+  sitioWeb?: string
+}
+
 interface Professional {
   id: string
   name: string
@@ -77,6 +84,8 @@ interface Professional {
   institucionFormacion?: string
   aniosExperiencia?: number | null
   tags?: string[]
+  experiencia?: string
+  redesSociales?: RedesSociales
 }
 
 interface TimeSlot {
@@ -478,11 +487,14 @@ function StepSelect({
     )
   }
 
-  const proBio = professional.descripcionPerfil?.trim() || (
+  const proBio = professional.descripcionPerfil?.trim() || professional.experiencia?.trim() || (
     professional.specialty.includes('Psiquiatra') || professional.specialty.includes('Psiquiatría')
       ? "Más de 15 años acompañando tratamientos de ansiedad, depresión y trastornos del ánimo. Enfoque integral que combina farmacología con seguimiento cercano y comunicación clara con el paciente."
       : "Psicólogo clínico con más de 12 años de trayectoria. Especializado en terapia cognitivo-conductual, tratamiento de ansiedad, ataques de pánico y desarrollo personal."
   );
+
+  const redes = professional.redesSociales;
+  const hasRedes = !!(redes && (redes.instagram || redes.facebook || redes.linkedin || redes.sitioWeb));
 
   return (
     <div className="checkout-body" style={{ maxWidth: '780px', margin: '0 auto' }}>
@@ -511,6 +523,31 @@ function StepSelect({
             <div className="doc-spec">{professional.degree} · {professional.specialty}</div>
 
             <p className="doc-bio">{proBio}</p>
+
+            {hasRedes && (
+              <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+                {redes?.instagram && (
+                  <a href={redes.instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram" style={{ color: 'var(--color-text-secondary)', display: 'inline-flex' }}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75"><rect x="2" y="2" width="20" height="20" rx="5" /><circle cx="12" cy="12" r="4" /><line x1="17.5" y1="6.5" x2="17.5" y2="6.5" /></svg>
+                  </a>
+                )}
+                {redes?.facebook && (
+                  <a href={redes.facebook} target="_blank" rel="noopener noreferrer" aria-label="Facebook" style={{ color: 'var(--color-text-secondary)', display: 'inline-flex' }}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg>
+                  </a>
+                )}
+                {redes?.linkedin && (
+                  <a href={redes.linkedin} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" style={{ color: 'var(--color-text-secondary)', display: 'inline-flex' }}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" /><rect x="2" y="9" width="4" height="12" /><circle cx="4" cy="4" r="2" /></svg>
+                  </a>
+                )}
+                {redes?.sitioWeb && (
+                  <a href={redes.sitioWeb} target="_blank" rel="noopener noreferrer" aria-label="Sitio web" style={{ color: 'var(--color-text-secondary)', display: 'inline-flex' }}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -58,6 +58,13 @@ interface Tariff {
   price: number
 }
 
+interface RedesSociales {
+  instagram?: string
+  facebook?: string
+  linkedin?: string
+  sitioWeb?: string
+}
+
 interface Professional {
   id: string
   name: string
@@ -82,6 +89,8 @@ interface Professional {
   pacientesAtiende?: string[]
   institucionFormacion?: string
   aniosExperiencia?: number | null
+  experiencia?: string
+  redesSociales?: RedesSociales
 }
 
 // PROFESSIONALS mock array removed since values are loaded from API
@@ -160,7 +169,7 @@ function SkeletonCard() {
 
 // ── Professional Card ──────────────────────────────────────────
 function ProCard({ pro, onBook, onChat, currentUser, availabilityDateLabel, availabilityCount }: { pro: Professional; onBook: (p: Professional) => void; onChat: (p: Professional) => void; currentUser: any; availabilityDateLabel?: string | null; availabilityCount?: number }) {
-  const proBio = pro.descripcionPerfil?.trim() || (
+  const proBio = pro.descripcionPerfil?.trim() || pro.experiencia?.trim() || (
     pro.specialty.includes('Psiquiatra') || pro.specialty.includes('Psiquiatría')
       ? "Médico especialista con enfoque integral combinando psicoterapia y abordaje farmacológico de forma personalizada."
       : "Profesional con enfoque clínico integral y seguimiento cercano del paciente para tratamientos de ansiedad, depresión y regulación emocional."
@@ -512,6 +521,8 @@ interface BookTarget {
   institucionFormacion?: string
   aniosExperiencia?: number | null
   tags?: string[]
+  experiencia?: string
+  redesSociales?: RedesSociales
 }
 
 export default function LandingPage({
@@ -816,7 +827,9 @@ export default function LandingPage({
         pacientesAtiende: pro.pacientesAtiende,
         institucionFormacion: pro.institucionFormacion,
         aniosExperiencia: pro.aniosExperiencia,
-        tags: pro.tags
+        tags: pro.tags,
+        experiencia: pro.experiencia,
+        redesSociales: pro.redesSociales
       })
     }
   }
@@ -1366,63 +1379,7 @@ export default function LandingPage({
               <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Mi Historia Clínica / Informes</h3>
               <button onClick={() => setShowReportsModal(false)} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
             </div>
-            {loadingPortal ? (
-              <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}><div className="checkout-spinner" style={{ margin: 'auto' }} /></div>
-            ) : myReports.length === 0 ? (
-              <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--space-4)' }}>No tenés informes emitidos.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                {myReports.map(r => (
-                  <div key={r.id} style={{
-                    padding: 'var(--space-4)',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: 'var(--color-surface)',
-                    border: '1px solid var(--color-border)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 'var(--space-2)'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <span className="badge badge--success" style={{ textTransform: 'uppercase', fontSize: '9px' }}>
-                          {r.tipoInforme.replace('_', ' ')}
-                        </span>
-                        <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                          Emitido por: <strong>{r.nombreMedico || 'Particular'}</strong>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                        <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>
-                          {r.fecha}
-                        </span>
-                        <button 
-                          onClick={() => downloadReportPDF(r, currentUser)}
-                          className="btn btn--secondary btn--sm" 
-                          style={{ padding: '2px 8px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          PDF
-                        </button>
-                      </div>
-                    </div>
-                    {r.planTrabajo && (
-                      <div style={{ fontSize: '11px' }}>
-                        <strong>Plan de Trabajo:</strong> {r.planTrabajo}
-                      </div>
-                    )}
-                    {r.contenido && (
-                      <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-2)', whiteSpace: 'pre-wrap' }}>
-                        {r.contenido}
-                      </div>
-                    )}
-                    {r.nombreArchivo && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginTop: 'var(--space-2)', fontSize: '11px', color: 'var(--color-primary)' }}>
-                        Adjunto: <em>{r.nombreArchivo}</em>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+            <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--space-4)' }}>Próximamente — vas a poder ver acá tu historia clínica e informes.</p>
           </div>
         </div>
       )}

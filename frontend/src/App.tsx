@@ -41,6 +41,13 @@ interface CheckoutTarget {
   institucionFormacion?: string
   aniosExperiencia?: number | null
   tags?: string[]
+  experiencia?: string
+  redesSociales?: {
+    instagram?: string
+    facebook?: string
+    linkedin?: string
+    sitioWeb?: string
+  }
 }
 
 // ── /reserva/:proId route — resolves the professional either from the
@@ -87,6 +94,8 @@ function CheckoutRoute({ currentUser, loadingSession }: { currentUser: any; load
           institucionFormacion: m.institucionFormacion,
           aniosExperiencia: m.aniosExperiencia,
           tags: m.tags,
+          experiencia: m.experiencia,
+          redesSociales: m.redesSociales,
         })
       })
       .catch(() => setNotFound(true))
@@ -1488,6 +1497,7 @@ function getMissingRequirements(m: any): string[] {
   if (!m.institucionFormacion || !m.institucionFormacion.trim()) missing.push("Institución donde te formaste")
   if (m.aniosExperiencia === null || m.aniosExperiencia === undefined) missing.push("Años de experiencia clínica")
   if (!m.ofreceOnline && !m.ofrecePresencial) missing.push("Al menos una modalidad de consulta (online o presencial)")
+  if (!m.experiencia || !m.experiencia.trim()) missing.push("Tu Experiencia (Presencia y Contenido)")
   if (!m.verificadoAdmin) missing.push("Verificación y validación de matrícula por el Administrador de Tranqui")
 
   return missing
@@ -1552,6 +1562,11 @@ function SettingsView({
   const [fotoUrl, setFotoUrl] = useState(medicoInfo?.fotoUrl || '')
   const [ofreceOnline, setOfreceOnline] = useState(medicoInfo?.ofreceOnline !== undefined ? medicoInfo.ofreceOnline : true)
   const [ofrecePresencial, setOfrecePresencial] = useState(medicoInfo?.ofrecePresencial !== undefined ? medicoInfo.ofrecePresencial : false)
+  const [experiencia, setExperiencia] = useState(medicoInfo?.experiencia || '')
+  const [instagram, setInstagram] = useState(medicoInfo?.redesSociales?.instagram || '')
+  const [facebook, setFacebook] = useState(medicoInfo?.redesSociales?.facebook || '')
+  const [linkedin, setLinkedin] = useState(medicoInfo?.redesSociales?.linkedin || '')
+  const [sitioWeb, setSitioWeb] = useState(medicoInfo?.redesSociales?.sitioWeb || '')
 
   // Public profile info (shown to patients on the booking page, required for account verification)
   const [descripcionPerfil, setDescripcionPerfil] = useState(medicoInfo?.descripcionPerfil || '')
@@ -1611,7 +1626,14 @@ function SettingsView({
         descripcionPerfil,
         pacientesAtiende,
         institucionFormacion,
-        aniosExperiencia: aniosExperiencia === '' ? null : Number(aniosExperiencia)
+        aniosExperiencia: aniosExperiencia === '' ? null : Number(aniosExperiencia),
+        experiencia,
+        redesSociales: {
+          instagram,
+          facebook,
+          linkedin,
+          sitioWeb
+        }
       })
       showAlert("Configuración guardada con éxito ✓", "success")
     } catch (err) {
@@ -2019,6 +2041,54 @@ function SettingsView({
         <div style={{ marginTop: 'var(--space-6)' }}>
           <button className="btn btn--primary" onClick={handleSave} disabled={saving} id="btn-save-public-profile">
             {saving ? 'Guardando...' : 'Guardar perfil público'}
+          </button>
+        </div>
+      </div>
+
+      {/* Presencia y Contenido */}
+      <div className="card">
+        <div className="card__header">
+          <h2 className="card__title">Presencia y Contenido</h2>
+          <p className="card__subtitle">Esta información se muestra a los pacientes en tu perfil público y al reservar un turno.</p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-experiencia">Tu Experiencia</label>
+            <textarea
+              id="input-experiencia"
+              className="form-input"
+              rows={4}
+              placeholder="Contales a tus pacientes tu trayectoria, enfoque y especialización..."
+              value={experiencia}
+              onChange={(e) => setExperiencia(e.target.value)}
+              style={{ resize: 'vertical' }}
+            />
+          </div>
+          <div>
+            <div className="form-label" style={{ marginBottom: 'var(--space-3)' }}>Redes sociales</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="input-instagram">Instagram</label>
+                <input id="input-instagram" className="form-input" type="url" placeholder="https://instagram.com/tu_usuario" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="input-facebook">Facebook</label>
+                <input id="input-facebook" className="form-input" type="url" placeholder="https://facebook.com/tu_pagina" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="input-linkedin">LinkedIn</label>
+                <input id="input-linkedin" className="form-input" type="url" placeholder="https://linkedin.com/in/tu_usuario" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="input-sitio-web">Sitio web</label>
+                <input id="input-sitio-web" className="form-input" type="url" placeholder="https://tu-sitio.com" value={sitioWeb} onChange={(e) => setSitioWeb(e.target.value)} />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style={{ marginTop: 'var(--space-6)' }}>
+          <button className="btn btn--primary" onClick={handleSave} disabled={saving} id="btn-save-presencia">
+            {saving ? 'Guardando...' : 'Guardar presencia y contenido'}
           </button>
         </div>
       </div>
