@@ -41,6 +41,13 @@ interface CheckoutTarget {
   institucionFormacion?: string
   aniosExperiencia?: number | null
   tags?: string[]
+  experiencia?: string
+  redesSociales?: {
+    instagram?: string
+    facebook?: string
+    linkedin?: string
+    sitioWeb?: string
+  }
 }
 
 // ── /reserva/:proId route — resolves the professional either from the
@@ -87,6 +94,8 @@ function CheckoutRoute({ currentUser, loadingSession }: { currentUser: any; load
           institucionFormacion: m.institucionFormacion,
           aniosExperiencia: m.aniosExperiencia,
           tags: m.tags,
+          experiencia: m.experiencia,
+          redesSociales: m.redesSociales,
         })
       })
       .catch(() => setNotFound(true))
@@ -1585,6 +1594,7 @@ function getMissingRequirements(m: any): string[] {
   if (!m.institucionFormacion || !m.institucionFormacion.trim()) missing.push("Institución donde te formaste")
   if (m.aniosExperiencia === null || m.aniosExperiencia === undefined) missing.push("Años de experiencia clínica")
   if (!m.ofreceOnline && !m.ofrecePresencial) missing.push("Al menos una modalidad de consulta (online o presencial)")
+  if (!m.experiencia || !m.experiencia.trim()) missing.push("Tu Experiencia (Presencia y Contenido)")
   if (!m.verificadoAdmin) missing.push("Verificación y validación de matrícula por el Administrador de Tranqui")
 
   return missing
@@ -1649,6 +1659,11 @@ function SettingsView({
   const [fotoUrl, setFotoUrl] = useState(medicoInfo?.fotoUrl || '')
   const [ofreceOnline, setOfreceOnline] = useState(medicoInfo?.ofreceOnline !== undefined ? medicoInfo.ofreceOnline : true)
   const [ofrecePresencial, setOfrecePresencial] = useState(medicoInfo?.ofrecePresencial !== undefined ? medicoInfo.ofrecePresencial : false)
+  const [experiencia, setExperiencia] = useState(medicoInfo?.experiencia || '')
+  const [instagram, setInstagram] = useState(medicoInfo?.redesSociales?.instagram || '')
+  const [facebook, setFacebook] = useState(medicoInfo?.redesSociales?.facebook || '')
+  const [linkedin, setLinkedin] = useState(medicoInfo?.redesSociales?.linkedin || '')
+  const [sitioWeb, setSitioWeb] = useState(medicoInfo?.redesSociales?.sitioWeb || '')
 
   // Public profile info (shown to patients on the booking page, required for account verification)
   const [descripcionPerfil, setDescripcionPerfil] = useState(medicoInfo?.descripcionPerfil || '')
@@ -1745,7 +1760,14 @@ function SettingsView({
         descripcionPerfil,
         pacientesAtiende,
         institucionFormacion,
-        aniosExperiencia: aniosExperiencia === '' ? null : Number(aniosExperiencia)
+        aniosExperiencia: aniosExperiencia === '' ? null : Number(aniosExperiencia),
+        experiencia,
+        redesSociales: {
+          instagram,
+          facebook,
+          linkedin,
+          sitioWeb
+        }
       })
       showAlert("Configuración guardada con éxito ✓", "success")
     } catch (err) {
@@ -2182,6 +2204,54 @@ function SettingsView({
         </div>
       </div>
       )}
+
+      {/* Presencia y Contenido */}
+      <div className="card">
+        <div className="card__header">
+          <h2 className="card__title">Presencia y Contenido</h2>
+          <p className="card__subtitle">Esta información se muestra a los pacientes en tu perfil público y al reservar un turno.</p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-experiencia">Tu Experiencia</label>
+            <textarea
+              id="input-experiencia"
+              className="form-input"
+              rows={4}
+              placeholder="Contales a tus pacientes tu trayectoria, enfoque y especialización..."
+              value={experiencia}
+              onChange={(e) => setExperiencia(e.target.value)}
+              style={{ resize: 'vertical' }}
+            />
+          </div>
+          <div>
+            <div className="form-label" style={{ marginBottom: 'var(--space-3)' }}>Redes sociales</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="input-instagram">Instagram</label>
+                <input id="input-instagram" className="form-input" type="url" placeholder="https://instagram.com/tu_usuario" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="input-facebook">Facebook</label>
+                <input id="input-facebook" className="form-input" type="url" placeholder="https://facebook.com/tu_pagina" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="input-linkedin">LinkedIn</label>
+                <input id="input-linkedin" className="form-input" type="url" placeholder="https://linkedin.com/in/tu_usuario" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="input-sitio-web">Sitio web</label>
+                <input id="input-sitio-web" className="form-input" type="url" placeholder="https://tu-sitio.com" value={sitioWeb} onChange={(e) => setSitioWeb(e.target.value)} />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style={{ marginTop: 'var(--space-6)' }}>
+          <button className="btn btn--primary" onClick={handleSave} disabled={saving} id="btn-save-presencia">
+            {saving ? 'Guardando...' : 'Guardar presencia y contenido'}
+          </button>
+        </div>
+      </div>
 
       {/* Tariffs */}
       {activeTab === 'honorarios' && (
@@ -2909,13 +2979,14 @@ function DashboardHome({
             </ul>
           )
         ) : calendarView === 'weekly' ? (
-          /* Weekly Calendar Matrix Grid */
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: '80px repeat(5, 1fr)', 
-            gap: 'var(--space-2)', 
+          /* Weekly Calendar Matrix Grid — horizontally scrollable on mobile/tablet so no column gets squished or hidden */
+          <div style={{ width: '100%', overflowX: 'auto', marginTop: 'var(--space-4)' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '80px repeat(5, minmax(140px, 1fr))',
+            gap: 'var(--space-2)',
             width: '100%',
-            marginTop: 'var(--space-4)',
+            minWidth: '760px',
             border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-lg)',
             overflow: 'hidden',
@@ -3100,64 +3171,117 @@ function DashboardHome({
               );
             })}
           </div>
+          </div>
         ) : (
-          /* Monthly Calendar Grid */
-          <table className="dashboard-home-cal">
-            <thead>
-              <tr>
-                {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((dName) => (
-                  <th key={dName}>{dName}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: 5 }).map((_, weekIdx) => (
-                <tr key={weekIdx}>
-                  {monthDays.slice(weekIdx * 7, weekIdx * 7 + 7).map((d, index) => {
-                    const isCurrentMonth = d.getMonth() === currentDate.getMonth();
-                    const isToday = d.toDateString() === new Date().toDateString();
-                    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                    const dayAppts = allAppointments.filter(a => a.fecha === dateStr && a.status !== 'cancelled');
-                    const dayExternalEvts = externalEvents.filter(e => e.fecha === dateStr);
-                    const dayItemsTotal = dayAppts.length + dayExternalEvts.length;
+          /* Monthly Calendar Grid — horizontally scrollable on mobile/tablet so no column gets squished or hidden */
+          <div style={{ width: '100%', overflowX: 'auto', marginTop: 'var(--space-4)' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, minmax(110px, 1fr))',
+            minWidth: '700px',
+            gap: '1px',
+            backgroundColor: 'var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden'
+          }}>
+            {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((dName) => (
+              <div key={dName} style={{
+                backgroundColor: 'var(--green-50)',
+                color: 'var(--color-primary)',
+                padding: 'var(--space-2)',
+                textAlign: 'center',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                textTransform: 'uppercase'
+              }}>
+                {dName}
+              </div>
+            ))}
+            {monthDays.map((d, index) => {
+              const isCurrentMonth = d.getMonth() === currentDate.getMonth();
+              const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+              const dayAppts = allAppointments.filter(a => a.fecha === dateStr && a.status !== 'cancelled');
+              const dayExternalEvts = externalEvents.filter(e => e.fecha === dateStr);
+              const dayItemsTotal = dayAppts.length + dayExternalEvts.length;
 
-                    return (
-                      <td key={index}>
-                        <span className={`dashboard-home-daynum ${isToday ? 'dashboard-home-daynum--today' : isCurrentMonth ? '' : 'dashboard-home-daynum--muted'}`}>
-                          {d.getDate()}
-                        </span>
-                        {dayItemsTotal > 0 && (
-                          <div className="dashboard-home-day-appts">
-                            {dayAppts.slice(0, 2).map((a) => (
-                              <div
-                                key={a.id}
-                                onClick={() => setSelectedAppt(a)}
-                                className={`dashboard-home-day-appt ${a.status === 'confirmed' ? 'dashboard-home-day-appt--confirmed' : 'dashboard-home-day-appt--pending'}`}
-                              >
-                                {a.hour} {a.patientName}
-                              </div>
-                            ))}
-                            {dayAppts.length < 2 && dayExternalEvts.slice(0, 2 - dayAppts.length).map((e) => (
-                              <div
-                                key={e.id}
-                                className="dashboard-home-day-appt dashboard-home-day-appt--external"
-                                title={e.title}
-                              >
-                                {e.allDay ? e.title : `${e.hour} ${e.title}`}
-                              </div>
-                            ))}
-                            {dayItemsTotal > 2 && (
-                              <div className="dashboard-home-day-more">+{dayItemsTotal - 2} más</div>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              return (
+                <div key={index} style={{
+                  backgroundColor: '#ffffff',
+                  minHeight: '90px',
+                  padding: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  opacity: isCurrentMonth ? 1 : 0.4,
+                  borderBottom: '1px solid #f0f2f5',
+                  borderRight: '1px solid #f0f2f5'
+                }}>
+                  <div style={{
+                    fontWeight: 'bold',
+                    fontSize: '11px',
+                    color: d.toDateString() === new Date().toDateString() ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                    alignSelf: 'flex-start',
+                    backgroundColor: d.toDateString() === new Date().toDateString() ? 'var(--green-100)' : 'transparent',
+                    borderRadius: '50%',
+                    width: '20px',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {d.getDate()}
+                  </div>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
+                    {dayAppts.slice(0, 2).map((a) => (
+                      <div
+                        key={a.id}
+                        onClick={() => setSelectedAppt(a)}
+                        style={{
+                          fontSize: '9px',
+                          padding: '2px 4px',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: a.status === 'confirmed' ? 'var(--green-50)' : '#fffbeb',
+                          color: a.status === 'confirmed' ? 'var(--color-primary)' : '#b45309',
+                          borderLeft: a.status === 'confirmed' ? '2px solid var(--color-primary)' : '2px solid #f59e0b',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {a.hour} {a.patientName}
+                      </div>
+                    ))}
+                    {dayAppts.length < 2 && dayExternalEvts.slice(0, 2 - dayAppts.length).map((e) => (
+                      <div
+                        key={e.id}
+                        title={e.title}
+                        style={{
+                          fontSize: '9px',
+                          padding: '2px 4px',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: 'var(--neutral-100)',
+                          color: 'var(--color-text-secondary)',
+                          borderLeft: '2px solid var(--neutral-400)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}
+                      >
+                        {e.allDay ? e.title : `${e.hour} ${e.title}`}
+                      </div>
+                    ))}
+                    {dayItemsTotal > 2 && (
+                      <div style={{ fontSize: '9px', color: 'var(--color-text-secondary)', paddingLeft: '4px', fontWeight: 'bold' }}>
+                        +{dayItemsTotal - 2} más
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          </div>
         )}
       </div>
 
@@ -3279,11 +3403,8 @@ function DashboardHome({
                 <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
                   Información del Paciente
                 </label>
-                <div style={{
+                <div className="turno-modal-grid" style={{
                   marginTop: 'var(--space-2)',
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: 'var(--space-3)',
                   backgroundColor: 'var(--neutral-50)',
                   padding: 'var(--space-4)',
                   borderRadius: 'var(--radius-lg)',
@@ -3298,19 +3419,19 @@ function DashboardHome({
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Email</label>
                     <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500' }}>
-                      {selectedAppt.patientEmail || '-'}
+                      {selectedAppt.patientInfo?.email || '-'}
                     </span>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>DNI</label>
                     <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500' }}>
-                      {selectedAppt.patientDni || '-'}
+                      {selectedAppt.patientInfo?.dni || '-'}
                     </span>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Dato de Contacto</label>
                     <span style={{ fontSize: 'var(--text-sm)', fontWeight: '500' }}>
-                      {selectedAppt.patientPhone || '-'}
+                      {selectedAppt.patientInfo?.telefono || '-'}
                     </span>
                   </div>
                 </div>
@@ -3321,11 +3442,8 @@ function DashboardHome({
                 <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
                   Detalles de Cobertura
                 </label>
-                <div style={{
+                <div className="turno-modal-grid" style={{
                   marginTop: 'var(--space-2)',
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: 'var(--space-3)',
                   backgroundColor: 'var(--neutral-50)',
                   padding: 'var(--space-4)',
                   borderRadius: 'var(--radius-lg)',
@@ -3333,12 +3451,18 @@ function DashboardHome({
                 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Obra Social</label>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>{selectedAppt.obraSocial || 'Particular'}</span>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>{selectedAppt.patientInfo?.obraSocial || 'Particular'}</span>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>Plan</label>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>{selectedAppt.plan || '-'}</span>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>{selectedAppt.patientInfo?.credencial?.plan || '-'}</span>
                   </div>
+                  {selectedAppt.metadataAfiliado && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>N° de Afiliado OSDE (copago)</label>
+                      <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>{selectedAppt.metadataAfiliado}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -3375,11 +3499,7 @@ function DashboardHome({
                 </div>
 
                 {isRescheduling && (
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1.2fr 0.8fr 1fr',
-                    gap: 'var(--space-2)',
-                    alignItems: 'flex-end',
+                  <div className="turno-modal-reschedule-grid" style={{
                     backgroundColor: 'var(--neutral-50)',
                     padding: 'var(--space-3)',
                     borderRadius: 'var(--radius-md)',

@@ -1684,6 +1684,7 @@
   }
 }
 
+
 /* ── Settings view (Configuración) ────────────────────────────
    Scoped classes for SettingsView's sub-navigation, section labels, fees
    table and the "Presencia y contenido" placeholder tab. These reuse the
@@ -2323,4 +2324,102 @@
   .dashboard-home-cal td {
     height: 70px;
   }
+}
+
+/* ── Turno detail modal grids (responsive) ──────────────────── */
+.turno-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.turno-modal-reschedule-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 1fr;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+@media (max-width: 480px) {
+  .turno-modal-grid {
+    grid-template-columns: 1fr;
+  }
+  .turno-modal-reschedule-grid {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+}
+
+/* ── Availability grid — extra breakpoint for narrow phones ──── */
+@media (max-width: 480px) {
+  .availability-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── Patients master-detail layout (responsive) ──────────────── */
+.patients-master-detail {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+}
+
+.patients-master-detail__sidebar {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.patients-master-detail__back {
+  display: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  padding: var(--space-1);
+  flex-shrink: 0;
+}
+
+.patients-master-detail__meta-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 900px) {
+  .patients-master-detail {
+    grid-template-columns: 1fr;
+  }
+
+  /* Mobile: show only one pane at a time — list or detail — like a native chat app */
+  .patients-master-detail[data-selected="true"] .patients-master-detail__sidebar {
+    display: none;
+  }
+
+  .patients-master-detail[data-selected="false"] .patients-master-detail__main {
+    display: none;
+  }
+
+  .patients-master-detail__back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .patients-master-detail__meta-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .patients-master-detail__meta-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Generic responsive form grid — replaces fixed N-column inline
+   grids (ficha de paciente, seguimientos, informes) so every field
+   stays reachable/full-width on mobile instead of getting squished ── */
+.form-grid-auto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }

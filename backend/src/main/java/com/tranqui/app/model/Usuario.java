@@ -235,6 +235,21 @@ public class Usuario {
     @Column(name = "intervalo_entre_turnos_minutos")
     private Integer intervaloEntreTurnosMinutos;
 
+    @Column(name = "experiencia", columnDefinition = "TEXT")
+    private String experiencia;
+
+    @Column(name = "instagram_url", length = 255)
+    private String instagramUrl;
+
+    @Column(name = "facebook_url", length = 255)
+    private String facebookUrl;
+
+    @Column(name = "linkedin_url", length = 255)
+    private String linkedinUrl;
+
+    @Column(name = "sitio_web_url", length = 255)
+    private String sitioWebUrl;
+
     // ── QBI2 Recipe integration fields (médico) ────────────────────────────
     // Digital signature image, required on every electronic prescription. Same
     // shape as fotoUrl (a URL or a base64 data-uri) and validated the same way

@@ -139,6 +139,14 @@ public class MedicoService {
         medico.setFotoUrl(dto.getFotoUrl());
         medico.setOfreceOnline(dto.isOfreceOnline());
         medico.setOfrecePresencial(dto.isOfrecePresencial());
+        medico.setExperiencia(dto.getExperiencia());
+
+        if (dto.getRedesSociales() != null) {
+            medico.setInstagramUrl(dto.getRedesSociales().getInstagram());
+            medico.setFacebookUrl(dto.getRedesSociales().getFacebook());
+            medico.setLinkedinUrl(dto.getRedesSociales().getLinkedin());
+            medico.setSitioWebUrl(dto.getRedesSociales().getSitioWeb());
+        }
 
         if (dto.getFirmaUrl() != null && com.tranqui.app.util.ImageUtils.decodedByteSize(dto.getFirmaUrl()) > MAX_FOTO_BYTES) {
             throw new IllegalArgumentException(
@@ -325,6 +333,13 @@ public class MedicoService {
                 .selloLinea1(m.getSelloLinea1())
                 .selloLinea2(m.getSelloLinea2())
                 .selloLinea3(m.getSelloLinea3())
+                .experiencia(m.getExperiencia())
+                .redesSociales(MedicoDto.RedesSocialesDto.builder()
+                        .instagram(m.getInstagramUrl())
+                        .facebook(m.getFacebookUrl())
+                        .linkedin(m.getLinkedinUrl())
+                        .sitioWeb(m.getSitioWebUrl())
+                        .build())
                 .build();
     }
 
@@ -503,6 +518,7 @@ public class MedicoService {
                 && u.getAniosExperiencia() != null
                 && u.getTags() != null && !u.getTags().trim().isEmpty()
                 && (u.isOfreceOnline() || u.isOfrecePresencial())
+                && u.getExperiencia() != null && !u.getExperiencia().trim().isEmpty()
                 && Boolean.TRUE.equals(u.getVerificadoAdmin());
     }
 }
