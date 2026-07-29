@@ -3189,28 +3189,25 @@ function DashboardHome({
             </ul>
           )
         ) : calendarView === 'weekly' ? (
-          /* Weekly Calendar Matrix Grid — 7 days (Lun-Dom), matching Monthly & Daily aesthetics */
-          <div style={{ width: '100%', overflowX: 'auto', marginTop: 'var(--space-4)' }}>
+          /* Weekly Calendar Matrix Grid — identical design system, grid gap, and background colors as Monthly view */
+          <div style={{ width: '100%', overflowX: 'auto', marginTop: 'var(--space-3)' }}>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '55px repeat(7, minmax(95px, 1fr))',
-              width: '100%',
-              minWidth: '680px',
-              border: '1px solid var(--color-border)',
+              gridTemplateColumns: '55px repeat(7, minmax(85px, 1fr))',
+              gap: '2px',
+              backgroundColor: 'var(--color-border)',
               borderRadius: 'var(--radius-lg)',
               overflow: 'hidden',
-              backgroundColor: 'var(--color-surface)',
               boxShadow: 'var(--shadow-sm)'
             }}>
               {/* Corner Header */}
               <div style={{
                 backgroundColor: 'var(--green-50)',
-                padding: 'var(--space-3) var(--space-2)',
-                borderBottom: '2px solid var(--color-border)',
-                borderRight: '1px solid var(--color-border)',
-                fontSize: '11px',
-                fontWeight: 'bold',
                 color: 'var(--color-primary)',
+                padding: '6px 2px',
+                textAlign: 'center',
+                fontWeight: 'bold',
+                fontSize: '11px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -3221,32 +3218,32 @@ function DashboardHome({
               {/* Day Headers (7 Days: Lun - Dom) */}
               {weekdaysWithDates.map((day) => (
                 <div key={day.num} style={{
+                  backgroundColor: 'var(--green-50)',
+                  color: 'var(--color-primary)',
+                  padding: '6px 2px',
                   textAlign: 'center',
-                  padding: 'var(--space-2) var(--space-1)',
-                  fontSize: 'var(--text-xs)',
                   fontWeight: 'bold',
-                  color: day.isToday ? '#ffffff' : 'var(--color-primary)',
-                  backgroundColor: day.isToday ? 'var(--color-primary)' : 'var(--green-50)',
-                  borderBottom: '2px solid var(--color-border)',
-                  borderRight: day.num !== 7 ? '1px solid var(--color-border)' : 'none',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
+                  fontSize: '11px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '2px'
                 }}>
-                  <span style={{ fontSize: '11px', opacity: day.isToday ? 0.95 : 0.85 }}>{day.abbr}</span>
-                  <span style={{
-                    fontSize: '13px',
-                    fontWeight: '800',
-                    backgroundColor: day.isToday ? 'rgba(255,255,255,0.2)' : 'transparent',
-                    padding: '1px 6px',
-                    borderRadius: 'var(--radius-sm)'
+                  <span style={{ fontSize: '10px', textTransform: 'uppercase', opacity: 0.85 }}>{day.abbr}</span>
+                  <div style={{
+                    fontWeight: day.isToday ? 'bold' : '500',
+                    fontSize: '11px',
+                    color: day.isToday ? 'white' : 'var(--color-primary)',
+                    borderRadius: '50%',
+                    padding: '2px 6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: day.isToday ? 'var(--color-primary)' : 'transparent'
                   }}>
                     {day.dayNum}/{day.monthNum}
-                  </span>
+                  </div>
                 </div>
               ))}
 
@@ -3271,15 +3268,14 @@ function DashboardHome({
                   <React.Fragment key={slot}>
                     {/* Hour Label Column */}
                     <div style={{
+                      backgroundColor: 'var(--green-50)',
+                      color: 'var(--color-primary)',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: 'var(--neutral-50)',
-                      borderRight: '1px solid var(--color-border)',
-                      borderBottom: '1px solid var(--color-border)',
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      color: 'var(--color-text-secondary)'
+                      padding: '4px'
                     }}>
                       {slot} hs
                     </div>
@@ -3300,31 +3296,27 @@ function DashboardHome({
 
                       return (
                         <div key={day.num} style={{
-                          padding: 'var(--space-2)',
-                          borderRight: day.num !== 7 ? '1px solid var(--color-border)' : 'none',
-                          borderBottom: '1px solid var(--color-border)',
-                          minHeight: '75px',
-                          backgroundColor: !isCellVisible
-                            ? 'var(--neutral-50)'
-                            : appt || externalEvent
-                              ? 'var(--color-surface)'
-                              : 'rgba(0, 166, 80, 0.04)', // Clean soft green for available slots
+                          backgroundColor: day.isToday ? '#F0F9F1' : '#ffffff',
+                          minHeight: '52px',
+                          padding: '4px',
                           display: 'flex',
                           flexDirection: 'column',
+                          alignItems: 'center',
                           justifyContent: 'center',
-                          gap: 'var(--space-1)',
-                          transition: 'background-color 0.15s ease'
+                          gap: '3px',
+                          opacity: isCellVisible ? 1 : 0.4
                         }}>
                           {externalEvent && (
                             <div style={{
-                              padding: '5px 8px',
-                              borderRadius: 'var(--radius-md)',
+                              padding: '4px 6px',
+                              borderRadius: 'var(--radius-sm)',
                               backgroundColor: '#eef4fe',
                               border: '1px solid #c9dcfb',
                               borderLeft: '3px solid #4285f4',
                               fontSize: '10px',
                               fontWeight: '600',
-                              color: 'var(--color-text-primary)'
+                              color: 'var(--color-text-primary)',
+                              width: '100%'
                             }}>
                               📅 {externalEvent.title}
                             </div>
@@ -3333,36 +3325,32 @@ function DashboardHome({
                             <div 
                               onClick={() => setSelectedAppt(appt)}
                               style={{
-                                padding: 'var(--space-2) var(--space-3)',
-                                borderRadius: 'var(--radius-md)',
+                                padding: '4px 6px',
+                                borderRadius: 'var(--radius-sm)',
                                 backgroundColor: 'var(--color-surface)',
                                 border: '1px solid var(--color-border)',
                                 borderLeft: appt.status === 'confirmed' 
-                                  ? '4px solid var(--color-primary)' 
+                                  ? '3px solid var(--color-primary)' 
                                   : appt.status === 'completed' 
-                                    ? '4px solid var(--neutral-400)' 
-                                    : '4px solid var(--color-warning)',
+                                    ? '3px solid var(--neutral-400)' 
+                                    : '3px solid #f59e0b',
                                 boxShadow: 'var(--shadow-xs)',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '3px',
+                                gap: '2px',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                                position: 'relative'
+                                width: '100%',
+                                transition: 'transform 0.15s ease'
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.borderColor = 'var(--color-primary)';
-                                e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                                e.currentTarget.style.transform = 'translateY(-1px)';
                               }}
                               onMouseLeave={(e) => {
                                 e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.borderColor = 'var(--color-border)';
-                                e.currentTarget.style.boxShadow = 'var(--shadow-xs)';
                               }}
                             >
                               <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span>{appt.patientName}</span>
+                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{appt.patientName}</span>
                                 {appt.meetUrl && (
                                   <span title="Videollamada Google Meet" style={{ color: '#1a73e8', fontSize: '10px' }}>📹</span>
                                 )}
@@ -3392,9 +3380,8 @@ function DashboardHome({
                               color: 'var(--color-primary)',
                               fontWeight: '600',
                               backgroundColor: 'rgba(0, 166, 80, 0.08)',
-                              padding: '3px 6px',
-                              borderRadius: 'var(--radius-sm)',
-                              alignSelf: 'center'
+                              padding: '2px 5px',
+                              borderRadius: 'var(--radius-sm)'
                             }}>
                               Disponible
                             </div>
