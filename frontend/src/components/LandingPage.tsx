@@ -78,7 +78,6 @@ interface Tariff {
 
 interface RedesSociales {
   instagram?: string
-  facebook?: string
   linkedin?: string
   sitioWeb?: string
 }
@@ -314,12 +313,12 @@ function PublicHeader({
           
           {/* Help Button */}
           <button
-            className="btn btn--ghost btn--sm"
+            className="btn btn--ghost btn--sm btn-faq"
             onClick={onOpenHelp}
-            style={{ fontSize: 'var(--text-xs)', padding: 'var(--space-2) var(--space-4)', display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}
+            title="Ayuda y preguntas frecuentes"
           >
             <IconHelp />
-            Ayuda / FAQ
+            <span className="btn-faq-text">Ayuda / FAQ</span>
           </button>
 
           <button
@@ -328,28 +327,26 @@ function PublicHeader({
             id="btn-crisis-trigger"
           >
             <span className="btn-crisis__dot" aria-hidden="true" />
-            Ayuda urgente
+            <span className="btn-crisis-text">Ayuda urgente</span>
           </button>
 
           {currentUser ? (
             isDoctor ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>
-                  {currentUser.nombre} (Médico)
+              <div className="header-pro-actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span className="header-pro-name" style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', fontWeight: 'var(--font-weight-medium)' }}>
+                  {currentUser.nombre}
                 </span>
                 <button 
                   className="btn btn--secondary btn--sm" 
                   onClick={onGoToDashboard}
-                  style={{ padding: 'var(--space-2) var(--space-4)', fontSize: 'var(--text-xs)' }}
                 >
-                  Panel Profesional
+                  Panel
                 </button>
                 <button 
                   className="btn btn--ghost btn--sm" 
                   onClick={onLogout}
-                  style={{ padding: 'var(--space-2) var(--space-4)', fontSize: 'var(--text-xs)' }}
                 >
-                  Cerrar sesión
+                  Salir
                 </button>
               </div>
             ) : (
@@ -1600,39 +1597,10 @@ export default function LandingPage({
               const opening = !showFloatingChat;
               setShowFloatingChat(opening);
               if (opening) {
-                // Always land on the conversation list when (re)opening the widget from
-                // its icon — same as WhatsApp itself. Only an explicit "Chatear" click
-                // (handleStartChat) or tapping a channel jumps straight into a chat.
                 setChatSubView('list');
               }
             }}
             className="chat-fab"
-            style={{
-              position: 'fixed',
-              bottom: '24px',
-              right: '24px',
-              width: '60px',
-              height: '60px',
-              borderRadius: 'var(--radius-full)',
-              background: 'linear-gradient(180deg, var(--green-400), var(--color-primary))',
-              border: 'none',
-              boxShadow: 'var(--shadow-green)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              zIndex: 1000,
-              transition: 'transform var(--transition-fast), box-shadow var(--transition-fast)',
-              color: 'white'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.08)';
-              e.currentTarget.style.boxShadow = 'var(--shadow-lg)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.boxShadow = 'var(--shadow-green)';
-            }}
             aria-label="Abrir chat con profesionales"
           >
             {/* Tranqui chat icon: speech bubble with a calm pulse, not a borrowed brand mark */}

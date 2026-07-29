@@ -33,6 +33,24 @@ public class PacienteDto {
     private String datosOfuscado;
     private CredencialInfoDto credencial;
 
+    // Structured domicilio for QBI2 Recipe — additive alongside `direccion` (free text).
+    private DomicilioDto domicilio;
+
+    @lombok.Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DomicilioDto {
+        private String calle;
+        private String numero;
+        private String piso;
+        private String dpto;
+        private String codigoPostal;
+        private String localidad;
+        private String provincia;
+        private String pais;
+    }
+
     @lombok.Data
     @Builder
     @NoArgsConstructor

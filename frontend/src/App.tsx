@@ -341,8 +341,17 @@ const Icon = {
       <path d="M12 18v4" />
     </svg>
   ),
-  MercadoPago: ({ size = 16 }: { size?: number } = {}) => (
-    <img src="/logo-mp.svg" alt="" style={{ width: size, height: size, display: 'block' }} />
+  MercadoPago: ({ size = 18 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'block' }}>
+      <path d="M40.9763,30.6458a5.2763,5.2763,0,0,1-2.1726-2.0337,54.6611,54.6611,0,0,1-8.7476,1.0169c-3.701,0-6.6869-.1757-5.4673-3.6243s4.4579-10.5561,5.5934-11.986,2.6859-3.239,3.4486-3.1542c.9463.1051,2.7152,1.2834,2.5166,2.0333-.1892.715-1.1287,2.2774-2.7471,1.1649"/>
+      <path d="M32.8639,14.8392a8.1339,8.1339,0,0,1,1.2926-1.6406"/>
+      <path d="M35.9393,13.4064c.5677-.1443,1.64.5818,1.035,1.3272a4.7779,4.7779,0,0,1-2.8178,1.3248c-.6248.0556-2.7967-.021-2.7967-.021-.9252,1.5981-.7149,4.0374-.7991,6.1822a9.3461,9.3461,0,0,1-.8831,3.6589c3.7009-1.7243,10.0093-3.028,13.8224-2.3972"/>
+      <path d="M7.0237,30.6458a5.2763,5.2763,0,0,0,2.1726-2.0337,54.6611,54.6611,0,0,0,8.7476,1.0169c3.701,0,6.6869-.1757,5.4673-3.6243s-4.4579-10.5561-5.5934-11.986-2.6859-3.239-3.4486-3.1542c-.9463.1051-2.7152,1.2834-2.5166,2.0333.1892.715,1.1287,2.2774,2.7471,1.1649"/>
+      <path d="M15.1361,14.8392a8.1339,8.1339,0,0,0-1.2926-1.6406"/>
+      <path d="M12.0607,13.4064c-.5677-.1443-1.6405.5818-1.035,1.3272a4.7779,4.7779,0,0,0,2.8178,1.3248c.6248.0556,2.7967-.021,2.7967-.021.9252,1.5981.7149,4.0374.7991,6.1822a9.3461,9.3461,0,0,0,.8831,3.6589C14.6215,24.1542,8.3131,22.8505,4.5,23.4813"/>
+      <path d="M32.1812,11.742a27.5655,27.5655,0,0,0-16.3641.0006"/>
+      <path d="M10.9168,13.9894C6.9758,16.46,4.5,20.03,4.5,24c0,7.4558,8.73,13.5,19.5,13.5S43.5,31.4558,43.5,24c0-3.9705-2.4759-7.5407-6.4172-10.0109"/>
+    </svg>
   ),
   Star: ({ size = 16 }: { size?: number } = {}) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
@@ -372,7 +381,21 @@ function getNotificationVisual(tipo: string | undefined): { Icon: (props: { size
 }
 
 // ── Sidebar Component ──────────────────────────────────────────
-function Sidebar({ activeNav, onNavChange, medicoInfo, hasUnreadChats }: { activeNav: NavSection; onNavChange: (s: NavSection) => void; medicoInfo: any; hasUnreadChats: boolean }) {
+function Sidebar({
+  activeNav,
+  onNavChange,
+  medicoInfo,
+  hasUnreadChats,
+  mobileOpen,
+  onCloseMobile
+}: {
+  activeNav: NavSection;
+  onNavChange: (s: NavSection) => void;
+  medicoInfo: any;
+  hasUnreadChats: boolean;
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
+}) {
   const navItems = [
     { id: 'dashboard' as NavSection, label: 'Inicio', Icon: Icon.Dashboard },
     { id: 'agenda' as NavSection, label: 'Agenda', Icon: Icon.Calendar },
@@ -381,62 +404,87 @@ function Sidebar({ activeNav, onNavChange, medicoInfo, hasUnreadChats }: { activ
     { id: 'settings' as NavSection, label: 'Configuración', Icon: Icon.Settings },
   ]
 
+  const handleNavClick = (id: NavSection) => {
+    onNavChange(id)
+    if (onCloseMobile) onCloseMobile()
+  }
+
+  const doctorName = medicoInfo ? `${medicoInfo.nombre || ''} ${medicoInfo.apellido || ''}`.trim() : 'Médico';
+  const doctorInitials = doctorName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'DR';
+
   return (
-    <aside className="sidebar">
-      <div className="sidebar__logo">
-        <div className="sidebar__logo-btn" style={{ cursor: 'default' }}>
-          <img src="/tranqui-icon.webp" alt="Tranqui" className="sidebar__logo-img" />
-          <span className="sidebar__logo-text">tranqui</span>
-        </div>
-      </div>
-
-      <nav className="sidebar__nav" role="navigation" aria-label="Navegación principal">
-        <span className="sidebar__nav-section-title">Panel</span>
-        {navItems.map(({ id, label, Icon: NavIcon }) => (
-          <button
-            key={id}
-            className={`sidebar__nav-item ${activeNav === id ? 'active' : ''}`}
-            onClick={() => onNavChange(id)}
-            aria-current={activeNav === id ? 'page' : undefined}
+    <>
+      {mobileOpen && <div className="sidebar-backdrop" onClick={onCloseMobile} />}
+      <aside className={`sidebar ${mobileOpen ? 'sidebar--open' : ''}`}>
+        <div className="sidebar__logo">
+          <div 
+            className="sidebar__logo-btn" 
+            style={{ cursor: 'pointer' }}
+            onClick={() => handleNavClick('dashboard')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleNavClick('dashboard'); } }}
+            role="button"
+            tabIndex={0}
+            aria-label="Ir al inicio"
           >
-            <NavIcon />
-            {label}
-            {id === 'patients' && hasUnreadChats && (
-              <span className="sidebar__badge" style={{ backgroundColor: 'var(--color-danger)', width: '8px', height: '8px', minWidth: '8px', padding: 0, borderRadius: '50%', marginLeft: 'auto' }} />
-            )}
-          </button>
-        ))}
-      </nav>
-
-      <div className="sidebar__footer">
-        <div
-          className="sidebar__user"
-          role="button"
-          tabIndex={0}
-          onClick={() => onNavChange('settings')}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNavChange('settings') } }}
-        >
-          {medicoInfo?.fotoUrl ? (
-            <img 
-              src={medicoInfo.fotoUrl} 
-              alt={medicoInfo.name} 
-              className="sidebar__avatar" 
-              style={{ objectFit: 'cover', border: '1.5px solid var(--color-border)', width: '36px', height: '36px', borderRadius: '50%' }} 
-            />
-          ) : (
-            <div className="sidebar__avatar" aria-hidden="true">
-              {medicoInfo?.initials || 'LP'}
-            </div>
+            <img src="/tranqui-icon.png" alt="Tranqui" className="sidebar__logo-img" />
+            <span className="sidebar__logo-text">tranqui</span>
+          </div>
+          {onCloseMobile && (
+            <button
+              className="sidebar__mobile-close"
+              onClick={onCloseMobile}
+              aria-label="Cerrar menú"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
           )}
-          <div className="sidebar__user-info">
-            <div className="sidebar__user-name">{medicoInfo?.name || 'Lic. Paula Rossi'}</div>
-            <div className="sidebar__user-role">
-              {medicoInfo?.degree || 'Psicóloga'} — {medicoInfo?.matricula ? `MN ${medicoInfo.matricula}` : 'MN 49281'}
+        </div>
+
+        <nav className="sidebar__nav" role="navigation" aria-label="Navegación principal">
+          <span className="sidebar__nav-section-title">Menú Principal</span>
+          {navItems.map(({ id, label, Icon: NavIcon }) => (
+            <button
+              key={id}
+              className={`sidebar__nav-item ${activeNav === id ? 'active' : ''}`}
+              onClick={() => handleNavClick(id)}
+              aria-current={activeNav === id ? 'page' : undefined}
+            >
+              <span className="nav-icon"><NavIcon /></span>
+              <span className="sidebar__nav-label">{label}</span>
+              {id === 'patients' && hasUnreadChats && (
+                <span className="sidebar__badge-pulse" />
+              )}
+            </button>
+          ))}
+        </nav>
+
+        <div className="sidebar__footer">
+          <div
+            className="sidebar__user"
+            role="button"
+            tabIndex={0}
+            onClick={() => handleNavClick('settings')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleNavClick('settings') } }}
+          >
+            {medicoInfo?.fotoUrl ? (
+              <img src={medicoInfo.fotoUrl} alt="" className="sidebar__avatar" />
+            ) : (
+              <div className="sidebar__avatar">{doctorInitials}</div>
+            )}
+            <div className="sidebar__user-info">
+              <div className="sidebar__user-name">{doctorName}</div>
+              <div className="sidebar__user-role">
+                <span className="sidebar__user-dot" />
+                {medicoInfo?.specialty || 'Profesional'}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   )
 }
 
@@ -1562,15 +1610,23 @@ const TRATAMIENTOS_DISPONIBLES = [
 
 const PACIENTES_ATIENDE_OPCIONES = ['Niños', 'Adolescentes', 'Adultos', 'Adultos mayores']
 
-type SettingsTab = 'perfil-pro' | 'perfil-publico' | 'honorarios' | 'notificaciones' | 'integraciones' | 'extendido'
+export interface ExperienciaLaboral {
+  id: string
+  nombreLugar: string
+  desde: string
+  hasta: string
+  descripcion: string
+}
+
+type SettingsTab = 'perfil-pro' | 'perfil-publico' | 'presencia' | 'honorarios' | 'notificaciones' | 'integraciones'
 
 const SETTINGS_TABS: { id: SettingsTab; label: string; Icon: (props: { size?: number }) => React.JSX.Element }[] = [
   { id: 'perfil-pro', label: 'Perfil profesional', Icon: Icon.User },
   { id: 'perfil-publico', label: 'Perfil público', Icon: Icon.Globe },
+  { id: 'presencia', label: 'Presencia y Experiencia', Icon: Icon.Star },
   { id: 'honorarios', label: 'Honorarios y servicios', Icon: Icon.DollarSign },
   { id: 'notificaciones', label: 'Notificaciones', Icon: Icon.BellSimple },
   { id: 'integraciones', label: 'Integraciones', Icon: Icon.MercadoPago },
-  { id: 'extendido', label: 'Presencia y contenido', Icon: Icon.Star },
 ]
 
 function getMissingRequirements(m: any): string[] {
@@ -1659,9 +1715,47 @@ function SettingsView({
   const [fotoUrl, setFotoUrl] = useState(medicoInfo?.fotoUrl || '')
   const [ofreceOnline, setOfreceOnline] = useState(medicoInfo?.ofreceOnline !== undefined ? medicoInfo.ofreceOnline : true)
   const [ofrecePresencial, setOfrecePresencial] = useState(medicoInfo?.ofrecePresencial !== undefined ? medicoInfo.ofrecePresencial : false)
-  const [experiencia, setExperiencia] = useState(medicoInfo?.experiencia || '')
+  const [experienciasLaborales, setExperienciasLaborales] = useState<ExperienciaLaboral[]>(() => {
+    const raw = medicoInfo?.experiencia || ''
+    if (!raw) return []
+    try {
+      if (raw.trim().startsWith('[')) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) return parsed
+      }
+    } catch (e) {
+      // fallback
+    }
+    return [{ id: 'exp-1', nombreLugar: 'Experiencia laboral', desde: '', hasta: '', descripcion: raw }]
+  })
+  const [expForm, setExpForm] = useState<ExperienciaLaboral | null>(null)
+  const [showExpModal, setShowExpModal] = useState(false)
+
+  const formatMonthYearInput = (val: string) => {
+    if (!val) return ''
+    if (val.toLowerCase().startsWith('a')) return 'Actualidad'
+    const digits = val.replace(/\D/g, '').slice(0, 6)
+    if (!digits) return ''
+    if (digits.length <= 2) return digits
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`
+  }
+
+  const handleSaveExpItem = () => {
+    if (!expForm || !expForm.nombreLugar.trim()) return
+    if (expForm.id) {
+      setExperienciasLaborales(experienciasLaborales.map(item => item.id === expForm.id ? expForm : item))
+    } else {
+      setExperienciasLaborales([...experienciasLaborales, { ...expForm, id: 'exp-' + Date.now() }])
+    }
+    setExpForm(null)
+    setShowExpModal(false)
+  }
+
+  const handleDeleteExpItem = (id: string) => {
+    setExperienciasLaborales(experienciasLaborales.filter(item => item.id !== id))
+  }
+
   const [instagram, setInstagram] = useState(medicoInfo?.redesSociales?.instagram || '')
-  const [facebook, setFacebook] = useState(medicoInfo?.redesSociales?.facebook || '')
   const [linkedin, setLinkedin] = useState(medicoInfo?.redesSociales?.linkedin || '')
   const [sitioWeb, setSitioWeb] = useState(medicoInfo?.redesSociales?.sitioWeb || '')
 
@@ -1761,10 +1855,9 @@ function SettingsView({
         pacientesAtiende,
         institucionFormacion,
         aniosExperiencia: aniosExperiencia === '' ? null : Number(aniosExperiencia),
-        experiencia,
+        experiencia: JSON.stringify(experienciasLaborales),
         redesSociales: {
           instagram,
-          facebook,
           linkedin,
           sitioWeb
         }
@@ -1783,15 +1876,16 @@ function SettingsView({
   const honorariosComplete = tariffs.some((t: any) => t.enabled)
   const integracionesPendientes = (mpConnected ? 0 : 1) + (googleConnected ? 0 : 1)
 
+  const presenciaComplete = experienciasLaborales.length > 0
   const tabStatus: Record<SettingsTab, { label: string; tone: 'ok' | 'warn' }> = {
     'perfil-pro': perfilProComplete ? { label: 'Completo', tone: 'ok' } : { label: 'Incompleto', tone: 'warn' },
     'perfil-publico': perfilPublicoComplete ? { label: 'Completo', tone: 'ok' } : { label: 'Incompleto', tone: 'warn' },
+    'presencia': presenciaComplete ? { label: 'Completo', tone: 'ok' } : { label: 'Sin completar', tone: 'warn' },
     'honorarios': honorariosComplete ? { label: 'Completo', tone: 'ok' } : { label: 'Sin configurar', tone: 'warn' },
     'notificaciones': { label: 'Activas', tone: 'ok' },
     'integraciones': integracionesPendientes === 0
       ? { label: 'Completo', tone: 'ok' }
       : { label: `${integracionesPendientes} pendiente${integracionesPendientes > 1 ? 's' : ''}`, tone: 'warn' },
-    'extendido': { label: 'Sin completar', tone: 'warn' },
   }
 
   const notImplementedYet = () => showAlert('Esta función va a estar disponible próximamente.', 'info')
@@ -2019,7 +2113,7 @@ function SettingsView({
           {/* Modalities selector */}
           <div className="form-group" style={{ gridColumn: 'span 2' }}>
             <label className="form-label form-label--required">Modalidades de Consulta</label>
-            <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+            <div className="modalities-chips-container" style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
               <label className={`check-chip check-chip--auto ${ofreceOnline ? 'active' : ''}`}>
                 <input
                   type="checkbox"
@@ -2205,35 +2299,26 @@ function SettingsView({
       </div>
       )}
 
-      {/* Presencia y Contenido */}
+      {/* Presencia y Experiencia (Redes Sociales y Experiencias Laborales) */}
+      {activeTab === 'presencia' && (
       <div className="card">
         <div className="card__header">
-          <h2 className="card__title">Presencia y Contenido</h2>
-          <p className="card__subtitle">Esta información se muestra a los pacientes en tu perfil público y al reservar un turno.</p>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-          <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-experiencia">Tu Experiencia</label>
-            <textarea
-              id="input-experiencia"
-              className="form-input"
-              rows={4}
-              placeholder="Contales a tus pacientes tu trayectoria, enfoque y especialización..."
-              value={experiencia}
-              onChange={(e) => setExperiencia(e.target.value)}
-              style={{ resize: 'vertical' }}
-            />
-          </div>
           <div>
-            <div className="form-label" style={{ marginBottom: 'var(--space-3)' }}>Redes sociales</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+            <h2 className="card__title">Presencia y Experiencia Laboral</h2>
+            <p className="card__subtitle">Sumá tus redes sociales y tus experiencias laborales previas para dar confianza a tus pacientes.</p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+          {/* Redes Sociales */}
+          <div>
+            <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-semi)', marginBottom: 'var(--space-3)' }}>
+              Redes sociales y sitio web
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-4)' }}>
               <div className="form-group">
                 <label className="form-label" htmlFor="input-instagram">Instagram</label>
                 <input id="input-instagram" className="form-input" type="url" placeholder="https://instagram.com/tu_usuario" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="input-facebook">Facebook</label>
-                <input id="input-facebook" className="form-input" type="url" placeholder="https://facebook.com/tu_pagina" value={facebook} onChange={(e) => setFacebook(e.target.value)} />
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="input-linkedin">LinkedIn</label>
@@ -2245,13 +2330,121 @@ function SettingsView({
               </div>
             </div>
           </div>
+
+          <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: 'var(--space-2) 0' }} />
+
+          {/* Experiencias Laborales */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+              <div>
+                <h3 style={{ fontSize: 'var(--text-base)', fontWeight: 'var(--font-weight-semi)', margin: 0 }}>
+                  Experiencias laborales
+                </h3>
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', margin: '2px 0 0' }}>
+                  Agregá los lugares donde trabajaste (clínicas, hospitales, consultorios) con su período y una breve descripción.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn--secondary btn--sm"
+                onClick={() => {
+                  setExpForm({ id: '', nombreLugar: '', desde: '', hasta: '', descripcion: '' })
+                  setShowExpModal(true)
+                }}
+              >
+                <Icon.Plus /> Agregar experiencia
+              </button>
+            </div>
+
+            {experienciasLaborales.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: 'var(--space-6)',
+                backgroundColor: 'var(--color-surface)',
+                border: '1px dashed var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--color-text-secondary)',
+                fontSize: 'var(--text-sm)'
+              }}>
+                Aún no agregaste experiencias laborales. Hacé clic en "Agregar experiencia" para sumar tu historial de trabajo.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                {experienciasLaborales.map((exp) => (
+                  <div
+                    key={exp.id}
+                    style={{
+                      padding: 'var(--space-4)',
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-md)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      gap: 'var(--space-3)'
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                        <strong style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)' }}>{exp.nombreLugar}</strong>
+                        {(exp.desde || exp.hasta) && (
+                          <span style={{
+                            fontSize: '11px',
+                            backgroundColor: 'var(--green-50)',
+                            color: 'var(--green-700)',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            fontWeight: '600'
+                          }}>
+                            {exp.desde} {exp.hasta ? `– ${exp.hasta}` : ''}
+                          </span>
+                        )}
+                      </div>
+                      {exp.descripcion && (
+                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', margin: 'var(--space-2) 0 0', lineHeight: 1.5 }}>
+                          {exp.descripcion}
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => {
+                          setExpForm(exp)
+                          setShowExpModal(true)
+                        }}
+                        title="Editar"
+                      >
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => handleDeleteExpItem(exp.id)}
+                        title="Eliminar"
+                        style={{ color: 'var(--color-error)' }}
+                      >
+                        <Icon.Trash size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+
         <div style={{ marginTop: 'var(--space-6)' }}>
           <button className="btn btn--primary" onClick={handleSave} disabled={saving} id="btn-save-presencia">
-            {saving ? 'Guardando...' : 'Guardar presencia y contenido'}
+            {saving ? 'Guardando...' : 'Guardar presencia y experiencia'}
           </button>
         </div>
       </div>
+      )}
 
       {/* Tariffs */}
       {activeTab === 'honorarios' && (
@@ -2410,78 +2603,88 @@ function SettingsView({
       </>
       )}
 
-      {/* Presencia y contenido — extended public profile. Not backed by any persisted
-          data/API today; these are honest empty-state placeholders (see report). */}
-      {activeTab === 'extendido' && (
-      <div className="card">
-        <div className="card__header">
-          <div>
-            <h2 className="card__title">Presencia y contenido</h2>
-            <p className="card__subtitle">Sumá fotos, tu experiencia y redes para que los pacientes te conozcan mejor antes de reservar.</p>
-          </div>
-        </div>
-
-        <div className="settings-ext-row">
-          <div className="settings-ext-desc">
-            <h3>Fotos y video</h3>
-            <p>Mostrá tu consultorio y presentate en video para generar más confianza antes de la primera consulta.</p>
-          </div>
-          <div className="settings-ext-card">
-            <div className="settings-ext-card-title">
-              <span className="settings-ext-card-title-text">Fotos y video de presentación</span>
-              <button className="btn btn--secondary btn--sm" onClick={notImplementedYet}>Editar</button>
-            </div>
-            <div className="settings-media-grid">
-              <div className="settings-media-box">
-                <div className="settings-media-box-label">Fotos del consultorio</div>
-                <div className="settings-media-box-val">Sin cargar</div>
+      {/* Modal para Agregar/Editar Experiencia Laboral */}
+      {showExpModal && expForm && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: 'var(--space-4)'
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '500px', backgroundColor: 'white', padding: 'var(--space-6)', borderRadius: '12px' }}>
+            <h3 style={{ margin: '0 0 var(--space-4)', fontSize: 'var(--text-lg)' }}>
+              {expForm.id ? 'Editar experiencia laboral' : 'Nueva experiencia laboral'}
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div className="form-group">
+                <label className="form-label form-label--required">Nombre del lugar u organización</label>
+                <input
+                  className="form-input"
+                  type="text"
+                  placeholder="Ej. Hospital Italiano, Consultorio Privado"
+                  value={expForm.nombreLugar}
+                  onChange={(e) => setExpForm({ ...expForm, nombreLugar: e.target.value })}
+                />
               </div>
-              <div className="settings-media-box">
-                <div className="settings-media-box-label">Video de presentación</div>
-                <div className="settings-media-box-val">Sin cargar</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                <div className="form-group">
+                  <label className="form-label">Desde (Mes/Año)</label>
+                  <input
+                    className="form-input"
+                    type="text"
+                    placeholder="Ej. 03/2018"
+                    value={expForm.desde}
+                    onChange={(e) => setExpForm({ ...expForm, desde: formatMonthYearInput(e.target.value) })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Hasta (Mes/Año)</label>
+                  <input
+                    className="form-input"
+                    type="text"
+                    placeholder="Ej. 12/2022 o Actualidad"
+                    value={expForm.hasta}
+                    onChange={(e) => setExpForm({ ...expForm, hasta: formatMonthYearInput(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Breve descripción de lo que hiciste</label>
+                <textarea
+                  className="form-input"
+                  rows={3}
+                  placeholder="Describí brevemente tus responsabilidades, rol o tareas..."
+                  value={expForm.descripcion}
+                  onChange={(e) => setExpForm({ ...expForm, descripcion: e.target.value })}
+                />
               </div>
             </div>
-            <div className="settings-tip-box">
-              <div className="settings-tip-box-title">Consejo</div>
-              <p>Los perfiles con fotos reales del consultorio suelen recibir más reservas.</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-6)' }}>
+              <button
+                type="button"
+                className="btn btn--secondary"
+                onClick={() => {
+                  setShowExpModal(false)
+                  setExpForm(null)
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={handleSaveExpItem}
+                disabled={!expForm.nombreLugar.trim()}
+              >
+                Guardar experiencia
+              </button>
             </div>
           </div>
         </div>
-
-        <div className="settings-ext-row">
-          <div className="settings-ext-desc">
-            <h3>Tu experiencia</h3>
-            <p>Contá tu trayectoria, publicaciones o certificaciones destacadas para que los pacientes conozcan tu recorrido.</p>
-          </div>
-          <div className="settings-ext-card">
-            <div className="settings-ext-card-title">
-              <span className="settings-ext-card-title-text">Trayectoria y certificaciones</span>
-              <button className="btn btn--secondary btn--sm" onClick={notImplementedYet}>Editar</button>
-            </div>
-            <div className="settings-ext-field">
-              <div className="settings-ext-field-label">Estado</div>
-              <div className="settings-ext-field-val">Sin completar</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="settings-ext-row">
-          <div className="settings-ext-desc">
-            <h3>Redes sociales</h3>
-            <p>Vinculá tus redes para que los pacientes puedan conocer más sobre tu trabajo.</p>
-          </div>
-          <div className="settings-ext-card">
-            <div className="settings-ext-card-title">
-              <span className="settings-ext-card-title-text">Instagram, LinkedIn y sitio web</span>
-              <button className="btn btn--secondary btn--sm" onClick={notImplementedYet}>Editar</button>
-            </div>
-            <div className="settings-ext-field">
-              <div className="settings-ext-field-label">Estado</div>
-              <div className="settings-ext-field-val">Sin completar</div>
-            </div>
-          </div>
-        </div>
-      </div>
       )}
         </div>
       </div>
@@ -2705,9 +2908,13 @@ function DashboardHome({
     { name: 'Miércoles', abbr: 'Mié', num: 3 },
     { name: 'Jueves', abbr: 'Jue', num: 4 },
     { name: 'Viernes', abbr: 'Vie', num: 5 },
+    { name: 'Sábado', abbr: 'Sáb', num: 6 },
+    { name: 'Domingo', abbr: 'Dom', num: 7 },
   ];
 
   const weekdaysWithDates = useMemo(() => {
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     return weekdays.map((day, idx) => {
       const cellDate = new Date(currentWeekMonday);
       cellDate.setDate(currentWeekMonday.getDate() + idx);
@@ -2718,7 +2925,10 @@ function DashboardHome({
       return {
         ...day,
         dateStr,
-        label: `${day.name} ${cellDate.getDate()}/${cellDate.getMonth() + 1}`
+        dayNum: cellDate.getDate(),
+        monthNum: cellDate.getMonth() + 1,
+        isToday: dateStr === todayStr,
+        label: `${day.abbr} ${cellDate.getDate()}/${cellDate.getMonth() + 1}`
       };
     });
   }, [currentWeekMonday]);
@@ -2979,308 +3189,326 @@ function DashboardHome({
             </ul>
           )
         ) : calendarView === 'weekly' ? (
-          /* Weekly Calendar Matrix Grid — horizontally scrollable on mobile/tablet so no column gets squished or hidden */
+          /* Weekly Calendar Matrix Grid — 7 days (Lun-Dom), matching Monthly & Daily aesthetics */
           <div style={{ width: '100%', overflowX: 'auto', marginTop: 'var(--space-4)' }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '80px repeat(5, minmax(140px, 1fr))',
-            gap: 'var(--space-2)',
-            width: '100%',
-            minWidth: '760px',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            backgroundColor: 'var(--color-surface)'
-          }}>
-            {/* Headers */}
-            <div style={{ backgroundColor: 'var(--neutral-50)', padding: 'var(--space-3) var(--space-2)', borderBottom: '2px solid var(--color-border)', borderRight: '1px solid var(--color-border)' }}></div>
-            {weekdaysWithDates.map((day) => (
-              <div key={day.num} style={{
-                textAlign: 'center',
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '70px repeat(7, minmax(130px, 1fr))',
+              width: '100%',
+              minWidth: '940px',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-lg)',
+              overflow: 'hidden',
+              backgroundColor: 'var(--color-surface)',
+              boxShadow: 'var(--shadow-sm)'
+            }}>
+              {/* Corner Header */}
+              <div style={{
+                backgroundColor: 'var(--green-50)',
                 padding: 'var(--space-3) var(--space-2)',
-                fontSize: 'var(--text-xs)',
-                fontWeight: 'bold',
-                color: 'var(--color-primary)',
-                backgroundColor: 'var(--green-50)',
                 borderBottom: '2px solid var(--color-border)',
-                borderRight: day.num < 5 ? '1px solid var(--color-border)' : 'none',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em'
-              }}>
-                {day.label}
-              </div>
-            ))}
-
-            {/* Rows by hour */}
-            {baseSlots.filter((slot) => {
-              if (showInactiveSlots) return true;
-              const slotHour = parseInt(slot.split(':')[0]);
-              const hasActiveAvailability = weekdays.some((day) => isSlotAvailable(day.num, slot));
-              const hasAppointment = allAppointments.some((a) => {
-                const apptHour = parseInt(a.hour);
-                return weekdaysWithDates.some(d => d.dateStr === a.fecha) && apptHour === slotHour && a.status !== 'cancelled';
-              });
-              const hasExternalEvent = externalEvents.some((e) => {
-                if (e.allDay) return false;
-                const eventHour = parseInt(e.hour);
-                return weekdaysWithDates.some(d => d.dateStr === e.fecha) && eventHour === slotHour;
-              });
-              return hasActiveAvailability || hasAppointment || hasExternalEvent;
-            }).map((slot) => {
-              const slotHour = parseInt(slot.split(':')[0]);
-              return (
-                <React.Fragment key={slot}>
-                  {/* Hour Label Column */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: 'var(--neutral-50)',
-                    borderRight: '1px solid var(--color-border)',
-                    borderBottom: '1px solid var(--color-border)',
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    color: 'var(--color-text-secondary)'
-                  }}>
-                    {slot} hs
-                  </div>
-
-                  {/* Day Columns for this hour */}
-                  {weekdaysWithDates.map((day) => {
-                    const appt = allAppointments.find(a => {
-                      const apptHour = parseInt(a.hour);
-                      return a.fecha === day.dateStr && apptHour === slotHour && a.status !== 'cancelled';
-                    });
-                    const externalEvent = externalEvents.find(e => {
-                      if (e.allDay) return false;
-                      const eventHour = parseInt(e.hour);
-                      return e.fecha === day.dateStr && eventHour === slotHour;
-                    });
-                    const isActive = isSlotAvailable(day.num, slot);
-
-                    // If not active and not appt/externalEvent, and showInactiveSlots is false, render empty/neutral cell
-                    const isCellVisible = appt || externalEvent || isActive || showInactiveSlots;
-
-                    return (
-                      <div key={day.num} style={{
-                        padding: 'var(--space-2)',
-                        borderRight: day.num < 5 ? '1px solid var(--color-border)' : 'none',
-                        borderBottom: '1px solid var(--color-border)',
-                        minHeight: '80px',
-                        backgroundColor: !isCellVisible
-                          ? 'var(--neutral-50)'
-                          : appt || externalEvent
-                            ? 'var(--color-surface)'
-                            : 'var(--green-50)', // Light green for active empty slots
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        gap: 'var(--space-1)'
-                      }}>
-                        {externalEvent && (
-                          <div style={{
-                            padding: '6px 10px',
-                            borderRadius: 'var(--radius-lg)',
-                            backgroundColor: '#eef4fe',
-                            border: '1px solid #c9dcfb',
-                            borderLeft: '3px solid #4285f4',
-                            fontSize: '11px',
-                            fontWeight: '600',
-                            color: 'var(--color-text-primary)'
-                          }}>
-                            {externalEvent.title}
-                          </div>
-                        )}
-                        {appt ? (
-                          <div 
-                            onClick={() => setSelectedAppt(appt)}
-                            style={{
-                              padding: 'var(--space-3)',
-                              borderRadius: 'var(--radius-lg)',
-                              backgroundColor: 'var(--color-surface)',
-                              border: '1px solid var(--color-border)',
-                              borderLeft: appt.status === 'confirmed' 
-                                ? '4px solid var(--color-primary)' 
-                                : appt.status === 'completed' 
-                                  ? '4px solid var(--color-text-secondary)' 
-                                  : '4px solid var(--color-warning)',
-                              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: 'var(--space-2)',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                              position: 'relative'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
-                              e.currentTarget.style.borderColor = 'var(--color-primary)';
-                              e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                              e.currentTarget.style.borderColor = 'var(--color-border)';
-                              e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)';
-                            }}
-                          >
-                            <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-primary)' }}>
-                              {appt.patientName}
-                            </div>
-                            {appt.attendanceStatus && appt.attendanceStatus !== 'ESPERANDO' && (
-                              <div style={{
-                                fontSize: '10px',
-                                fontWeight: '600',
-                                color: appt.attendanceStatus === 'LLEGO' 
-                                  ? 'var(--color-primary)' 
-                                  : appt.attendanceStatus === 'AUSENTE'
-                                    ? 'var(--color-danger)'
-                                    : '#10b981',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '2px',
-                                marginTop: '2px'
-                              }}>
-                                <span>{appt.attendanceStatus === 'LLEGO' ? '🚶‍♂️' : appt.attendanceStatus === 'AUSENTE' ? '❌' : '✓'}</span>
-                                {appt.attendanceStatus}
-                              </div>
-                            )}
-                          </div>
-                        ) : isActive ? (
-                          <div style={{
-                            textAlign: 'center',
-                            fontSize: '10px',
-                            color: 'var(--color-primary)',
-                            fontWeight: 'bold'
-                          }}>
-                            Disponible
-                          </div>
-                        ) : (
-                          <div style={{
-                            textAlign: 'center',
-                            fontSize: '10px',
-                            color: 'var(--neutral-400)',
-                            fontStyle: 'italic'
-                          }}>
-                            —
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </React.Fragment>
-              );
-            })}
-          </div>
-          </div>
-        ) : (
-          /* Monthly Calendar Grid — horizontally scrollable on mobile/tablet so no column gets squished or hidden */
-          <div style={{ width: '100%', overflowX: 'auto', marginTop: 'var(--space-4)' }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, minmax(110px, 1fr))',
-            minWidth: '700px',
-            gap: '1px',
-            backgroundColor: 'var(--color-border)',
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden'
-          }}>
-            {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((dName) => (
-              <div key={dName} style={{
-                backgroundColor: 'var(--green-50)',
-                color: 'var(--color-primary)',
-                padding: 'var(--space-2)',
-                textAlign: 'center',
-                fontWeight: 'bold',
+                borderRight: '1px solid var(--color-border)',
                 fontSize: '11px',
-                textTransform: 'uppercase'
+                fontWeight: 'bold',
+                color: 'var(--color-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}>
-                {dName}
+                HORA
               </div>
-            ))}
-            {monthDays.map((d, index) => {
-              const isCurrentMonth = d.getMonth() === currentDate.getMonth();
-              const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-              const dayAppts = allAppointments.filter(a => a.fecha === dateStr && a.status !== 'cancelled');
-              const dayExternalEvts = externalEvents.filter(e => e.fecha === dateStr);
-              const dayItemsTotal = dayAppts.length + dayExternalEvts.length;
 
-              return (
-                <div key={index} style={{
-                  backgroundColor: '#ffffff',
-                  minHeight: '90px',
-                  padding: '8px',
+              {/* Day Headers (7 Days: Lun - Dom) */}
+              {weekdaysWithDates.map((day) => (
+                <div key={day.num} style={{
+                  textAlign: 'center',
+                  padding: 'var(--space-2) var(--space-1)',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: 'bold',
+                  color: day.isToday ? '#ffffff' : 'var(--color-primary)',
+                  backgroundColor: day.isToday ? 'var(--color-primary)' : 'var(--green-50)',
+                  borderBottom: '2px solid var(--color-border)',
+                  borderRight: day.num !== 7 ? '1px solid var(--color-border)' : 'none',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '4px',
-                  opacity: isCurrentMonth ? 1 : 0.4,
-                  borderBottom: '1px solid #f0f2f5',
-                  borderRight: '1px solid #f0f2f5'
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '2px'
                 }}>
-                  <div style={{
-                    fontWeight: 'bold',
-                    fontSize: '11px',
-                    color: d.toDateString() === new Date().toDateString() ? 'var(--color-primary)' : 'var(--color-text-primary)',
-                    alignSelf: 'flex-start',
-                    backgroundColor: d.toDateString() === new Date().toDateString() ? 'var(--green-100)' : 'transparent',
-                    borderRadius: '50%',
-                    width: '20px',
-                    height: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
+                  <span style={{ fontSize: '11px', opacity: day.isToday ? 0.95 : 0.85 }}>{day.abbr}</span>
+                  <span style={{
+                    fontSize: '13px',
+                    fontWeight: '800',
+                    backgroundColor: day.isToday ? 'rgba(255,255,255,0.2)' : 'transparent',
+                    padding: '1px 6px',
+                    borderRadius: 'var(--radius-sm)'
                   }}>
-                    {d.getDate()}
-                  </div>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', overflowY: 'auto' }}>
-                    {dayAppts.slice(0, 2).map((a) => (
-                      <div
-                        key={a.id}
-                        onClick={() => setSelectedAppt(a)}
-                        style={{
-                          fontSize: '9px',
-                          padding: '2px 4px',
-                          borderRadius: 'var(--radius-sm)',
-                          backgroundColor: a.status === 'confirmed' ? 'var(--green-50)' : '#fffbeb',
-                          color: a.status === 'confirmed' ? 'var(--color-primary)' : '#b45309',
-                          borderLeft: a.status === 'confirmed' ? '2px solid var(--color-primary)' : '2px solid #f59e0b',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {a.hour} {a.patientName}
-                      </div>
-                    ))}
-                    {dayAppts.length < 2 && dayExternalEvts.slice(0, 2 - dayAppts.length).map((e) => (
-                      <div
-                        key={e.id}
-                        title={e.title}
-                        style={{
-                          fontSize: '9px',
-                          padding: '2px 4px',
-                          borderRadius: 'var(--radius-sm)',
-                          backgroundColor: 'var(--neutral-100)',
-                          color: 'var(--color-text-secondary)',
-                          borderLeft: '2px solid var(--neutral-400)',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}
-                      >
-                        {e.allDay ? e.title : `${e.hour} ${e.title}`}
-                      </div>
-                    ))}
-                    {dayItemsTotal > 2 && (
-                      <div style={{ fontSize: '9px', color: 'var(--color-text-secondary)', paddingLeft: '4px', fontWeight: 'bold' }}>
-                        +{dayItemsTotal - 2} más
+                    {day.dayNum}/{day.monthNum}
+                  </span>
+                </div>
+              ))}
+
+              {/* Rows by hour */}
+              {baseSlots.filter((slot) => {
+                if (showInactiveSlots) return true;
+                const slotHour = parseInt(slot.split(':')[0]);
+                const hasActiveAvailability = weekdays.some((day) => isSlotAvailable(day.num, slot));
+                const hasAppointment = allAppointments.some((a) => {
+                  const apptHour = parseInt(a.hour);
+                  return weekdaysWithDates.some(d => d.dateStr === a.fecha) && apptHour === slotHour && a.status !== 'cancelled';
+                });
+                const hasExternalEvent = externalEvents.some((e) => {
+                  if (e.allDay) return false;
+                  const eventHour = parseInt(e.hour);
+                  return weekdaysWithDates.some(d => d.dateStr === e.fecha) && eventHour === slotHour;
+                });
+                return hasActiveAvailability || hasAppointment || hasExternalEvent;
+              }).map((slot) => {
+                const slotHour = parseInt(slot.split(':')[0]);
+                return (
+                  <React.Fragment key={slot}>
+                    {/* Hour Label Column */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'var(--neutral-50)',
+                      borderRight: '1px solid var(--color-border)',
+                      borderBottom: '1px solid var(--color-border)',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      color: 'var(--color-text-secondary)'
+                    }}>
+                      {slot} hs
+                    </div>
+
+                    {/* Day Columns for this hour */}
+                    {weekdaysWithDates.map((day) => {
+                      const appt = allAppointments.find(a => {
+                        const apptHour = parseInt(a.hour);
+                        return a.fecha === day.dateStr && apptHour === slotHour && a.status !== 'cancelled';
+                      });
+                      const externalEvent = externalEvents.find(e => {
+                        if (e.allDay) return false;
+                        const eventHour = parseInt(e.hour);
+                        return e.fecha === day.dateStr && eventHour === slotHour;
+                      });
+                      const isActive = isSlotAvailable(day.num, slot);
+                      const isCellVisible = appt || externalEvent || isActive || showInactiveSlots;
+
+                      return (
+                        <div key={day.num} style={{
+                          padding: 'var(--space-2)',
+                          borderRight: day.num !== 7 ? '1px solid var(--color-border)' : 'none',
+                          borderBottom: '1px solid var(--color-border)',
+                          minHeight: '75px',
+                          backgroundColor: !isCellVisible
+                            ? 'var(--neutral-50)'
+                            : appt || externalEvent
+                              ? 'var(--color-surface)'
+                              : 'rgba(0, 166, 80, 0.04)', // Clean soft green for available slots
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center',
+                          gap: 'var(--space-1)',
+                          transition: 'background-color 0.15s ease'
+                        }}>
+                          {externalEvent && (
+                            <div style={{
+                              padding: '5px 8px',
+                              borderRadius: 'var(--radius-md)',
+                              backgroundColor: '#eef4fe',
+                              border: '1px solid #c9dcfb',
+                              borderLeft: '3px solid #4285f4',
+                              fontSize: '10px',
+                              fontWeight: '600',
+                              color: 'var(--color-text-primary)'
+                            }}>
+                              📅 {externalEvent.title}
+                            </div>
+                          )}
+                          {appt ? (
+                            <div 
+                              onClick={() => setSelectedAppt(appt)}
+                              style={{
+                                padding: 'var(--space-2) var(--space-3)',
+                                borderRadius: 'var(--radius-md)',
+                                backgroundColor: 'var(--color-surface)',
+                                border: '1px solid var(--color-border)',
+                                borderLeft: appt.status === 'confirmed' 
+                                  ? '4px solid var(--color-primary)' 
+                                  : appt.status === 'completed' 
+                                    ? '4px solid var(--neutral-400)' 
+                                    : '4px solid var(--color-warning)',
+                                boxShadow: 'var(--shadow-xs)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '3px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                                position: 'relative'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.borderColor = 'var(--color-primary)';
+                                e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.borderColor = 'var(--color-border)';
+                                e.currentTarget.style.boxShadow = 'var(--shadow-xs)';
+                              }}
+                            >
+                              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span>{appt.patientName}</span>
+                                {appt.meetUrl && (
+                                  <span title="Videollamada Google Meet" style={{ color: '#1a73e8', fontSize: '10px' }}>📹</span>
+                                )}
+                              </div>
+                              {appt.attendanceStatus && appt.attendanceStatus !== 'ESPERANDO' && (
+                                <div style={{
+                                  fontSize: '9px',
+                                  fontWeight: '600',
+                                  color: appt.attendanceStatus === 'LLEGO' 
+                                    ? 'var(--color-primary)' 
+                                    : appt.attendanceStatus === 'AUSENTE'
+                                      ? 'var(--color-danger)'
+                                      : '#10b981',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '2px'
+                                }}>
+                                  <span>{appt.attendanceStatus === 'LLEGO' ? '🚶‍♂️' : appt.attendanceStatus === 'AUSENTE' ? '❌' : '✓'}</span>
+                                  {appt.attendanceStatus}
+                                </div>
+                              )}
+                            </div>
+                          ) : isActive ? (
+                            <div style={{
+                              textAlign: 'center',
+                              fontSize: '10px',
+                              color: 'var(--color-primary)',
+                              fontWeight: '600',
+                              backgroundColor: 'rgba(0, 166, 80, 0.08)',
+                              padding: '3px 6px',
+                              borderRadius: 'var(--radius-sm)',
+                              alignSelf: 'center'
+                            }}>
+                              Disponible
+                            </div>
+                          ) : (
+                            <div style={{
+                              textAlign: 'center',
+                              fontSize: '10px',
+                              color: 'var(--neutral-400)',
+                              fontStyle: 'italic'
+                            }}>
+                              —
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          /* Monthly Calendar Grid — compact, icon-focused calendar */
+          <div style={{ width: '100%', maxWidth: '560px', margin: 'var(--space-3) auto 0' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(7, 1fr)',
+              gap: '2px',
+              backgroundColor: 'var(--color-border)',
+              borderRadius: 'var(--radius-lg)',
+              overflow: 'hidden',
+              boxShadow: 'var(--shadow-sm)'
+            }}>
+              {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((dName) => (
+                <div key={dName} style={{
+                  backgroundColor: 'var(--green-50)',
+                  color: 'var(--color-primary)',
+                  padding: '6px 2px',
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  fontSize: '11px'
+                }}>
+                  {dName}
+                </div>
+              ))}
+              {monthDays.map((d, index) => {
+                const isCurrentMonth = d.getMonth() === currentDate.getMonth();
+                const isToday = d.toDateString() === new Date().toDateString();
+                const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                const dayAppts = allAppointments.filter(a => a.fecha === dateStr && a.status !== 'cancelled');
+                const dayExternalEvts = externalEvents.filter(e => e.fecha === dateStr);
+                const dayItemsTotal = dayAppts.length + dayExternalEvts.length;
+
+                return (
+                  <div key={index} style={{
+                    backgroundColor: isToday ? '#F0F9F1' : '#ffffff',
+                    minHeight: '52px',
+                    padding: '4px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '3px',
+                    opacity: isCurrentMonth ? 1 : 0.35
+                  }}>
+                    <div style={{
+                      fontWeight: isToday ? 'bold' : '500',
+                      fontSize: '12px',
+                      color: isToday ? 'white' : 'var(--color-text-primary)',
+                      borderRadius: '50%',
+                      width: '22px',
+                      height: '22px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: isToday ? 'var(--color-primary)' : 'transparent'
+                    }}>
+                      {d.getDate()}
+                    </div>
+                    {dayItemsTotal > 0 && (
+                      <div style={{ display: 'flex', gap: '3px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        {dayAppts.map((a) => (
+                          <span
+                            key={a.id}
+                            onClick={() => setSelectedAppt(a)}
+                            title={`Turno: ${a.hour} hs - ${a.patientName}`}
+                            style={{
+                              width: '7px',
+                              height: '7px',
+                              borderRadius: '50%',
+                              backgroundColor: a.status === 'confirmed' ? 'var(--color-primary)' : '#f59e0b',
+                              display: 'inline-block',
+                              cursor: 'pointer'
+                            }}
+                          />
+                        ))}
+                        {dayExternalEvts.map((evt) => (
+                          <span
+                            key={evt.id}
+                            title={`Evento: ${evt.title}`}
+                            style={{
+                              width: '7px',
+                              height: '7px',
+                              borderRadius: '50%',
+                              backgroundColor: '#3b82f6',
+                              display: 'inline-block'
+                            }}
+                          />
+                        ))}
                       </div>
                     )}
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -3613,6 +3841,7 @@ export default function App() {
   const [showUnverifiedAlert, setShowUnverifiedAlert] = useState(true)
   const [showDashboardAlertList, setShowDashboardAlertList] = useState(false)
   const [hasUnreadChats, setHasUnreadChats] = useState(false)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
   const refreshUnreadChatsStatus = () => {
     if (currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')) {
@@ -4201,10 +4430,30 @@ export default function App() {
           </div>
         </>
       )}
-      <Sidebar activeNav={activeNav} onNavChange={(section) => navigate('/panel/' + section)} medicoInfo={medicoInfo} hasUnreadChats={hasUnreadChats} />
+      <Sidebar
+        activeNav={activeNav}
+        onNavChange={(section) => navigate('/panel/' + section)}
+        medicoInfo={medicoInfo}
+        hasUnreadChats={hasUnreadChats}
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
+      />
 
-      <header className="dashboard-header" role="banner" style={{ position: 'relative' }}>
-        <h1 className="dashboard-header__title">{pageTitle[activeNav]}</h1>
+      <header className="dashboard-header" role="banner">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <button
+            className="btn btn--icon btn--ghost dashboard-mobile-nav-toggle"
+            onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+            aria-label="Abrir menú de navegación"
+          >
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+          <h1 className="dashboard-header__title">{pageTitle[activeNav]}</h1>
+        </div>
         <div className="dashboard-header__actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           
           {/* Interactive Notifications Bell */}
@@ -4316,12 +4565,22 @@ export default function App() {
                 alt={medicoInfo.name} 
                 className="sidebar__avatar" 
                 style={{ cursor: 'pointer', objectFit: 'cover', border: '1.5px solid var(--color-border)', width: '36px', height: '36px', borderRadius: '50%' }} 
-                aria-label="Menú de perfil" 
+                aria-label="Ir a Configuración" 
                 role="button" 
                 tabIndex={0}
+                onClick={() => navigate('/panel/settings')}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/panel/settings'); } }}
               />
             ) : (
-              <div className="sidebar__avatar" aria-label="Menú de perfil" role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
+              <div 
+                className="sidebar__avatar" 
+                aria-label="Ir a Configuración" 
+                role="button" 
+                tabIndex={0} 
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate('/panel/settings')}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/panel/settings'); } }}
+              >
                 {medicoInfo?.initials || 'LP'}
               </div>
             )}

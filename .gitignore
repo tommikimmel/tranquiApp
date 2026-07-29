@@ -4,3 +4,9 @@
 .idea/
 .vscode/
 .playwright-cli/
+*.tar.gz
+project.tar.gz
+node_modules/
+dist/
+target/
+.claude/

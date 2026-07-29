@@ -1793,6 +1793,8 @@
   flex-shrink: 0;
 }
 
+.settings-submenu-item:hover .settings-submenu-icon,
+.settings-submenu-item:focus .settings-submenu-icon,
 .settings-submenu-item.active .settings-submenu-icon {
   background: var(--color-primary);
   color: white;
@@ -2423,3 +2425,420 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
+
+/* ── Mobile Sidebar Drawer & Global Responsive Enhancements ── */
+.dashboard-mobile-nav-toggle {
+  display: none;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 998;
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sidebar__mobile-close {
+  display: none;
+  background: var(--neutral-100);
+  border: 1px solid var(--color-border);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  margin-left: auto;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.sidebar__mobile-close:hover {
+  background: var(--neutral-200);
+  color: var(--color-text-primary);
+}
+
+.sidebar__badge-pulse {
+  margin-left: auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background-color: var(--color-danger);
+  box-shadow: 0 0 0 3px rgba(224, 49, 49, 0.25);
+  animation: badgePulse 2s infinite;
+}
+
+@keyframes badgePulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(224, 49, 49, 0.5); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(224, 49, 49, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(224, 49, 49, 0); }
+}
+
+@media (max-width: 1024px) {
+  .dashboard-mobile-nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dashboard-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 285px;
+    z-index: 999;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+    background: #ffffff;
+    border-radius: 0 20px 20px 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar.sidebar--open {
+    transform: translateX(0);
+  }
+
+  .sidebar__logo {
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .sidebar__mobile-close {
+    display: inline-flex;
+  }
+
+  .sidebar__nav-item {
+    border-radius: 12px;
+    padding: 11px 14px;
+  }
+
+  .sidebar__nav-item.active {
+    background: linear-gradient(135deg, var(--green-50), #E6F4EA);
+    color: var(--color-primary);
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px var(--green-200);
+  }
+
+  .sidebar__user {
+    background: var(--neutral-50);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    padding: 10px 12px;
+  }
+
+  .sidebar__user-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    margin-right: 5px;
+  }
+
+  .dashboard-header {
+    padding: var(--space-3) var(--space-4);
+  }
+  
+  .dashboard-header__title {
+    font-size: var(--text-lg);
+  }
+
+  .settings-layout {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+
+  .settings-submenu {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: var(--space-2);
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    gap: var(--space-2);
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-submenu-item {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-full);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    flex-shrink: 0;
+    width: auto;
+  }
+
+  .settings-submenu-item.active {
+    background-color: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+  }
+
+  .settings-submenu-item.active .settings-submenu-status {
+    background-color: rgba(255, 255, 255, 0.25);
+    color: white;
+  }
+
+  .settings-submenu-item.active .settings-submenu-icon {
+    color: white;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-content {
+    padding: var(--space-3);
+  }
+
+  .card {
+    padding: var(--space-4);
+    border-radius: 12px;
+  }
+
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: var(--space-3);
+  }
+
+  .dashboard-home-greeting h1 {
+    font-size: 1.25rem;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Mobile Specific Overrides (Stat Cards, Bottom Sidebar, Chat, Modalities, Integrations)
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* 1. Stat Cards on Mobile (Cuanto ganaste, Pacientes activos, Sesiones hoy, No shows) */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .stat-card {
+    padding: 10px 12px !important;
+    gap: 4px !important;
+    border-radius: 10px !important;
+  }
+
+  .stat-card__icon {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 6px !important;
+  }
+
+  .stat-card__icon svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .stat-card__value {
+    font-size: 1.1rem !important;
+    line-height: 1.2 !important;
+  }
+
+  .stat-card__label {
+    font-size: 0.7rem !important;
+    line-height: 1.2 !important;
+  }
+
+  .stat-card__change {
+    font-size: 0.65rem !important;
+    padding: 2px 6px !important;
+    margin-top: 2px !important;
+  }
+
+  /* 2. Fixed Bottom Sidebar with Icons Only */
+  .dashboard-mobile-nav-toggle,
+  .sidebar-backdrop,
+  .sidebar__mobile-close,
+  .sidebar__logo,
+  .sidebar__footer,
+  .sidebar__nav-section-title {
+    display: none !important;
+  }
+
+  .sidebar {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    height: 56px !important;
+    z-index: 1000 !important;
+    flex-direction: row !important;
+    border-right: none !important;
+    border-top: 1px solid var(--color-border) !important;
+    background: var(--color-surface, #ffffff) !important;
+    padding: 0 !important;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08) !important;
+    transform: none !important;
+    border-radius: 0 !important;
+  }
+
+  .sidebar__nav {
+    flex-direction: row !important;
+    padding: 0 !important;
+    justify-content: space-around !important;
+    align-items: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    gap: 0 !important;
+  }
+
+  .sidebar__nav-item {
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding: 0 !important;
+    height: 100% !important;
+    flex: 1 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .sidebar__nav-item.active {
+    background: var(--green-50, #E6F4EA) !important;
+    color: var(--color-primary, #2FA84F) !important;
+  }
+
+  .sidebar__nav-label {
+    display: none !important; /* Icons ONLY, NO text */
+  }
+
+  .sidebar__nav-item .nav-icon {
+    width: 22px !important;
+    height: 22px !important;
+    margin: 0 !important;
+  }
+
+  .sidebar__badge-pulse {
+    position: absolute;
+    top: 8px;
+    right: calc(50% - 14px);
+  }
+
+  .dashboard-main {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* 3. Patient Chat Section Mobile Optimization */
+  .patients-master-detail {
+    height: calc(100vh - 120px) !important;
+    height: calc(100dvh - 120px) !important;
+  }
+
+  .patients-chat-header {
+    padding: 10px 12px !important;
+    gap: 6px !important;
+  }
+
+  .patients-master-detail__meta-grid {
+    display: none !important;
+  }
+
+  .patients-chat-badge {
+    display: none !important;
+  }
+
+  .patients-master-detail__main {
+    border-radius: 0 !important;
+  }
+
+  /* 4. Consultation Modalities Cards in Settings */
+  .modalities-chips-container {
+    flex-direction: column !important;
+    gap: 6px !important;
+  }
+
+  .modalities-chips-container .check-chip {
+    padding: 8px 12px !important;
+    font-size: 0.78rem !important;
+    gap: 8px !important;
+    border-radius: 8px !important;
+    width: 100% !important;
+  }
+
+  .modalities-chips-container .check-chip input[type="checkbox"] {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .modalities-chips-container .check-chip__icon svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  /* 5. Integration Cards (Mercado Pago, Google Calendar) */
+  .mp-connect-banner {
+    padding: 12px 14px !important;
+    gap: 10px !important;
+    border-radius: 12px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .mp-connect-banner__icon {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 8px !important;
+  }
+
+  .mp-connect-banner__logo {
+    width: 26px !important;
+    height: auto !important;
+  }
+
+  .mp-connect-banner__status {
+    padding: 2px 8px !important;
+    font-size: 0.68rem !important;
+    margin-bottom: 4px !important;
+  }
+
+  .mp-connect-banner__title {
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    margin-bottom: 2px !important;
+  }
+
+  .mp-connect-banner__body {
+    font-size: 0.75rem !important;
+    line-height: 1.35 !important;
+    max-width: 100% !important;
+  }
+
+  .mp-connect-banner__action {
+    width: 100% !important;
+    margin-top: 4px !important;
+  }
+
+  .mp-connect-banner__action .btn {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 6px 12px !important;
+    font-size: 0.8rem !important;
+  }
+}
+

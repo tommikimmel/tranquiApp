@@ -90,7 +90,7 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
         {selectedPatient ? (
           <>
             {/* Header: Patient Bio Details */}
-            <div style={{
+            <div className="patients-chat-header" style={{
               padding: 'var(--space-4) var(--space-6)',
               borderBottom: '1px solid var(--color-border)',
               backgroundColor: 'var(--color-surface)',
@@ -126,7 +126,7 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
                 </div>
 
                 <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                  <span className="btn btn--sm btn--primary" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'default' }}>
+                  <span className="btn btn--sm btn--primary patients-chat-badge" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'default' }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}>
                       <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
                     </svg>

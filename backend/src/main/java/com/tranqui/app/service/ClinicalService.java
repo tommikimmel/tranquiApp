@@ -121,6 +121,16 @@ public class ClinicalService {
                 .numeroDocumento(p.getNumeroDocumento())
                 .datosOfuscado(p.getDatosOfuscado() != null ? p.getDatosOfuscado() : "N")
                 .credencial(cred)
+                .domicilio(PacienteDto.DomicilioDto.builder()
+                        .calle(p.getDomicilioCalle())
+                        .numero(p.getDomicilioNumero())
+                        .piso(p.getDomicilioPiso())
+                        .dpto(p.getDomicilioDpto())
+                        .codigoPostal(p.getDomicilioCodigoPostal())
+                        .localidad(p.getDomicilioLocalidad())
+                        .provincia(p.getDomicilioProvincia())
+                        .pais(p.getDomicilioPais())
+                        .build())
                 .build();
     }
 
@@ -265,6 +275,17 @@ public class ClinicalService {
         paciente.setTipoDocumento(dto.getTipoDocumento());
         paciente.setNumeroDocumento(dto.getNumeroDocumento());
         paciente.setDatosOfuscado(dto.getDatosOfuscado());
+
+        if (dto.getDomicilio() != null) {
+            paciente.setDomicilioCalle(dto.getDomicilio().getCalle());
+            paciente.setDomicilioNumero(dto.getDomicilio().getNumero());
+            paciente.setDomicilioPiso(dto.getDomicilio().getPiso());
+            paciente.setDomicilioDpto(dto.getDomicilio().getDpto());
+            paciente.setDomicilioCodigoPostal(dto.getDomicilio().getCodigoPostal());
+            paciente.setDomicilioLocalidad(dto.getDomicilio().getLocalidad());
+            paciente.setDomicilioProvincia(dto.getDomicilio().getProvincia());
+            paciente.setDomicilioPais(dto.getDomicilio().getPais());
+        }
 
         if (dto.getCredencial() != null) {
             paciente.setCredencialCodEntidad(dto.getCredencial().getCodEntidad());

@@ -64,11 +64,13 @@ public class NotificacionService {
         return notif;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<Notificacion> obtenerNotificaciones(String email) {
         Usuario usuario = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
-        return notificacionRepository.findByUsuarioIdOrderByFechaCreacionDesc(usuario.getId());
+        LocalDateTime hace24Horas = LocalDateTime.now().minusHours(24);
+        notificacionRepository.deleteByFechaCreacionBefore(hace24Horas);
+        return notificacionRepository.findByUsuarioIdAndFechaCreacionAfterOrderByFechaCreacionDesc(usuario.getId(), hace24Horas);
     }
 
     @Transactional
@@ -76,5 +78,12 @@ public class NotificacionService {
         Usuario usuario = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
         notificacionRepository.markAllAsRead(usuario.getId());
+    }
+
+    @Transactional
+    public void limpiarNotificacionesAntiguas() {
+        LocalDateTime hace24Horas = LocalDateTime.now().minusHours(24);
+        notificacionRepository.deleteByFechaCreacionBefore(hace24Horas);
+        log.info("Limpieza de notificaciones de más de 24hs ejecutada.");
     }
 }

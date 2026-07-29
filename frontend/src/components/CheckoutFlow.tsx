@@ -59,7 +59,6 @@ function IconCheck({ size = 12 }: { size?: number }) {
 // ── Types ──────────────────────────────────────────────────────
 interface RedesSociales {
   instagram?: string
-  facebook?: string
   linkedin?: string
   sitioWeb?: string
 }
@@ -201,7 +200,7 @@ function StepSelect({
   const [email, setEmail] = useState(cachedUser?.email || '')
   const [phone, setPhone] = useState((cachedUser?.telefono || '').replace(/^\+54\s*/, ''))
   const [tipo, setTipo] = useState<'PARTICULAR' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'>('PARTICULAR')
-  const [afiliado, setAfiliado] = useState('')
+  const [afiliado, setAfiliado] = useState(cachedUser?.numAfiliado || '')
   const [customTime, setCustomTime] = useState('09:00')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [isFirstTime, setIsFirstTime] = useState(false)
@@ -494,7 +493,22 @@ function StepSelect({
   );
 
   const redes = professional.redesSociales;
-  const hasRedes = !!(redes && (redes.instagram || redes.facebook || redes.linkedin || redes.sitioWeb));
+  const hasRedes = !!(redes && (redes.instagram || redes.linkedin || redes.sitioWeb));
+
+  const parseExperiencias = (raw?: string) => {
+    if (!raw) return []
+    try {
+      if (raw.trim().startsWith('[')) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) return parsed
+      }
+    } catch (e) {
+      // fallback
+    }
+    return [{ id: '1', nombreLugar: 'Experiencia laboral', desde: '', hasta: '', descripcion: raw }]
+  }
+
+  const experienciasList = parseExperiencias(professional.experiencia)
 
   return (
     <div className="checkout-body" style={{ maxWidth: '780px', margin: '0 auto' }}>
@@ -529,11 +543,6 @@ function StepSelect({
                 {redes?.instagram && (
                   <a href={redes.instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram" style={{ color: 'var(--color-text-secondary)', display: 'inline-flex' }}>
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75"><rect x="2" y="2" width="20" height="20" rx="5" /><circle cx="12" cy="12" r="4" /><line x1="17.5" y1="6.5" x2="17.5" y2="6.5" /></svg>
-                  </a>
-                )}
-                {redes?.facebook && (
-                  <a href={redes.facebook} target="_blank" rel="noopener noreferrer" aria-label="Facebook" style={{ color: 'var(--color-text-secondary)', display: 'inline-flex' }}>
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.75"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg>
                   </a>
                 )}
                 {redes?.linkedin && (
@@ -803,6 +812,21 @@ function StepSelect({
                 />
               </div>
 
+              {tipo === 'OSDE' && (
+                <div className="checkout-form__group">
+                  <label htmlFor="afiliado-right" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>Número de afiliado OSDE *</label>
+                  <input
+                    id="afiliado-right"
+                    type="text"
+                    placeholder="Ej: 1-123456-7"
+                    className="checkout-form__input"
+                    value={afiliado}
+                    onChange={(e) => setAfiliado(e.target.value)}
+                    style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none' }}
+                  />
+                </div>
+              )}
+
               {/* Surcharge Alert */}
               {showFirstTimeAlert && (
                 <div className="checkout-alert checkout-alert--warning" style={{ display: 'flex', gap: '8px', padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: '#fffbe6', border: '1px solid #ffe58f', fontSize: '12.5px', color: '#ad7c11' }}>
@@ -927,6 +951,37 @@ function StepSelect({
                 </li>
               )}
             </ul>
+
+            {experienciasList.length > 0 && (
+              <div style={{ marginTop: '16px' }}>
+                <div className="seo-title" style={{ fontSize: '14px', marginBottom: '8px' }}>Experiencias laborales</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {experienciasList.map((exp: any, i: number) => (
+                    <div key={i} style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '10px 12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                          </svg>
+                          <strong style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{exp.nombreLugar}</strong>
+                        </div>
+                        {(exp.desde || exp.hasta) && (
+                          <span style={{ fontSize: '11px', color: 'var(--color-primary)', fontWeight: '600' }}>
+                            {exp.desde} {exp.hasta ? `– ${exp.hasta}` : ''}
+                          </span>
+                        )}
+                      </div>
+                      {exp.descripcion && (
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: '4px 0 0', lineHeight: 1.4 }}>
+                          {exp.descripcion}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

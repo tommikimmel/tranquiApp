@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /panel
 
-Sitemap: https://subdom.cloud/sitemap.xml
+Sitemap: https://tranquisalud.com/sitemap.xml

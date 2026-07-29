@@ -72,9 +72,10 @@ class NotificacionServiceTest {
         Usuario usuario = usuario();
         when(usuarioRepository.findByEmail("ana@mail.com")).thenReturn(Optional.of(usuario));
         List<Notificacion> expected = List.of(Notificacion.builder().id(1L).build());
-        when(notificacionRepository.findByUsuarioIdOrderByFechaCreacionDesc(1L)).thenReturn(expected);
+        when(notificacionRepository.findByUsuarioIdAndFechaCreacionAfterOrderByFechaCreacionDesc(eq(1L), any())).thenReturn(expected);
 
         assertEquals(expected, notificacionService.obtenerNotificaciones("ana@mail.com"));
+        verify(notificacionRepository).deleteByFechaCreacionBefore(any());
     }
 
     @Test

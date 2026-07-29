@@ -26,11 +26,11 @@ services:
     container_name: tranqui-backend
     restart: always
     ports:
-      - "8081:8080"
+      - "127.0.0.1:8081:8080"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tranqui-backend.entrypoints=websecure"
-      - "traefik.http.routers.tranqui-backend.rule=Host(`subdom.cloud`) && (PathPrefix(`/api`) || PathPrefix(`/ws-tranqui`))"
+      - "traefik.http.routers.tranqui-backend.rule=Host(`tranquisalud.com`) && (PathPrefix(`/api`) || PathPrefix(`/ws-tranqui`))"
       - "traefik.http.routers.tranqui-backend.tls.certresolver=letsencrypt"
       - "traefik.http.services.tranqui-backend.loadbalancer.server.port=8080"
     environment:
@@ -65,11 +65,11 @@ services:
     container_name: tranqui-frontend
     restart: always
     ports:
-      - "3000:80"
+      - "127.0.0.1:3000:80"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tranqui-frontend.entrypoints=websecure"
-      - "traefik.http.routers.tranqui-frontend.rule=Host(`subdom.cloud`)"
+      - "traefik.http.routers.tranqui-frontend.rule=Host(`tranquisalud.com`)"
       - "traefik.http.routers.tranqui-frontend.tls.certresolver=letsencrypt"
       - "traefik.http.services.tranqui-frontend.loadbalancer.server.port=80"
     networks:

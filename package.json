@@ -1,0 +1,25 @@
+{
+  "name": "tranquiapp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "deploy.js",
+  "scripts": {
+    "deploy": "node deploy.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tommikimmel/tranquiApp.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/tommikimmel/tranquiApp/issues"
+  },
+  "homepage": "https://github.com/tommikimmel/tranquiApp#readme",
+  "dependencies": {
+    "ssh2": "^1.17.0"
+  }
+}

@@ -19,11 +19,11 @@ async function run() {
   const pagePublic = await contextPublic.newPage();
   
   try {
-    await pagePublic.goto('https://subdom.cloud/', { waitUntil: 'networkidle' });
+    await pagePublic.goto('https://tranquisalud.com/', { waitUntil: 'networkidle' });
     await pagePublic.screenshot({ path: path.join(outputDir, '01_landing_publico.png'), fullPage: true });
     console.log('01_landing_publico.png saved.');
     
-    await pagePublic.goto('https://subdom.cloud/login', { waitUntil: 'networkidle' });
+    await pagePublic.goto('https://tranquisalud.com/login', { waitUntil: 'networkidle' });
     await pagePublic.screenshot({ path: path.join(outputDir, '02_login_page.png'), fullPage: true });
     console.log('02_login_page.png saved.');
   } catch (err) {
@@ -38,7 +38,7 @@ async function run() {
   });
   const pageDoctor = await contextDoctor.newPage();
   try {
-    await pageDoctor.goto('https://subdom.cloud/login', { waitUntil: 'networkidle' });
+    await pageDoctor.goto('https://tranquisalud.com/login', { waitUntil: 'networkidle' });
     await pageDoctor.fill('id=login-email', 'medico.verificado@gmail.com');
     await pageDoctor.fill('id=login-password', 'admin123');
     await pageDoctor.click('button[type="submit"]');
@@ -58,7 +58,7 @@ async function run() {
 
     for (const sub of doctorSubpaths) {
       console.log(`Navigating to ${sub.path}...`);
-      await pageDoctor.goto(`https://subdom.cloud${sub.path}`, { waitUntil: 'networkidle' });
+      await pageDoctor.goto(`https://tranquisalud.com${sub.path}`, { waitUntil: 'networkidle' });
       await pageDoctor.waitForTimeout(2000);
       await pageDoctor.screenshot({ path: path.join(outputDir, sub.name), fullPage: true });
       console.log(`${sub.name} saved.`);
@@ -76,7 +76,7 @@ async function run() {
   });
   const pageAdmin = await contextAdmin.newPage();
   try {
-    await pageAdmin.goto('https://subdom.cloud/login', { waitUntil: 'networkidle' });
+    await pageAdmin.goto('https://tranquisalud.com/login', { waitUntil: 'networkidle' });
     await pageAdmin.fill('id=login-email', 'admin@tranqui.com');
     await pageAdmin.fill('id=login-password', 'admin123');
     await pageAdmin.click('button[type="submit"]');
@@ -97,19 +97,19 @@ async function run() {
   });
   const pagePatient = await contextPatient.newPage();
   try {
-    await pagePatient.goto('https://subdom.cloud/login', { waitUntil: 'networkidle' });
+    await pagePatient.goto('https://tranquisalud.com/login', { waitUntil: 'networkidle' });
     await pagePatient.fill('id=login-email', 'paciente.completo@gmail.com');
     await pagePatient.fill('id=login-password', 'admin123');
     await pagePatient.click('button[type="submit"]');
     
-    await pagePatient.waitForURL('https://subdom.cloud/', { timeout: 10000 });
+    await pagePatient.waitForURL('https://tranquisalud.com/', { timeout: 10000 });
     await pagePatient.waitForTimeout(3000);
     await pagePatient.screenshot({ path: path.join(outputDir, '08_paciente_landing.png'), fullPage: true });
     console.log('08_paciente_landing.png saved.');
 
     // Go to booking page
     console.log('Navigating to booking page...');
-    await pagePatient.goto('https://subdom.cloud/reserva/3', { waitUntil: 'networkidle' });
+    await pagePatient.goto('https://tranquisalud.com/reserva/3', { waitUntil: 'networkidle' });
     await pagePatient.waitForTimeout(2000);
     await pagePatient.screenshot({ path: path.join(outputDir, '09_paciente_reserva.png'), fullPage: true });
     console.log('09_paciente_reserva.png saved.');

@@ -22,6 +22,20 @@ public class NotificationScheduler {
     @Autowired
     private WhatsAppService whatsappService;
 
+    @Autowired
+    private NotificacionService notificacionService;
+
+    // Cron se ejecuta cada 1 hora para eliminar notificaciones enviadas hace más de 24 horas
+    @Scheduled(cron = "0 0 * * * ?")
+    @Transactional
+    public void autoEliminarNotificacionesVencidas() {
+        try {
+            notificacionService.limpiarNotificacionesAntiguas();
+        } catch (Exception e) {
+            log.error("Fallo al ejecutar la limpieza de notificaciones antiguas", e);
+        }
+    }
+
     // Cron se ejecuta todos los días a las 20:00:00 (Zona Horaria Argentina)
     @Scheduled(cron = "0 0 20 * * ?", zone = "America/Argentina/Cordoba")
     @Transactional

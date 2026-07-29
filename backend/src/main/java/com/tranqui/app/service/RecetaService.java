@@ -52,17 +52,21 @@ public class RecetaService {
 
         receta = recetaRepository.save(receta);
 
-        // Generate simulated PDF URL
+        // NOTE: this is a placeholder, internal-only record — there is no real PDF, no digital
+        // signature, and no legal validity yet. Real electronic prescriptions require the QBI2
+        // Recipe integration (pending); until that's wired in, do not present this as a signed
+        // document anywhere (WhatsApp copy below, frontend, etc).
         String pdfUrl = "https://tranquiapp.com/api/recetas/pdf/" + receta.getId();
         receta.setPdfUrl(pdfUrl);
         receta = recetaRepository.save(receta);
 
         // Construct message for patient
         String text = String.format(
-            "Hola %s, tu receta electrónica asistida fue emitida por %s (Matrícula: %s).\n\n" +
+            "Hola %s, %s (Matrícula: %s) registró una prescripción para vos en Tranqui.\n\n" +
             "Medicación:\n%s\n\n" +
             "Indicaciones: %s\n\n" +
-            "Podés descargar el PDF firmado aquí: %s",
+            "Podés ver el resumen acá: %s\n\n" +
+            "Este resumen es una constancia interna, no un documento firmado digitalmente. Para uso en farmacias, confirmá los detalles con tu médico.",
             paciente.getNombre(),
             medico.getNombre(),
             medico.getMatricula() != null ? medico.getMatricula() : "S/N",
