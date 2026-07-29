@@ -1813,7 +1813,77 @@ function SettingsView({
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<SettingsTab>('perfil-pro')
 
+  const isValidUrl = (urlStr: string) => {
+    try {
+      const parsed = new URL(urlStr);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
   const handleSave = async () => {
+    // 1. Validar Número de Documento (debe contener únicamente números)
+    const numDocStr = String(numeroDocumento ?? '').trim();
+    if (numDocStr && !/^\d+$/.test(numDocStr)) {
+      showAlert("El número de documento debe contener únicamente dígitos numéricos sin letras, puntos ni guiones.", "error");
+      return;
+    }
+
+    // 2. Validar CUIL/CUIT (solo dígitos)
+    const cuilStr = String(cuil ?? '').trim();
+    if (cuilStr && !/^\d+$/.test(cuilStr)) {
+      showAlert("El CUIL/CUIT debe ser un número válido sin letras, guiones ni puntos.", "error");
+      return;
+    }
+
+    // 3. Validar Número de Matrícula (solo dígitos)
+    const matStr = String(matricula ?? '').trim();
+    if (matStr && !/^\d+$/.test(matStr)) {
+      showAlert("El número de matrícula debe contener únicamente dígitos numéricos.", "error");
+      return;
+    }
+
+    // 4. Validar Años de Experiencia (número entero no negativo)
+    if (aniosExperiencia !== '' && (isNaN(Number(aniosExperiencia)) || Number(aniosExperiencia) < 0 || !/^\d+$/.test(String(aniosExperiencia).trim()))) {
+      showAlert("Los años de experiencia deben ser un número entero mayor o igual a 0.", "error");
+      return;
+    }
+
+    // 5. Validar Redes Sociales (Opcionales, pero si se llenan deben ser URLs válidas)
+    let formattedInstagram = instagram ? instagram.trim() : '';
+    if (formattedInstagram) {
+      if (!/^https?:\/\//i.test(formattedInstagram)) {
+        formattedInstagram = 'https://' + formattedInstagram;
+      }
+      if (!isValidUrl(formattedInstagram) || !formattedInstagram.toLowerCase().includes('instagram.com')) {
+        showAlert("La URL de Instagram no es válida. Debe ser una dirección web válida de Instagram (ej: https://instagram.com/tu_usuario).", "error");
+        return;
+      }
+    }
+
+    let formattedLinkedin = linkedin ? linkedin.trim() : '';
+    if (formattedLinkedin) {
+      if (!/^https?:\/\//i.test(formattedLinkedin)) {
+        formattedLinkedin = 'https://' + formattedLinkedin;
+      }
+      if (!isValidUrl(formattedLinkedin) || !formattedLinkedin.toLowerCase().includes('linkedin.com')) {
+        showAlert("La URL de LinkedIn no es válida. Debe ser una dirección web válida de LinkedIn (ej: https://linkedin.com/in/tu_usuario).", "error");
+        return;
+      }
+    }
+
+    let formattedSitioWeb = sitioWeb ? sitioWeb.trim() : '';
+    if (formattedSitioWeb) {
+      if (!/^https?:\/\//i.test(formattedSitioWeb)) {
+        formattedSitioWeb = 'https://' + formattedSitioWeb;
+      }
+      if (!isValidUrl(formattedSitioWeb)) {
+        showAlert("La URL del sitio web no es válida. Debe ser una dirección web válida (ej: https://tu-sitio.com).", "error");
+        return;
+      }
+    }
+
     setSaving(true)
     try {
       await onSave({
@@ -1822,9 +1892,9 @@ function SettingsView({
         apellido,
         sexo,
         fechaNacimiento,
-        cuil: cuil ? Number(cuil) : null,
+        cuil: cuilStr ? Number(cuilStr) : null,
         tipoDocumento,
-        numeroDocumento: numeroDocumento ? Number(numeroDocumento) : null,
+        numeroDocumento: numDocStr ? Number(numDocStr) : null,
         domicilioAtencion: ofrecePresencial ? domicilioAtencion : '',
         domicilioLat: ofrecePresencial ? domicilioLat : null,
         domicilioLng: ofrecePresencial ? domicilioLng : null,
@@ -1832,7 +1902,7 @@ function SettingsView({
         matriculaInfo: {
           tipo: matTipo,
           provincia: matProvincia,
-          numero: matricula ? Number(matricula) : null,
+          numero: matStr ? Number(matStr) : null,
           especialidad: {
             textoLibre: specialty
           },
@@ -1844,8 +1914,8 @@ function SettingsView({
         },
         degree,
         specialty,
-        matricula,
-        cuit: cuil ? String(cuil) : '',
+        matricula: matStr,
+        cuit: cuilStr,
         tariffs,
         fotoUrl,
         tags: selectedTags,
@@ -1857,9 +1927,9 @@ function SettingsView({
         aniosExperiencia: aniosExperiencia === '' ? null : Number(aniosExperiencia),
         experiencia: JSON.stringify(experienciasLaborales),
         redesSociales: {
-          instagram,
-          linkedin,
-          sitioWeb
+          instagram: formattedInstagram,
+          linkedin: formattedLinkedin,
+          sitioWeb: formattedSitioWeb
         }
       })
       showAlert("Configuración guardada con éxito ✓", "success")
@@ -2104,11 +2174,11 @@ function SettingsView({
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-num-doc">Número de Documento</label>
-            <input id="input-num-doc" className="form-input" type="number" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} />
+            <input id="input-num-doc" className="form-input" type="text" inputMode="numeric" placeholder="Ej. 12345678" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-cuil">CUIL/CUIT</label>
-            <input id="input-cuil" className="form-input" type="number" placeholder="Ej. 27123456780" value={cuil} onChange={(e) => setCuil(e.target.value)} />
+            <input id="input-cuil" className="form-input" type="text" inputMode="numeric" placeholder="Ej. 27123456780" value={cuil} onChange={(e) => setCuil(e.target.value)} />
           </div>
           {/* Modalities selector */}
           <div className="form-group" style={{ gridColumn: 'span 2' }}>
