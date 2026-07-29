@@ -3193,9 +3193,9 @@ function DashboardHome({
           <div style={{ width: '100%', overflowX: 'auto', marginTop: 'var(--space-4)' }}>
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '70px repeat(7, minmax(130px, 1fr))',
+              gridTemplateColumns: '55px repeat(7, minmax(95px, 1fr))',
               width: '100%',
-              minWidth: '940px',
+              minWidth: '680px',
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-lg)',
               overflow: 'hidden',
