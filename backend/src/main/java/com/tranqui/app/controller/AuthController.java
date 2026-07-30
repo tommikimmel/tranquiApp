@@ -42,12 +42,26 @@ public class AuthController {
     @Autowired
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private com.tranqui.app.service.ResendEmailService resendEmailService;
+
     @org.springframework.beans.factory.annotation.Value("${google.client-id:dummy-client-id}")
     private String clientId;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody com.tranqui.app.model.dto.RegisterRequestDto registerRequestDto) {
-        if (usuarioRepository.findByEmail(registerRequestDto.getEmail()).isPresent()) {
+        String emailClean = registerRequestDto.getEmail() != null ? registerRequestDto.getEmail().trim().toLowerCase() : "";
+        String emailRegex = "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$";
+        if (emailClean.isEmpty() || !emailClean.matches(emailRegex)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El formato del email es inválido.");
+        }
+
+        String rawPass = registerRequestDto.getPassword();
+        if (rawPass == null || rawPass.length() < 8 || !rawPass.matches(".*[A-Z].*") || !rawPass.matches(".*[a-z].*") || !rawPass.matches(".*[0-9].*")) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La contraseña debe tener al menos 8 caracteres, incluir al menos una letra mayúscula, una minúscula y un número.");
+        }
+
+        if (usuarioRepository.findByEmail(emailClean).isPresent()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El email ya está registrado");
         }
 
@@ -56,8 +70,11 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La foto de perfil es demasiado grande (máx. 3MB). Elegí una imagen más liviana.");
         }
 
+        String codigoVerificacion = String.format("%06d", new java.util.Random().nextInt(1000000));
+        java.time.LocalDateTime expiresAt = java.time.LocalDateTime.now().plusMinutes(15);
+
         Usuario usuario = Usuario.builder()
-                .email(registerRequestDto.getEmail())
+                .email(emailClean)
                 .password(passwordEncoder.encode(registerRequestDto.getPassword()))
                 .rol(registerRequestDto.getRol())
                 .nombre(registerRequestDto.getNombre())
@@ -85,19 +102,135 @@ public class AuthController {
                 .ofrecePresencial(registerRequestDto.getOfrecePresencial())
                 .fotoUrl(registerRequestDto.getFotoUrl())
                 .verificadoAdmin(registerRequestDto.getRol() == Rol.PACIENTE ? true : null)
+                .emailVerificado(false)
+                .codigoVerificacion(codigoVerificacion)
+                .codigoVerificacionExpiresAt(expiresAt)
                 .build();
 
         usuarioRepository.save(usuario);
-        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono()));
+        resendEmailService.enviarCodigoVerificacion(usuario.getEmail(), usuario.getNombre(), codigoVerificacion);
+
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("message", "Registro exitoso. Se envió un código de verificación a tu correo.");
+        response.put("email", emailClean);
+        response.put("requiresVerification", true);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<?> verifyEmail(@RequestBody com.tranqui.app.model.dto.VerifyEmailDto dto) {
+        String cleanEmail = dto.getEmail() != null ? dto.getEmail().trim().toLowerCase() : "";
+        Usuario usuario = usuarioRepository.findByEmail(cleanEmail)
+                .orElse(null);
+
+        if (usuario == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Usuario no encontrado.");
+        }
+
+        if (Boolean.TRUE.equals(usuario.getEmailVerificado())) {
+            return ResponseEntity.ok("Tu email ya está verificado.");
+        }
+
+        if (usuario.getCodigoVerificacion() == null || !usuario.getCodigoVerificacion().equals(dto.getCodigo() != null ? dto.getCodigo().trim() : "")) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Código de verificación incorrecto.");
+        }
+
+        if (usuario.getCodigoVerificacionExpiresAt() != null && java.time.LocalDateTime.now().isAfter(usuario.getCodigoVerificacionExpiresAt())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El código ha expirado. Solicitá uno nuevo.");
+        }
+
+        usuario.setEmailVerificado(true);
+        usuario.setCodigoVerificacion(null);
+        usuario.setCodigoVerificacionExpiresAt(null);
+        usuarioRepository.save(usuario);
+
+        return ResponseEntity.ok("Email verificado correctamente. Ya podés iniciar sesión.");
+    }
+
+    @PostMapping("/resend-code")
+    public ResponseEntity<?> resendCode(@RequestBody com.tranqui.app.model.dto.VerifyEmailDto dto) {
+        String cleanEmail = dto.getEmail() != null ? dto.getEmail().trim().toLowerCase() : "";
+        Usuario usuario = usuarioRepository.findByEmail(cleanEmail)
+                .orElse(null);
+
+        if (usuario == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Usuario no encontrado.");
+        }
+
+        if (Boolean.TRUE.equals(usuario.getEmailVerificado())) {
+            return ResponseEntity.ok("Tu email ya está verificado.");
+        }
+
+        String nuevoCodigo = String.format("%06d", new java.util.Random().nextInt(1000000));
+        usuario.setCodigoVerificacion(nuevoCodigo);
+        usuario.setCodigoVerificacionExpiresAt(java.time.LocalDateTime.now().plusMinutes(15));
+        usuarioRepository.save(usuario);
+
+        resendEmailService.enviarCodigoVerificacion(usuario.getEmail(), usuario.getNombre(), nuevoCodigo);
+        return ResponseEntity.ok("Código reenviado a tu correo.");
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody com.tranqui.app.model.dto.ForgotPasswordDto dto) {
+        String cleanEmail = dto.getEmail() != null ? dto.getEmail().trim().toLowerCase() : "";
+        Usuario usuario = usuarioRepository.findByEmail(cleanEmail).orElse(null);
+
+        // Retornar mensaje estándar aun si no existe para evitar enumeración de emails
+        if (usuario == null) {
+            return ResponseEntity.ok("Si el correo está registrado, recibirás las instrucciones en tu bandeja de entrada.");
+        }
+
+        String resetCode = String.format("%06d", new java.util.Random().nextInt(1000000));
+        usuario.setResetPasswordCode(resetCode);
+        usuario.setResetPasswordExpiresAt(java.time.LocalDateTime.now().plusMinutes(15));
+        usuarioRepository.save(usuario);
+
+        resendEmailService.enviarCodigoRecuperacion(usuario.getEmail(), usuario.getNombre(), resetCode);
+        return ResponseEntity.ok("Si el correo está registrado, recibirás las instrucciones en tu bandeja de entrada.");
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody com.tranqui.app.model.dto.ResetPasswordDto dto) {
+        String cleanEmail = dto.getEmail() != null ? dto.getEmail().trim().toLowerCase() : "";
+        String rawPass = dto.getNewPassword();
+
+        if (rawPass == null || rawPass.length() < 8 || !rawPass.matches(".*[A-Z].*") || !rawPass.matches(".*[a-z].*") || !rawPass.matches(".*[0-9].*")) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La nueva contraseña debe tener al menos 8 caracteres, incluir una letra mayúscula, una minúscula y un número.");
+        }
+
+        Usuario usuario = usuarioRepository.findByEmail(cleanEmail).orElse(null);
+        if (usuario == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Código de recuperación inválido o expirado.");
+        }
+
+        if (usuario.getResetPasswordCode() == null || !usuario.getResetPasswordCode().equals(dto.getCodigo() != null ? dto.getCodigo().trim() : "")) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Código de recuperación incorrecto.");
+        }
+
+        if (usuario.getResetPasswordExpiresAt() != null && java.time.LocalDateTime.now().isAfter(usuario.getResetPasswordExpiresAt())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El código de recuperación ha expirado. Solicitá uno nuevo.");
+        }
+
+        usuario.setPassword(passwordEncoder.encode(rawPass));
+        usuario.setResetPasswordCode(null);
+        usuario.setResetPasswordExpiresAt(null);
+        usuarioRepository.save(usuario);
+
+        return ResponseEntity.ok("Tu contraseña ha sido restablecida con éxito. Ya podés iniciar sesión.");
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody com.tranqui.app.model.dto.LoginRequestDto loginRequestDto, HttpServletResponse response) {
-        Usuario usuario = usuarioRepository.findByEmail(loginRequestDto.getEmail())
+        String cleanEmail = loginRequestDto.getEmail() != null ? loginRequestDto.getEmail().trim().toLowerCase() : "";
+        Usuario usuario = usuarioRepository.findByEmail(cleanEmail)
                 .orElse(null);
 
         if (usuario == null || usuario.getPassword() == null || !passwordEncoder.matches(loginRequestDto.getPassword(), usuario.getPassword())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Credenciales incorrectas");
+        }
+
+        if (Boolean.FALSE.equals(usuario.getEmailVerificado()) && usuario.getRol() != Rol.ADMIN) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Debés verificar tu correo electrónico antes de ingresar. Te enviamos un código al registrarte.");
         }
 
         String jwtToken = jwtService.generateToken(usuario);

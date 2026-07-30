@@ -734,19 +734,43 @@
 
 /* ── Integration Connect Banner (Mercado Pago, Google Calendar) ── */
 .mp-connect-banner {
-  background: var(--neutral-50);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
+  background: #ffffff;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 14px;
+  padding: 16px 20px;
   display: flex;
   align-items: center;
-  gap: var(--space-5);
-  transition: background var(--transition-fast), border-color var(--transition-fast);
+  gap: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.mp-connect-banner:hover {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+.mp-connect-banner--mp {
+  border-left: 4px solid #009ee3;
+}
+
+.mp-connect-banner--google {
+  border-left: 4px solid #1a73e8;
 }
 
 .mp-connect-banner--connected {
-  background: var(--green-50);
-  border-color: var(--green-200);
+  background: #f6fbf8;
+  border-color: #c6f6d5;
+}
+
+.mp-connect-banner--mp.mp-connect-banner--connected {
+  border-left-color: #009ee3;
+}
+
+.mp-connect-banner--google.mp-connect-banner--connected {
+  border-left-color: #1a73e8;
 }
 
 .mp-connect-banner__icon {
@@ -754,16 +778,26 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.mp-connect-banner--mp .mp-connect-banner__icon {
+  background: rgba(0, 158, 227, 0.06);
+  border-color: rgba(0, 158, 227, 0.15);
+}
+
+.mp-connect-banner--google .mp-connect-banner__icon {
+  background: rgba(26, 115, 232, 0.06);
+  border-color: rgba(26, 115, 232, 0.15);
 }
 
 .mp-connect-banner__logo {
-  width: 32px;
+  width: 26px;
   height: auto;
   display: block;
 }
@@ -776,19 +810,31 @@
 .mp-connect-banner__status {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semi);
-  padding: 3px 10px;
-  border-radius: var(--radius-full);
-  margin-bottom: var(--space-2);
-  background: var(--neutral-200);
-  color: var(--neutral-600);
+  gap: 5px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-bottom: 4px;
+  background: #f1f5f9;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .mp-connect-banner--connected .mp-connect-banner__status {
-  background: var(--green-100);
-  color: var(--green-700);
+  background: #e6f4ea;
+  color: #137333;
+}
+
+.mp-connect-banner--mp:not(.mp-connect-banner--connected) .mp-connect-banner__status {
+  background: rgba(0, 158, 227, 0.1);
+  color: #0077b5;
+}
+
+.mp-connect-banner--google:not(.mp-connect-banner--connected) .mp-connect-banner__status {
+  background: rgba(26, 115, 232, 0.1);
+  color: #1a73e8;
 }
 
 .mp-connect-banner__status-dot {
@@ -800,21 +846,57 @@
 
 .mp-connect-banner__title {
   font-family: var(--font-heading);
-  font-size: var(--text-base);
-  font-weight: var(--font-weight-semi);
-  color: var(--color-text-primary);
-  margin-bottom: 2px;
+  font-size: 0.925rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #1e293b);
+  margin-bottom: 3px;
+  line-height: 1.25;
 }
 
 .mp-connect-banner__body {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  line-height: var(--line-height-relaxed);
-  max-width: 480px;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #64748b);
+  line-height: 1.4;
+  max-width: 500px;
+  margin: 0;
 }
 
 .mp-connect-banner__action {
   flex-shrink: 0;
+}
+
+.mp-btn--connect {
+  background-color: #009ee3 !important;
+  border-color: #009ee3 !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  padding: 8px 16px !important;
+  font-size: 0.825rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.mp-btn--connect:hover {
+  background-color: #0082bd !important;
+  border-color: #0082bd !important;
+  box-shadow: 0 4px 12px rgba(0, 158, 227, 0.28) !important;
+}
+
+.google-btn--connect {
+  background-color: #1a73e8 !important;
+  border-color: #1a73e8 !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  padding: 8px 16px !important;
+  font-size: 0.825rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.google-btn--connect:hover {
+  background-color: #1557b0 !important;
+  border-color: #1557b0 !important;
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.28) !important;
 }
 
 /* ── Inputs ────────────────────────────────────────────────── */

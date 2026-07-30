@@ -59,3 +59,7 @@ qbi2:
 app:
   public-url: ${APP_PUBLIC_URL:http://localhost:8081}
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
+
+resend:
+  api-key: ${RESEND_API_KEY:}
+  from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}

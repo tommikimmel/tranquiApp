@@ -491,29 +491,29 @@ function Sidebar({
 // ── MP Connect Banner ──────────────────────────────────────────
 function MPConnectBanner({ connected, onConnect, onDisconnect }: { connected: boolean; onConnect: () => void; onDisconnect: () => void }) {
   return (
-    <div className={`mp-connect-banner ${connected ? 'mp-connect-banner--connected' : ''}`} role={connected ? 'status' : 'alert'}>
+    <div className={`mp-connect-banner mp-connect-banner--mp ${connected ? 'mp-connect-banner--connected' : ''}`} role={connected ? 'status' : 'alert'}>
       <div className="mp-connect-banner__icon">
         <img src="/logo-mp-icon.png" alt="Mercado Pago" className="mp-connect-banner__logo" />
       </div>
       <div className="mp-connect-banner__content">
         <span className="mp-connect-banner__status">
           <span className="mp-connect-banner__status-dot" />
-          {connected ? 'Conectado' : 'Desconectado'}
+          {connected ? 'Conectado' : 'Sin vincular'}
         </span>
         <h2 className="mp-connect-banner__title">
           {connected ? 'Mercado Pago vinculado' : 'Conectá tu cuenta de Mercado Pago'}
         </h2>
         <p className="mp-connect-banner__body">
           {connected
-            ? 'Los pagos se acreditan automáticamente en tu cuenta de Mercado Pago al confirmarse cada sesión. Tranqui es 100% libre de comisiones.'
-            : 'Para que los pacientes puedan pagarte directamente, necesitás vincular tu cuenta de Mercado Pago. El proceso toma menos de 2 minutos. Sin esto, tu perfil no aparece en las búsquedas públicas.'}
+            ? 'Los cobros se acreditan directo en tu cuenta al confirmarse cada sesión. 100% libre de comisiones.'
+            : 'Permite que los pacientes abonen sus turnos de forma directa e instantánea a tu cuenta sin comisiones extra.'}
         </p>
       </div>
       <div className="mp-connect-banner__action">
         {connected ? (
           <button className="btn btn--ghost btn--sm" onClick={onDisconnect}>Desconectar</button>
         ) : (
-          <button className="btn btn--primary btn--sm" onClick={onConnect} id="btn-connect-mp">Conectar Mercado Pago</button>
+          <button className="btn btn--primary btn--sm mp-btn--connect" onClick={onConnect} id="btn-connect-mp">Conectar Mercado Pago</button>
         )}
       </div>
     </div>
@@ -523,29 +523,29 @@ function MPConnectBanner({ connected, onConnect, onDisconnect }: { connected: bo
 // ── Google Calendar Connect Banner ──────────────────────────────
 function GoogleCalendarConnectBanner({ connected, onConnect, onDisconnect }: { connected: boolean; onConnect: () => void; onDisconnect: () => void }) {
   return (
-    <div className={`mp-connect-banner ${connected ? 'mp-connect-banner--connected' : ''}`} role={connected ? 'status' : 'alert'}>
+    <div className={`mp-connect-banner mp-connect-banner--google ${connected ? 'mp-connect-banner--connected' : ''}`} role={connected ? 'status' : 'alert'}>
       <div className="mp-connect-banner__icon">
         <img src="/logo-google-calendar.svg" alt="Google Calendar" className="mp-connect-banner__logo" />
       </div>
       <div className="mp-connect-banner__content">
-        <span className="mp-connect-banner__status" style={connected ? { background: '#E8F0FE', color: '#1a73e8' } : undefined}>
+        <span className="mp-connect-banner__status">
           <span className="mp-connect-banner__status-dot" />
-          {connected ? 'Conectado' : 'Desconectado'}
+          {connected ? 'Conectado' : 'Sin vincular'}
         </span>
         <h2 className="mp-connect-banner__title">
           {connected ? 'Google Calendar vinculado' : 'Vinculá tu Google Calendar / Google Meet'}
         </h2>
         <p className="mp-connect-banner__body">
           {connected
-            ? 'Se crean reuniones reales de Google Meet automáticamente en tu agenda de Google para todas las videollamadas con pacientes de Tranqui App.'
-            : 'Para que el sistema genere automáticamente enlaces reales de Google Meet en cada turno confirmado y se añadan a tu agenda de Google, necesitás conectar tu cuenta.'}
+            ? 'Genera videollamadas de Google Meet y sincroniza automáticamente las sesiones en tu agenda personal.'
+            : 'Sincroniza tus sesiones de forma automática con Google Calendar y crea links de Google Meet para videollamadas.'}
         </p>
       </div>
       <div className="mp-connect-banner__action">
         {connected ? (
           <button className="btn btn--ghost btn--sm" onClick={onDisconnect}>Desconectar</button>
         ) : (
-          <button className="btn btn--primary btn--sm" onClick={onConnect} id="btn-connect-google" style={{ backgroundColor: '#1a73e8', borderColor: '#1a73e8' }}>
+          <button className="btn btn--primary btn--sm google-btn--connect" onClick={onConnect} id="btn-connect-google">
             Conectar Google Calendar
           </button>
         )}

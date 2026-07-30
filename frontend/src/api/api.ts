@@ -71,6 +71,18 @@ export const api = {
   register: (data: any) => 
     apiFetch('/auth/register', { method: 'POST', body: data }),
 
+  verifyEmail: (data: { email: string; codigo: string }) =>
+    apiFetch('/auth/verify-email', { method: 'POST', body: data as any }),
+
+  resendCode: (data: { email: string }) =>
+    apiFetch('/auth/resend-code', { method: 'POST', body: data as any }),
+
+  forgotPassword: (data: { email: string }) =>
+    apiFetch('/auth/forgot-password', { method: 'POST', body: data as any }),
+
+  resetPassword: (data: { email: string; codigo: string; newPassword: string }) =>
+    apiFetch('/auth/reset-password', { method: 'POST', body: data as any }),
+
   getMe: () => apiFetch('/auth/me'),
   logout: () => apiFetch('/auth/logout', { method: 'POST' }),
 

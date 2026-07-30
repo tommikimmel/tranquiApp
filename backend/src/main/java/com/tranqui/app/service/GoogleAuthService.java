@@ -77,6 +77,7 @@ public class GoogleAuthService {
                             .nombre(name)
                             .email(email)
                             .rol(Rol.PACIENTE)
+                            .emailVerificado(true)
                             .build();
                     return usuarioRepository.save(nuevo);
                 });

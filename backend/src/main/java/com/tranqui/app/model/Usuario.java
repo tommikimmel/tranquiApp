@@ -209,6 +209,22 @@ public class Usuario {
     @Column(name = "password", length = 100)
     private String password;
 
+    @Builder.Default
+    @Column(name = "email_verificado")
+    private Boolean emailVerificado = false;
+
+    @Column(name = "codigo_verificacion", length = 10)
+    private String codigoVerificacion;
+
+    @Column(name = "codigo_verificacion_expires_at")
+    private LocalDateTime codigoVerificacionExpiresAt;
+
+    @Column(name = "reset_password_code", length = 10)
+    private String resetPasswordCode;
+
+    @Column(name = "reset_password_expires_at")
+    private LocalDateTime resetPasswordExpiresAt;
+
     @Column(name = "verificado_admin")
     private Boolean verificadoAdmin;
 
