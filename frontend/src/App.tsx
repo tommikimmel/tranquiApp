@@ -492,28 +492,61 @@ function Sidebar({
 function MPConnectBanner({ connected, onConnect, onDisconnect }: { connected: boolean; onConnect: () => void; onDisconnect: () => void }) {
   return (
     <div className={`mp-connect-banner mp-connect-banner--mp ${connected ? 'mp-connect-banner--connected' : ''}`} role={connected ? 'status' : 'alert'}>
-      <div className="mp-connect-banner__icon">
-        <img src="/logo-mp-icon.png" alt="Mercado Pago" className="mp-connect-banner__logo" />
-      </div>
-      <div className="mp-connect-banner__content">
+      <div className="mp-connect-banner__top-row">
+        <span className="mp-connect-banner__tag">
+          ⚡ {connected ? 'INTEGRACIÓN ACTIVA' : 'INTEGRACIÓN DE PAGOS'}
+        </span>
         <span className="mp-connect-banner__status">
           <span className="mp-connect-banner__status-dot" />
-          {connected ? 'Conectado' : 'Sin vincular'}
+          {connected ? 'Mercado Pago Conectado' : 'Sin vincular'}
         </span>
-        <h2 className="mp-connect-banner__title">
-          {connected ? 'Mercado Pago vinculado' : 'Conectá tu cuenta de Mercado Pago'}
-        </h2>
-        <p className="mp-connect-banner__body">
-          {connected
-            ? 'Los cobros se acreditan directo en tu cuenta al confirmarse cada sesión. 100% libre de comisiones.'
-            : 'Permite que los pacientes abonen sus turnos de forma directa e instantánea a tu cuenta sin comisiones extra.'}
-        </p>
       </div>
+
+      <div className="mp-connect-banner__body-wrapper">
+        <div className="mp-connect-banner__icon">
+          <img src="/logo-mp-icon.png" alt="Mercado Pago" className="mp-connect-banner__logo" />
+        </div>
+        <div className="mp-connect-banner__content">
+          <h2 className="mp-connect-banner__title">
+            {connected ? 'Mercado Pago vinculado' : 'Conectá tu cuenta de Mercado Pago'}
+          </h2>
+          <p className="mp-connect-banner__body">
+            {connected
+              ? 'Los cobros de tus pacientes se acreditan de forma directa e instantánea en tu cuenta al confirmarse cada reserva.'
+              : 'Recibí cobros de tus pacientes de forma automatizada y directa en tu cuenta bancaria o CVU, 100% libre de comisiones de plataforma.'}
+          </p>
+
+          {!connected && (
+            <div className="mp-connect-banner__features">
+              <span className="mp-connect-banner__feature-chip">
+                <svg className="mp-connect-banner__feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Cobros en tiempo real
+              </span>
+              <span className="mp-connect-banner__feature-chip">
+                <svg className="mp-connect-banner__feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                0% comisiones Tranqui
+              </span>
+              <span className="mp-connect-banner__feature-chip">
+                <svg className="mp-connect-banner__feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Acreditación directa
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="mp-connect-banner__action">
         {connected ? (
-          <button className="btn btn--ghost btn--sm" onClick={onDisconnect}>Desconectar</button>
+          <button className="btn btn--ghost btn--sm" onClick={onDisconnect} style={{ color: 'var(--color-error)' }}>
+            Desconectar Mercado Pago
+          </button>
         ) : (
-          <button className="btn btn--primary btn--sm mp-btn--connect" onClick={onConnect} id="btn-connect-mp">Conectar Mercado Pago</button>
+          <button className="btn btn--primary btn--sm mp-btn--connect" onClick={onConnect} id="btn-connect-mp">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 16, height: 16 }}>
+              <path d="M15 3h6v6M10 14L21 3M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+            </svg>
+            Vincular Mercado Pago
+          </button>
         )}
       </div>
     </div>
@@ -524,29 +557,60 @@ function MPConnectBanner({ connected, onConnect, onDisconnect }: { connected: bo
 function GoogleCalendarConnectBanner({ connected, onConnect, onDisconnect }: { connected: boolean; onConnect: () => void; onDisconnect: () => void }) {
   return (
     <div className={`mp-connect-banner mp-connect-banner--google ${connected ? 'mp-connect-banner--connected' : ''}`} role={connected ? 'status' : 'alert'}>
-      <div className="mp-connect-banner__icon">
-        <img src="/logo-google-calendar.svg" alt="Google Calendar" className="mp-connect-banner__logo" />
-      </div>
-      <div className="mp-connect-banner__content">
+      <div className="mp-connect-banner__top-row">
+        <span className="mp-connect-banner__tag">
+          📅 {connected ? 'INTEGRACIÓN ACTIVA' : 'INTEGRACIÓN DE AGENDA'}
+        </span>
         <span className="mp-connect-banner__status">
           <span className="mp-connect-banner__status-dot" />
-          {connected ? 'Conectado' : 'Sin vincular'}
+          {connected ? 'Google Calendar Conectado' : 'Sin vincular'}
         </span>
-        <h2 className="mp-connect-banner__title">
-          {connected ? 'Google Calendar vinculado' : 'Vinculá tu Google Calendar / Google Meet'}
-        </h2>
-        <p className="mp-connect-banner__body">
-          {connected
-            ? 'Genera videollamadas de Google Meet y sincroniza automáticamente las sesiones en tu agenda personal.'
-            : 'Sincroniza tus sesiones de forma automática con Google Calendar y crea links de Google Meet para videollamadas.'}
-        </p>
       </div>
+
+      <div className="mp-connect-banner__body-wrapper">
+        <div className="mp-connect-banner__icon">
+          <img src="/logo-google-calendar.svg" alt="Google Calendar" className="mp-connect-banner__logo" />
+        </div>
+        <div className="mp-connect-banner__content">
+          <h2 className="mp-connect-banner__title">
+            {connected ? 'Google Calendar vinculado' : 'Conectá Google Calendar & Meet'}
+          </h2>
+          <p className="mp-connect-banner__body">
+            {connected
+              ? 'Tus sesiones virtuales generan videollamadas de Google Meet automáticamente y se sincronizan en tu agenda personal.'
+              : 'Sincronizá tus turnos en tu agenda personal y generá reuniones virtuales de Google Meet de forma automática para cada consulta.'}
+          </p>
+
+          {!connected && (
+            <div className="mp-connect-banner__features">
+              <span className="mp-connect-banner__feature-chip">
+                <svg className="mp-connect-banner__feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Links de Meet automáticos
+              </span>
+              <span className="mp-connect-banner__feature-chip">
+                <svg className="mp-connect-banner__feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Sincronización 2-way
+              </span>
+              <span className="mp-connect-banner__feature-chip">
+                <svg className="mp-connect-banner__feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Recordatorios al paciente
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="mp-connect-banner__action">
         {connected ? (
-          <button className="btn btn--ghost btn--sm" onClick={onDisconnect}>Desconectar</button>
+          <button className="btn btn--ghost btn--sm" onClick={onDisconnect} style={{ color: 'var(--color-error)' }}>
+            Desconectar Google Calendar
+          </button>
         ) : (
           <button className="btn btn--primary btn--sm google-btn--connect" onClick={onConnect} id="btn-connect-google">
-            Conectar Google Calendar
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 16, height: 16 }}>
+              <path d="M15 3h6v6M10 14L21 3M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+            </svg>
+            Vincular Google Calendar
           </button>
         )}
       </div>
@@ -4376,14 +4440,14 @@ export default function App() {
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 10000,
-            backgroundColor: '#fafaf9',
-            border: '1px solid var(--color-border)',
-            borderRadius: '12px',
-            padding: 'var(--space-4)',
+            background: 'linear-gradient(135deg, rgba(255, 246, 232, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%)',
+            backdropFilter: 'blur(16px) saturate(180%)',
+            border: '1px solid rgba(201, 138, 27, 0.3)',
+            borderRadius: 'var(--radius-lg)',
+            padding: 'var(--space-4) var(--space-5)',
             color: 'var(--color-text-primary)',
-            fontSize: 'var(--text-sm)',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
-            maxWidth: '520px',
+            boxShadow: '0 16px 36px -6px rgba(201, 138, 27, 0.15), 0 4px 12px rgba(0, 0, 0, 0.04)',
+            maxWidth: '540px',
             width: '92%',
             display: 'flex',
             flexDirection: 'column',
@@ -4391,27 +4455,45 @@ export default function App() {
             animation: 'slideDownAlert 0.35s cubic-bezier(0.16, 1, 0.3, 1) both'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: '16px', height: '16px', color: 'var(--color-warning)', flexShrink: 0 }}>
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                  <line x1="12" y1="9" x2="12" y2="13" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-                <strong style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>Verificación pendiente</strong>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '10px',
+                  backgroundColor: 'var(--color-warning)',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(201, 138, 27, 0.3)',
+                  flexShrink: 0
+                }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: '16px', height: '16px' }}>
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-bold)', color: '#92400e', margin: 0 }}>Verificación de perfil pendiente</h4>
+                </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <button
                   onClick={() => setShowDashboardAlertList(!showDashboardAlertList)}
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--color-primary)',
-                    fontSize: '11px',
+                    background: 'rgba(201, 138, 27, 0.1)',
+                    border: '1px solid rgba(201, 138, 27, 0.25)',
+                    color: '#92400e',
+                    fontSize: '11.5px',
                     fontWeight: '600',
+                    padding: '4px 10px',
+                    borderRadius: 'var(--radius-full)',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '2px'
+                    gap: '4px',
+                    transition: 'all 0.2s'
                   }}
                 >
                   {showDashboardAlertList ? 'Ocultar' : 'Ver qué falta'}
@@ -4424,9 +4506,9 @@ export default function App() {
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: 'var(--color-text-secondary)',
+                    color: 'var(--neutral-500)',
                     cursor: 'pointer',
-                    padding: '2px',
+                    padding: '4px',
                     borderRadius: '50%',
                     display: 'flex',
                     alignItems: 'center',
@@ -4444,7 +4526,7 @@ export default function App() {
               </div>
             </div>
             
-            <div style={{ fontSize: '12.5px', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
+            <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: '1.45', fontFamily: 'var(--font-body)' }}>
               Completá tu perfil para aparecer en el buscador de pacientes y recibir reservas de turnos.
             </div>
 

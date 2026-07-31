@@ -1,49 +1,77 @@
 import React, { createContext, useContext, useState } from 'react';
 
-function AlertIcon({ type, size = 16 }: { type: AlertType; size?: number }) {
-  const common = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, style: { width: size, height: size } };
-  switch (type) {
-    case 'error':
-      return <svg {...common}><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>;
-    case 'warning':
-      return <svg {...common}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>;
-    case 'info':
-      return <svg {...common}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>;
-    default:
-      return <svg {...common}><polyline points="20 6 9 17 4 12" /></svg>;
-  }
-}
-
-function CloseIcon({ size = 12 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ width: size, height: size }}>
-      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-
 export type AlertType = 'success' | 'error' | 'info' | 'warning';
 
 export interface AlertMessage {
   id: string;
   message: string;
   type: AlertType;
+  title?: string;
 }
 
 interface AlertContextProps {
   alerts: AlertMessage[];
-  showAlert: (message: string, type?: AlertType) => void;
+  showAlert: (message: string, type?: AlertType, title?: string) => void;
   removeAlert: (id: string) => void;
 }
 
 const AlertContext = createContext<AlertContextProps | undefined>(undefined);
 
+function ToastIcon({ type, size = 18 }: { type: AlertType; size?: number }) {
+  const style = { width: size, height: size };
+  switch (type) {
+    case 'success':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={style}>
+          <path d="M20 6L9 17l-5-5" />
+        </svg>
+      );
+    case 'error':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={style}>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M15 9l-6 6M9 9l6 6" />
+        </svg>
+      );
+    case 'warning':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={style}>
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          <path d="M12 9v4M12 17h.01" />
+        </svg>
+      );
+    case 'info':
+    default:
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={style}>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4M12 8h.01" />
+        </svg>
+      );
+  }
+}
+
+function getDefaultTitle(type: AlertType): string {
+  switch (type) {
+    case 'success':
+      return '¡Operación exitosa!';
+    case 'error':
+      return 'Atención requerida';
+    case 'warning':
+      return 'Aviso importante';
+    case 'info':
+    default:
+      return 'Información';
+  }
+}
+
 export function AlertProvider({ children }: { children: React.ReactNode }) {
   const [alerts, setAlerts] = useState<AlertMessage[]>([]);
 
-  const showAlert = (message: string, type: AlertType = 'success') => {
+  const showAlert = (message: string, type: AlertType = 'success', title?: string) => {
     const id = String(Date.now()) + Math.random().toString(36).substr(2, 5);
-    setAlerts((prev) => [...prev, { id, message, type }]);
+    const resolvedTitle = title || getDefaultTitle(type);
+    setAlerts((prev) => [...prev, { id, message, type, title: resolvedTitle }]);
     setTimeout(() => {
       removeAlert(id);
     }, 5000);
@@ -56,76 +84,36 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
   return (
     <AlertContext.Provider value={{ alerts, showAlert, removeAlert }}>
       {children}
-      {/* Toast Notification HUD */}
-      <div style={{
-        position: 'fixed',
-        top: '24px',
-        right: '24px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--space-3)',
-        zIndex: 999999,
-        maxWidth: '420px',
-        width: '100%'
-      }}>
-        {alerts.map((a) => {
-          const isError = a.type === 'error';
-          const isWarning = a.type === 'warning';
-          const isInfo = a.type === 'info';
-
-          const accentColor = isError ? 'var(--color-error)' : isWarning ? 'var(--color-warning)' : isInfo ? 'var(--color-info)' : 'var(--color-primary)';
-          const bg = isError ? 'var(--color-error-bg)' : isWarning ? 'var(--color-warning-bg)' : isInfo ? 'var(--color-info-bg)' : 'var(--green-50)';
-
-          return (
-            <div key={a.id} style={{
-              backgroundColor: bg,
-              borderTop: '1px solid var(--color-border)',
-              borderRight: '1px solid var(--color-border)',
-              borderBottom: '1px solid var(--color-border)',
-              borderLeft: `4px solid ${accentColor}`,
-              borderRadius: 'var(--radius-lg)',
-              padding: 'var(--space-4) var(--space-5)',
-              color: 'var(--color-text-primary)',
-              fontSize: 'var(--text-sm)',
-              fontFamily: 'var(--font-body)',
-              fontWeight: 'var(--font-weight-medium)',
-              boxShadow: 'var(--shadow-lg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 'var(--space-4)',
-              animation: 'slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-              position: 'relative'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                <span style={{ color: accentColor, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                  <AlertIcon type={a.type} size={20} />
-                </span>
-                <span style={{ lineHeight: 'var(--line-height-relaxed)' }}>{a.message}</span>
-              </div>
-              <button
-                onClick={() => removeAlert(a.id)}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  color: 'var(--color-text-secondary)',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  opacity: 0.6,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'opacity var(--transition-fast)',
-                  borderRadius: '50%',
-                  backgroundColor: 'transparent',
-                  flexShrink: 0
-                }}
-              >
-                <CloseIcon size={14} />
-              </button>
+      {/* Redesigned Toast Notification HUD */}
+      <div className="tranqui-toast-container" aria-live="polite">
+        {alerts.map((a) => (
+          <div
+            key={a.id}
+            className={`tranqui-toast tranqui-toast--${a.type}`}
+            role="alert"
+          >
+            <div className="tranqui-toast__icon-box">
+              <ToastIcon type={a.type} size={18} />
             </div>
-          );
-        })}
+
+            <div className="tranqui-toast__content">
+              <span className="tranqui-toast__title">{a.title}</span>
+              <span className="tranqui-toast__message">{a.message}</span>
+            </div>
+
+            <button
+              onClick={() => removeAlert(a.id)}
+              className="tranqui-toast__close"
+              aria-label="Cerrar notificación"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" style={{ width: 14, height: 14 }}>
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="tranqui-toast__progress" />
+          </div>
+        ))}
       </div>
     </AlertContext.Provider>
   );

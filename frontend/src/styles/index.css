@@ -224,9 +224,187 @@ img, svg {
   border: 1px solid #BFDBFE;
 }
 
-/* Toast notifications (AlertContext) can appear on any page, so this lives in the
-   globally-loaded stylesheet rather than a page-scoped one like dashboard.css/landing.css. */
-@keyframes slideInRight {
-  from { transform: translateX(24px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+/* ── Toast notifications (AlertContext) design system ───────────────────── */
+@keyframes toastSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(40px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }
+
+@keyframes toastSlideOut {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(40px) scale(0.96);
+  }
+}
+
+@keyframes toastProgress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+.tranqui-toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  z-index: 999999;
+  max-width: 420px;
+  width: calc(100vw - 32px);
+  pointer-events: none;
+}
+
+.tranqui-toast {
+  pointer-events: auto;
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  box-shadow: 0 16px 36px -6px rgba(23, 43, 31, 0.12), 0 4px 12px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  animation: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+
+.tranqui-toast:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 42px -6px rgba(23, 43, 31, 0.16), 0 6px 16px rgba(0, 0, 0, 0.06);
+}
+
+.tranqui-toast:hover .tranqui-toast__progress {
+  animation-play-state: paused;
+}
+
+.tranqui-toast--success {
+  border: 1px solid rgba(47, 168, 79, 0.25);
+  background: linear-gradient(135deg, rgba(234, 246, 238, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.tranqui-toast--error {
+  border: 1px solid rgba(214, 69, 69, 0.25);
+  background: linear-gradient(135deg, rgba(253, 236, 236, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.tranqui-toast--warning {
+  border: 1px solid rgba(201, 138, 27, 0.25);
+  background: linear-gradient(135deg, rgba(255, 246, 232, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.tranqui-toast--info {
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  background: linear-gradient(135deg, rgba(234, 242, 254, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.tranqui-toast__icon-box {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tranqui-toast--success .tranqui-toast__icon-box {
+  background: var(--green-500);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(47, 168, 79, 0.32);
+}
+
+.tranqui-toast--error .tranqui-toast__icon-box {
+  background: var(--color-error);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(214, 69, 69, 0.32);
+}
+
+.tranqui-toast--warning .tranqui-toast__icon-box {
+  background: var(--color-warning);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(201, 138, 27, 0.32);
+}
+
+.tranqui-toast--info .tranqui-toast__icon-box {
+  background: var(--color-info);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.32);
+}
+
+.tranqui-toast__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 1px;
+}
+
+.tranqui-toast__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.25;
+}
+
+.tranqui-toast--success .tranqui-toast__title { color: var(--green-800); }
+.tranqui-toast--error .tranqui-toast__title { color: #991b1b; }
+.tranqui-toast--warning .tranqui-toast__title { color: #92400e; }
+.tranqui-toast--info .tranqui-toast__title { color: #1e40af; }
+
+.tranqui-toast__message {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--color-text-primary);
+  line-height: 1.45;
+  font-weight: var(--font-weight-medium);
+}
+
+.tranqui-toast__close {
+  background: transparent;
+  border: none;
+  color: var(--neutral-400);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  margin-top: -2px;
+  margin-right: -4px;
+}
+
+.tranqui-toast__close:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--neutral-800);
+}
+
+.tranqui-toast__progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  animation: toastProgress 5s linear forwards;
+  border-bottom-left-radius: var(--radius-lg);
+}
+
+.tranqui-toast--success .tranqui-toast__progress { background: var(--green-500); }
+.tranqui-toast--error .tranqui-toast__progress { background: var(--color-error); }
+.tranqui-toast--warning .tranqui-toast__progress { background: var(--color-warning); }
+.tranqui-toast--info .tranqui-toast__progress { background: var(--color-info); }
+

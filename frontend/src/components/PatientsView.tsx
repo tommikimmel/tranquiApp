@@ -36,6 +36,13 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
     setUnreadCounts(initialCounts)
   }, [patients])
 
+  // Auto-select top/most recent patient chat when opening Patients view
+  useEffect(() => {
+    if (!selectedPatient && filteredPatients.length > 0 && !loadingPatients) {
+      setSelectedPatient(filteredPatients[0])
+    }
+  }, [filteredPatients, selectedPatient, loadingPatients])
+
   useEffect(() => {
     if (selectedPatient) {
       setTimeout(() => {
