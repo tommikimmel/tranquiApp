@@ -42,8 +42,8 @@
   --color-warning:  #C98A1B;
   --color-warning-bg: #FFF6E8;
   --color-success:  var(--green-500);
-  --color-info:     #2563eb;
-  --color-info-bg:  #EAF2FE;
+  --color-info:     var(--green-600);
+  --color-info-bg:  var(--green-50);
 
   /* Semantic */
   --color-primary:       var(--green-500);
@@ -307,8 +307,8 @@ img, svg {
 }
 
 .tranqui-toast--info {
-  border: 1px solid rgba(37, 99, 235, 0.25);
-  background: linear-gradient(135deg, rgba(234, 242, 254, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
+  border: 1px solid rgba(47, 168, 79, 0.25);
+  background: linear-gradient(135deg, rgba(234, 246, 238, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
 }
 
 .tranqui-toast__icon-box {
@@ -340,9 +340,9 @@ img, svg {
 }
 
 .tranqui-toast--info .tranqui-toast__icon-box {
-  background: var(--color-info);
+  background: var(--green-600);
   color: #ffffff;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.32);
+  box-shadow: 0 4px 14px rgba(30, 122, 60, 0.32);
 }
 
 .tranqui-toast__content {
@@ -363,7 +363,7 @@ img, svg {
 .tranqui-toast--success .tranqui-toast__title { color: var(--green-800); }
 .tranqui-toast--error .tranqui-toast__title { color: #991b1b; }
 .tranqui-toast--warning .tranqui-toast__title { color: #92400e; }
-.tranqui-toast--info .tranqui-toast__title { color: #1e40af; }
+.tranqui-toast--info .tranqui-toast__title { color: var(--green-800); }
 
 .tranqui-toast__message {
   font-family: var(--font-body);

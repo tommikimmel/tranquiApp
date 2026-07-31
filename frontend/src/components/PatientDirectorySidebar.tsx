@@ -155,8 +155,11 @@ export default function PatientDirectorySidebar({
                   </div>
                   <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginTop: '2px', flexWrap: 'wrap' }}>
                     {patient.sinTurno && (
-                      <span className="badge badge--neutral" style={{ fontSize: '8px', padding: '0px 3px', backgroundColor: '#e2e8f0', color: '#475569' }}>
-                        💬 Sin Turno
+                      <span className="badge badge--neutral" style={{ fontSize: '8.5px', padding: '1px 5px', backgroundColor: '#e2e8f0', color: '#475569', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 9, height: 9 }}>
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>
+                        Sin Turno
                       </span>
                     )}
                     {isHighPriority && (
