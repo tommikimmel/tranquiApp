@@ -14,6 +14,7 @@ const PatientsView = lazy(() => import('./components/PatientsView'))
 const ClinicalHistoryView = lazy(() => import('./components/ClinicalHistoryView'))
 const VisitorsView = lazy(() => import('./components/VisitorsView'))
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
+const NotFoundView = lazy(() => import('./components/NotFoundView'))
 import AddressMapPicker from './components/AddressMapPicker'
 import { api } from './api/api'
 import { useAlert } from './context/AlertContext'
@@ -4925,7 +4926,7 @@ export default function App() {
             )
           }
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundView currentUser={currentUser} />} />
       </Routes>
     </Suspense>
   )
