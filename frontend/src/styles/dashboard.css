@@ -1843,7 +1843,7 @@
   display: grid;
   grid-template-columns: 260px 1fr;
   gap: var(--space-5);
-  align-items: start;
+  align-items: stretch;
 }
 
 @media (max-width: 860px) {
