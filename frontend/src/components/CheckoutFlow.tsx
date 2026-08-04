@@ -466,10 +466,11 @@ function StepSelect({
 
   const handlePayClick = () => {
     if (canPay) {
+      const formattedPhone = `+54 ${phone.trim().replace(/^\+54\s*/, '')}`;
       onSelect(currentDay!, selectedSlot || { time: customTime, available: true }, {
         name,
         email,
-        phone: `+54 ${phone.trim()}`,
+        phone: formattedPhone,
         tipo,
         afiliado: tipo === 'OSDE' ? afiliado : undefined,
         customTime: tipo === 'SOBRETUNO' ? customTime : undefined
@@ -585,20 +586,7 @@ function StepSelect({
             </div>
           </div>
 
-          {tipo === 'OSDE' && (
-            <div className="checkout-form__group">
-              <label htmlFor="afiliado" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>Número de afiliado OSDE *</label>
-              <input
-                id="afiliado"
-                type="text"
-                placeholder="Ej: 1-123456-7"
-                className="checkout-form__input"
-                value={afiliado}
-                onChange={(e) => setAfiliado(e.target.value)}
-                style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none' }}
-              />
-            </div>
-          )}
+
 
           {tipo === 'SOBRETUNO' && (
             <div className="checkout-form__group">
@@ -802,14 +790,32 @@ function StepSelect({
 
               <div className="checkout-form__group">
                 <label className="checkout-form__label">Teléfono celular *</label>
-                <input
-                  type="tel"
-                  placeholder="Ej: 3515998822"
-                  className="checkout-form__input"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none' }}
-                />
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <span style={{
+                    padding: '10px 12px',
+                    backgroundColor: 'var(--color-bg-secondary, #f0f4f1)',
+                    border: '1px solid var(--color-border)',
+                    borderRight: 'none',
+                    borderRadius: 'var(--radius-md) 0 0 var(--radius-md)',
+                    fontWeight: 'bold',
+                    fontSize: '13px',
+                    color: 'var(--color-text-secondary, #555)',
+                    userSelect: 'none',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}>
+                    +54
+                  </span>
+                  <input
+                    type="tel"
+                    placeholder="Ej: 3515998822"
+                    maxLength={11}
+                    className="checkout-form__input"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/[^\d]/g, '').slice(0, 11))}
+                    style={{ flex: 1, padding: '10px', borderRadius: '0 var(--radius-md) var(--radius-md) 0', border: '1px solid var(--color-border)', outline: 'none' }}
+                  />
+                </div>
               </div>
 
               {tipo === 'OSDE' && (
@@ -1398,7 +1404,7 @@ export default function CheckoutFlow({
             }}>
               <div><strong>Turno ID:</strong> #{createdTurn.turnoId}</div>
               <div><strong>Profesional:</strong> {professional.name}</div>
-              <div><strong>Fecha:</strong> {createdTurn.fecha} a las {createdTurn.horaInicio} hs</div>
+              <div><strong>Fecha:</strong> {createdTurn.fecha ? createdTurn.fecha.split('-').reverse().join('/') : ''} a las {createdTurn.horaInicio} hs</div>
               <div><strong>Monto a abonar:</strong> ${createdTurn.precio}</div>
             </div>
 

@@ -95,8 +95,9 @@ conn.on('ready', () => {
         // 6. Start the Docker services (Traefik will read labels and automatically configure SSL)
         `echo "=== Launching Docker Containers ==="
         cd /app
-        docker compose down
-        docker compose up -d`,
+        docker compose down --remove-orphans || true
+        docker rm -f tranqui-db tranqui-backend tranqui-frontend 2>/dev/null || true
+        docker compose up -d --force-recreate`,
         
         // 6. Verify running containers
         `echo "=== Verification ==="

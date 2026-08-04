@@ -35,7 +35,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable()) // Session is secured using HttpOnly and SameSite cookies
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/google", "/api/auth/register", "/api/auth/login", "/api/health", "/api/payments/webhook", "/ws-tranqui/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/medicos", "/api/medicos/*/turnos-disponibles", "/api/medicos/turnos-disponibles-conteo", "/api/medicos/mercadopago/callback", "/api/medicos/google-calendar/callback", "/api/medicos/google-calendar/webhook", "/api/turnos/reservar", "/api/turnos/check-first-consultation", "/api/turnos/*/abandonar-pago", "/error").permitAll()
+                .requestMatchers("/api/auth/google", "/api/auth/register", "/api/auth/login", "/api/auth/verify-email", "/api/auth/resend-code", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/health", "/api/payments/webhook", "/ws-tranqui/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/medicos", "/api/medicos/*/turnos-disponibles", "/api/medicos/turnos-disponibles-conteo", "/api/medicos/mercadopago/callback", "/api/medicos/google-calendar/callback", "/api/medicos/google-calendar/webhook", "/api/turnos/reservar", "/api/turnos/check-first-consultation", "/api/turnos/*/abandonar-pago", "/error").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

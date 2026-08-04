@@ -73,6 +73,11 @@ public class AuthController {
         String codigoVerificacion = String.format("%06d", new java.util.Random().nextInt(1000000));
         java.time.LocalDateTime expiresAt = java.time.LocalDateTime.now().plusMinutes(15);
 
+        String tel = registerRequestDto.getTelefono();
+        if (tel != null && !tel.trim().isEmpty() && !tel.trim().startsWith("+54")) {
+            tel = "+54 " + tel.trim();
+        }
+
         Usuario usuario = Usuario.builder()
                 .email(emailClean)
                 .password(passwordEncoder.encode(registerRequestDto.getPassword()))
@@ -83,7 +88,7 @@ public class AuthController {
                 .fechaNacimiento(registerRequestDto.getFechaNacimiento())
                 .tipoDocumento(registerRequestDto.getTipoDocumento())
                 .numeroDocumento(registerRequestDto.getNumeroDocumento())
-                .telefono(registerRequestDto.getTelefono())
+                .telefono(tel)
                 .obraSocial(registerRequestDto.getObraSocial())
                 .numAfiliado(registerRequestDto.getNumAfiliado())
                 .matricula(registerRequestDto.getMatricula())

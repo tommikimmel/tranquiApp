@@ -1902,6 +1902,16 @@ function SettingsView({
       showAlert("El número de documento debe contener únicamente dígitos numéricos sin letras, puntos ni guiones.", "error");
       return;
     }
+    if (numDocStr && (numDocStr.length < 7 || numDocStr.length > 8)) {
+      showAlert("El número de documento debe tener entre 7 y 8 dígitos.", "error");
+      return;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (fechaNacimiento && (fechaNacimiento > todayStr || fechaNacimiento < '1900-01-01')) {
+      showAlert("La fecha de nacimiento debe ser una fecha verídica (entre 1900 y hoy).", "error");
+      return;
+    }
 
     // 2. Validar CUIL/CUIT (solo dígitos)
     const cuilStr = String(cuil ?? '').trim();
@@ -1914,6 +1924,10 @@ function SettingsView({
     const matStr = String(matricula ?? '').trim();
     if (matStr && !/^\d+$/.test(matStr)) {
       showAlert("El número de matrícula debe contener únicamente dígitos numéricos.", "error");
+      return;
+    }
+    if (matStr && (matStr.length < 3 || matStr.length > 10)) {
+      showAlert("El número de matrícula debe tener entre 3 y 10 dígitos.", "error");
       return;
     }
 
@@ -2234,8 +2248,8 @@ function SettingsView({
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="input-nacimiento">Fecha de Nacimiento</label>
-            <input id="input-nacimiento" className="form-input" type="date" value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} />
+            <label className="form-label form-label--required" htmlFor="input-nacimiento">Fecha de Nacimiento (DD/MM/AAAA)</label>
+            <input id="input-nacimiento" className="form-input" type="date" min="1900-01-01" max={new Date().toISOString().split('T')[0]} value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-tipo-doc">Tipo Documento</label>
@@ -2247,7 +2261,7 @@ function SettingsView({
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-num-doc">Número de Documento</label>
-            <input id="input-num-doc" className="form-input" type="text" inputMode="numeric" placeholder="Ej. 12345678" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} />
+            <input id="input-num-doc" className="form-input" type="text" inputMode="numeric" maxLength={8} placeholder="Ej. 12345678" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value.replace(/[^\d]/g, '').slice(0, 8))} />
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-cuil">CUIL/CUIT</label>
@@ -2298,7 +2312,11 @@ function SettingsView({
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-mat-tipo">Tipo de Matrícula</label>
-            <input id="input-mat-tipo" className="form-input" type="text" placeholder="Ej. MN, MP" value={matTipo} onChange={(e) => setMatTipo(e.target.value)} />
+            <select id="input-mat-tipo" className="form-input" value={matTipo} onChange={(e) => setMatTipo(e.target.value)}>
+              <option value="MN">MN - Matrícula Nacional</option>
+              <option value="MP">MP - Matrícula Provincial</option>
+              <option value="MN_MP">MN / MP - Nacional y Provincial</option>
+            </select>
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-mat-provincia">Provincia</label>
@@ -2340,7 +2358,7 @@ function SettingsView({
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-matricula">Número de Matrícula</label>
-            <input id="input-matricula" className="form-input" type="text" value={matricula} onChange={(e) => setMatricula(e.target.value)} />
+            <input id="input-matricula" className="form-input" type="text" inputMode="numeric" maxLength={10} value={matricula} onChange={(e) => setMatricula(e.target.value.replace(/[^\d]/g, '').slice(0, 10))} />
             <span className="form-helper">Verificada ✓</span>
           </div>
 
@@ -3824,6 +3842,47 @@ function DashboardHome({
                 </div>
               </div>
 
+              {/* Cartel de Datos Incompletos para el Profesional / Psiquiatra */}
+              {(() => {
+                const p = selectedAppt.patientInfo;
+                const missing: string[] = [];
+                if (!p?.dni && !p?.numeroDocumento) missing.push('DNI / Documento');
+                if (!p?.fechaNacimiento) missing.push('Fecha de Nacimiento');
+                if (!p?.telefono) missing.push('Teléfono');
+                if (!p?.direccion) missing.push('Dirección');
+                if (p?.obraSocial && p.obraSocial.toLowerCase() !== 'particular' && !selectedAppt.metadataAfiliado && (!p.numAfiliado || p.numAfiliado === 'N/A')) {
+                  missing.push('N° de Afiliado');
+                }
+                if (missing.length === 0) return null;
+                return (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    padding: '10px 14px',
+                    backgroundColor: '#fffbe6',
+                    border: '1px solid #ffe58f',
+                    borderRadius: 'var(--radius-md)',
+                    marginTop: 'var(--space-3)',
+                    color: '#ad7c11',
+                    fontSize: '12.5px',
+                    lineHeight: '1.4'
+                  }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 18, height: 18, flexShrink: 0, marginTop: '2px', color: '#d48806' }}>
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" />
+                      <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    <div>
+                      <strong style={{ display: 'block', color: '#873800', marginBottom: '2px' }}>
+                        ⚠️ Datos Incompletos del Paciente
+                      </strong>
+                      El perfil del paciente requiere completar los siguientes campos: <strong>{missing.join(', ')}</strong>.
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Reschedule Section */}
               <div style={{
                 padding: 'var(--space-4) 0',
@@ -3865,7 +3924,7 @@ function DashboardHome({
                     marginTop: 'var(--space-2)'
                   }}>
                     <div>
-                      <label style={{ fontSize: '9px', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>Nueva Fecha</label>
+                      <label style={{ fontSize: '9px', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>Nueva Fecha (DD/MM/AAAA)</label>
                       <input 
                         type="date" 
                         value={rescheduleDate}

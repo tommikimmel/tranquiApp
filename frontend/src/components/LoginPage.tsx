@@ -2,10 +2,47 @@ import { useState } from 'react'
 import { api } from '../api/api'
 import AddressMapPicker from './AddressMapPicker'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { useAlert } from '../context/AlertContext'
 
 interface LoginPageProps {
   onLoginSuccess: (user: any) => void
   onBack: () => void
+}
+
+function IconBrandLogo({ size = 28 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, color: 'var(--color-primary)' }}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M8 12h8M12 8v8" />
+    </svg>
+  )
+}
+
+function IconMail({ size = 36 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, color: 'var(--color-primary)' }}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="M22 6l-10 7L2 6" />
+    </svg>
+  )
+}
+
+function IconKey({ size = 36 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, color: 'var(--color-primary)' }}>
+      <circle cx="7.5" cy="15.5" r="5.5" />
+      <path d="M11.5 11.5L21 2M16 7l2 2M19 4l2 2" />
+    </svg>
+  )
+}
+
+function IconLock({ size = 36 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, color: 'var(--color-primary)' }}>
+      <rect x="3" y="11" width="18" height="11" rx="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  )
 }
 
 function IconPatient({ size = 26 }: { size?: number }) {
@@ -63,6 +100,7 @@ const ESPECIALIDADES_GRUPOS = [
 
 export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   useDocumentTitle('Iniciar sesión — Tranqui App')
+  const { showAlert } = useAlert()
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'verify' | 'forgot' | 'reset'>('login')
   const [role, setRole] = useState<'PACIENTE' | 'PSIQUIATRA'>('PACIENTE')
   const [loading, setLoading] = useState(false)
@@ -180,20 +218,20 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   const handleFormLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!loginEmail || !loginPassword) {
-      setError('Por favor, completá todos los campos.')
+      showAlert('Por favor, completá todos los campos.', 'warning')
       return
     }
     setLoading(true)
-    setError(null)
     try {
       const user = await api.login({ email: loginEmail.trim().toLowerCase(), password: loginPassword })
       localStorage.setItem('tranqui_user', JSON.stringify(user));
       onLoginSuccess(user)
     } catch (err: any) {
-      const errMsg = err.message || 'Credenciales inválidas.'
-      setError(errMsg)
+      const errMsg = err.message || 'Credenciales no válidas.'
+      showAlert(errMsg, 'error')
       if (errMsg.includes('verificar tu correo')) {
         setPendingEmail(loginEmail.trim().toLowerCase())
+        setActiveTab('verify')
       }
     } finally {
       setLoading(false)
@@ -203,30 +241,43 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   const totalSteps = role === 'PSIQUIATRA' || hasObraSocial ? 3 : 2;
 
   const handleNextStep = () => {
-    setError(null)
     if (regStep === 1) {
       const cleanEmail = email.trim()
       if (!cleanEmail || !password || !confirmPassword) {
-        setError('Por favor, completá todos los campos.')
+        showAlert('Por favor, completá todos los campos.', 'warning')
         return
       }
       if (!EMAIL_REGEX.test(cleanEmail)) {
-        setError('Por favor, ingresá un formato de email válido (ej: usuario@dominio.com).')
+        showAlert('Por favor, ingresá un formato de email válido.', 'warning')
         return
       }
       const passErr = validatePassword(password)
       if (passErr) {
-        setError(passErr)
+        showAlert(passErr, 'warning')
         return
       }
       if (password !== confirmPassword) {
-        setError('Las contraseñas no coinciden.')
+        showAlert('Las contraseñas no coinciden.', 'warning')
         return
       }
       setRegStep(2)
     } else if (regStep === 2) {
       if (!nombre || !apellido || !fechaNacimiento || !numeroDocumento || !telefono) {
-        setError('Por favor, completá todos los datos personales obligatorios.')
+        showAlert('Por favor, completá todos los datos personales obligatorios.', 'warning')
+        return
+      }
+      const todayStr = new Date().toISOString().split('T')[0]
+      if (fechaNacimiento > todayStr || fechaNacimiento < '1900-01-01') {
+        showAlert('La fecha de nacimiento debe ser una fecha verídica (entre 1900 y hoy).', 'warning')
+        return
+      }
+      if (String(numeroDocumento).length < 7 || String(numeroDocumento).length > 8) {
+        showAlert('El número de documento debe tener entre 7 y 8 dígitos.', 'warning')
+        return
+      }
+      const cleanPhone = telefono.replace(/[^\d]/g, '')
+      if (cleanPhone.length < 8 || cleanPhone.length > 11) {
+        showAlert('El número de teléfono debe tener entre 8 y 11 dígitos.', 'warning')
         return
       }
       if (totalSteps > 2) {
@@ -236,7 +287,6 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   }
 
   const handlePrevStep = () => {
-    setError(null)
     if (regStep > 1) {
       setRegStep(regStep - 1)
     }
@@ -246,23 +296,23 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
     e.preventDefault()
     const cleanEmail = email.trim().toLowerCase()
     if (!EMAIL_REGEX.test(cleanEmail)) {
-      setError('Por favor, ingresá un formato de email válido.')
+      showAlert('Por favor, ingresá un formato de email válido.', 'warning')
       return
     }
 
     const passErr = validatePassword(password)
     if (passErr) {
-      setError(passErr)
+      showAlert(passErr, 'warning')
       return
     }
 
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden.')
+      showAlert('Las contraseñas no coinciden.', 'warning')
       return
     }
 
     if (!cleanEmail || !password || !nombre || !apellido || !numeroDocumento || !telefono) {
-      setError('Por favor, completá los datos obligatorios.')
+      showAlert('Por favor, completá los datos obligatorios.', 'warning')
       return
     }
 
@@ -276,13 +326,13 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       fechaNacimiento,
       tipoDocumento,
       numeroDocumento: Number(numeroDocumento),
-      telefono: `+54 ${telefono.trim()}`,
+      telefono: `+54 ${telefono.trim().replace(/^\+54\s*/, '')}`,
     }
 
     if (role === 'PACIENTE') {
       if (hasObraSocial) {
         if (!obraSocial || !numAfiliado) {
-          setError('Por favor, completá los datos de tu obra social.')
+          showAlert('Por favor, completá los datos de tu obra social.', 'warning')
           return
         }
         payload.obraSocial = obraSocial
@@ -293,15 +343,15 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       }
     } else {
       if (!titulo || !specialty || !matricula || !codigoReFeps) {
-        setError('Por favor, completá los datos profesionales obligatorios.')
+        showAlert('Por favor, completá los datos profesionales obligatorios.', 'warning')
         return
       }
       if (!ofreceOnline && !ofrecePresencial) {
-        setError('Seleccioná al menos una modalidad de consulta (Online o Presencial).')
+        showAlert('Seleccioná al menos una modalidad de consulta (Online o Presencial).', 'warning')
         return
       }
       if (ofrecePresencial && !domicilioAtencion) {
-        setError('Si ofrecés consultas presenciales, indicá el domicilio de atención.')
+        showAlert('Si ofrecés consultas presenciales, indicá el domicilio de atención.', 'warning')
         return
       }
       payload.matricula = matricula
@@ -321,15 +371,13 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
     }
 
     setLoading(true)
-    setError(null)
-    setSuccess(null)
     try {
       await api.register(payload)
       setPendingEmail(cleanEmail)
-      setSuccess('¡Registro exitoso! Enviamos un código de 6 dígitos a tu correo para activar tu cuenta.')
+      showAlert('¡Registro exitoso! Enviamos un código de 6 dígitos a tu correo para activar tu cuenta.', 'success')
       setActiveTab('verify')
     } catch (err: any) {
-      setError(err.message || 'Error al intentar registrarse.')
+      showAlert(err.message || 'Error al intentar registrarse.', 'error')
     } finally {
       setLoading(false)
     }
@@ -339,40 +387,37 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
     e.preventDefault()
     const targetEmail = (pendingEmail || loginEmail || email).trim().toLowerCase()
     if (!verifyCode || verifyCode.trim().length !== 6) {
-      setError('Ingresá el código de 6 dígitos recibido por correo.')
+      showAlert('Ingresá el código de 6 dígitos recibido por correo.', 'warning')
       return
     }
     setLoading(true)
-    setError(null)
-    setSuccess(null)
     try {
       await api.verifyEmail({ email: targetEmail, codigo: verifyCode.trim() })
-      setSuccess('¡Email verificado con éxito! Ya podés iniciar sesión.')
+      showAlert('¡Email verificado con éxito! Ya podés iniciar sesión.', 'success')
       setLoginEmail(targetEmail)
       setLoginPassword(password)
       setActiveTab('login')
       setVerifyCode('')
     } catch (err: any) {
-      setError(err.message || 'Código de verificación incorrecto o expirado.')
+      showAlert(err.message || 'Código de verificación incorrecto o expirado.', 'error')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleResendCode = async () => {
+  const handleResendCode = async (e?: React.MouseEvent) => {
+    e?.preventDefault()
     const targetEmail = (pendingEmail || loginEmail || email).trim().toLowerCase()
     if (!targetEmail) {
-      setError('No hay dirección de email seleccionada.')
+      showAlert('No se encontró una dirección de correo válida para reenviar el código.', 'error')
       return
     }
     setLoading(true)
-    setError(null)
-    setSuccess(null)
     try {
       await api.resendCode({ email: targetEmail })
-      setSuccess('Se envió un nuevo código de verificación a tu correo.')
+      showAlert('Se envió un nuevo código de verificación a tu correo.', 'success')
     } catch (err: any) {
-      setError(err.message || 'No se pudo reenviar el código.')
+      showAlert(err.message || 'No se pudo reenviar el código.', 'error')
     } finally {
       setLoading(false)
     }
@@ -382,18 +427,16 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
     e.preventDefault()
     const targetEmail = forgotEmail.trim().toLowerCase()
     if (!targetEmail || !EMAIL_REGEX.test(targetEmail)) {
-      setError('Ingresá un formato de email válido.')
+      showAlert('Ingresá un formato de email válido.', 'warning')
       return
     }
     setLoading(true)
-    setError(null)
-    setSuccess(null)
     try {
       await api.forgotPassword({ email: targetEmail })
-      setSuccess('Si el correo está registrado, recibirás un código de 6 dígitos.')
+      showAlert('Si el correo está registrado, recibirás un código de 6 dígitos.', 'success')
       setActiveTab('reset')
     } catch (err: any) {
-      setError(err.message || 'Error al solicitar la recuperación de contraseña.')
+      showAlert(err.message || 'Error al solicitar la recuperación de contraseña.', 'error')
     } finally {
       setLoading(false)
     }
@@ -403,29 +446,27 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
     e.preventDefault()
     const targetEmail = forgotEmail.trim().toLowerCase()
     if (!resetCode || resetCode.trim().length !== 6) {
-      setError('Ingresá el código de 6 dígitos enviado a tu correo.')
+      showAlert('Ingresá el código de 6 dígitos enviado a tu correo.', 'warning')
       return
     }
     const passErr = validatePassword(newPassword)
     if (passErr) {
-      setError(passErr)
+      showAlert(passErr, 'warning')
       return
     }
     if (newPassword !== confirmNewPassword) {
-      setError('Las contraseñas no coinciden.')
+      showAlert('Las contraseñas no coinciden.', 'warning')
       return
     }
 
     setLoading(true)
-    setError(null)
-    setSuccess(null)
     try {
       await api.resetPassword({
         email: targetEmail,
         codigo: resetCode.trim(),
         newPassword
       })
-      setSuccess('¡Tu contraseña fue actualizada con éxito! Ya podés iniciar sesión.')
+      showAlert('¡Tu contraseña fue actualizada con éxito! Ya podés iniciar sesión.', 'success')
       setActiveTab('login')
       setLoginEmail(targetEmail)
       setLoginPassword(newPassword)
@@ -433,7 +474,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       setNewPassword('')
       setConfirmNewPassword('')
     } catch (err: any) {
-      setError(err.message || 'No se pudo restablecer la contraseña.')
+      showAlert(err.message || 'No se pudo restablecer la contraseña.', 'error')
     } finally {
       setLoading(false)
     }
@@ -484,10 +525,9 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
           ← Volver a la página principal
         </button>
 
-        {/* Brand Header */}
         <div style={{ textAlign: 'center' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
-            <span style={{ fontSize: 'var(--text-2xl)' }}>🧘</span>
+            <IconBrandLogo size={28} />
             <span style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-xl)', fontWeight: 'bold', color: 'var(--color-primary)' }}>
               Tranqui App
             </span>
@@ -501,7 +541,6 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
           </p>
         </div>
 
-        {/* Navigation Tabs (only for Login / Register) */}
         {(activeTab === 'login' || activeTab === 'register') && (
           <div style={{
             display: 'grid',
@@ -549,29 +588,32 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
         )}
 
         {error && (
-          <div style={{
-            padding: 'var(--space-3) var(--space-4)',
-            backgroundColor: 'var(--color-error-bg)',
-            color: 'var(--color-error)',
+          <div role="alert" style={{
+            padding: '12px 14px',
+            backgroundColor: '#fef2f2',
+            color: '#991b1b',
             borderRadius: 'var(--radius-sm)',
-            fontSize: 'var(--text-sm)',
-            border: '1px solid #fecaca',
-            lineHeight: 'var(--line-height-normal)',
+            fontSize: '13px',
+            border: '1px solid #fca5a5',
+            lineHeight: '1.4',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '6px'
+            alignItems: 'flex-start',
+            gap: '10px'
           }}>
-            <div>{error}</div>
-            {error.includes('verificar tu correo') && (
-              <button
-                type="button"
-                className="btn btn--sm btn--primary"
-                onClick={() => { setActiveTab('verify'); setError(null); setSuccess(null); }}
-                style={{ alignSelf: 'flex-start', fontSize: '12px' }}
-              >
-                Ingresar código de verificación
-              </button>
-            )}
+            <span style={{ fontSize: '16px', lineHeight: 1 }}>⚠️</span>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div>{error}</div>
+              {error.includes('verificar tu correo') && (
+                <button
+                  type="button"
+                  className="btn btn--sm btn--primary"
+                  onClick={() => { setActiveTab('verify'); setError(null); setSuccess(null); }}
+                  style={{ alignSelf: 'flex-start', fontSize: '12px' }}
+                >
+                  Ingresar código de verificación
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -609,7 +651,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                 <label className="form-label" htmlFor="login-password">Contraseña</label>
                 <button
                   type="button"
-                  onClick={() => { setForgotEmail(loginEmail); setActiveTab('forgot'); setError(null); setSuccess(null); }}
+                  onClick={() => { setActiveTab('forgot'); setError(null); setSuccess(null); }}
                   style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '12px', cursor: 'pointer', padding: 0 }}
                 >
                   ¿Olvidaste tu contraseña?
@@ -631,178 +673,246 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
               className="btn btn--primary"
               style={{ width: '100%', padding: '10px' }}
             >
-              {loading ? 'Accediendo...' : 'Iniciar Sesión'}
+              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </button>
 
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              margin: 'var(--space-2) 0',
-              color: 'var(--color-text-secondary)',
-              fontSize: '12px'
-            }}>
-              <span style={{ borderBottom: '1px solid var(--color-border)', flex: 1, marginRight: '10px' }}></span>
-              o ingresá con Google
-              <span style={{ borderBottom: '1px solid var(--color-border)', flex: 1, marginLeft: '10px' }}></span>
+            <div style={{ display: 'flex', alignItems: 'center', margin: 'var(--space-2) 0' }}>
+              <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }} />
+              <span style={{ padding: '0 var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>o ingresar con</span>
+              <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }} />
             </div>
 
-            {/* Real Google Button */}
-            <div id="google-signin-btn" style={{ display: 'flex', justifyContent: 'center' }}></div>
+            <div id="google-signin-btn" style={{ display: 'flex', justifyContent: 'center' }} />
           </form>
         )}
 
         {/* ── TAB 2: REGISTER ── */}
         {activeTab === 'register' && (
-          <form onSubmit={handleFormRegister} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            
-            {/* Step Progress Indicator */}
-            <div className="checkout-progress" style={{ padding: '0 var(--space-6)' }}>
-              <div className={`checkout-progress__step ${regStep >= 1 ? 'active' : ''}`}>
-                <span className="checkout-progress__dot">1</span>
-                Credenciales
+          <form onSubmit={handleFormRegister} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
+              <span style={{ fontSize: 'var(--text-xs)', fontWeight: '600', color: 'var(--color-primary)' }}>
+                Paso {regStep} de {totalSteps}
+              </span>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {Array.from({ length: totalSteps }).map((_, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      width: '24px',
+                      height: '4px',
+                      borderRadius: '2px',
+                      backgroundColor: i + 1 <= regStep ? 'var(--color-primary)' : 'var(--neutral-200)',
+                      transition: 'background-color 0.2s'
+                    }}
+                  />
+                ))}
               </div>
-              <div className="checkout-progress__line" />
-              <div className={`checkout-progress__step ${regStep >= 2 ? 'active' : ''}`}>
-                <span className="checkout-progress__dot">2</span>
-                Personales
-              </div>
-              {(role === 'PSIQUIATRA' || hasObraSocial) && (
-                <>
-                  <div className="checkout-progress__line" />
-                  <div className={`checkout-progress__step ${regStep >= 3 ? 'active' : ''}`}>
-                    <span className="checkout-progress__dot">3</span>
-                    {role === 'PSIQUIATRA' ? 'Profesionales' : 'Cobertura'}
-                  </div>
-                </>
-              )}
             </div>
 
-            {/* PASO 1: Credenciales & Rol */}
             {regStep === 1 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                {/* Role select */}
                 <div className="form-group">
-                  <label className="form-label">Registrarme como:</label>
-                  <div className="role-select" role="radiogroup" aria-label="Registrarme como">
+                  <label className="form-label form-label--required">Tipo de Usuario</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
                     <button
                       type="button"
-                      role="radio"
-                      aria-checked={role === 'PACIENTE'}
-                      className={`role-select__card ${role === 'PACIENTE' ? 'active' : ''}`}
                       onClick={() => setRole('PACIENTE')}
+                      style={{
+                        padding: 'var(--space-3)',
+                        border: role === 'PACIENTE' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                        borderRadius: 'var(--radius-md)',
+                        backgroundColor: role === 'PACIENTE' ? '#f0f9ff' : 'var(--color-surface)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
                     >
-                      <span className="role-select__icon"><IconPatient /></span>
-                      Paciente
+                      <IconPatient size={24} />
+                      <span style={{ fontSize: '13px', fontWeight: '600' }}>Paciente</span>
                     </button>
                     <button
                       type="button"
-                      role="radio"
-                      aria-checked={role === 'PSIQUIATRA'}
-                      className={`role-select__card ${role === 'PSIQUIATRA' ? 'active' : ''}`}
                       onClick={() => setRole('PSIQUIATRA')}
+                      style={{
+                        padding: 'var(--space-3)',
+                        border: role === 'PSIQUIATRA' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                        borderRadius: 'var(--radius-md)',
+                        backgroundColor: role === 'PSIQUIATRA' ? '#f0f9ff' : 'var(--color-surface)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
                     >
-                      <span className="role-select__icon"><IconStethoscope /></span>
-                      Profesional
+                      <IconStethoscope size={24} />
+                      <span style={{ fontSize: '13px', fontWeight: '600' }}>Profesional</span>
                     </button>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-                  <div style={{ gridColumn: 'span 2', fontWeight: 'bold', fontSize: '12px', color: 'var(--color-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '4px' }}>
-                    Credenciales de Acceso
-                  </div>
-                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                    <label className="form-label form-label--required">Email</label>
-                    <input type="email" className="form-input" placeholder="ejemplo@correo.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label form-label--required">Contraseña</label>
-                    <input type="password" className="form-input" placeholder="********" value={password} onChange={(e) => setPassword(e.target.value)} required />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label form-label--required">Confirmar Contraseña</label>
-                    <input type="password" className="form-input" placeholder="********" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
-                  </div>
+                <div className="form-group">
+                  <label className="form-label form-label--required">Email</label>
+                  <input
+                    type="email"
+                    className="form-input"
+                    placeholder="ejemplo@correo.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
                 </div>
 
-                <div style={{ backgroundColor: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '11px', color: '#64748b' }}>
-                  <strong>Requisitos de la contraseña:</strong> Mínimo 8 caracteres, al menos una mayúscula, una minúscula y un número.
+                <div className="form-group">
+                  <label className="form-label form-label--required">Contraseña</label>
+                  <input
+                    type="password"
+                    className="form-input"
+                    placeholder="********"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
                 </div>
 
-                <button type="button" className="btn btn--primary" onClick={handleNextStep} style={{ marginTop: 'var(--space-2)' }}>
-                  Siguiente paso →
+                <div className="form-group">
+                  <label className="form-label form-label--required">Confirmar Contraseña</label>
+                  <input
+                    type="password"
+                    className="form-input"
+                    placeholder="********"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <button type="button" className="btn btn--primary" onClick={handleNextStep} style={{ width: '100%', marginTop: 'var(--space-2)' }}>
+                  Siguiente →
                 </button>
               </div>
             )}
 
-            {/* PASO 2: Datos Personales */}
             {regStep === 2 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '12px', color: 'var(--color-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '4px' }}>
-                  Datos Personales Identificatorios
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                  <div className="form-group">
+                    <label className="form-label form-label--required">Nombre</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={nombre}
+                      onChange={(e) => setNombre(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label form-label--required">Apellido</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={apellido}
+                      onChange={(e) => setApellido(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                   <div className="form-group">
-                    <label className="form-label form-label--required">Nombre</label>
-                    <input type="text" className="form-input" placeholder="Juan" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label form-label--required">Apellido</label>
-                    <input type="text" className="form-input" placeholder="Pérez" value={apellido} onChange={(e) => setApellido(e.target.value)} required />
-                  </div>
-
-                  <div className="form-group">
                     <label className="form-label form-label--required">Sexo</label>
-                    <select className="form-input" value={sexo} onChange={(e) => setSexo(e.target.value)}>
+                    <select className="form-select" value={sexo} onChange={(e) => setSexo(e.target.value)}>
                       <option value="M">Masculino</option>
                       <option value="F">Femenino</option>
-                      <option value="X">Otro / No declara</option>
+                      <option value="X">Otro / No especifica</option>
                     </select>
                   </div>
-
                   <div className="form-group">
-                    <label className="form-label form-label--required">Fecha de Nacimiento</label>
-                    <input type="date" className="form-input" value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} required />
+                    <label className="form-label form-label--required">Fecha de Nacimiento (DD/MM/AAAA)</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      min="1900-01-01"
+                      max={new Date().toISOString().split('T')[0]}
+                      value={fechaNacimiento}
+                      onChange={(e) => setFechaNacimiento(e.target.value)}
+                      required
+                    />
                   </div>
+                </div>
 
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--space-3)' }}>
                   <div className="form-group">
-                    <label className="form-label form-label--required">Tipo de Documento</label>
-                    <select className="form-input" value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
+                    <label className="form-label form-label--required">Documento</label>
+                    <select className="form-select" value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
                       <option value="DNI">DNI</option>
                       <option value="PASAPORTE">Pasaporte</option>
-                      <option value="LC">Libreta Cívica</option>
-                      <option value="LE">Libreta de Enrolamiento</option>
+                      <option value="LC">LC</option>
+                      <option value="LE">LE</option>
                     </select>
                   </div>
-
                   <div className="form-group">
-                    <label className="form-label form-label--required">Número de Documento</label>
-                    <input type="number" className="form-input" placeholder="12345678" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value)} required />
+                    <label className="form-label form-label--required">Número</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={8}
+                      className="form-input"
+                      placeholder="12345678"
+                      value={numeroDocumento}
+                      onChange={(e) => setNumeroDocumento(e.target.value.replace(/[^\d]/g, '').slice(0, 8))}
+                      required
+                    />
                   </div>
-
-                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                    <label className="form-label form-label--required">Teléfono (WhatsApp)</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                      <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>+54</span>
-                      <input type="tel" className="form-input" placeholder="11 2345-6789" value={telefono} onChange={(e) => setTelefono(e.target.value)} required />
-                    </div>
-                  </div>
-
-                  {role === 'PACIENTE' && (
-                    <div className="form-group" style={{ gridColumn: 'span 2', marginTop: 'var(--space-1)' }}>
-                      <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer', userSelect: 'none' }}>
-                        <input
-                          type="checkbox"
-                          checked={hasObraSocial}
-                          onChange={(e) => setHasObraSocial(e.target.checked)}
-                          style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)' }}
-                        />
-                        Tengo Obra Social o Prepaga
-                      </label>
-                    </div>
-                  )}
                 </div>
+
+                <div className="form-group">
+                  <label className="form-label form-label--required">Teléfono Móvil (WhatsApp)</label>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span style={{
+                      padding: '10px 12px',
+                      backgroundColor: 'var(--color-bg-secondary, #f0f4f1)',
+                      border: '1px solid var(--color-border)',
+                      borderRight: 'none',
+                      borderRadius: 'var(--radius-md) 0 0 var(--radius-md)',
+                      fontWeight: 'bold',
+                      fontSize: '14px',
+                      color: 'var(--color-text-secondary, #555)',
+                      userSelect: 'none',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}>
+                      +54
+                    </span>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      placeholder="1112345678"
+                      maxLength={11}
+                      value={telefono.replace(/^\+54\s*/, '')}
+                      onChange={(e) => setTelefono(e.target.value.replace(/[^\d]/g, '').slice(0, 11))}
+                      style={{
+                        borderRadius: '0 var(--radius-md) var(--radius-md) 0'
+                      }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {role === 'PACIENTE' && (
+                  <div className="form-group">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                      <input
+                        type="checkbox"
+                        checked={hasObraSocial}
+                        onChange={(e) => setHasObraSocial(e.target.checked)}
+                      />
+                      Tengo Cobertura / Obra Social o Prepaga
+                    </label>
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                   <button type="button" className="btn btn--ghost" onClick={handlePrevStep} style={{ flex: 1 }}>
@@ -810,7 +920,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                   </button>
                   {totalSteps > 2 ? (
                     <button type="button" className="btn btn--primary" onClick={handleNextStep} style={{ flex: 1 }}>
-                      Siguiente paso →
+                      Siguiente →
                     </button>
                   ) : (
                     <button type="submit" disabled={loading} className="btn btn--primary" style={{ flex: 1 }}>
@@ -821,83 +931,116 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
               </div>
             )}
 
-            {/* PASO 3: Profesional o Cobertura */}
             {regStep === 3 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                 {role === 'PACIENTE' ? (
                   <>
-                    <div style={{ fontWeight: 'bold', fontSize: '12px', color: 'var(--color-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '4px' }}>
-                      Datos de Obra Social / Prepaga
+                    <div className="form-group">
+                      <label className="form-label form-label--required">Obra Social / Prepaga</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="OSDE, Swiss Medical, Galeno, etc."
+                        value={obraSocial}
+                        onChange={(e) => setObraSocial(e.target.value)}
+                        required
+                      />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-                      <div className="form-group">
-                        <label className="form-label form-label--required">Obra Social / Prepaga</label>
-                        <input type="text" className="form-input" placeholder="OSDE, Swiss Medical, etc." value={obraSocial} onChange={(e) => setObraSocial(e.target.value)} required />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label form-label--required">Número de Afiliado</label>
-                        <input type="text" className="form-input" placeholder="12345678901" value={numAfiliado} onChange={(e) => setNumAfiliado(e.target.value)} required />
-                      </div>
+                    <div className="form-group">
+                      <label className="form-label form-label--required">Número de Afiliado</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Ej: 123456789/01"
+                        value={numAfiliado}
+                        onChange={(e) => setNumAfiliado(e.target.value)}
+                        required
+                      />
                     </div>
                   </>
                 ) : (
                   <>
-                    <div style={{ fontWeight: 'bold', fontSize: '12px', color: 'var(--color-primary)', borderBottom: '1px solid var(--color-border)', paddingBottom: '4px' }}>
-                      Información Profesional & Matrícula
-                    </div>
-
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                       <div className="form-group">
                         <label className="form-label form-label--required">Título Profesional</label>
-                        <input type="text" className="form-input" placeholder="Médico / Médico Psiquiatra" value={titulo} onChange={(e) => setTitulo(e.target.value)} required />
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="Médico Psiquiatra"
+                          value={titulo}
+                          onChange={(e) => setTitulo(e.target.value)}
+                          required
+                        />
                       </div>
-
                       <div className="form-group">
-                        <label className="form-label form-label--required">Especialidad Principal</label>
-                        <select className="form-input" value={specialty} onChange={(e) => setSpecialty(e.target.value)} required>
-                          <option value="">Seleccionar especialidad...</option>
+                        <label className="form-label form-label--required">Especialidad</label>
+                        <select className="form-select" value={specialty} onChange={(e) => setSpecialty(e.target.value)} required>
+                          <option value="">Seleccionar...</option>
                           {ESPECIALIDADES_GRUPOS.map((esp) => (
                             <option key={esp} value={esp}>{esp}</option>
                           ))}
                         </select>
                       </div>
+                    </div>
 
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-2)' }}>
                       <div className="form-group">
-                        <label className="form-label form-label--required">Tipo de Matrícula</label>
-                        <select className="form-input" value={matriculaTipo} onChange={(e) => setMatriculaTipo(e.target.value)}>
-                          <option value="MN">Nacional (MN)</option>
-                          <option value="MP">Provincial (MP)</option>
+                        <label className="form-label form-label--required">Tipo Matrícula</label>
+                        <select className="form-select" value={matriculaTipo} onChange={(e) => setMatriculaTipo(e.target.value)}>
+                          <option value="MN">MN - Matrícula Nacional</option>
+                          <option value="MP">MP - Matrícula Provincial</option>
+                          <option value="MN_MP">MN / MP - Nacional y Provincial</option>
                         </select>
                       </div>
-
-                      {matriculaTipo === 'MP' && (
+                      {(matriculaTipo === 'MP' || matriculaTipo === 'MN_MP') && (
                         <div className="form-group">
-                          <label className="form-label form-label--required">Provincia de Matrícula</label>
-                          <select className="form-input" value={matriculaProvincia} onChange={(e) => setMatriculaProvincia(e.target.value)} required>
-                            <option value="">Seleccionar provincia...</option>
+                          <label className="form-label form-label--required">Provincia</label>
+                          <select className="form-select" value={matriculaProvincia} onChange={(e) => setMatriculaProvincia(e.target.value)}>
+                            <option value="">Provincia...</option>
                             {PROVINCIAS_ARGENTINA.map((p) => (
                               <option key={p} value={p}>{p}</option>
                             ))}
                           </select>
                         </div>
                       )}
+                      <div className="form-group" style={{ gridColumn: (matriculaTipo === 'MP' || matriculaTipo === 'MN_MP') ? 'span 1' : 'span 2' }}>
+                        <label className="form-label form-label--required">N° Matrícula</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={10}
+                          className="form-input"
+                          placeholder="123456"
+                          value={matricula}
+                          onChange={(e) => setMatricula(e.target.value.replace(/[^\d]/g, '').slice(0, 10))}
+                          required
+                        />
+                      </div>
+                    </div>
 
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                       <div className="form-group">
-                        <label className="form-label form-label--required">Número de Matrícula</label>
-                        <input type="number" className="form-input" placeholder="123456" value={matricula} onChange={(e) => setMatricula(e.target.value)} required />
+                        <label className="form-label">CUIT / CUIL</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="20123456789"
+                          value={cuil}
+                          onChange={(e) => setCuil(e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label form-label--required">Código REFEPS</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="123456"
+                          value={codigoReFeps}
+                          onChange={(e) => setCodigoReFeps(e.target.value)}
+                          required
+                        />
                       </div>
 
-                      <div className="form-group">
-                        <label className="form-label form-label--required">Código ReFEPS</label>
-                        <input type="number" className="form-input" placeholder="12345678" value={codigoReFeps} onChange={(e) => setCodigoReFeps(e.target.value)} required />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">CUIL / CUIT</label>
-                        <input type="number" className="form-input" placeholder="20123456789" value={cuil} onChange={(e) => setCuil(e.target.value)} />
-                      </div>
-
-                      {/* Modalidades de atención */}
                       <div className="form-group" style={{ gridColumn: 'span 2' }}>
                         <label className="form-label form-label--required">Modalidades de Atención</label>
                         <div style={{ display: 'flex', gap: 'var(--space-4)', marginTop: '4px' }}>
@@ -951,11 +1094,16 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
         {activeTab === 'verify' && (
           <form onSubmit={handleVerifyEmail} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             <div style={{ textAlign: 'center', padding: '10px 0' }}>
-              <span style={{ fontSize: '36px' }}>✉️</span>
-              <h3 style={{ margin: '8px 0 4px 0', fontSize: '16px', color: 'var(--color-primary)' }}>Confirmación de Email</h3>
+              <div style={{ display: 'inline-flex', padding: '12px', backgroundColor: '#e0f2fe', borderRadius: '50%', marginBottom: '8px' }}>
+                <IconMail size={32} />
+              </div>
+              <h3 style={{ margin: '4px 0', fontSize: '16px', color: 'var(--color-primary)' }}>Confirmación de Email</h3>
               <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
-                Enviamos un código de 6 dígitos a <strong>{pendingEmail || loginEmail || email}</strong>. Ingresalo a continuación para activar tu perfil:
+                Ingresá el código de 6 dígitos enviado a tu casilla:
               </p>
+              <div style={{ backgroundColor: '#f1f5f9', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginTop: '8px', fontSize: '13px', fontWeight: 'bold', color: '#1e293b', wordBreak: 'break-all' }}>
+                {pendingEmail || loginEmail || email || 'tu casilla de correo'}
+              </div>
             </div>
 
             <div className="form-group">
@@ -982,13 +1130,13 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                 type="button"
                 onClick={handleResendCode}
                 disabled={loading}
-                style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '12px', cursor: 'pointer', padding: 0 }}
+                style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: '12px', cursor: 'pointer', padding: 0, fontWeight: '600' }}
               >
-                Reenviar código
+                {loading ? 'Enviando...' : 'Reenviar código'}
               </button>
               <button
                 type="button"
-                onClick={() => { setActiveTab('login'); setError(null); setSuccess(null); }}
+                onClick={() => { setActiveTab('login'); }}
                 style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', fontSize: '12px', cursor: 'pointer', padding: 0 }}
               >
                 Volver a Iniciar Sesión
@@ -1001,8 +1149,10 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
         {activeTab === 'forgot' && (
           <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             <div style={{ textAlign: 'center', padding: '10px 0' }}>
-              <span style={{ fontSize: '36px' }}>🔑</span>
-              <h3 style={{ margin: '8px 0 4px 0', fontSize: '16px', color: 'var(--color-primary)' }}>Recuperar Contraseña</h3>
+              <div style={{ display: 'inline-flex', padding: '12px', backgroundColor: '#eff6ff', borderRadius: '50%', marginBottom: '8px' }}>
+                <IconKey size={32} />
+              </div>
+              <h3 style={{ margin: '4px 0', fontSize: '16px', color: 'var(--color-primary)' }}>Recuperar Contraseña</h3>
               <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
                 Ingresá la dirección de correo con la que te registraste para enviarte un código de recuperación.
               </p>
@@ -1027,7 +1177,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
             <button
               type="button"
-              onClick={() => { setActiveTab('login'); setError(null); setSuccess(null); }}
+              onClick={() => { setActiveTab('login'); }}
               style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', fontSize: '12px', cursor: 'pointer', padding: 0, textAlign: 'center' }}
             >
               ← Volver a Iniciar Sesión
@@ -1039,8 +1189,10 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
         {activeTab === 'reset' && (
           <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             <div style={{ textAlign: 'center', padding: '6px 0' }}>
-              <span style={{ fontSize: '32px' }}>🔒</span>
-              <h3 style={{ margin: '6px 0 2px 0', fontSize: '16px', color: 'var(--color-primary)' }}>Restablecer Contraseña</h3>
+              <div style={{ display: 'inline-flex', padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '50%', marginBottom: '8px' }}>
+                <IconLock size={32} />
+              </div>
+              <h3 style={{ margin: '4px 0', fontSize: '16px', color: 'var(--color-primary)' }}>Restablecer Contraseña</h3>
               <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
                 Ingresá el código de 6 dígitos recibido y definí tu nueva clave.
               </p>
@@ -1095,7 +1247,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
             <button
               type="button"
-              onClick={() => { setActiveTab('login'); setError(null); setSuccess(null); }}
+              onClick={() => { setActiveTab('login'); }}
               style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', fontSize: '12px', cursor: 'pointer', padding: 0, textAlign: 'center' }}
             >
               ← Cancelar y volver a Iniciar Sesión

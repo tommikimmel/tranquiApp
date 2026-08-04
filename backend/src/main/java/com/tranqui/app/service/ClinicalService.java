@@ -266,7 +266,11 @@ public class ClinicalService {
         paciente.setDni(dto.getDni());
         paciente.setObraSocial(dto.getObraSocial());
         paciente.setDireccion(dto.getDireccion());
-        paciente.setTelefono(dto.getTelefono());
+        String patientTel = dto.getTelefono();
+        if (patientTel != null && !patientTel.trim().isEmpty() && !patientTel.trim().startsWith("+54")) {
+            patientTel = "+54 " + patientTel.trim();
+        }
+        paciente.setTelefono(patientTel);
         paciente.setSexo(dto.getSexo());
         if (dto.getFechaNacimiento() != null && !dto.getFechaNacimiento().trim().isEmpty()) {
             paciente.setFechaNacimiento(java.time.LocalDate.parse(dto.getFechaNacimiento().trim()));

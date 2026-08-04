@@ -167,9 +167,51 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
               }}>
                 <div><strong>DNI:</strong> {selectedPatient.dni || 'No cargado'}</div>
                 <div><strong>Obra Social:</strong> {selectedPatient.obraSocial || 'Particular'}</div>
-                <div><strong>N° Afiliado:</strong> {selectedPatient.numAfiliado || 'N/A'}</div>
+                {selectedPatient.obraSocial && selectedPatient.obraSocial.toLowerCase() !== 'particular' && selectedPatient.numAfiliado && selectedPatient.numAfiliado !== 'N/A' && (
+                  <div><strong>N° Afiliado:</strong> {selectedPatient.numAfiliado}</div>
+                )}
                 <div><strong>Dirección:</strong> {selectedPatient.direccion || 'No cargada'}</div>
               </div>
+
+              {/* Cartel de Datos Incompletos para el Profesional / Psiquiatra */}
+              {(() => {
+                const missing: string[] = []
+                if (!selectedPatient.dni && !selectedPatient.numeroDocumento) missing.push('DNI / Documento')
+                if (!selectedPatient.fechaNacimiento) missing.push('Fecha de Nacimiento')
+                if (!selectedPatient.telefono || selectedPatient.telefono === 'Sin teléfono') missing.push('Teléfono')
+                if (!selectedPatient.direccion || selectedPatient.direccion === 'No cargada') missing.push('Dirección')
+                if (selectedPatient.obraSocial && selectedPatient.obraSocial.toLowerCase() !== 'particular' && (!selectedPatient.numAfiliado || selectedPatient.numAfiliado === 'N/A')) {
+                  missing.push('N° de Afiliado')
+                }
+                if (missing.length === 0) return null
+                return (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    padding: '10px 14px',
+                    backgroundColor: '#fffbe6',
+                    border: '1px solid #ffe58f',
+                    borderRadius: 'var(--radius-md)',
+                    marginTop: 'var(--space-3)',
+                    color: '#ad7c11',
+                    fontSize: '12.5px',
+                    lineHeight: '1.4'
+                  }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 18, height: 18, flexShrink: 0, marginTop: '2px', color: '#d48806' }}>
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" />
+                      <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    <div>
+                      <strong style={{ display: 'block', color: '#873800', marginBottom: '2px' }}>
+                        ⚠️ Datos Incompletos del Paciente
+                      </strong>
+                      El perfil del paciente requiere completar los siguientes campos: <strong>{missing.join(', ')}</strong>.
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
 
             {/* Chat */}

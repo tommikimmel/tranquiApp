@@ -6,7 +6,12 @@ import { useChat } from '../hooks/useChat'
 import { useAlert } from '../context/AlertContext'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
-import { downloadReportPDF } from '../utils/pdfGenerator'
+const formatDateDDMMYYYY = (dateStr?: string) => {
+  if (!dateStr) return '';
+  const parts = dateStr.trim().split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return dateStr;
+};
 
 // ── Icons ────────────────────────────────────────────────────────
 function IconCheck({ size = 12 }: { size?: number }) {
@@ -956,7 +961,7 @@ export default function LandingPage({
               </button>
               {showDatePicker && (
                 <div className="availability-popover" role="dialog" aria-label="Elegir fecha de disponibilidad">
-                  <label className="availability-popover__label" htmlFor="availability-date-input">Ver disponibilidad para el:</label>
+                  <label className="availability-popover__label" htmlFor="availability-date-input">Ver disponibilidad para el (DD/MM/AAAA):</label>
                   <input
                     id="availability-date-input"
                     type="date"
@@ -1080,7 +1085,7 @@ export default function LandingPage({
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
                         <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                          {appt.fecha} · {appt.hour} hs
+                          {formatDateDDMMYYYY(appt.fecha)} · {appt.hour} hs
                         </span>
                         <span className={`badge ${isConfirmed ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '9px', padding: '2px 6px', textTransform: 'uppercase' }}>
                           {isConfirmed ? 'Confirmado' : 'Pendiente Pago'}
@@ -1285,7 +1290,7 @@ export default function LandingPage({
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>
-                          {appt.fecha} · {appt.hour} hs
+                          {formatDateDDMMYYYY(appt.fecha)} · {appt.hour} hs
                         </span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                           <span className={`badge ${isConfirmed ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '9px' }}>
@@ -1561,7 +1566,7 @@ export default function LandingPage({
                 gap: '4px'
               }}>
                 <div><strong>Profesional:</strong> {appt.patientName}</div>
-                <div><strong>Fecha:</strong> {appt.fecha}</div>
+                <div><strong>Fecha:</strong> {formatDateDDMMYYYY(appt.fecha)}</div>
                 <div><strong>Horario:</strong> {appt.hour} hs</div>
                 <div><strong>Modalidad:</strong> {appt.type}</div>
               </div>

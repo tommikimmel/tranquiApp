@@ -2,6 +2,47 @@ const API_BASE = window.location.protocol === 'https:'
   ? `https://${window.location.host}/api`
   : `http://${window.location.hostname}:8081/api`;
 
+function sanitizeErrorMessage(errorText: string, status: number): string {
+  if (status === 401) {
+    return 'Sesión expirada o credenciales no válidas.';
+  }
+  if (status >= 500) {
+    return 'Ocurrió un inconveniente temporal en el servidor. Por favor, intentá nuevamente en unos momentos.';
+  }
+
+  let message = '';
+  try {
+    const parsed = JSON.parse(errorText);
+    if (typeof parsed === 'string') {
+      message = parsed;
+    } else if (parsed && typeof parsed === 'object') {
+      message = parsed.message || parsed.error || '';
+    }
+  } catch {
+    message = errorText;
+  }
+
+  if (!message || typeof message !== 'string') {
+    return 'No se pudo procesar la solicitud. Por favor, verificá la información e intentá nuevamente.';
+  }
+
+  const technicalKeywords = [
+    'exception', 'nullpointer', 'sql', 'postgres', 'hibernate', 'stack',
+    'trace', 'internal server', 'syntaxerror', 'typeerror', 'referenceerror',
+    'org.springframework', 'com.tranqui', 'java.lang', 'at com.', 'at org.', '{', '}',
+    'bad request', 'unauthorized', 'forbidden'
+  ];
+
+  const lower = message.toLowerCase();
+  const isTechnical = technicalKeywords.some((kw) => lower.includes(kw));
+
+  if (isTechnical || message.length > 250) {
+    return 'No se pudo completar la operación. Por favor, verificá los datos e intentá de nuevo.';
+  }
+
+  return message;
+}
+
 // Helper for fetch with credentials
 async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE}${endpoint}`;
@@ -24,15 +65,16 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(errorText || 'API Error');
+    throw new Error(sanitizeErrorMessage(errorText, response.status));
   }
 
-  // Handle empty responses
+  // Handle empty or text responses
   const contentType = response.headers.get('content-type');
   if (contentType && contentType.includes('application/json')) {
     return await response.json();
   }
-  return null;
+  const textResponse = await response.text();
+  return textResponse ? { message: textResponse } : null;
 }
 
 export const api = {

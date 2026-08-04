@@ -170,13 +170,19 @@ public class TurnoService {
             }
         }
 
+        String formattedTelefono = dto.getTelefonoPaciente();
+        if (formattedTelefono != null && !formattedTelefono.trim().isEmpty() && !formattedTelefono.trim().startsWith("+54")) {
+            formattedTelefono = "+54 " + formattedTelefono.trim();
+        }
+
         // Find or create patient
+        String finalTel = formattedTelefono;
         Usuario paciente = usuarioRepository.findByEmail(dto.getEmailPaciente())
                 .orElseGet(() -> {
                     Usuario nuevo = Usuario.builder()
                             .nombre(dto.getNombrePaciente())
                             .email(dto.getEmailPaciente())
-                            .telefono(dto.getTelefonoPaciente())
+                            .telefono(finalTel)
                             .rol(com.tranqui.app.model.Rol.PACIENTE)
                             .build();
                     return usuarioRepository.save(nuevo);

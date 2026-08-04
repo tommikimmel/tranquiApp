@@ -1,5 +1,6 @@
 package com.tranqui.app.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -9,6 +10,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @Slf4j
@@ -23,6 +27,8 @@ public class ResendEmailService {
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public void enviarCodigoVerificacion(String toEmail, String nombre, String codigo) {
         String asunto = "Código de verificación - Tranqui App";
@@ -68,13 +74,13 @@ public class ResendEmailService {
         }
 
         try {
-            String jsonPayload = String.format(
-                    "{\"from\":\"Tranqui App <%s>\",\"to\":[\"%s\"],\"subject\":\"%s\",\"html\":%s}",
-                    fromEmail,
-                    toEmail,
-                    escapeJson(asunto),
-                    escapeJson(htmlBody)
-            );
+            Map<String, Object> payloadMap = new HashMap<>();
+            payloadMap.put("from", String.format("Tranqui App <%s>", fromEmail));
+            payloadMap.put("to", List.of(toEmail));
+            payloadMap.put("subject", asunto);
+            payloadMap.put("html", htmlBody);
+
+            String jsonPayload = objectMapper.writeValueAsString(payloadMap);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("https://api.resend.com/emails"))
@@ -93,29 +99,5 @@ public class ResendEmailService {
         } catch (Exception e) {
             log.error("Excepción al enviar correo mediante Resend a {}", toEmail, e);
         }
-    }
-
-    private String escapeJson(String input) {
-        if (input == null) return "\"\"";
-        StringBuilder sb = new StringBuilder("\"");
-        for (char c : input.toCharArray()) {
-            switch (c) {
-                case '"': sb.append("\\\""); break;
-                case '\\': sb.append("\\\\"); break;
-                case '\b': sb.append("\\b"); break;
-                case '\f': sb.append("\\f"); break;
-                case '\n': sb.append("\\n"); break;
-                case '\r': sb.append("\\r"); break;
-                case '\t': sb.append("\\t"); break;
-                default:
-                    if (c < ' ') {
-                        sb.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        sb.append(c);
-                    }
-            }
-        }
-        sb.append("\"");
-        return sb.toString();
     }
 }
