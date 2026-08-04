@@ -6,9 +6,12 @@ import { useChat } from '../hooks/useChat'
 import { useAlert } from '../context/AlertContext'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
+import { downloadPrescriptionPDF } from '../utils/pdfGenerator'
+
 const formatDateDDMMYYYY = (dateStr?: string) => {
   if (!dateStr) return '';
-  const parts = dateStr.trim().split('-');
+  if (dateStr.includes('/')) return dateStr;
+  const parts = dateStr.trim().split('T')[0].split('-');
   if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
   return dateStr;
 };
@@ -569,10 +572,11 @@ export default function LandingPage({
 
   // Patient Portal states
   const [myAppointments, setMyAppointments] = useState<any[]>([])
-  const [myReports, setMyReports] = useState<any[]>([])
+  const [myPrescriptions, setMyPrescriptions] = useState<any[]>([])
   const [loadingPortal, setLoadingPortal] = useState(false)
   const [showAppointmentsModal, setShowAppointmentsModal] = useState(false)
-  const [showReportsModal, setShowReportsModal] = useState(false)
+  const [showPrescriptionsModal, setShowPrescriptionsModal] = useState(false)
+  const [selectedPrescriptionDetail, setSelectedPrescriptionDetail] = useState<any | null>(null)
   const [showHelpModal, setShowHelpModal] = useState(false)
   const [cancelTurnoId, setCancelTurnoId] = useState<number | null>(null)
 
@@ -679,10 +683,10 @@ export default function LandingPage({
               // Refresh patient portal data in real time
               Promise.all([
                 api.getMisTurnos(),
-                api.getMisInformes()
-              ]).then(([turnos, informes]) => {
+                api.getMisRecetas()
+              ]).then(([turnos, recetas]) => {
                 setMyAppointments(turnos || [])
-                setMyReports(informes || [])
+                setMyPrescriptions(recetas || [])
               }).catch((err) => console.error("Error refreshing patient portal data via WS:", err))
 
             } catch (e) {
@@ -730,11 +734,11 @@ export default function LandingPage({
       setLoadingPortal(true)
       Promise.all([
         api.getMisTurnos(),
-        api.getMisInformes()
+        api.getMisRecetas()
       ])
-        .then(([turnos, informes]) => {
+        .then(([turnos, recetas]) => {
           setMyAppointments(turnos || [])
-          setMyReports(informes || [])
+          setMyPrescriptions(recetas || [])
         })
         .catch((err) => console.error("Error loading patient data:", err))
         .finally(() => setLoadingPortal(false))
@@ -887,7 +891,7 @@ export default function LandingPage({
         onLogout={onLogout}
         onGoToDashboard={onGoToDashboard}
         onOpenMyAppointments={() => setShowAppointmentsModal(true)}
-        onOpenMyClinicalHistory={() => setShowReportsModal(true)}
+        onOpenMyClinicalHistory={() => setShowPrescriptionsModal(true)}
         onOpenHelp={() => setShowHelpModal(true)}
       />
 
@@ -1008,12 +1012,12 @@ export default function LandingPage({
               <button
                 type="button"
                 className="quick-access-card"
-                onClick={() => setShowReportsModal(true)}
+                onClick={() => setShowPrescriptionsModal(true)}
               >
                 <span className="quick-access-card__icon"><IconClipboard size={22} /></span>
                 <span className="quick-access-card__body">
-                  <span className="quick-access-card__title">Mi Historia Clínica</span>
-                  <span className="quick-access-card__subtitle">Consultá tus informes y documentos</span>
+                  <span className="quick-access-card__title">Mi Receta</span>
+                  <span className="quick-access-card__subtitle">Consultá tus recetas médicas prescritas</span>
                 </span>
                 <span className="quick-access-card__arrow"><IconChevronRight /></span>
               </button>
@@ -1402,7 +1406,7 @@ export default function LandingPage({
       )}
 
       {/* Mi Historia Clinica Modal */}
-      {showReportsModal && (
+      {showPrescriptionsModal && (
         <div style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
@@ -1415,7 +1419,7 @@ export default function LandingPage({
           padding: 'var(--space-4)'
         }}>
           <div className="card" style={{
-            maxWidth: '600px',
+            maxWidth: '650px',
             width: '100%',
             maxHeight: '85vh',
             overflowY: 'auto',
@@ -1426,10 +1430,117 @@ export default function LandingPage({
             gap: 'var(--space-4)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
-              <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Mi Historia Clínica / Informes</h3>
-              <button onClick={() => setShowReportsModal(false)} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
+              <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Mis Recetas Médicas</h3>
+              <button onClick={() => { setShowPrescriptionsModal(false); setSelectedPrescriptionDetail(null); }} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
             </div>
-            <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--space-4)' }}>Próximamente — vas a poder ver acá tu historia clínica e informes.</p>
+
+            {selectedPrescriptionDetail ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                <button
+                  className="btn btn--ghost btn--sm"
+                  style={{ alignSelf: 'flex-start' }}
+                  onClick={() => setSelectedPrescriptionDetail(null)}
+                >
+                  ← Volver al listado
+                </button>
+                <div style={{ padding: 'var(--space-4)', backgroundColor: 'var(--neutral-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>
+                    Emisión: {formatDateDDMMYYYY(selectedPrescriptionDetail.fechaEmision || selectedPrescriptionDetail.fecha)}
+                  </div>
+                  <h4 style={{ margin: '0 0 var(--space-1)', color: 'var(--color-primary)' }}>
+                    Médico Prescriptor: {selectedPrescriptionDetail.medico ? `${selectedPrescriptionDetail.medico.nombre} ${selectedPrescriptionDetail.medico.apellido || ''}` : 'Médico Tratante'}
+                  </h4>
+                  {selectedPrescriptionDetail.medico?.matricula && (
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)' }}>
+                      Matrícula: {selectedPrescriptionDetail.medico.matricula}
+                    </div>
+                  )}
+
+                  {selectedPrescriptionDetail.diagnostico && (
+                    <div style={{ marginBottom: 'var(--space-3)' }}>
+                      <strong>Diagnóstico (CIE-10):</strong>
+                      <div style={{ fontSize: 'var(--text-sm)' }}>{selectedPrescriptionDetail.diagnostico}</div>
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: 'var(--space-3)' }}>
+                    <strong>Medicación prescrita:</strong>
+                    <pre style={{
+                      fontFamily: 'inherit',
+                      whiteSpace: 'pre-wrap',
+                      backgroundColor: '#ffffff',
+                      padding: 'var(--space-3)',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--color-border)',
+                      marginTop: '4px',
+                      fontSize: 'var(--text-sm)'
+                    }}>
+                      {selectedPrescriptionDetail.medicamentos}
+                    </pre>
+                  </div>
+
+                  {selectedPrescriptionDetail.indicaciones && (
+                    <div style={{ marginBottom: 'var(--space-3)' }}>
+                      <strong>Indicaciones para el paciente:</strong>
+                      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                        {selectedPrescriptionDetail.indicaciones}
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    className="btn btn--primary btn--sm"
+                    style={{ marginTop: 'var(--space-2)' }}
+                    onClick={() => downloadPrescriptionPDF(selectedPrescriptionDetail, selectedPrescriptionDetail.medico, currentUser)}
+                  >
+                    Descargar PDF de Receta
+                  </button>
+                </div>
+              </div>
+            ) : myPrescriptions.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                {myPrescriptions.map((rx, idx) => (
+                  <div key={rx.id || idx} style={{
+                    padding: 'var(--space-4)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 'var(--space-2)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ fontSize: 'var(--text-sm)', color: 'var(--color-primary)' }}>
+                        {rx.medico ? `${rx.medico.nombre} ${rx.medico.apellido || ''}` : 'Receta Médica'}
+                      </strong>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                        {formatDateDDMMYYYY(rx.fechaEmision || rx.fecha)}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                      {rx.medicamentos}
+                    </div>
+                    <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+                      <button
+                        className="btn btn--secondary btn--sm"
+                        onClick={() => setSelectedPrescriptionDetail(rx)}
+                      >
+                        Ver detalle
+                      </button>
+                      <button
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => downloadPrescriptionPDF(rx, rx.medico, currentUser)}
+                      >
+                        Descargar PDF
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--space-6)' }}>
+                No tenés recetas médicas registradas actualmente.
+              </p>
+            )}
           </div>
         </div>
       )}

@@ -86,4 +86,15 @@ public class RecetaService {
 
         return receta;
     }
+
+    @Transactional(readOnly = true)
+    public List<Receta> obtenerMisRecetas(String email) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+        if (usuario.getRol() == com.tranqui.app.model.Rol.PACIENTE) {
+            return recetaRepository.findByPacienteId(usuario.getId());
+        } else {
+            return recetaRepository.findByMedicoId(usuario.getId());
+        }
+    }
 }

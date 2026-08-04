@@ -501,7 +501,7 @@ public class TurnoService {
         Turno turno = turnoRepository.findById(turnoId)
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
 
-        java.time.LocalDate nuevaFecha = java.time.LocalDate.parse(fechaStr);
+        java.time.LocalDate nuevaFecha = com.tranqui.app.config.DateConfig.parseLocalDate(fechaStr);
         java.time.LocalTime nuevaHoraInicio = java.time.LocalTime.parse(horaStr);
         java.time.LocalTime nuevaHoraFin = nuevaHoraInicio.plusMinutes(45);
 

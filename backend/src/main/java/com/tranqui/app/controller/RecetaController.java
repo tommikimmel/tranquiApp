@@ -24,4 +24,11 @@ public class RecetaController {
             @RequestBody RecetaDto dto) {
         return ResponseEntity.ok(recetaService.emitirReceta(userDetails.getUsername(), dto));
     }
+
+    @GetMapping("/me")
+    @PreAuthorize("hasAnyRole('PACIENTE', 'PSIQUIATRA')")
+    public ResponseEntity<java.util.List<Receta>> obtenerMisRecetas(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return ResponseEntity.ok(recetaService.obtenerMisRecetas(userDetails.getUsername()));
+    }
 }

@@ -402,6 +402,7 @@ function Sidebar({
     { id: 'agenda' as NavSection, label: 'Agenda', Icon: Icon.Calendar },
     { id: 'patients' as NavSection, label: 'Pacientes', Icon: Icon.Users },
     { id: 'clinical-history' as NavSection, label: 'Historia Clínica', Icon: Icon.ClinicalRecord },
+    { id: 'prescriptions' as NavSection, label: 'Recetas', Icon: Icon.Prescription },
     { id: 'settings' as NavSection, label: 'Configuración', Icon: Icon.Settings },
   ]
 
@@ -1309,63 +1310,147 @@ const COMMON_MEDS = [
   'Pregabalina 75mg',
 ]
 
-function PrescriptionView({ onSend }: { onSend: (data: any) => Promise<void> }) {
-  const { showAlert } = useAlert();
-  const [selectedPatient, setSelectedPatient] = useState('')
-  const [medications, setMedications] = useState([{ name: '', dosage: '', frequency: '', duration: '' }])
-  const [diagnosis, setDiagnosis] = useState('')
-  const [notes, setNotes] = useState('')
-  const [sending, setSending] = useState(false)
-  const [sent, setSent] = useState(false)
+const CATALOG_MEDICATIONS = [
+  'Escitalopram 10mg',
+  'Escitalopram 20mg',
+  'Sertralina 50mg',
+  'Sertralina 100mg',
+  'Clonazepam 0.5mg',
+  'Clonazepam 2mg',
+  'Alprazolam 0.25mg',
+  'Alprazolam 0.5mg',
+  'Alprazolam 1mg',
+  'Quetiapina 25mg',
+  'Quetiapina 100mg',
+  'Risperidona 1mg',
+  'Risperidona 2mg',
+  'Melatonina 3mg',
+  'Melatonina 5mg',
+  'Pregabalina 75mg',
+  'Pregabalina 150mg',
+  'Lorazepam 1mg',
+  'Lorazepam 2mg',
+  'Fluoxetina 20mg',
+  'Paroxetina 20mg',
+  'Venlafaxina 75mg',
+  'Valproato de Sodio 500mg',
+  'Lamotrigina 50mg',
+  'Carbamazepina 200mg',
+  'Carbonato de Litio 300mg',
+];
 
-  const addMedication = () => {
-    setMedications([...medications, { name: '', dosage: '', frequency: '', duration: '' }])
-  }
+function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promise<void>; medicoInfo?: any }) {
+  const { showAlert } = useAlert();
+  const [patients, setPatients] = useState<any[]>([]);
+  const [patientSearch, setPatientSearch] = useState('');
+  const [selectedPatientObj, setSelectedPatientObj] = useState<any | null>(null);
+  const [showPatientDropdown, setShowPatientDropdown] = useState(false);
+
+  const [medications, setMedications] = useState<Array<{ name: string; dosage: string; frequency: string; duration: string }>>([]);
+  const [medSearchInput, setMedSearchInput] = useState('');
+  const [showMedDropdown, setShowMedDropdown] = useState(false);
+
+  const [diagnosis, setDiagnosis] = useState('');
+  const [notes, setNotes] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    api.getPacientesAtendidos()
+      .then((data: any) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setPatients(data);
+        } else {
+          setPatients(MOCK_PATIENTS);
+        }
+      })
+      .catch(() => setPatients(MOCK_PATIENTS));
+  }, []);
+
+  const filteredPatients = patientSearch.trim().length >= 3
+    ? patients.filter(p => {
+        const q = patientSearch.toLowerCase();
+        const name = (p.name || `${p.nombre || ''} ${p.apellido || ''}`).toLowerCase();
+        const dni = (p.dni || p.numeroDocumento || '').toString();
+        const email = (p.email || '').toLowerCase();
+        return name.includes(q) || dni.includes(q) || email.includes(q);
+      })
+    : [];
+
+  const handleSelectPatient = (patient: any) => {
+    setSelectedPatientObj(patient);
+    setPatientSearch(`${patient.name || `${patient.nombre} ${patient.apellido}`} — DNI: ${patient.dni || patient.numeroDocumento || 'S/D'}`);
+    setShowPatientDropdown(false);
+  };
+
+  const handleClearPatient = () => {
+    setSelectedPatientObj(null);
+    setPatientSearch('');
+  };
+
+  const filteredMeds = medSearchInput.trim().length > 0
+    ? CATALOG_MEDICATIONS.filter(m => m.toLowerCase().includes(medSearchInput.toLowerCase()))
+    : CATALOG_MEDICATIONS;
+
+  const handleAddMedication = (medNameToAdd?: string) => {
+    const medName = (medNameToAdd || medSearchInput).trim();
+    if (!medName) return;
+    setMedications(prev => [...prev, { name: medName, dosage: '', frequency: '', duration: '' }]);
+    setMedSearchInput('');
+    setShowMedDropdown(false);
+  };
+
+  const handleMedKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddMedication();
+    }
+  };
 
   const updateMedication = (index: number, field: string, value: string) => {
-    const updated = [...medications]
-    updated[index] = { ...updated[index], [field]: value }
-    setMedications(updated)
-  }
+    const updated = [...medications];
+    updated[index] = { ...updated[index], [field]: value };
+    setMedications(updated);
+  };
 
   const removeMedication = (index: number) => {
-    if (medications.length > 1) {
-      setMedications(medications.filter((_, i) => i !== index))
-    }
-  }
+    setMedications(prev => prev.filter((_, i) => i !== index));
+  };
 
-  const canSend = selectedPatient && medications[0].name.trim().length > 0
+  const canSend = selectedPatientObj && medications.length > 0 && medications.some(m => m.name.trim().length > 0);
 
   const handleSend = () => {
-    setSending(true)
+    if (!selectedPatientObj) return;
+    setSending(true);
     onSend({
-      pacienteId: Number(selectedPatient),
+      pacienteId: Number(selectedPatientObj.id),
       medications,
       diagnosis,
       notes
     })
-    .then(() => {
-      setSent(true)
-    })
+    .then(() => setSent(true))
     .catch((err) => {
-      console.error("Error al emitir receta:", err)
-      showAlert("Error al emitir y enviar receta", "error")
+      console.error("Error al emitir receta:", err);
+      showAlert("Error al emitir y enviar receta", "error");
     })
-    .finally(() => {
-      setSending(false)
-    })
-  }
+    .finally(() => setSending(false));
+  };
 
   const handleReset = () => {
-    setSelectedPatient('')
-    setMedications([{ name: '', dosage: '', frequency: '', duration: '' }])
-    setDiagnosis('')
-    setNotes('')
-    setSent(false)
-  }
+    setSelectedPatientObj(null);
+    setPatientSearch('');
+    setMedications([]);
+    setMedSearchInput('');
+    setDiagnosis('');
+    setNotes('');
+    setSent(false);
+  };
+
+  const doctorName = medicoInfo ? `${medicoInfo.nombre || ''} ${medicoInfo.apellido || ''}`.trim() : 'Médico';
+  const doctorMatricula = medicoInfo?.matricula || medicoInfo?.matriculaNumero ? `MN ${medicoInfo.matricula || medicoInfo.matriculaNumero}` : 'MN S/N';
 
   if (sent) {
-    const patient = MOCK_PATIENTS.find(p => p.id === selectedPatient)
+    const patientName = selectedPatientObj?.name || `${selectedPatientObj?.nombre || ''} ${selectedPatientObj?.apellido || ''}`.trim();
     return (
       <div className="card" style={{ textAlign: 'center', padding: 'var(--space-10)' }}>
         <div style={{
@@ -1377,13 +1462,13 @@ function PrescriptionView({ onSend }: { onSend: (data: any) => Promise<void> }) 
           <Icon.Check />
         </div>
         <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-2xl)', fontWeight: 'var(--font-weight-bold)', marginBottom: 'var(--space-3)' }}>
-          Receta enviada
+          Receta emitida exitosamente
         </h2>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)' }}>
-          Se envió la receta a <strong>{patient?.name}</strong>
+          Se envió la receta a <strong>{patientName}</strong>
         </p>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)', marginBottom: 'var(--space-8)' }}>
-          {patient?.email} · PDF adjunto por email y WhatsApp
+          Emisor: {doctorName} ({doctorMatricula}) · Notificación enviada por WhatsApp y registrada en el sistema.
         </p>
         <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
           <button className="btn btn--primary" onClick={handleReset} id="btn-new-prescription">
@@ -1391,125 +1476,206 @@ function PrescriptionView({ onSend }: { onSend: (data: any) => Promise<void> }) 
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-      {/* Header info */}
-      <div className="alert-banner alert-banner--success" role="status">
-        <span className="alert-banner__icon">
-          <Icon.Prescription />
-        </span>
-        <div className="alert-banner__content">
-          <div className="alert-banner__title">Receta electrónica asistida</div>
-          <div className="alert-banner__body">
-            Completá los datos, generamos el PDF y lo enviamos directo al paciente por email y WhatsApp.
-            La firma digital del documento requiere tu certificado de firma electrónica.
-          </div>
-        </div>
-      </div>
-
-      {/* Patient select */}
-      <div className="card">
+      {/* Patient Search Autocomplete */}
+      <div className="card" style={{ overflow: 'visible' }}>
         <div className="card__header">
           <h2 className="card__title">Paciente</h2>
         </div>
-        <div className="form-group">
-          <label className="form-label form-label--required" htmlFor="rx-patient">Seleccionar paciente</label>
-          <select
-            id="rx-patient"
-            className="form-input"
-            value={selectedPatient}
-            onChange={(e) => setSelectedPatient(e.target.value)}
-          >
-            <option value="">Elegir paciente...</option>
-            {MOCK_PATIENTS.map(p => (
-              <option key={p.id} value={p.id}>{p.name} — {p.email}</option>
-            ))}
-          </select>
+        <div className="form-group" style={{ position: 'relative' }}>
+          <label className="form-label form-label--required">Buscador de paciente</label>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+            <input
+              id="rx-patient-search"
+              className="form-input"
+              type="text"
+              placeholder="Ingresá al menos 3 letras para buscar (Nombre, Apellido, DNI)..."
+              value={patientSearch}
+              onChange={(e) => {
+                setPatientSearch(e.target.value);
+                if (selectedPatientObj) setSelectedPatientObj(null);
+                setShowPatientDropdown(true);
+              }}
+              onFocus={() => setShowPatientDropdown(true)}
+            />
+            {selectedPatientObj && (
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={handleClearPatient}
+                title="Limpiar paciente seleccionado"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {showPatientDropdown && patientSearch.trim().length >= 3 && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+              backgroundColor: '#ffffff', border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              maxHeight: '220px', overflowY: 'auto', marginTop: '4px'
+            }}>
+              {filteredPatients.length > 0 ? (
+                filteredPatients.map(p => {
+                  const pName = p.name || `${p.nombre || ''} ${p.apellido || ''}`.trim();
+                  const pDni = p.dni || p.numeroDocumento || 'S/D';
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => handleSelectPatient(p)}
+                      style={{
+                        padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9',
+                        fontSize: 'var(--text-sm)', display: 'flex', justifyContent: 'space-between'
+                      }}
+                      className="patient-search-item"
+                    >
+                      <strong>{pName} — DNI {pDni}</strong>
+                      <span style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>{p.email}</span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ padding: '12px', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', textAlign: 'center' }}>
+                  No se encontraron pacientes que coincidan con "{patientSearch}"
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Medications */}
-      <div className="card">
+      {/* Medication Search & Addition */}
+      <div className="card" style={{ overflow: 'visible' }}>
         <div className="card__header">
           <h2 className="card__title">Medicación</h2>
-          <button className="btn btn--secondary btn--sm" onClick={addMedication} id="btn-add-med">
-            <Icon.Plus /> Agregar
-          </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-          {medications.map((med, i) => (
-            <div key={i} style={{
-              display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
-              padding: 'var(--space-4)', background: 'var(--neutral-50)',
-              borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)',
-              position: 'relative',
+        <div className="form-group" style={{ position: 'relative', marginBottom: 'var(--space-4)' }}>
+          <label className="form-label">Buscar o agregar medicamento (Presioná Enter para añadir)</label>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <input
+              id="rx-med-search"
+              className="form-input"
+              type="text"
+              placeholder="Ej: Escitalopram 10mg, Sertralina 50mg..."
+              value={medSearchInput}
+              onChange={(e) => {
+                setMedSearchInput(e.target.value);
+                setShowMedDropdown(true);
+              }}
+              onFocus={() => setShowMedDropdown(true)}
+              onKeyDown={handleMedKeyDown}
+            />
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={() => handleAddMedication()}
+              disabled={!medSearchInput.trim()}
+            >
+              <Icon.Plus /> Añadir
+            </button>
+          </div>
+
+          {showMedDropdown && medSearchInput.trim().length > 0 && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 90,
+              backgroundColor: '#ffffff', border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              maxHeight: '180px', overflowY: 'auto', marginTop: '4px'
             }}>
-              {medications.length > 1 && (
+              {filteredMeds.length > 0 ? (
+                filteredMeds.map((m, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => handleAddMedication(m)}
+                    style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', fontSize: 'var(--text-sm)' }}
+                  >
+                    + {m}
+                  </div>
+                ))
+              ) : (
+                <div
+                  onClick={() => handleAddMedication()}
+                  style={{ padding: '10px 14px', cursor: 'pointer', color: 'var(--color-primary)', fontSize: 'var(--text-sm)' }}
+                >
+                  + Añadir personalizado: "{medSearchInput}" (Presioná Enter)
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* List of Added Medications */}
+        {medications.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            {medications.map((med, i) => (
+              <div key={i} style={{
+                display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
+                padding: 'var(--space-4)', background: 'var(--neutral-50)',
+                borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)',
+                position: 'relative'
+              }}>
                 <button
+                  type="button"
                   onClick={() => removeMedication(i)}
                   style={{
                     position: 'absolute', top: 8, right: 8,
                     background: 'none', border: 'none', color: 'var(--color-text-secondary)',
-                    fontSize: 'var(--text-lg)', cursor: 'pointer', lineHeight: 1,
+                    fontSize: 'var(--text-lg)', cursor: 'pointer', lineHeight: 1
                   }}
                   aria-label="Quitar medicación"
                 >
                   ×
                 </button>
-              )}
-              <div className="form-group">
-                <label className="form-label form-label--required">Medicamento</label>
-                <input
-                  className="form-input"
-                  type="text"
-                  list={`meds-list-${i}`}
-                  placeholder="Ej: Escitalopram 10mg"
-                  value={med.name}
-                  onChange={(e) => updateMedication(i, 'name', e.target.value)}
-                />
-                <datalist id={`meds-list-${i}`}>
-                  {COMMON_MEDS.map(m => <option key={m} value={m} />)}
-                </datalist>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)' }}>
-                <div className="form-group">
-                  <label className="form-label">Dosis</label>
-                  <input
-                    className="form-input"
-                    type="text"
-                    placeholder="Ej: 1 comp"
-                    value={med.dosage}
-                    onChange={(e) => updateMedication(i, 'dosage', e.target.value)}
-                  />
+                <div style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)' }}>
+                  {i + 1}. {med.name}
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Frecuencia</label>
-                  <input
-                    className="form-input"
-                    type="text"
-                    placeholder="Ej: cada 24hs"
-                    value={med.frequency}
-                    onChange={(e) => updateMedication(i, 'frequency', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Duración</label>
-                  <input
-                    className="form-input"
-                    type="text"
-                    placeholder="Ej: 30 días"
-                    value={med.duration}
-                    onChange={(e) => updateMedication(i, 'duration', e.target.value)}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)' }}>
+                  <div className="form-group">
+                    <label className="form-label">Dosis</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="Ej: 1 comp"
+                      value={med.dosage}
+                      onChange={(e) => updateMedication(i, 'dosage', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Frecuencia</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="Ej: cada 24hs"
+                      value={med.frequency}
+                      onChange={(e) => updateMedication(i, 'frequency', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Duración</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      placeholder="Ej: 30 días"
+                      value={med.duration}
+                      onChange={(e) => updateMedication(i, 'duration', e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', margin: 0 }}>
+            No hay medicamentos añadidos aún. Buscá un medicamento arriba y presioná Enter para añadirlo.
+          </p>
+        )}
       </div>
 
       {/* Diagnosis + Notes */}
@@ -1547,10 +1713,10 @@ function PrescriptionView({ onSend }: { onSend: (data: any) => Promise<void> }) 
       {/* Send */}
       <div className="card">
         <div className="card__header">
-          <h2 className="card__title">Enviar receta</h2>
+          <h2 className="card__title">Emitir y enviar receta</h2>
         </div>
         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)' }}>
-          Se genera un PDF con tus datos profesionales (Lic. Paula Rossi · MN 49281) y se envía al paciente por email y WhatsApp.
+          Se registrará la receta con los datos profesionales del médico en sesión (<strong>{doctorName} · {doctorMatricula}</strong>) y se enviará la constancia al paciente por WhatsApp y email.
         </p>
         <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
           <button
@@ -1559,15 +1725,15 @@ function PrescriptionView({ onSend }: { onSend: (data: any) => Promise<void> }) 
             onClick={handleSend}
             id="btn-send-prescription"
           >
-            {sending ? 'Enviando...' : 'Generar PDF y enviar al paciente'}
+            {sending ? 'Enviando...' : 'Emitir receta y enviar al paciente'}
           </button>
           <button className="btn btn--ghost" disabled={sending} onClick={handleReset}>
-            Limpiar
+            Limpiar todo
           </button>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ── Settings: Tariff & Profile ─────────────────────────────────
@@ -4461,7 +4627,7 @@ export default function App() {
       case 'clinical-history':
         return <ClinicalHistoryView />
       case 'prescriptions':
-        return <PrescriptionView onSend={handleSendPrescription} />
+        return <PrescriptionView onSend={handleSendPrescription} medicoInfo={medicoInfo} />
       case 'visitors': 
         return <VisitorsView />
       case 'payments': return (

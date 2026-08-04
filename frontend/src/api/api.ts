@@ -194,6 +194,7 @@ export const api = {
     diagnosis: string
     notes: string
   }) => apiFetch('/recetas/enviar', { method: 'POST', body: data as any }),
+  getMisRecetas: () => apiFetch('/recetas/me'),
 
   // Chat API
   getChatHistorial: (destinatarioId: number | string, page = 0, size = 100) =>
