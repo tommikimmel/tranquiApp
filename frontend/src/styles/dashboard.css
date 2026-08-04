@@ -1865,6 +1865,22 @@
   top: var(--space-4);
   align-self: start;
   z-index: 5;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.settings-submenu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.settings-submenu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-submenu::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
 }
 
 @media (max-width: 860px) {
