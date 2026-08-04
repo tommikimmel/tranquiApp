@@ -84,7 +84,11 @@ public class Qbi2RecipeClientHttp implements Qbi2RecipeClient {
 
     @Override
     public Qbi2CatalogoDtos.DiagnosticoResponse buscarDiagnosticos(String texto) {
-        HttpRequest request = requestBuilder("/apirecipe/GetDiagnostico?text=" + urlEncode(texto))
+        String path = "/apirecipe/GetDiagnostico?text=" + urlEncode(texto);
+        if (clienteAppId != null && !clienteAppId.isBlank()) {
+            path += "&clienteAppId=" + urlEncode(clienteAppId);
+        }
+        HttpRequest request = requestBuilder(path)
                 .GET()
                 .build();
         String body = send(request);
@@ -112,7 +116,11 @@ public class Qbi2RecipeClientHttp implements Qbi2RecipeClient {
 
     @Override
     public Qbi2CatalogoDtos.FinanciadorResponse buscarFinanciadores() {
-        HttpRequest request = requestBuilder("/apirecipe/GetFinanciadores")
+        String path = "/apirecipe/GetFinanciadores";
+        if (clienteAppId != null && !clienteAppId.isBlank()) {
+            path += "?clienteAppId=" + urlEncode(clienteAppId);
+        }
+        HttpRequest request = requestBuilder(path)
                 .GET()
                 .build();
         String body = send(request);
@@ -126,6 +134,11 @@ public class Qbi2RecipeClientHttp implements Qbi2RecipeClient {
     @Override
     public Qbi2RecetaDtos.RecetaResponse generarReceta(Qbi2RecetaDtos.RecetaRequest recetaRequest) {
         try {
+            if (recetaRequest.getClienteAppId() == null && clienteAppId != null && !clienteAppId.isBlank()) {
+                try {
+                    recetaRequest.setClienteAppId(Integer.parseInt(clienteAppId));
+                } catch (NumberFormatException ignored) {}
+            }
             String jsonBody = objectMapper.writeValueAsString(recetaRequest);
             HttpRequest request = requestBuilder("/apirecipe/Receta")
                     .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
