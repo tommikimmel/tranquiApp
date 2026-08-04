@@ -3859,26 +3859,39 @@ function DashboardHome({
                   <div style={{
                     display: 'flex',
                     alignItems: 'flex-start',
-                    gap: '10px',
-                    padding: '10px 14px',
-                    backgroundColor: '#fffbe6',
-                    border: '1px solid #ffe58f',
-                    borderRadius: 'var(--radius-md)',
+                    gap: '12px',
+                    padding: '12px 16px',
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #fde68a',
+                    borderRadius: 'var(--radius-lg, 10px)',
                     marginTop: 'var(--space-3)',
-                    color: '#ad7c11',
-                    fontSize: '12.5px',
-                    lineHeight: '1.4'
+                    color: '#92400e',
+                    fontSize: '13px',
+                    lineHeight: '1.5',
+                    boxShadow: '0 1px 3px rgba(217, 119, 6, 0.05)'
                   }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 18, height: 18, flexShrink: 0, marginTop: '2px', color: '#d48806' }}>
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                      <line x1="12" y1="9" x2="12" y2="13" />
-                      <line x1="12" y1="17" x2="12.01" y2="17" />
-                    </svg>
+                    <div style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      backgroundColor: '#fef3c7',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      marginTop: '1px'
+                    }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                      </svg>
+                    </div>
                     <div>
-                      <strong style={{ display: 'block', color: '#873800', marginBottom: '2px' }}>
-                        ⚠️ Datos Incompletos del Paciente
+                      <strong style={{ display: 'block', color: '#78350f', fontWeight: '600', marginBottom: '2px' }}>
+                        Datos Incompletos del Paciente
                       </strong>
-                      El perfil del paciente requiere completar los siguientes campos: <strong>{missing.join(', ')}</strong>.
+                      <span>El perfil del paciente requiere completar los siguientes campos: <strong style={{ color: '#b45309' }}>{missing.join(', ')}</strong>.</span>
                     </div>
                   </div>
                 );
