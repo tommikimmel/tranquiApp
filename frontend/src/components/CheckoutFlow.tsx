@@ -684,9 +684,9 @@ function StepSelect({
 
         </div>
 
-        {/* Derecha: consultorio (solo si el profesional atiende presencial) */}
+        {/* Derecha: consultorio o cartel de atención online */}
         <div className="panel" style={{ height: 'fit-content' }}>
-          {professional.ofrecePresencial && (
+          {professional.ofrecePresencial ? (
             <>
               <div className="book-title sora"><span className="dot"></span>Consultorio</div>
 
@@ -756,6 +756,43 @@ function StepSelect({
                 )}
               </div>
             </>
+          ) : (
+            <div style={{
+              padding: 'var(--space-5)',
+              backgroundColor: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center',
+              gap: 'var(--space-3)'
+            }}>
+              <div style={{
+                width: 48,
+                height: 48,
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: '#e6f4ea',
+                color: '#2FA84F',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
+                </svg>
+              </div>
+              <div>
+                <strong style={{ fontSize: 'var(--text-sm)', color: '#1b632d', display: 'block', marginBottom: '4px' }}>
+                  Modalidad 100% Online
+                </strong>
+                <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                  El profesional únicamente acepta consultas Online. Las sesiones se realizan mediante videoconsulta HD con link automático de Google Meet.
+                </p>
+              </div>
+            </div>
           )}
 
           {/* Patient Form Fields + Pago (debajo del mapa para acortar la columna izquierda) */}
