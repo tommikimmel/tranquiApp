@@ -121,18 +121,20 @@ public class RecetaService {
                     .nombre(receta.getMedico().getNombre())
                     .apellido(receta.getMedico().getApellido())
                     .matricula(receta.getMedico().getMatricula())
-                    .especialidad(receta.getMedico().getEspecialidad())
+                    .especialidad(receta.getMedico().getSpecialty() != null ? receta.getMedico().getSpecialty() : receta.getMedico().getTitulo())
                     .email(receta.getMedico().getEmail())
                     .build();
         }
 
         RecetaResponseDto.PacienteSimpleDto pacienteDto = null;
         if (receta.getPaciente() != null) {
+            String dniStr = receta.getPaciente().getDni() != null ? receta.getPaciente().getDni() :
+                    (receta.getPaciente().getNumeroDocumento() != null ? String.valueOf(receta.getPaciente().getNumeroDocumento()) : null);
             pacienteDto = RecetaResponseDto.PacienteSimpleDto.builder()
                     .id(receta.getPaciente().getId())
                     .nombre(receta.getPaciente().getNombre())
                     .apellido(receta.getPaciente().getApellido())
-                    .dni(receta.getPaciente().getDni() != null ? receta.getPaciente().getDni() : receta.getPaciente().getNumeroDocumento())
+                    .dni(dniStr)
                     .email(receta.getPaciente().getEmail())
                     .telefono(receta.getPaciente().getTelefono())
                     .build();
