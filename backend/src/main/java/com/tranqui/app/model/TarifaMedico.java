@@ -32,4 +32,7 @@ public class TarifaMedico {
 
     @Column(name = "habilitado", nullable = false)
     private boolean habilitado;
+
+    @Column(name = "requiere_obra_social", nullable = false)
+    private boolean requiereObraSocial;
 }

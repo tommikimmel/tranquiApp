@@ -6,15 +6,13 @@ import com.tranqui.app.model.dto.Qbi2RecetaDtos;
 
 /**
  * Client for QBI2 Recipe (Innovamed), the external electronic-prescription
- * API that will eventually replace TranquiApp's internal simulated Receta
- * flow. Two implementations exist: {@link Qbi2RecipeClientMock} (default —
- * no real credentials exist yet) and {@link Qbi2RecipeClientHttp} (real HTTP
- * calls, activated via {@code qbi2.recipe.enabled=true}). IMPORTANT: QBI2's
- * authentication mechanism (how a Bearer token is obtained) is not
- * documented anywhere in their public Confluence space or Swagger spec as of
- * this writing — resolve that with Innovamed (soporte.it@innovamed.com.ar)
- * before flipping {@code qbi2.recipe.enabled} on; until then,
- * Qbi2RecipeClientHttp is unverified/untested code.
+ * API that replaces TranquiApp's internal simulated Receta flow. Two
+ * implementations exist: {@link Qbi2RecipeClientMock} (used when
+ * {@code qbi2.recipe.enabled=false}) and {@link Qbi2RecipeClientHttp} (real
+ * HTTP calls, activated via {@code qbi2.recipe.enabled=true}, currently the
+ * default in {@code .env}). Verified against the real HML environment on
+ * 2026-08-05: POST /apirecipe/Receta returns 200 with a valid
+ * s3Link/verificador/idReceta/nroCUIR for a particular (no financiador) case.
  */
 public interface Qbi2RecipeClient {
 

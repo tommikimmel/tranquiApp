@@ -85,7 +85,18 @@ interface Professional {
   tags?: string[]
   experiencia?: string
   redesSociales?: RedesSociales
+  tariffs?: { id: string; label: string; price: number; enabled: boolean; requiereObraSocial?: boolean }[]
 }
+
+interface Financiador {
+  idfinanciador: number
+  nombreComercial: string
+}
+
+// Services the médico configures in Honorarios y Servicios beyond the 5 defaults (particular,
+// obra_social, receta-fuera, certificado, sobreturno) — these are selected by their real
+// servicioId rather than the fixed TipoTurno-shaped ids below.
+const DEFAULT_SERVICE_IDS = new Set(['particular', 'sobreturno', 'obra_social', 'osde', 'receta-fuera', 'certificado'])
 
 interface TimeSlot {
   time: string
@@ -101,6 +112,18 @@ interface DayOption {
 
 type CheckoutStep = 'select' | 'review' | 'confirmed'
 type PaymentStatus = 'idle' | 'processing' | 'error'
+
+interface PatientBookingData {
+  name: string
+  email: string
+  phone: string
+  tipo: 'PARTICULAR' | 'OBRA_SOCIAL' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'
+  servicioId?: string
+  obraSocial?: string
+  idFinanciador?: string
+  afiliado?: string
+  customTime?: string
+}
 
 // ── Mock Data ──────────────────────────────────────────────────
 // generateDays mock function removed since availability is loaded from API
@@ -161,7 +184,7 @@ function StepSelect({
   errorMessage,
 }: {
   professional: Professional
-  onSelect: (day: DayOption, slot: TimeSlot, patientData: { name: string; email: string; phone: string; tipo: 'PARTICULAR' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'; afiliado?: string; customTime?: string }) => void
+  onSelect: (day: DayOption, slot: TimeSlot, patientData: PatientBookingData) => void
   paymentStatus: PaymentStatus
   errorMessage?: string | null
 }) {
@@ -199,7 +222,9 @@ function StepSelect({
   const [name, setName] = useState(cachedUser?.nombre || '')
   const [email, setEmail] = useState(cachedUser?.email || '')
   const [phone, setPhone] = useState((cachedUser?.telefono || '').replace(/^\+54\s*/, ''))
-  const [tipo, setTipo] = useState<'PARTICULAR' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'>('PARTICULAR')
+  const [tipo, setTipo] = useState<string>('PARTICULAR')
+  const [obraSocial, setObraSocial] = useState(cachedUser?.obraSocial || 'OSDE')
+  const [customObraSocial, setCustomObraSocial] = useState('')
   const [afiliado, setAfiliado] = useState(cachedUser?.numAfiliado || '')
   const [customTime, setCustomTime] = useState('09:00')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
@@ -207,11 +232,49 @@ function StepSelect({
   const [showFirstTimeAlert, setShowFirstTimeAlert] = useState(false)
   const [hasShownAlert, setHasShownAlert] = useState(false)
 
+  // Custom services the médico configured in Honorarios y Servicios (beyond the 5 defaults
+  // below), selected by their real servicioId. Some of them may require Obra Social + n° de
+  // afiliado, in which case the financiador combo is populated from QBI2's real catalog.
+  const customTariffs = (professional.tariffs || []).filter(t => t.enabled && !DEFAULT_SERVICE_IDS.has(t.id))
+  const selectedCustomTariff = customTariffs.find(t => t.id === tipo)
+  const isCustomObraSocialType = !!selectedCustomTariff?.requiereObraSocial
+
+  const [financiadores, setFinanciadores] = useState<Financiador[]>([])
+  const [idFinanciadorSel, setIdFinanciadorSel] = useState('')
+  const hasCustomObraSocialTariff = customTariffs.some(t => t.requiereObraSocial)
+  useEffect(() => {
+    if (!hasCustomObraSocialTariff) return
+    api.getFinanciadores()
+      .then((res: any) => setFinanciadores(res?.financiadores || []))
+      .catch((err: any) => console.error("Error al cargar financiadores:", err))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasCustomObraSocialTariff])
+
+  const OBRAS_SOCIALES = [
+    'OSDE',
+    'Swiss Medical',
+    'Galeno',
+    'Medifé',
+    'Omint',
+    'OSECAC',
+    'IOMA',
+    'PAMI',
+    'SanCor Salud',
+    'Medicus',
+    'Accord Salud',
+    'Unión Personal',
+    'Prevención Salud',
+    'Otra'
+  ]
+
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const [leafletLoaded, setLeafletLoaded] = useState(!!(window as any).L)
 
+  const effectiveLat = professional.domicilioLat || -31.4201
+  const effectiveLng = professional.domicilioLng || -64.1888
+
   useEffect(() => {
-    if (professional.domicilioLat || professional.domicilioLng) {
+    if (professional.ofrecePresencial || professional.domicilioLat || professional.domicilioLng) {
       loadLeafletScript()
         .then(() => setLeafletLoaded(true))
         .catch(err => console.error("Error loading Leaflet for step select map", err))
@@ -219,51 +282,64 @@ function StepSelect({
   }, [professional])
 
   useEffect(() => {
-    if (!leafletLoaded || !professional.domicilioLat || !professional.domicilioLng || !mapContainerRef.current) return
+    if (!leafletLoaded || !mapContainerRef.current) return
     const L = (window as any).L
     if (!L) return
 
-    const lat = professional.domicilioLat
-    const lng = professional.domicilioLng
+    const lat = effectiveLat
+    const lng = effectiveLng
     
+    if ((mapContainerRef.current as any)._leaflet_id) {
+      (mapContainerRef.current as any)._leaflet_id = null
+      mapContainerRef.current.innerHTML = ''
+    }
+
     const map = L.map(mapContainerRef.current, {
       zoomControl: false,
       attributionControl: false,
       dragging: false,
       touchZoom: false,
       doubleClickZoom: false,
-      scrollWheelZoom: false
+      scrollWheelZoom: false,
+      boxZoom: false,
+      keyboard: false
     }).setView([lat, lng], 15)
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map)
 
     const customIcon = L.divIcon({
       html: `
-        <svg viewBox="0 0 24 24" fill="none" stroke="#2E7D5B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 24px; height: 24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); display: block;">
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" fill="#ffffff" />
-          <circle cx="12" cy="10" r="3.2" fill="#2E7D5B" />
-        </svg>
+        <div style="background-color: #2E7D5B; border: 2px solid #ffffff; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 8px rgba(0,0,0,0.35);">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" fill="#2E7D5B"/>
+            <circle cx="12" cy="10" r="3" fill="#ffffff"/>
+          </svg>
+        </div>
       `,
       className: 'custom-leaflet-marker-mini',
-      iconSize: [24, 24],
-      iconAnchor: [12, 24]
+      iconSize: [30, 30],
+      iconAnchor: [15, 30]
     })
 
     L.marker([lat, lng], { icon: customIcon }).addTo(map)
 
-    // Force a resize pass once the surrounding grid/panel layout has settled —
-    // Leaflet measures its container synchronously at init, and a wrong initial
-    // read (e.g. while web fonts are still swapping in) leaves the map blank.
-    const resizeTimer = setTimeout(() => map.invalidateSize(), 150)
+    map.invalidateSize()
+    const timer1 = setTimeout(() => map.invalidateSize(), 50)
+    const timer2 = setTimeout(() => map.invalidateSize(), 250)
+    const timer3 = setTimeout(() => map.invalidateSize(), 600)
     const handleWindowResize = () => map.invalidateSize()
     window.addEventListener('resize', handleWindowResize)
 
     return () => {
-      clearTimeout(resizeTimer)
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+      clearTimeout(timer3)
       window.removeEventListener('resize', handleWindowResize)
-      map.remove()
+      try {
+        map.remove()
+      } catch (e) {}
     }
-  }, [leafletLoaded, professional.domicilioLat, professional.domicilioLng])
+  }, [leafletLoaded, effectiveLat, effectiveLng])
 
   const getDayOptionIndex = (date: Date) => {
     const year = date.getFullYear()
@@ -428,27 +504,43 @@ function StepSelect({
 
   const services = [
     { id: 'PARTICULAR', label: 'Consulta Particular', price: professional.price, desc: 'Consulta estándar de 50 minutos' },
-    { id: 'OSDE', label: 'Copago OSDE', price: 10500, desc: 'Requiere número de afiliado' },
+    { id: 'OBRA_SOCIAL', label: 'Obra Social', price: 10500, desc: 'Requiere Obra Social y número de afiliado' },
     { id: 'RECETA', label: 'Receta fuera de turno', price: 45000, desc: 'Solicitud de recetas o órdenes médicas' },
     { id: 'CERTIFICADO', label: 'Certificado', price: 55000, desc: 'Emisión de certificados aptos y licencias' },
     { id: 'SOBRETUNO', label: 'Sobre turno', price: 90000, desc: 'Horario personalizado fuera de agenda' }
   ] as const;
 
+  // Custom tariffs render as additional selectable pills alongside the 5 defaults above.
+  const allServices = [
+    ...services,
+    ...customTariffs.map(t => ({
+      id: t.id,
+      label: t.label,
+      price: t.price,
+      desc: t.requiereObraSocial ? 'Requiere Obra Social y número de afiliado' : 'Servicio configurado por el profesional'
+    }))
+  ]
+
   const currentPrice = useMemo(() => {
-    const s = services.find(x => x.id === tipo)
+    const s = allServices.find(x => x.id === tipo)
     let basePrice = s ? s.price : professional.price
     if (isFirstTime && tipo === 'PARTICULAR') {
       basePrice = Math.round(basePrice * 1.30)
     }
     return basePrice
-  }, [tipo, professional.price, isFirstTime])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tipo, professional.price, isFirstTime, customTariffs])
+
+  const isObraSocialType = tipo === 'OBRA_SOCIAL' || tipo === 'OSDE';
+  const effectiveObraSocial = obraSocial === 'Otra' ? customObraSocial : obraSocial;
 
   const canPay = name.trim().length > 2 &&
                   email.includes('@') &&
                   phone.length >= 8 &&
                   selectedDayIdx !== null &&
                   (selectedSlot !== null || tipo === 'SOBRETUNO') &&
-                  (tipo !== 'OSDE' || afiliado.trim().length > 4) &&
+                  (!isObraSocialType || (effectiveObraSocial.trim().length > 0 && afiliado.trim().length > 4)) &&
+                  (!isCustomObraSocialType || (idFinanciadorSel.trim().length > 0 && afiliado.trim().length > 4)) &&
                   (tipo !== 'SOBRETUNO' || /^([01]\d|2[0-3]):[0-5]\d$/.test(customTime)) &&
                   acceptedTerms &&
                   paymentStatus !== 'processing';
@@ -460,19 +552,31 @@ function StepSelect({
   if (name.trim().length <= 2) missingRequirements.push('tu nombre completo')
   if (!email.includes('@')) missingRequirements.push('un email válido')
   if (phone.length < 8) missingRequirements.push('tu teléfono')
-  if (tipo === 'OSDE' && afiliado.trim().length <= 4) missingRequirements.push('tu número de afiliado OSDE')
+  if (isObraSocialType && !effectiveObraSocial.trim()) missingRequirements.push('seleccionar tu Obra Social')
+  if (isObraSocialType && afiliado.trim().length <= 4) missingRequirements.push('tu número de afiliado')
+  if (isCustomObraSocialType && !idFinanciadorSel.trim()) missingRequirements.push('seleccionar tu Obra Social')
+  if (isCustomObraSocialType && afiliado.trim().length <= 4) missingRequirements.push('tu número de afiliado')
   if (tipo === 'SOBRETUNO' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(customTime)) missingRequirements.push('un horario válido (HH:MM)')
   if (!acceptedTerms) missingRequirements.push('aceptar los términos de servicio')
 
   const handlePayClick = () => {
     if (canPay) {
       const formattedPhone = `+54 ${phone.trim().replace(/^\+54\s*/, '')}`;
+      const financiadorElegido = isCustomObraSocialType
+        ? financiadores.find(f => String(f.idfinanciador) === idFinanciadorSel)
+        : undefined;
       onSelect(currentDay!, selectedSlot || { time: customTime, available: true }, {
         name,
         email,
         phone: formattedPhone,
-        tipo,
-        afiliado: tipo === 'OSDE' ? afiliado : undefined,
+        // Custom tariffs always travel as PARTICULAR at the TipoTurno-enum level — their real
+        // identity/price is carried by servicioId, which the backend resolves directly (see
+        // TurnoService.reservarTurno's custom-tariff branch).
+        tipo: selectedCustomTariff ? 'PARTICULAR' : (isObraSocialType ? 'OBRA_SOCIAL' : tipo as PatientBookingData['tipo']),
+        servicioId: selectedCustomTariff ? selectedCustomTariff.id : undefined,
+        obraSocial: isObraSocialType ? effectiveObraSocial.trim() : (isCustomObraSocialType ? financiadorElegido?.nombreComercial : undefined),
+        idFinanciador: isCustomObraSocialType ? idFinanciadorSel : undefined,
+        afiliado: (isObraSocialType || isCustomObraSocialType) ? afiliado.trim() : undefined,
         customTime: tipo === 'SOBRETUNO' ? customTime : undefined
       });
     }
@@ -568,7 +672,7 @@ function StepSelect({
           <div>
             <div className="book-title sora"><span className="dot"></span>Tipo de turno</div>
             <div className="types">
-              {services.map((s) => (
+              {allServices.map((s) => (
                 <button
                   key={s.id}
                   type="button"
@@ -691,51 +795,24 @@ function StepSelect({
               <div className="book-title sora"><span className="dot"></span>Consultorio</div>
 
               <div className="map-box">
-                {professional.domicilioLat && professional.domicilioLng ? (
-                  <div
-                    style={{ position: 'relative', cursor: 'pointer' }}
-                    onClick={() => {
-                      const url = `https://www.google.com/maps/search/?api=1&query=${professional.domicilioLat},${professional.domicilioLng}`;
-                      window.open(url, '_blank', 'noopener,noreferrer');
-                    }}
-                  >
-                    <div
-                      ref={mapContainerRef}
-                      style={{
-                        height: '190px',
-                        width: '100%',
-                        backgroundColor: '#EAF2EA',
-                        zIndex: 1
-                      }}
-                    />
-                    <div style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      zIndex: 10,
-                      backgroundColor: 'transparent'
-                    }} />
-                  </div>
-                ) : (
-                  <div style={{
+                <div
+                  ref={mapContainerRef}
+                  style={{
                     height: '190px',
                     width: '100%',
                     backgroundColor: '#EAF2EA',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    color: 'var(--color-text-secondary)'
-                  }}>
-                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.75">
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
-                    </svg>
-                    <span style={{ fontSize: '12px' }}>Mapa no disponible</span>
-                  </div>
-                )}
+                    position: 'relative',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => {
+                    const searchParam = professional.domicilioLat && professional.domicilioLng
+                      ? `${professional.domicilioLat},${professional.domicilioLng}`
+                      : encodeURIComponent(professional.domicilioAtencion || 'Córdoba, Argentina');
+                    const url = `https://www.google.com/maps/search/?api=1&query=${searchParam}`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }}
+                  title="Abrir ubicación en Google Maps"
+                />
 
                 {professional.domicilioAtencion && (
                   <div className="map-addr">
@@ -855,19 +932,104 @@ function StepSelect({
                 </div>
               </div>
 
-              {tipo === 'OSDE' && (
-                <div className="checkout-form__group">
-                  <label htmlFor="afiliado-right" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>Número de afiliado OSDE *</label>
-                  <input
-                    id="afiliado-right"
-                    type="text"
-                    placeholder="Ej: 1-123456-7"
-                    className="checkout-form__input"
-                    value={afiliado}
-                    onChange={(e) => setAfiliado(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none' }}
-                  />
-                </div>
+              {isObraSocialType && (
+                <>
+                  <div className="checkout-form__group">
+                    <label htmlFor="obra-social-select" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                      Obra Social *
+                    </label>
+                    <select
+                      id="obra-social-select"
+                      className="checkout-form__input"
+                      value={OBRAS_SOCIALES.includes(obraSocial) ? obraSocial : (obraSocial ? 'Otra' : '')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setObraSocial(val);
+                        if (val !== 'Otra') {
+                          setCustomObraSocial('');
+                        }
+                      }}
+                      style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none', backgroundColor: '#fff' }}
+                    >
+                      <option value="">Seleccionar Obra Social...</option>
+                      {OBRAS_SOCIALES.map(os => (
+                        <option key={os} value={os}>{os}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {(obraSocial === 'Otra' || (!OBRAS_SOCIALES.includes(obraSocial) && obraSocial !== '')) && (
+                    <div className="checkout-form__group">
+                      <label htmlFor="custom-obra-social" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                        Nombre de tu Obra Social *
+                      </label>
+                      <input
+                        id="custom-obra-social"
+                        type="text"
+                        placeholder="Ej: OSAPM, Mutualidad, etc."
+                        className="checkout-form__input"
+                        value={customObraSocial || (OBRAS_SOCIALES.includes(obraSocial) ? '' : obraSocial)}
+                        onChange={(e) => {
+                          setCustomObraSocial(e.target.value);
+                          setObraSocial('Otra');
+                        }}
+                        style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none' }}
+                      />
+                    </div>
+                  )}
+
+                  <div className="checkout-form__group">
+                    <label htmlFor="afiliado-right" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                      Número de afiliado de Obra Social *
+                    </label>
+                    <input
+                      id="afiliado-right"
+                      type="text"
+                      placeholder="Ej: 1-123456-7"
+                      className="checkout-form__input"
+                      value={afiliado}
+                      onChange={(e) => setAfiliado(e.target.value)}
+                      style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none' }}
+                    />
+                  </div>
+                </>
+              )}
+
+              {isCustomObraSocialType && (
+                <>
+                  <div className="checkout-form__group">
+                    <label htmlFor="financiador-select" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                      Obra Social *
+                    </label>
+                    <select
+                      id="financiador-select"
+                      className="checkout-form__input"
+                      value={idFinanciadorSel}
+                      onChange={(e) => setIdFinanciadorSel(e.target.value)}
+                      style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none', backgroundColor: '#fff' }}
+                    >
+                      <option value="">Seleccionar Obra Social...</option>
+                      {financiadores.map(f => (
+                        <option key={f.idfinanciador} value={f.idfinanciador}>{f.nombreComercial}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="checkout-form__group">
+                    <label htmlFor="afiliado-custom" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                      Número de afiliado de Obra Social *
+                    </label>
+                    <input
+                      id="afiliado-custom"
+                      type="text"
+                      placeholder="Ej: 1-123456-7"
+                      className="checkout-form__input"
+                      value={afiliado}
+                      onChange={(e) => setAfiliado(e.target.value)}
+                      style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none' }}
+                    />
+                  </div>
+                </>
               )}
 
               {/* Surcharge Alert */}
@@ -1068,43 +1230,68 @@ function StepConfirmed({
     }
   }, [isPresencial, professional])
 
+  const confirmedLat = professional.domicilioLat || -31.4201
+  const confirmedLng = professional.domicilioLng || -64.1888
+
   useEffect(() => {
-    if (!isPresencial || !leafletLoaded || !professional.domicilioLat || !professional.domicilioLng || !mapContainerRef.current) return
+    if (isPresencial) {
+      loadLeafletScript()
+        .then(() => setLeafletLoaded(true))
+        .catch(err => console.error("Error loading Leaflet for mini map", err))
+    }
+  }, [isPresencial])
+
+  useEffect(() => {
+    if (!isPresencial || !leafletLoaded || !mapContainerRef.current) return
     const L = (window as any).L
     if (!L) return
 
-    const lat = professional.domicilioLat
-    const lng = professional.domicilioLng
+    const lat = confirmedLat
+    const lng = confirmedLng
     
+    if ((mapContainerRef.current as any)._leaflet_id) {
+      (mapContainerRef.current as any)._leaflet_id = null
+      mapContainerRef.current.innerHTML = ''
+    }
+
     const map = L.map(mapContainerRef.current, {
       zoomControl: false,
       attributionControl: false,
       dragging: false,
       touchZoom: false,
       doubleClickZoom: false,
-      scrollWheelZoom: false
+      scrollWheelZoom: false,
+      boxZoom: false,
+      keyboard: false
     }).setView([lat, lng], 15)
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map)
 
     const customIcon = L.divIcon({
       html: `
-        <svg viewBox="0 0 24 24" fill="none" stroke="#2E7D5B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 24px; height: 24px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); display: block;">
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" fill="#ffffff" />
-          <circle cx="12" cy="10" r="3.2" fill="#2E7D5B" />
-        </svg>
+        <div style="background-color: #2E7D5B; border: 2px solid #ffffff; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 8px rgba(0,0,0,0.35);">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" fill="#2E7D5B"/>
+            <circle cx="12" cy="10" r="3" fill="#ffffff"/>
+          </svg>
+        </div>
       `,
       className: 'custom-leaflet-marker-mini',
-      iconSize: [24, 24],
-      iconAnchor: [12, 24]
+      iconSize: [28, 28],
+      iconAnchor: [14, 28]
     })
 
     L.marker([lat, lng], { icon: customIcon }).addTo(map)
 
+    const resizeTimer = setTimeout(() => map.invalidateSize(), 200)
+
     return () => {
-      map.remove()
+      clearTimeout(resizeTimer)
+      try {
+        map.remove()
+      } catch (e) {}
     }
-  }, [isPresencial, leafletLoaded, professional.domicilioLat, professional.domicilioLng])
+  }, [isPresencial, leafletLoaded, confirmedLat, confirmedLng])
 
   return (
     <div className="checkout-body checkout-body--confirmed">
@@ -1204,36 +1391,30 @@ function StepConfirmed({
           </div>
 
           {/* Small Mini-Map */}
-          {professional.domicilioLat && professional.domicilioLng && (
+          {isPresencial && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontWeight: 'bold' }}>Ubicación en el mapa:</div>
               <div 
-                style={{ position: 'relative', cursor: 'pointer' }}
+                ref={mapContainerRef} 
+                style={{ 
+                  height: '160px', 
+                  width: '100%',
+                  borderRadius: 'var(--radius-md)', 
+                  border: '1px solid var(--color-border)',
+                  overflow: 'hidden',
+                  position: 'relative',
+                  cursor: 'pointer',
+                  backgroundColor: '#EAF2EA'
+                }} 
                 onClick={() => {
-                  const url = `https://www.google.com/maps/search/?api=1&query=${professional.domicilioLat},${professional.domicilioLng}`;
+                  const searchParam = professional.domicilioLat && professional.domicilioLng 
+                    ? `${professional.domicilioLat},${professional.domicilioLng}` 
+                    : encodeURIComponent(professional.domicilioAtencion || 'Córdoba, Argentina');
+                  const url = `https://www.google.com/maps/search/?api=1&query=${searchParam}`;
                   window.open(url, '_blank', 'noopener,noreferrer');
                 }}
-              >
-                <div 
-                  ref={mapContainerRef} 
-                  style={{ 
-                    height: '160px', 
-                    borderRadius: 'var(--radius-md)', 
-                    border: '1px solid var(--color-border)',
-                    zIndex: 1
-                  }} 
-                />
-                {/* Overlay transparente para asegurar que el click funcione en todo el mapa y deshabilitar clicks de Leaflet */}
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  zIndex: 10,
-                  backgroundColor: 'transparent'
-                }} />
-              </div>
+                title="Abrir ubicación en Google Maps"
+              />
             </div>
           )}
         </div>
@@ -1309,13 +1490,13 @@ export default function CheckoutFlow({
   const handleSelectSlot = (
     day: DayOption,
     slot: TimeSlot,
-    patientData: { name: string; email: string; phone: string; tipo: 'PARTICULAR' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'; afiliado?: string; customTime?: string }
+    patientData: PatientBookingData
   ) => {
     setSelectedDay(day)
     setSelectedSlot(slot)
     
     // Automatically derive modality
-    if (patientData.tipo === 'PARTICULAR' || patientData.tipo === 'OSDE') {
+    if (patientData.tipo === 'PARTICULAR' || patientData.tipo === 'OBRA_SOCIAL' || (patientData.tipo as string) === 'OSDE') {
       setModality(professional.ofrecePresencial ? 'presencial' : 'online')
     } else {
       setModality('online')
@@ -1327,7 +1508,7 @@ export default function CheckoutFlow({
   const handlePay = (
     day: DayOption,
     slot: TimeSlot,
-    patientData: { name: string; email: string; phone: string; tipo: 'PARTICULAR' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'; afiliado?: string; customTime?: string }
+    patientData: PatientBookingData
   ) => {
     setPaymentStatus('processing')
     const finalTime = patientData.tipo === 'SOBRETUNO' && patientData.customTime 
@@ -1339,6 +1520,9 @@ export default function CheckoutFlow({
       fecha: day.date,
       hora: finalTime + ":00",
       tipo: patientData.tipo,
+      servicioId: patientData.servicioId,
+      obraSocial: patientData.obraSocial,
+      idFinanciador: patientData.idFinanciador,
       metadataAfiliado: patientData.afiliado,
       nombrePaciente: patientData.name,
       emailPaciente: patientData.email,

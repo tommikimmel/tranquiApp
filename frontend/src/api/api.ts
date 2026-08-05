@@ -93,15 +93,22 @@ export const api = {
     medicoId: number
     fecha: string
     hora: string
-    tipo: 'PARTICULAR' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'
+    tipo: 'PARTICULAR' | 'OBRA_SOCIAL' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'
+    servicioId?: string
+    obraSocial?: string
+    idFinanciador?: string
     metadataAfiliado?: string
     nombrePaciente: string
     emailPaciente: string
     telefonoPaciente: string
   }) => apiFetch('/turnos/reservar', { method: 'POST', body: data as any }),
 
-  checkFirstConsultation: (email: string) => 
+  checkFirstConsultation: (email: string) =>
     apiFetch(`/turnos/check-first-consultation?email=${encodeURIComponent(email)}`),
+
+  // Public catalog of obras sociales/financiadores from QBI2 — used at checkout when the
+  // médico marked a service as "Requiere Obra Social" (see Honorarios y Servicios).
+  getFinanciadores: () => apiFetch('/recetas/financiadores'),
 
   // Auth / Login with Google
   loginGoogle: (idToken: string) => 

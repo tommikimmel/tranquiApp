@@ -43,12 +43,12 @@ public class MedicoService {
     private static final int DEFAULT_INTERVALO_ENTRE_TURNOS_MINUTOS = 10;
 
     private static final List<MedicoDto.TarifaDto> DEFAULT_TARIFFS = Arrays.asList(
-            new MedicoDto.TarifaDto("particular", "Consulta particular", new BigDecimal("60000"), true),
-            new MedicoDto.TarifaDto("sobreturno", "Sobreturno", new BigDecimal("90000"), true),
-            new MedicoDto.TarifaDto("osde", "Copago OSDE", new BigDecimal("10500"), true),
-            new MedicoDto.TarifaDto("receta-fuera", "Receta fuera de turno", new BigDecimal("45000"), true),
-            new MedicoDto.TarifaDto("certificado", "Certificado", new BigDecimal("55000"), true),
-            new MedicoDto.TarifaDto("informe-apto", "Informe / Apto médico", new BigDecimal("165000"), true)
+            new MedicoDto.TarifaDto("particular", "Consulta particular", new BigDecimal("60000"), true, false),
+            new MedicoDto.TarifaDto("sobreturno", "Sobreturno", new BigDecimal("90000"), true, false),
+            new MedicoDto.TarifaDto("obra_social", "Obra Social", new BigDecimal("10500"), true, true),
+            new MedicoDto.TarifaDto("receta-fuera", "Receta fuera de turno", new BigDecimal("45000"), true, false),
+            new MedicoDto.TarifaDto("certificado", "Certificado", new BigDecimal("55000"), true, false),
+            new MedicoDto.TarifaDto("informe-apto", "Informe / Apto médico", new BigDecimal("165000"), true, false)
     );
 
     @Transactional(readOnly = true)
@@ -183,6 +183,7 @@ public class MedicoService {
                     tarifa.setLabel(tDto.getLabel());
                     tarifa.setPrecio(tDto.getPrice());
                     tarifa.setHabilitado(tDto.isEnabled());
+                    tarifa.setRequiereObraSocial(tDto.isRequiereObraSocial());
                 } else {
                     tarifa = TarifaMedico.builder()
                             .medico(medico)
@@ -190,6 +191,7 @@ public class MedicoService {
                             .label(tDto.getLabel())
                             .precio(tDto.getPrice())
                             .habilitado(tDto.isEnabled())
+                            .requiereObraSocial(tDto.isRequiereObraSocial())
                             .build();
                 }
                 tarifaRepository.save(tarifa);
@@ -224,6 +226,7 @@ public class MedicoService {
                         .label(def.getLabel())
                         .precio(def.getPrice())
                         .habilitado(def.isEnabled())
+                        .requiereObraSocial(def.isRequiereObraSocial())
                         .build();
                 tarifasDb.add(tarifaRepository.save(t));
             }
@@ -236,6 +239,7 @@ public class MedicoService {
                         .label(t.getLabel())
                         .price(t.getPrecio())
                         .enabled(t.isHabilitado())
+                        .requiereObraSocial(t.isRequiereObraSocial())
                         .build())
                 .collect(Collectors.toList());
 

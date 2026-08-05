@@ -62,6 +62,12 @@ public class Turno {
     @Column(name = "metadata_afiliado", length = 100)
     private String metadataAfiliado;
 
+    @Column(name = "servicio_id", length = 50)
+    private String servicioId; // id de la tarifa elegida (Honorarios y Servicios), para servicios custom del médico
+
+    @Column(name = "id_financiador", length = 50)
+    private String idFinanciador; // id del financiador QBI2 elegido, cuando el servicio requiere obra social
+
     @Column(name = "telemedicina_url", length = 500)
     private String telemedicinaUrl;
 

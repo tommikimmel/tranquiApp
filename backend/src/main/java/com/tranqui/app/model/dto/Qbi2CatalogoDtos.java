@@ -1,12 +1,12 @@
 package com.tranqui.app.model.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.*;
 import java.util.List;
 
 /**
  * Response shapes for QBI2 Recipe's catalog search endpoints: GetDiagnostico,
- * GetMedicamento and GetFinanciadores. See Qbi2RecetaDtos for the source of
- * the field spec and its caveats.
+ * GetMedicamento and GetFinanciadores.
  */
 public class Qbi2CatalogoDtos {
 
@@ -15,6 +15,7 @@ public class Qbi2CatalogoDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class DiagnosticoResponse {
         private List<DiagnosticoItem> diagnosticos;
     }
@@ -24,6 +25,7 @@ public class Qbi2CatalogoDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class DiagnosticoItem {
         private Integer iddiagnostico;
         private String coddiagnostico; // CIE-10 code, e.g. B010
@@ -35,6 +37,7 @@ public class Qbi2CatalogoDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class MedicamentoResponse {
         private List<MedicamentoItem> medicamentos;
         private PageInfo pageInfo;
@@ -45,6 +48,7 @@ public class Qbi2CatalogoDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class MedicamentoItem {
         private String presentacion;
         private String nombreProducto;
@@ -56,7 +60,7 @@ public class Qbi2CatalogoDtos {
         private Boolean psicofarmaco;
         private Boolean estupefaciente;
         private Boolean ventaControlada;
-        private Boolean hiv; // read-only flag on the medication itself; this is the only HIV-related signal found anywhere in the API — there is no separate HIV coding field on the Receta request
+        private Boolean hiv;
         private Boolean requiereDuplicado;
     }
 
@@ -65,10 +69,11 @@ public class Qbi2CatalogoDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PageInfo {
         private Integer numeroPagina;
         private Integer cantidadPaginas;
-        private Integer cantidadMaxResultadosXPagina; // fixed at 20 per the docs
+        private Integer cantidadMaxResultadosXPagina;
         private Boolean tieneMasResultados;
     }
 
@@ -77,6 +82,7 @@ public class Qbi2CatalogoDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class FinanciadorResponse {
         private List<FinanciadorItem> financiadores;
     }
@@ -86,11 +92,12 @@ public class Qbi2CatalogoDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class FinanciadorItem {
         private Integer idfinanciador;
         private String nrofinanciador;
         private String nombreComercial;
-        private List<PlanItem> planes; // only populated for financiadores that require plan selection
+        private List<PlanItem> planes;
     }
 
     @Getter
@@ -98,8 +105,10 @@ public class Qbi2CatalogoDtos {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PlanItem {
         private Integer id;
         private String nombre;
     }
 }
+

@@ -19,12 +19,11 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Real HTTP implementation of {@link Qbi2RecipeClient}, active only when
- * qbi2.recipe.enabled=true. NONE OF THIS HAS BEEN TESTED AGAINST A REAL QBI2
- * SERVER — we have no credentials yet, and QBI2's own authentication
- * mechanism is undocumented (see the Javadoc on Qbi2RecipeClient). This code
- * prioritizes clarity and correctness of the request shape over defensive
- * edge-case handling; treat it as a first draft to be reviewed and corrected
- * once real credentials exist, not as finished/battle-tested code.
+ * qbi2.recipe.enabled=true (currently the default in .env). generarReceta()
+ * was verified against the real HML environment on 2026-08-05 (200 OK, valid
+ * s3Link/verificador/idReceta returned for a particular/no-financiador case).
+ * Every call is logged (request + response, token masked) via send() for
+ * audit purposes — see the QBI2 Recipe → / ← log lines.
  */
 @Service
 @ConditionalOnProperty(prefix = "qbi2.recipe", name = "enabled", havingValue = "true")
@@ -48,7 +47,8 @@ public class Qbi2RecipeClientHttp implements Qbi2RecipeClient {
     private String token;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private String baseUrl() {
         return "prod".equalsIgnoreCase(environment) ? baseUrlProd : baseUrlHml;
@@ -66,9 +66,22 @@ public class Qbi2RecipeClientHttp implements Qbi2RecipeClient {
         return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
     }
 
+    private String maskedToken() {
+        if (token == null || token.isBlank()) return "(sin token)";
+        return token.length() > 12 ? token.substring(0, 10) + "…(" + token.length() + " chars)" : "***";
+    }
+
     private String send(HttpRequest request) {
+        return send(request, null);
+    }
+
+    private String send(HttpRequest request, String requestBodyForLog) {
+        log.info("QBI2 Recipe → {} {} | token={} | body={}", request.method(), request.uri(), maskedToken(),
+                requestBodyForLog != null ? requestBodyForLog : "(sin body)");
         try {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            log.info("QBI2 Recipe ← {} {} | status={} | body={}", request.method(), request.uri(),
+                    response.statusCode(), response.body());
             if (response.statusCode() >= 400) {
                 throw new RuntimeException("QBI2 Recipe respondió " + response.statusCode()
                         + " para " + request.method() + " " + request.uri()
@@ -78,6 +91,7 @@ public class Qbi2RecipeClientHttp implements Qbi2RecipeClient {
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
+            log.error("QBI2 Recipe: error de red/IO llamando a {} {}", request.method(), request.uri(), e);
             throw new RuntimeException("Error llamando a QBI2 Recipe: " + request.method() + " " + request.uri(), e);
         }
     }
@@ -143,7 +157,7 @@ public class Qbi2RecipeClientHttp implements Qbi2RecipeClient {
             HttpRequest request = requestBuilder("/apirecipe/Receta")
                     .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                     .build();
-            String body = send(request);
+            String body = send(request, jsonBody);
             return objectMapper.readValue(body, Qbi2RecetaDtos.RecetaResponse.class);
         } catch (RuntimeException e) {
             throw e;
@@ -163,7 +177,7 @@ public class Qbi2RecipeClientHttp implements Qbi2RecipeClient {
             HttpRequest request = requestBuilder("/apirecipe/Receta/" + urlEncode(hash))
                     .method("DELETE", HttpRequest.BodyPublishers.ofString(jsonBody))
                     .build();
-            String body = send(request);
+            String body = send(request, jsonBody);
             return objectMapper.readValue(body, Qbi2AnularDtos.FarmalinkResult.class);
         } catch (RuntimeException e) {
             throw e;

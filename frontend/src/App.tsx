@@ -17,7 +17,7 @@ const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
 const NotFoundView = lazy(() => import('./components/NotFoundView'))
 import AddressMapPicker from './components/AddressMapPicker'
 import { api } from './api/api'
-import { downloadPrescriptionPDF } from './utils/pdfGenerator'
+import { openOfficialPrescriptionPdf } from './utils/pdfGenerator'
 import { useAlert } from './context/AlertContext'
 import { useDocumentTitle } from './hooks/useDocumentTitle'
 import { Client } from '@stomp/stompjs'
@@ -50,11 +50,23 @@ interface CheckoutTarget {
     linkedin?: string
     sitioWeb?: string
   }
+  tariffs?: { id: string; label: string; price: number; enabled: boolean; requiereObraSocial?: boolean }[]
+}
+
+// ── Helper to convert professional name to SEO-friendly slug ────
+export function getDoctorSlug(name: string): string {
+  if (!name) return ''
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 // ── /reserva/:proId route — resolves the professional either from the
 // navigation state (fast path, set by handleBook on click) or by fetching
-// the public medicos list and matching the id (direct URL load / refresh).
+// the public medicos list and matching the id or SEO slug (direct URL load / refresh).
 function CheckoutRoute({ currentUser, loadingSession }: { currentUser: any; loadingSession: boolean }) {
   const { proId } = useParams()
   const location = useLocation()
@@ -71,7 +83,14 @@ function CheckoutRoute({ currentUser, loadingSession }: { currentUser: any; load
     api.getMedicos()
       .then((res: any[]) => {
         if (cancelled) return
-        const m = (res || []).find((x: any) => String(x.id) === proId)
+        const param = (proId || '').trim().toLowerCase()
+        const m = (res || []).find((x: any) => {
+          if (String(x.id) === param) return true
+          const slug = getDoctorSlug(x.name)
+          if (slug === param) return true
+          if (slug.replace(/^(dr|dra|lic)-/, '') === param.replace(/^(dr|dra|lic)-/, '')) return true
+          return false
+        })
         if (!m) {
           setNotFound(true)
           return
@@ -98,6 +117,7 @@ function CheckoutRoute({ currentUser, loadingSession }: { currentUser: any; load
           tags: m.tags,
           experiencia: m.experiencia,
           redesSociales: m.redesSociales,
+          tariffs: m.tariffs,
         })
       })
       .catch(() => setNotFound(true))
@@ -1487,7 +1507,7 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
     })
     .catch((err) => {
       console.error("Error al emitir receta:", err);
-      showAlert("Error al emitir y enviar receta", "error");
+      showAlert(err?.message || "Error al emitir y enviar receta", "error");
     })
     .finally(() => setSending(false));
   };
@@ -1626,7 +1646,7 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                       </button>
                       <button
                         className="btn btn--ghost btn--sm"
-                        onClick={() => downloadPrescriptionPDF(rx, medicoInfo, rx.paciente)}
+                        onClick={() => openOfficialPrescriptionPdf(rx, () => showAlert('Esta receta todavía no tiene el documento oficial de QBI2/Innovamed disponible. Contactá a soporte.', 'error'))}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                       >
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1635,7 +1655,7 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                           <line x1="12" y1="18" x2="12" y2="12" />
                           <polyline points="9 15 12 18 15 15" />
                         </svg>
-                        Descargar PDF
+                        Ver PDF oficial
                       </button>
                     </div>
                   </div>
@@ -1708,7 +1728,7 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                   <button
                     className="btn btn--primary btn--sm"
                     style={{ marginTop: 'var(--space-2)', alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                    onClick={() => downloadPrescriptionPDF(selectedDetailModal, medicoInfo, selectedDetailModal.paciente)}
+                    onClick={() => openOfficialPrescriptionPdf(selectedDetailModal, () => showAlert('Esta receta todavía no tiene el documento oficial de QBI2/Innovamed disponible. Contactá a soporte.', 'error'))}
                   >
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -1716,7 +1736,7 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                       <line x1="12" y1="18" x2="12" y2="12" />
                       <polyline points="9 15 12 18 15 15" />
                     </svg>
-                    Descargar PDF de Receta
+                    Ver PDF oficial de Receta
                   </button>
                 </div>
               </div>
@@ -2157,7 +2177,7 @@ function getMissingRequirements(m: any): string[] {
   if (!m.fechaNacimiento) missing.push("Fecha de nacimiento")
   if (!m.cuil) missing.push("CUIL profesional")
   if (!m.tipoDocumento || !m.numeroDocumento) missing.push("Tipo y número de documento")
-  if (!m.domicilioAtencion || !m.domicilioAtencion.trim()) missing.push("Dirección física del consultorio")
+  if (m.ofrecePresencial && (!m.domicilioAtencion || !m.domicilioAtencion.trim())) missing.push("Dirección física del consultorio")
   if (!m.matriculaInfo?.tipo || !m.matriculaInfo?.provincia || !m.matriculaInfo?.numero) {
     missing.push("Datos completos de matrícula (tipo, provincia y número)")
   }
@@ -2288,7 +2308,7 @@ function SettingsView({
     setList(list.includes(value) ? list.filter(v => v !== value) : [...list, value])
   }
 
-  const updateTariff = (id: string, field: 'price' | 'enabled' | 'label', value: number | boolean | string) => {
+  const updateTariff = (id: string, field: 'price' | 'enabled' | 'label' | 'requiereObraSocial', value: number | boolean | string) => {
     setTariffs(tariffs.map(t => t.id === id ? { ...t, [field]: value } : t))
   }
 
@@ -2307,7 +2327,7 @@ function SettingsView({
   }
 
   const addTariff = (label: string, price: number) => {
-    setTariffs([...tariffs, { id: slugifyTariffId(label), label, price, enabled: true }])
+    setTariffs([...tariffs, { id: slugifyTariffId(label), label, price, enabled: true, requiereObraSocial: false }])
   }
 
   const deleteTariff = (id: string) => {
@@ -2694,7 +2714,7 @@ function SettingsView({
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-nacimiento">Fecha de Nacimiento (DD/MM/AAAA)</label>
-            <input id="input-nacimiento" className="form-input" type="date" min="1900-01-01" max={new Date().toISOString().split('T')[0]} value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} />
+            <input id="input-nacimiento" className="form-input" type="date" lang="es-AR" min="1900-01-01" max={new Date().toISOString().split('T')[0]} value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-tipo-doc">Tipo Documento</label>
@@ -3067,6 +3087,7 @@ function SettingsView({
               <th style={{ width: '44px' }}></th>
               <th>Servicio</th>
               <th>Valor (ARS)</th>
+              <th style={{ width: '150px' }}>Requiere Obra Social</th>
               <th style={{ width: '40px' }}></th>
             </tr>
           </thead>
@@ -3100,6 +3121,17 @@ function SettingsView({
                     onChange={(e) => updateTariff(t.id, 'price', Number(e.target.value))}
                     disabled={!t.enabled}
                   />
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  <label className="toggle" style={{ transform: 'scale(0.8)' }} title="Al reservar este servicio, se le pedirá al paciente su Obra Social y número de afiliado">
+                    <input
+                      type="checkbox"
+                      checked={!!t.requiereObraSocial}
+                      onChange={(e) => updateTariff(t.id, 'requiereObraSocial', e.target.checked)}
+                      disabled={!t.enabled}
+                    />
+                    <span className="toggle__track" />
+                  </label>
                 </td>
                 <td>
                   <button
@@ -4280,7 +4312,7 @@ function DashboardHome({
                   </div>
                   {selectedAppt.metadataAfiliado && (
                     <div style={{ gridColumn: '1 / -1' }}>
-                      <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>N° de Afiliado OSDE (copago)</label>
+                      <label style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>N° de Afiliado Obra Social</label>
                       <span style={{ fontSize: 'var(--text-sm)', fontWeight: '600' }}>{selectedAppt.metadataAfiliado}</span>
                     </div>
                   )}
@@ -4383,8 +4415,9 @@ function DashboardHome({
                   }}>
                     <div>
                       <label style={{ fontSize: '9px', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>Nueva Fecha (DD/MM/AAAA)</label>
-                      <input 
-                        type="date" 
+                      <input
+                        type="date"
+                        lang="es-AR"
                         value={rescheduleDate}
                         onChange={(e) => setRescheduleDate(e.target.value)}
                         style={{ width: '100%', fontSize: '11px', padding: '4px' }}
@@ -4784,7 +4817,8 @@ export default function App() {
       navigate('/login');
       return;
     }
-    navigate(`/reserva/${pro.id}`, { state: pro });
+    const slug = getDoctorSlug(pro.name) || String(pro.id);
+    navigate(`/reserva/${slug}`, { state: pro });
   }
 
   const handleLogout = async () => {

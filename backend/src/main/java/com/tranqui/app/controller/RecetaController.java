@@ -19,6 +19,9 @@ public class RecetaController {
     @Autowired
     private RecetaService recetaService;
 
+    @Autowired
+    private com.tranqui.app.service.Qbi2RecipeClient qbi2RecipeClient;
+
     @PostMapping("/enviar")
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<RecetaResponseDto> enviarReceta(
@@ -32,6 +35,29 @@ public class RecetaController {
     public ResponseEntity<List<RecetaResponseDto>> obtenerMisRecetas(
             @AuthenticationPrincipal UserDetails userDetails) {
         return ResponseEntity.ok(recetaService.obtenerMisRecetas(userDetails.getUsername()));
+    }
+
+    @GetMapping("/diagnosticos")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<com.tranqui.app.model.dto.Qbi2CatalogoDtos.DiagnosticoResponse> buscarDiagnosticos(
+            @RequestParam(defaultValue = "") String texto) {
+        return ResponseEntity.ok(qbi2RecipeClient.buscarDiagnosticos(texto));
+    }
+
+    @GetMapping("/medicamentos")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<com.tranqui.app.model.dto.Qbi2CatalogoDtos.MedicamentoResponse> buscarMedicamentos(
+            @RequestParam(defaultValue = "") String texto,
+            @RequestParam(defaultValue = "1") int pagina) {
+        return ResponseEntity.ok(qbi2RecipeClient.buscarMedicamentos(texto, pagina));
+    }
+
+    // Public: needed at booking time by patients who aren't logged in yet (guest checkout in
+    // CheckoutFlow.tsx) when the médico marked a service as "Requiere Obra Social" — see
+    // SecurityConfig's permitAll list for /api/recetas/financiadores.
+    @GetMapping("/financiadores")
+    public ResponseEntity<com.tranqui.app.model.dto.Qbi2CatalogoDtos.FinanciadorResponse> buscarFinanciadores() {
+        return ResponseEntity.ok(qbi2RecipeClient.buscarFinanciadores());
     }
 
     @GetMapping("/{id}")

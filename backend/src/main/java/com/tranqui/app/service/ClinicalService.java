@@ -297,7 +297,8 @@ public class ClinicalService {
             paciente.setCredencialPlan(dto.getCredencial().getPlan());
             paciente.setCredencialToken(dto.getCredencial().getToken());
             if (dto.getCredencial().getPlan() != null && !dto.getCredencial().getPlan().trim().isEmpty()) {
-                paciente.setObraSocial("OSDE " + dto.getCredencial().getPlan());
+                String baseOs = (dto.getObraSocial() != null && !dto.getObraSocial().isBlank()) ? dto.getObraSocial() : "Obra Social";
+                paciente.setObraSocial(baseOs + " " + dto.getCredencial().getPlan());
             } else {
                 paciente.setObraSocial(dto.getObraSocial());
             }

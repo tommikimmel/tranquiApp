@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -199,41 +200,82 @@ public class TurnoService {
                     return usuarioRepository.save(nuevo);
                 });
 
+        // Update patient's Obra Social details if provided
+        if (dto.getObraSocial() != null && !dto.getObraSocial().isBlank()) {
+            paciente.setObraSocial(dto.getObraSocial());
+        }
+        if (dto.getMetadataAfiliado() != null && !dto.getMetadataAfiliado().isBlank()) {
+            paciente.setNumAfiliado(dto.getMetadataAfiliado());
+        }
+        paciente = usuarioRepository.save(paciente);
+
         // Determine price based on selected service
         java.math.BigDecimal precio = java.math.BigDecimal.ZERO;
         String servicioId = "particular";
-        if (dto.getTipo() == TipoTurno.OSDE) {
-            servicioId = "osde";
-        } else if (dto.getTipo() == TipoTurno.RECETA) {
-            servicioId = "receta-fuera";
-        } else if (dto.getTipo() == TipoTurno.CERTIFICADO) {
-            servicioId = "certificado";
-        } else if (dto.getTipo() == TipoTurno.SOBRETUNO) {
-            servicioId = "sobreturno";
-        }
-        
-        Optional<com.tranqui.app.model.TarifaMedico> tarifaOpt = tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), servicioId);
-        if (tarifaOpt.isPresent() && tarifaOpt.get().isHabilitado()) {
-            precio = tarifaOpt.get().getPrecio();
+
+        // Custom services the médico created in "Honorarios y servicios" (beyond the fixed
+        // PARTICULAR/OBRA_SOCIAL/RECETA/CERTIFICADO/SOBRETUNO ones) are selected directly by
+        // servicioId rather than by the TipoTurno enum, since the enum only covers the defaults.
+        Set<String> servicioIdsConocidos = Set.of("particular", "sobreturno", "obra_social", "osde", "receta-fuera", "certificado");
+        boolean esServicioCustom = dto.getServicioId() != null && !dto.getServicioId().isBlank()
+                && !servicioIdsConocidos.contains(dto.getServicioId());
+
+        Optional<com.tranqui.app.model.TarifaMedico> tarifaCustomOpt = esServicioCustom
+                ? tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), dto.getServicioId())
+                : Optional.empty();
+
+        boolean usoTarifaCustom = tarifaCustomOpt.isPresent() && tarifaCustomOpt.get().isHabilitado();
+        if (usoTarifaCustom) {
+            servicioId = dto.getServicioId();
+            precio = tarifaCustomOpt.get().getPrecio();
         } else {
-            // Fallback to defaults
-            if (dto.getTipo() == TipoTurno.OSDE) {
-                precio = new java.math.BigDecimal("10500");
+            if (dto.getTipo() == TipoTurno.OBRA_SOCIAL || dto.getTipo() == TipoTurno.OSDE) {
+                servicioId = "obra_social";
             } else if (dto.getTipo() == TipoTurno.RECETA) {
-                precio = new java.math.BigDecimal("45000");
+                servicioId = "receta-fuera";
             } else if (dto.getTipo() == TipoTurno.CERTIFICADO) {
-                precio = new java.math.BigDecimal("55000");
+                servicioId = "certificado";
             } else if (dto.getTipo() == TipoTurno.SOBRETUNO) {
-                precio = new java.math.BigDecimal("90000");
+                servicioId = "sobreturno";
+            }
+
+            Optional<com.tranqui.app.model.TarifaMedico> tarifaOpt = tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), servicioId);
+            if (!tarifaOpt.isPresent() && (dto.getTipo() == TipoTurno.OBRA_SOCIAL || dto.getTipo() == TipoTurno.OSDE)) {
+                tarifaOpt = tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), "osde");
+            }
+
+            if (tarifaOpt.isPresent() && tarifaOpt.get().isHabilitado()) {
+                precio = tarifaOpt.get().getPrecio();
             } else {
-                precio = medico.getPrecio() != null ? medico.getPrecio() : new java.math.BigDecimal("60000");
+                // Fallback to defaults
+                if (dto.getTipo() == TipoTurno.OBRA_SOCIAL || dto.getTipo() == TipoTurno.OSDE) {
+                    precio = new java.math.BigDecimal("10500");
+                } else if (dto.getTipo() == TipoTurno.RECETA) {
+                    precio = new java.math.BigDecimal("45000");
+                } else if (dto.getTipo() == TipoTurno.CERTIFICADO) {
+                    precio = new java.math.BigDecimal("55000");
+                } else if (dto.getTipo() == TipoTurno.SOBRETUNO) {
+                    precio = new java.math.BigDecimal("90000");
+                } else {
+                    precio = medico.getPrecio() != null ? medico.getPrecio() : new java.math.BigDecimal("60000");
+                }
             }
         }
 
         // If it is the first consultation, apply a 30% surcharge and round to nearest whole number
-        if (dto.getTipo() == TipoTurno.PARTICULAR && esPrimeraConsulta(dto.getEmailPaciente())) {
+        // (never for a custom tariff — that surcharge only makes sense for the default "particular" price)
+        if (!usoTarifaCustom && dto.getTipo() == TipoTurno.PARTICULAR && esPrimeraConsulta(dto.getEmailPaciente())) {
             java.math.BigDecimal surcharge = precio.multiply(new java.math.BigDecimal("0.30"));
             precio = precio.add(surcharge).setScale(0, java.math.RoundingMode.HALF_UP);
+        }
+
+        String metaAfiliado = dto.getMetadataAfiliado();
+        if (dto.getObraSocial() != null && !dto.getObraSocial().isBlank()) {
+            if (metaAfiliado != null && !metaAfiliado.isBlank() && !metaAfiliado.startsWith(dto.getObraSocial())) {
+                metaAfiliado = dto.getObraSocial() + " - " + metaAfiliado;
+            } else if (metaAfiliado == null || metaAfiliado.isBlank()) {
+                metaAfiliado = dto.getObraSocial();
+            }
         }
 
         Turno turno = Turno.builder()
@@ -245,7 +287,9 @@ public class TurnoService {
                 .tipo(dto.getTipo())
                 .estado(EstadoTurno.PENDIENTE_PAGO)
                 .precio(precio)
-                .metadataAfiliado(dto.getMetadataAfiliado())
+                .metadataAfiliado(metaAfiliado)
+                .servicioId(servicioId)
+                .idFinanciador(dto.getIdFinanciador())
                 .build();
 
         turno = turnoRepository.save(turno);
@@ -328,7 +372,7 @@ public class TurnoService {
                         status = "completed";
                     }
 
-                    String typeLabel = t.getTipo() == TipoTurno.OSDE ? "Copago OSDE" : "Consulta particular";
+                    String typeLabel = (t.getTipo() == TipoTurno.OBRA_SOCIAL || t.getTipo() == TipoTurno.OSDE) ? "Obra Social" : "Consulta particular";
 
                     return com.tranqui.app.model.dto.TurnoMedicoDto.builder()
                             .id(t.getId())
@@ -388,7 +432,7 @@ public class TurnoService {
                         status = "completed";
                     }
 
-                    String typeLabel = t.getTipo() == TipoTurno.OSDE ? "Copago OSDE" : "Consulta particular";
+                    String typeLabel = (t.getTipo() == TipoTurno.OBRA_SOCIAL || t.getTipo() == TipoTurno.OSDE) ? "Obra Social" : "Consulta particular";
 
                     return com.tranqui.app.model.dto.TurnoMedicoDto.builder()
                             .id(t.getId())
@@ -429,7 +473,7 @@ public class TurnoService {
                         status = "completed";
                     }
 
-                    String typeLabel = t.getTipo() == TipoTurno.OSDE ? "Copago OSDE" : "Consulta particular";
+                    String typeLabel = (t.getTipo() == TipoTurno.OBRA_SOCIAL || t.getTipo() == TipoTurno.OSDE) ? "Obra Social" : "Consulta particular";
 
                     // The checkout URL is generated once at booking time (reservarTurno) and
                     // persisted on the turno — re-generating it here on every list read used to

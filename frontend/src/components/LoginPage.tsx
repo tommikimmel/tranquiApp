@@ -833,6 +833,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                     <label className="form-label form-label--required">Fecha de Nacimiento (DD/MM/AAAA)</label>
                     <input
                       type="date"
+                      lang="es-AR"
                       className="form-input"
                       min="1900-01-01"
                       max={new Date().toISOString().split('T')[0]}

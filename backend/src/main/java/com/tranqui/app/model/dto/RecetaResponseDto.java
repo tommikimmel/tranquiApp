@@ -19,6 +19,10 @@ public class RecetaResponseDto {
     private String diagnostico;
     private String indicaciones;
     private String pdfUrl;
+    private String qbi2IdReceta;
+    private String qbi2Verificador;
+    private String qbi2NroCuir;
+    private String qbi2FechaVencimiento;
     private LocalDateTime fechaEmision;
 
     @Data

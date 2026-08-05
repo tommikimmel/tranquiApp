@@ -113,5 +113,6 @@ public class MedicoDto {
         private String label;
         private BigDecimal price;
         private boolean enabled;
+        private boolean requiereObraSocial; // if true, checkout must collect financiador + n° de afiliado
     }
 }

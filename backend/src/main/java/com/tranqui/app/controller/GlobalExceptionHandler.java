@@ -1,5 +1,6 @@
 package com.tranqui.app.controller;
 
+import com.tranqui.app.service.RecetaElectronicaException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,5 +31,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<String> handleBadRequest(IllegalArgumentException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    }
+
+    // 422 (not 5xx) so apiFetch's sanitizeErrorMessage passes the real, professional-facing
+    // message through instead of masking it behind a generic "server error" string.
+    @ExceptionHandler(RecetaElectronicaException.class)
+    public ResponseEntity<String> handleRecetaElectronica(RecetaElectronicaException ex) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(ex.getMessage());
     }
 }

@@ -35,7 +35,22 @@ public class Receta {
     private String indicaciones;
 
     @Column(name = "pdf_url", length = 500)
-    private String pdfUrl;
+    private String pdfUrl; // Official S3 PDF link returned by QBI2/Innovamed — never a locally-generated document
+
+    @Column(name = "qbi2_id_receta", length = 100)
+    private String qbi2IdReceta; // Recetario/authorization number from QBI2's RecetaResult.idReceta
+
+    @Column(name = "qbi2_verificador", length = 255)
+    private String qbi2Verificador; // Full verification URL, e.g. https://qa.verumrp.com.ar/&lt;hash&gt;
+
+    @Column(name = "qbi2_nro_cuir", length = 500)
+    private String qbi2NroCuir;
+
+    @Column(name = "qbi2_fecha_vencimiento", length = 50)
+    private String qbi2FechaVencimiento;
+
+    @Column(name = "qbi2_id_transaccion", length = 100)
+    private String qbi2IdTransaccion;
 
     @Builder.Default
     @Column(name = "fecha_emision", nullable = false)

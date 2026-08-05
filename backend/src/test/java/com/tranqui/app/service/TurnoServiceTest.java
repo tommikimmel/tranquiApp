@@ -191,6 +191,32 @@ class TurnoServiceTest {
     }
 
     @Test
+    void testReservarTurnoObraSocial() {
+        com.tranqui.app.model.dto.ReservaTurnoDto dto = com.tranqui.app.model.dto.ReservaTurnoDto.builder()
+                .medicoId(medico.getId())
+                .fecha(LocalDate.now().plusDays(2))
+                .hora(LocalTime.of(10, 0))
+                .tipo(TipoTurno.OBRA_SOCIAL)
+                .obraSocial("Swiss Medical")
+                .metadataAfiliado("99887766")
+                .nombrePaciente("Lucia M")
+                .emailPaciente("lucia.m@gmail.com")
+                .telefonoPaciente("+543511111111")
+                .build();
+
+        com.tranqui.app.model.dto.TurnoResponseDto response = turnoService.reservarTurno(dto);
+        assertNotNull(response);
+        assertEquals("PENDIENTE_PAGO", response.getEstado());
+        assertNotNull(response.getCheckoutUrl());
+        assertFalse(response.getCheckoutUrl().isEmpty());
+        
+        // Clean up created turno & patient if created
+        if (response.getTurnoId() != null) {
+            try { turnoRepository.deleteById(response.getTurnoId()); } catch (Exception e) {}
+        }
+    }
+
+    @Test
     void testReservarTurnoParticular() {
         com.tranqui.app.model.dto.ReservaTurnoDto dto = com.tranqui.app.model.dto.ReservaTurnoDto.builder()
                 .medicoId(medico.getId())

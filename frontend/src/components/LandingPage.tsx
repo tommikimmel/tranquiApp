@@ -6,7 +6,7 @@ import { useChat } from '../hooks/useChat'
 import { useAlert } from '../context/AlertContext'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
-import { downloadPrescriptionPDF } from '../utils/pdfGenerator'
+import { openOfficialPrescriptionPdf } from '../utils/pdfGenerator'
 
 const formatDateDDMMYYYY = (dateStr?: string) => {
   if (!dateStr) return '';
@@ -80,8 +80,11 @@ function IconHelp({ size = 16 }: { size?: number }) {
 
 // ── Types ──────────────────────────────────────────────────────
 interface Tariff {
+  id: string
   label: string
   price: number
+  enabled: boolean
+  requiereObraSocial?: boolean
 }
 
 interface RedesSociales {
@@ -447,7 +450,7 @@ function PublicHeader({
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
-                      Mi Historia Clínica
+                      Mi Receta
                     </button>
                     <button
                       onClick={() => {
@@ -546,6 +549,7 @@ interface BookTarget {
   tags?: string[]
   experiencia?: string
   redesSociales?: RedesSociales
+  tariffs?: Tariff[]
 }
 
 export default function LandingPage({
@@ -729,8 +733,11 @@ export default function LandingPage({
           ofreceOnline: m.ofreceOnline !== undefined ? m.ofreceOnline : true,
           ofrecePresencial: m.ofrecePresencial !== undefined ? m.ofrecePresencial : false,
           tariffs: m.tariffs.map((t: any) => ({
+            id: t.id,
             label: t.label,
             price: t.price,
+            enabled: t.enabled,
+            requiereObraSocial: t.requiereObraSocial,
           })),
         }))
         setProfessionals(mapped)
@@ -863,7 +870,8 @@ export default function LandingPage({
         aniosExperiencia: pro.aniosExperiencia,
         tags: pro.tags,
         experiencia: pro.experiencia,
-        redesSociales: pro.redesSociales
+        redesSociales: pro.redesSociales,
+        tariffs: pro.tariffs
       })
     }
   }
@@ -979,6 +987,7 @@ export default function LandingPage({
                   <input
                     id="availability-date-input"
                     type="date"
+                    lang="es-AR"
                     className="availability-popover__input"
                     min={new Date().toISOString().split('T')[0]}
                     value={availabilityDate}
@@ -1145,7 +1154,7 @@ export default function LandingPage({
                                 boxShadow: '0 2px 4px rgba(0, 158, 227, 0.15)'
                               }}
                             >
-                              {appt.type === 'Copago OSDE' ? 'Pagar Copago' : 'Pagar Consulta'}
+                              {appt.type === 'Copago OSDE' || appt.type === 'Obra Social' ? 'Pagar Copago' : 'Pagar Consulta'}
                             </a>
                           )}
                           <button 
@@ -1366,6 +1375,17 @@ export default function LandingPage({
                               Ver dirección en Google Maps
                             </a>
                           )}
+                          {appt.domicilioLat != null && appt.domicilioLng != null && (
+                            <iframe
+                              title={`Ubicación del consultorio - turno ${appt.id}`}
+                              width="100%"
+                              height="140"
+                              style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}
+                              loading="lazy"
+                              referrerPolicy="no-referrer-when-downgrade"
+                              src={`https://www.openstreetmap.org/export/embed.html?bbox=${appt.domicilioLng - 0.006}%2C${appt.domicilioLat - 0.004}%2C${appt.domicilioLng + 0.006}%2C${appt.domicilioLat + 0.004}&layer=mapnik&marker=${appt.domicilioLat}%2C${appt.domicilioLng}`}
+                            />
+                          )}
                         </div>
                       )}
                       {appt.meetLink && isConfirmed && (
@@ -1501,7 +1521,7 @@ export default function LandingPage({
                   <button
                     className="btn btn--primary btn--sm"
                     style={{ marginTop: 'var(--space-2)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                    onClick={() => downloadPrescriptionPDF(selectedPrescriptionDetail, selectedPrescriptionDetail.medico, currentUser)}
+                    onClick={() => openOfficialPrescriptionPdf(selectedPrescriptionDetail, () => showAlert('Esta receta todavía no tiene el documento oficial de QBI2/Innovamed disponible. Contactá a tu médico.', 'error'))}
                   >
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -1509,7 +1529,7 @@ export default function LandingPage({
                       <line x1="12" y1="18" x2="12" y2="12" />
                       <polyline points="9 15 12 18 15 15" />
                     </svg>
-                    Descargar PDF de Receta
+                    Ver PDF oficial de Receta
                   </button>
                 </div>
               </div>
@@ -1549,7 +1569,7 @@ export default function LandingPage({
                       </button>
                       <button
                         className="btn btn--ghost btn--sm"
-                        onClick={() => downloadPrescriptionPDF(rx, rx.medico, currentUser)}
+                        onClick={() => openOfficialPrescriptionPdf(rx, () => showAlert('Esta receta todavía no tiene el documento oficial de QBI2/Innovamed disponible. Contactá a tu médico.', 'error'))}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                       >
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1558,7 +1578,7 @@ export default function LandingPage({
                           <line x1="12" y1="18" x2="12" y2="12" />
                           <polyline points="9 15 12 18 15 15" />
                         </svg>
-                        Descargar PDF
+                        Ver PDF oficial
                       </button>
                     </div>
                   </div>
