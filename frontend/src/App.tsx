@@ -1357,6 +1357,7 @@ const formatDateDDMMYYYY = (dateVal: any) => {
 
 function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promise<void>; medicoInfo?: any }) {
   const { showAlert } = useAlert();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
 
   const [patients, setPatients] = useState<any[]>([]);
@@ -1391,16 +1392,30 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
   useEffect(() => {
     api.getPacientesAtendidos()
       .then((data: any) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setPatients(data);
-        } else {
-          setPatients(MOCK_PATIENTS);
+        const list = Array.isArray(data) && data.length > 0 ? data : MOCK_PATIENTS;
+        setPatients(list);
+
+        const statePatient = location.state?.patient || location.state?.patientObj;
+        if (statePatient) {
+          const found = list.find((p: any) => p.id === statePatient.id) || statePatient;
+          setSelectedPatientObj(found);
+          const pName = found.name || `${found.nombre || ''} ${found.apellido || ''}`.trim();
+          const pDni = found.dni || found.numeroDocumento || 'S/D';
+          setPatientSearch(`${pName} — DNI: ${pDni}`);
+        } else if (location.state?.patientId) {
+          const found = list.find((p: any) => p.id === location.state.patientId);
+          if (found) {
+            setSelectedPatientObj(found);
+            const pName = found.name || `${found.nombre || ''} ${found.apellido || ''}`.trim();
+            const pDni = found.dni || found.numeroDocumento || 'S/D';
+            setPatientSearch(`${pName} — DNI: ${pDni}`);
+          }
         }
       })
       .catch(() => setPatients(MOCK_PATIENTS));
 
     loadHistory();
-  }, []);
+  }, [location.state]);
 
   const doctorName = medicoInfo ? `${medicoInfo.nombre || ''} ${medicoInfo.apellido || ''}`.trim() : 'Médico';
   const doctorMatricula = medicoInfo?.matricula || medicoInfo?.matriculaNumero ? `MN ${medicoInfo.matricula || medicoInfo.matriculaNumero}` : 'MN S/N';
