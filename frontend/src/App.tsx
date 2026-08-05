@@ -1512,14 +1512,25 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
           <button
             className={`btn btn--sm ${activeTab === 'new' ? 'btn--primary' : 'btn--ghost'}`}
             onClick={() => setActiveTab('new')}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            ✏️ Nueva Receta
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+            </svg>
+            Nueva Receta
           </button>
           <button
             className={`btn btn--sm ${activeTab === 'history' ? 'btn--primary' : 'btn--ghost'}`}
             onClick={() => { setActiveTab('history'); loadHistory(); }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            📋 Historial Emitidas ({emittedPrescriptions.length})
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+              <path d="M12 11v4l3 2" />
+            </svg>
+            Historial Emitidas ({emittedPrescriptions.length})
           </button>
         </div>
       </div>
@@ -1557,8 +1568,12 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
                       <div>
-                        <strong style={{ fontSize: 'var(--text-base)', color: 'var(--color-primary)' }}>
-                          👤 {patientFullName}
+                        <strong style={{ fontSize: 'var(--text-base)', color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                          </svg>
+                          {patientFullName}
                         </strong>
                         {patientDni && (
                           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginLeft: '8px' }}>
@@ -1586,14 +1601,26 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                       <button
                         className="btn btn--secondary btn--sm"
                         onClick={() => setSelectedDetailModal(rx)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                       >
-                        👁️ Ver detalle
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        Ver detalle
                       </button>
                       <button
                         className="btn btn--ghost btn--sm"
                         onClick={() => downloadPrescriptionPDF(rx, medicoInfo, rx.paciente)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                       >
-                        📄 Descargar PDF
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                          <line x1="12" y1="18" x2="12" y2="12" />
+                          <polyline points="9 15 12 18 15 15" />
+                        </svg>
+                        Descargar PDF
                       </button>
                     </div>
                   </div>
@@ -1665,10 +1692,16 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                   )}
                   <button
                     className="btn btn--primary btn--sm"
-                    style={{ marginTop: 'var(--space-2)', alignSelf: 'flex-start' }}
+                    style={{ marginTop: 'var(--space-2)', alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                     onClick={() => downloadPrescriptionPDF(selectedDetailModal, medicoInfo, selectedDetailModal.paciente)}
                   >
-                    📄 Descargar PDF de Receta
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="12" y1="18" x2="12" y2="12" />
+                      <polyline points="9 15 12 18 15 15" />
+                    </svg>
+                    Descargar PDF de Receta
                   </button>
                 </div>
               </div>
