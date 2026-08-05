@@ -55,7 +55,18 @@ public class TurnoService {
     @Transactional(readOnly = true)
     public List<java.time.LocalTime> obtenerHorariosDisponibles(Long medicoId, java.time.LocalDate fecha) {
         List<com.tranqui.app.model.Disponibilidad> disponibilidades = disponibilidadRepository.findByMedicoId(medicoId);
-        List<Turno> turnosExistentes = turnoRepository.findByMedicoIdAndFechaAndEstadoNot(medicoId, fecha, EstadoTurno.CANCELADO);
+        List<Turno> turnosRaw = turnoRepository.findByMedicoIdAndFechaAndEstadoNot(medicoId, fecha, EstadoTurno.CANCELADO);
+        java.time.LocalDateTime limiteCincoMin = java.time.LocalDateTime.now().minusMinutes(5);
+
+        List<Turno> turnosExistentes = turnosRaw.stream()
+                .filter(t -> {
+                    if (t.getEstado() == EstadoTurno.EXPIRADO) return false;
+                    if (t.getEstado() == EstadoTurno.PENDIENTE_PAGO) {
+                        return t.getFechaCreacion() != null && t.getFechaCreacion().isAfter(limiteCincoMin);
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
 
         Usuario medico = usuarioRepository.findById(medicoId).orElse(null);
         int duracionTurnoMinutos = (medico != null && medico.getDuracionTurnoMinutos() != null) ? medico.getDuracionTurnoMinutos() : 45;
@@ -296,7 +307,10 @@ public class TurnoService {
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
         java.time.LocalDate hoy = java.time.LocalDate.now();
-        List<Turno> turnos = turnoRepository.findByMedicoIdAndFechaAndEstadoNot(medico.getId(), hoy, EstadoTurno.CANCELADO);
+        List<Turno> turnosRaw = turnoRepository.findByMedicoIdAndFechaAndEstadoNot(medico.getId(), hoy, EstadoTurno.CANCELADO);
+        List<Turno> turnos = turnosRaw.stream()
+                .filter(t -> t.getEstado() == EstadoTurno.CONFIRMADO || t.getEstado() == EstadoTurno.PENDIENTE_VALIDACION)
+                .collect(Collectors.toList());
 
         // Sort by start time
         turnos.sort(java.util.Comparator.comparing(Turno::getHoraInicio));
@@ -353,7 +367,10 @@ public class TurnoService {
         Usuario medico = usuarioRepository.findByEmail(medicoEmail)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
-        List<Turno> turnos = turnoRepository.findByMedicoIdAndEstadoNot(medico.getId(), EstadoTurno.CANCELADO);
+        List<Turno> turnosRaw = turnoRepository.findByMedicoIdAndEstadoNot(medico.getId(), EstadoTurno.CANCELADO);
+        List<Turno> turnos = turnosRaw.stream()
+                .filter(t -> t.getEstado() == EstadoTurno.CONFIRMADO || t.getEstado() == EstadoTurno.PENDIENTE_VALIDACION)
+                .collect(Collectors.toList());
 
         turnos.sort(java.util.Comparator.comparing(Turno::getFecha).thenComparing(Turno::getHoraInicio));
 

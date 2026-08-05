@@ -1249,6 +1249,21 @@ export default function CheckoutFlow({
   const [createdTurn, setCreatedTurn] = useState<any>(null)
   const [showMockPaymentGateway, setShowMockPaymentGateway] = useState(false)
   const [simulatingWebhook, setSimulatingWebhook] = useState(false)
+  const [holdTimer, setHoldTimer] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (holdTimer === null || holdTimer <= 0) return
+    const interval = setInterval(() => {
+      setHoldTimer((prev) => (prev && prev > 1 ? prev - 1 : 0))
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [holdTimer])
+
+  const formatTimer = (seconds: number) => {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  }
 
   const [modality, setModality] = useState<'online' | 'presencial'>(
     professional.ofrecePresencial && !professional.ofreceOnline ? 'presencial' : 'online'
@@ -1295,6 +1310,7 @@ export default function CheckoutFlow({
     .then((res: any) => {
       setPaymentStatus('idle')
       setCreatedTurn(res)
+      setHoldTimer(300)
       if (res.checkoutUrl) {
         // The backend returns this fixed mock URL when Mercado Pago isn't really
         // configured (dev mode, or the professional hasn't linked a real account yet).
@@ -1390,6 +1406,21 @@ export default function CheckoutFlow({
                 Estás en modo de desarrollo local. Para facilitar las pruebas sin configurar cuentas reales ni túneles SSL (como ngrok), podés aprobar o rechazar el pago simulando la llamada del webhook de Mercado Pago de forma directa.
               </p>
             </div>
+
+            {holdTimer !== null && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                backgroundColor: holdTimer > 0 ? '#fffbe6' : '#fff2f0',
+                border: holdTimer > 0 ? '1px solid #ffe58f' : '1px solid #ffccc7',
+                borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: '13px',
+                color: holdTimer > 0 ? '#ad7c11' : '#ff4d4f', fontWeight: 'bold'
+              }}>
+                <span>⏱️ Reserva bloqueada por 5 minutos:</span>
+                <span style={{ fontSize: '15px', fontFamily: 'monospace' }}>
+                  {holdTimer > 0 ? formatTimer(holdTimer) : '00:00 (Expirado)'}
+                </span>
+              </div>
+            )}
 
             {/* Turn details */}
             <div style={{

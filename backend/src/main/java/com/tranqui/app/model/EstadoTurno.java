@@ -4,5 +4,6 @@ public enum EstadoTurno {
     PENDIENTE_PAGO,
     PENDIENTE_VALIDACION,
     CONFIRMADO,
-    CANCELADO
+    CANCELADO,
+    EXPIRADO
 }

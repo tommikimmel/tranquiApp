@@ -73,7 +73,7 @@ class RecetaServiceTest {
                 .medications(Arrays.asList(med1))
                 .build();
 
-        Receta result = recetaService.emitirReceta(medico.getEmail(), dto);
+        com.tranqui.app.model.dto.RecetaResponseDto result = recetaService.emitirReceta(medico.getEmail(), dto);
         assertNotNull(result);
         assertEquals(paciente.getId(), result.getPaciente().getId());
         assertEquals(medico.getId(), result.getMedico().getId());
