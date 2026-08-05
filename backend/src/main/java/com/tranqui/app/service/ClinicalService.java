@@ -42,7 +42,6 @@ public class ClinicalService {
 
         List<Usuario> pacientesConTurno = turnoRepository.findDistinctPacientesByMedicoId(medico.getId());
         List<Usuario> pacientesConChat = mensajeRepository.findPacientesConMensajesConMedico(medico.getId());
-        List<Usuario> todosLosPacientesSistema = usuarioRepository.findByRol(com.tranqui.app.model.Rol.PACIENTE);
 
         java.util.Map<Long, Usuario> pacientesMap = new java.util.LinkedHashMap<>();
         for (Usuario p : pacientesConTurno) {
@@ -50,9 +49,6 @@ public class ClinicalService {
         }
         for (Usuario p : pacientesConChat) {
             pacientesMap.put(p.getId(), p);
-        }
-        for (Usuario p : todosLosPacientesSistema) {
-            pacientesMap.putIfAbsent(p.getId(), p);
         }
 
         java.util.List<Usuario> todosLosPacientes = new java.util.ArrayList<>(pacientesMap.values());
