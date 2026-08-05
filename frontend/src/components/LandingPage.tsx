@@ -580,6 +580,16 @@ export default function LandingPage({
   const [showHelpModal, setShowHelpModal] = useState(false)
   const [cancelTurnoId, setCancelTurnoId] = useState<number | null>(null)
 
+  useEffect(() => {
+    if (showPrescriptionsModal) {
+      api.getMisRecetas()
+        .then((res: any) => {
+          setMyPrescriptions(Array.isArray(res) ? res : [])
+        })
+        .catch((err: any) => console.error("Error al obtener recetas:", err))
+    }
+  }, [showPrescriptionsModal])
+
   // Portal inner tabs
   const [activeDoctorId, setActiveDoctorId] = useState<number | null>(null)
   

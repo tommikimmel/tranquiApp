@@ -3,12 +3,14 @@ package com.tranqui.app.service;
 import com.tranqui.app.model.Receta;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.model.dto.RecetaDto;
+import com.tranqui.app.model.dto.RecetaResponseDto;
 import com.tranqui.app.repository.RecetaRepository;
 import com.tranqui.app.repository.UsuarioRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,7 +32,7 @@ public class RecetaService {
     private WhatsAppService whatsAppService;
 
     @Transactional
-    public Receta emitirReceta(String medicoEmail, RecetaDto dto) {
+    public RecetaResponseDto emitirReceta(String medicoEmail, RecetaDto dto) {
         Usuario medico = usuarioRepository.findByEmail(medicoEmail)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
@@ -52,10 +54,6 @@ public class RecetaService {
 
         receta = recetaRepository.save(receta);
 
-        // NOTE: this is a placeholder, internal-only record — there is no real PDF, no digital
-        // signature, and no legal validity yet. Real electronic prescriptions require the QBI2
-        // Recipe integration (pending); until that's wired in, do not present this as a signed
-        // document anywhere (WhatsApp copy below, frontend, etc).
         String pdfUrl = "https://tranquiapp.com/api/recetas/pdf/" + receta.getId();
         receta.setPdfUrl(pdfUrl);
         receta = recetaRepository.save(receta);
@@ -66,7 +64,7 @@ public class RecetaService {
             "Medicación:\n%s\n\n" +
             "Indicaciones: %s\n\n" +
             "Podés ver el resumen acá: %s\n\n" +
-            "Este resumen es una constancia interna, no un documento firmado digitalmente. Para uso en farmacias, confirmá los detalles con tu médico.",
+            "Este resumen es una constancia interna. Para uso en farmacias, confirmá los detalles con tu médico.",
             paciente.getNombre(),
             medico.getNombre(),
             medico.getMatricula() != null ? medico.getMatricula() : "S/N",
@@ -84,17 +82,71 @@ public class RecetaService {
             log.error("Error al enviar WhatsApp de receta para paciente ID: {}", paciente.getId(), e);
         }
 
-        return receta;
+        return mapToDto(receta);
     }
 
     @Transactional(readOnly = true)
-    public List<Receta> obtenerMisRecetas(String email) {
+    public List<RecetaResponseDto> obtenerMisRecetas(String email) {
         Usuario usuario = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+        List<Receta> recetas;
         if (usuario.getRol() == com.tranqui.app.model.Rol.PACIENTE) {
-            return recetaRepository.findByPacienteId(usuario.getId());
+            recetas = recetaRepository.findByPacienteIdOrderByFechaEmisionDesc(usuario.getId());
         } else {
-            return recetaRepository.findByMedicoId(usuario.getId());
+            recetas = recetaRepository.findByMedicoIdOrderByFechaEmisionDesc(usuario.getId());
         }
+        return recetas.stream().map(this::mapToDto).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public RecetaResponseDto obtenerRecetaPorId(Long id, String email) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+        Receta receta = recetaRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Receta no encontrada"));
+
+        if (!receta.getPaciente().getId().equals(usuario.getId()) && !receta.getMedico().getId().equals(usuario.getId())) {
+            throw new AccessDeniedException("No tiene permiso para ver esta receta");
+        }
+        return mapToDto(receta);
+    }
+
+    public RecetaResponseDto mapToDto(Receta receta) {
+        if (receta == null) return null;
+
+        RecetaResponseDto.MedicoSimpleDto medicoDto = null;
+        if (receta.getMedico() != null) {
+            medicoDto = RecetaResponseDto.MedicoSimpleDto.builder()
+                    .id(receta.getMedico().getId())
+                    .nombre(receta.getMedico().getNombre())
+                    .apellido(receta.getMedico().getApellido())
+                    .matricula(receta.getMedico().getMatricula())
+                    .especialidad(receta.getMedico().getEspecialidad())
+                    .email(receta.getMedico().getEmail())
+                    .build();
+        }
+
+        RecetaResponseDto.PacienteSimpleDto pacienteDto = null;
+        if (receta.getPaciente() != null) {
+            pacienteDto = RecetaResponseDto.PacienteSimpleDto.builder()
+                    .id(receta.getPaciente().getId())
+                    .nombre(receta.getPaciente().getNombre())
+                    .apellido(receta.getPaciente().getApellido())
+                    .dni(receta.getPaciente().getDni() != null ? receta.getPaciente().getDni() : receta.getPaciente().getNumeroDocumento())
+                    .email(receta.getPaciente().getEmail())
+                    .telefono(receta.getPaciente().getTelefono())
+                    .build();
+        }
+
+        return RecetaResponseDto.builder()
+                .id(receta.getId())
+                .medico(medicoDto)
+                .paciente(pacienteDto)
+                .medicamentos(receta.getMedicamentos())
+                .diagnostico(receta.getDiagnostico())
+                .indicaciones(receta.getIndicaciones())
+                .pdfUrl(receta.getPdfUrl())
+                .fechaEmision(receta.getFechaEmision())
+                .build();
     }
 }

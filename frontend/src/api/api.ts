@@ -195,6 +195,7 @@ export const api = {
     notes: string
   }) => apiFetch('/recetas/enviar', { method: 'POST', body: data as any }),
   getMisRecetas: () => apiFetch('/recetas/me'),
+  getRecetaPorId: (id: number | string) => apiFetch(`/recetas/${id}`),
 
   // Chat API
   getChatHistorial: (destinatarioId: number | string, page = 0, size = 100) =>

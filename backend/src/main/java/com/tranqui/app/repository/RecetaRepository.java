@@ -9,4 +9,6 @@ import java.util.List;
 public interface RecetaRepository extends JpaRepository<Receta, Long> {
     List<Receta> findByMedicoId(Long medicoId);
     List<Receta> findByPacienteId(Long pacienteId);
+    List<Receta> findByMedicoIdOrderByFechaEmisionDesc(Long medicoId);
+    List<Receta> findByPacienteIdOrderByFechaEmisionDesc(Long pacienteId);
 }
