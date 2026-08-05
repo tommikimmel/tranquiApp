@@ -33,6 +33,10 @@ public class TarifaMedico {
     @Column(name = "habilitado", nullable = false)
     private boolean habilitado;
 
-    @Column(name = "requiere_obra_social", nullable = false)
+    // columnDefinition (not just nullable=false) is required here: this table already had
+    // production rows when this column was added, and a plain "not null" ALTER COLUMN ADD
+    // with no DEFAULT fails against Postgres ("column ... contains null values") because it
+    // can't backfill existing rows — see 2026-08-05 incident where this broke /api/medicos/perfil.
+    @Column(name = "requiere_obra_social", columnDefinition = "boolean not null default false")
     private boolean requiereObraSocial;
 }
