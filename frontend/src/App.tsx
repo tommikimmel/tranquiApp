@@ -1738,6 +1738,14 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                     </svg>
                     Ver PDF oficial de Receta
                   </button>
+                  {selectedDetailModal.pdfUrl && (
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', wordBreak: 'break-all' }}>
+                      <strong>Link del documento (QBI2/Innovamed):</strong>{' '}
+                      <a href={selectedDetailModal.pdfUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>
+                        {selectedDetailModal.pdfUrl}
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

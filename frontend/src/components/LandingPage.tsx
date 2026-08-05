@@ -1531,6 +1531,14 @@ export default function LandingPage({
                     </svg>
                     Ver PDF oficial de Receta
                   </button>
+                  {selectedPrescriptionDetail.pdfUrl && (
+                    <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: 'var(--space-2)', wordBreak: 'break-all' }}>
+                      <strong>Link del documento (QBI2/Innovamed):</strong>{' '}
+                      <a href={selectedPrescriptionDetail.pdfUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>
+                        {selectedPrescriptionDetail.pdfUrl}
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : myPrescriptions.length > 0 ? (
