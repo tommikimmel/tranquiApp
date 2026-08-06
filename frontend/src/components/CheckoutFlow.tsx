@@ -267,7 +267,12 @@ function StepSelect({
     'Otra'
   ]
 
-  const mapContainerRef = useRef<HTMLDivElement>(null)
+  // A plain useRef here would miss the map entirely whenever this component's `loading` early
+  // return (below) is still showing the spinner when the map-init effect first runs — the ref
+  // stays null (nothing rendered yet), and since `loading` isn't a dependency of that effect, it
+  // never re-fires once the container actually mounts. A callback ref fires exactly when the DOM
+  // node attaches, whenever that happens, so it can't miss the mount regardless of timing.
+  const [mapContainer, setMapContainer] = useState<HTMLDivElement | null>(null)
   const [leafletLoaded, setLeafletLoaded] = useState(!!(window as any).L)
 
   const effectiveLat = professional.domicilioLat || -31.4201
@@ -282,19 +287,19 @@ function StepSelect({
   }, [professional])
 
   useEffect(() => {
-    if (!leafletLoaded || !mapContainerRef.current) return
+    if (!leafletLoaded || !mapContainer) return
     const L = (window as any).L
     if (!L) return
 
     const lat = effectiveLat
     const lng = effectiveLng
-    
-    if ((mapContainerRef.current as any)._leaflet_id) {
-      (mapContainerRef.current as any)._leaflet_id = null
-      mapContainerRef.current.innerHTML = ''
+
+    if ((mapContainer as any)._leaflet_id) {
+      (mapContainer as any)._leaflet_id = null
+      mapContainer.innerHTML = ''
     }
 
-    const map = L.map(mapContainerRef.current, {
+    const map = L.map(mapContainer, {
       zoomControl: false,
       attributionControl: false,
       dragging: false,
@@ -339,7 +344,7 @@ function StepSelect({
         map.remove()
       } catch (e) {}
     }
-  }, [leafletLoaded, effectiveLat, effectiveLng])
+  }, [leafletLoaded, effectiveLat, effectiveLng, mapContainer])
 
   const getDayOptionIndex = (date: Date) => {
     const year = date.getFullYear()
@@ -796,7 +801,7 @@ function StepSelect({
 
               <div className="map-box">
                 <div
-                  ref={mapContainerRef}
+                  ref={setMapContainer}
                   style={{
                     height: '190px',
                     width: '100%',
