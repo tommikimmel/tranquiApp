@@ -16,6 +16,7 @@ const VisitorsView = lazy(() => import('./components/VisitorsView'))
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
 const NotFoundView = lazy(() => import('./components/NotFoundView'))
 import AddressMapPicker from './components/AddressMapPicker'
+import DateInputDDMMYYYY from './components/DateInputDDMMYYYY'
 import { api } from './api/api'
 import { openOfficialPrescriptionPdf } from './utils/pdfGenerator'
 import { useAlert } from './context/AlertContext'
@@ -2722,7 +2723,7 @@ function SettingsView({
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-nacimiento">Fecha de Nacimiento (DD/MM/AAAA)</label>
-            <input id="input-nacimiento" className="form-input" type="date" lang="es-AR" min="1900-01-01" max={new Date().toISOString().split('T')[0]} value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} />
+            <DateInputDDMMYYYY id="input-nacimiento" className="form-input" min="1900-01-01" max={new Date().toISOString().split('T')[0]} value={fechaNacimiento} onChange={setFechaNacimiento} />
           </div>
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-tipo-doc">Tipo Documento</label>
@@ -4423,11 +4424,9 @@ function DashboardHome({
                   }}>
                     <div>
                       <label style={{ fontSize: '9px', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '2px' }}>Nueva Fecha (DD/MM/AAAA)</label>
-                      <input
-                        type="date"
-                        lang="es-AR"
+                      <DateInputDDMMYYYY
                         value={rescheduleDate}
-                        onChange={(e) => setRescheduleDate(e.target.value)}
+                        onChange={setRescheduleDate}
                         style={{ width: '100%', fontSize: '11px', padding: '4px' }}
                       />
                     </div>

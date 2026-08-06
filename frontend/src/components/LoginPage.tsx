@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api/api'
 import AddressMapPicker from './AddressMapPicker'
+import DateInputDDMMYYYY from './DateInputDDMMYYYY'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAlert } from '../context/AlertContext'
 
@@ -831,14 +832,12 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                   </div>
                   <div className="form-group">
                     <label className="form-label form-label--required">Fecha de Nacimiento (DD/MM/AAAA)</label>
-                    <input
-                      type="date"
-                      lang="es-AR"
+                    <DateInputDDMMYYYY
                       className="form-input"
                       min="1900-01-01"
                       max={new Date().toISOString().split('T')[0]}
                       value={fechaNacimiento}
-                      onChange={(e) => setFechaNacimiento(e.target.value)}
+                      onChange={setFechaNacimiento}
                       required
                     />
                   </div>

@@ -7,6 +7,7 @@ import { useAlert } from '../context/AlertContext'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import { openOfficialPrescriptionPdf } from '../utils/pdfGenerator'
+import DateInputDDMMYYYY from './DateInputDDMMYYYY'
 
 const formatDateDDMMYYYY = (dateStr?: string) => {
   if (!dateStr) return '';
@@ -984,14 +985,12 @@ export default function LandingPage({
               {showDatePicker && (
                 <div className="availability-popover" role="dialog" aria-label="Elegir fecha de disponibilidad">
                   <label className="availability-popover__label" htmlFor="availability-date-input">Ver disponibilidad para el (DD/MM/AAAA):</label>
-                  <input
+                  <DateInputDDMMYYYY
                     id="availability-date-input"
-                    type="date"
-                    lang="es-AR"
                     className="availability-popover__input"
                     min={new Date().toISOString().split('T')[0]}
                     value={availabilityDate}
-                    onChange={(e) => { setAvailabilityDate(e.target.value); setShowDatePicker(false) }}
+                    onChange={(iso) => { setAvailabilityDate(iso); setShowDatePicker(false) }}
                   />
                 </div>
               )}
