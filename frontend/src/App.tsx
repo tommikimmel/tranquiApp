@@ -1314,6 +1314,10 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
 
 
 // ── Prescription View ─────────────────────────────────────────
+// Quick-pick chips so completar Frecuencia/Duración sea de un click en vez de tipear a mano.
+const FRECUENCIAS_RAPIDAS = ['Cada 8hs', 'Cada 12hs', 'Cada 24hs', 'Antes de dormir', 'A demanda']
+const DURACIONES_RAPIDAS = ['7 días', '15 días', '30 días', '60 días', '90 días']
+
 const MOCK_PATIENTS = [
   { id: '1', name: 'Mateo Benítez', email: 'mateo.b@gmail.com' },
   { id: '2', name: 'Matías Rodríguez', email: 'matias.r@gmail.com' },
@@ -1799,8 +1803,12 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
             <>
               {/* Patient Search Autocomplete */}
               <div className="card" style={{ overflow: 'visible' }}>
-                <div className="card__header">
-                  <h2 className="card__title">Paciente</h2>
+                <div className="card__header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
+                  <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span className="rx-step-badge">1</span>
+                    Paciente
+                  </h2>
+                  <p className="card__subtitle">Buscá y seleccioná a quién le vas a recetar.</p>
                 </div>
                 <div className="form-group" style={{ position: 'relative' }}>
                   <label className="form-label form-label--required">Buscador de paciente</label>
@@ -1868,8 +1876,12 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
 
               {/* Medication Search & Addition */}
               <div className="card" style={{ overflow: 'visible' }}>
-                <div className="card__header">
-                  <h2 className="card__title">Medicación</h2>
+                <div className="card__header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
+                  <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span className="rx-step-badge">2</span>
+                    Medicación
+                  </h2>
+                  <p className="card__subtitle">Buscá cada medicamento en el catálogo oficial y completá cómo debe tomarlo.</p>
                 </div>
 
                 <div className="form-group" style={{ position: 'relative', marginBottom: 'var(--space-4)' }}>
@@ -1964,13 +1976,17 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                             </span>
                           )}
                         </div>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', cursor: 'pointer', width: 'fit-content' }}>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', cursor: 'pointer', width: 'fit-content' }}>
                           <input
                             type="checkbox"
                             checked={!!med.noSustituible}
                             onChange={(e) => updateMedication(i, 'noSustituible', e.target.checked)}
+                            style={{ marginTop: '2px' }}
                           />
-                          No sustituible (Decreto 987/03 Art.2°)
+                          <span>
+                            No sustituible
+                            <span style={{ display: 'block', fontSize: '11px' }}>La farmacia no podrá cambiarlo por otra marca (Decreto 987/03 Art.2°)</span>
+                          </span>
                         </label>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)' }}>
                           <div className="form-group">
@@ -1992,6 +2008,18 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                               value={med.frequency}
                               onChange={(e) => updateMedication(i, 'frequency', e.target.value)}
                             />
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                              {FRECUENCIAS_RAPIDAS.map(f => (
+                                <button
+                                  key={f}
+                                  type="button"
+                                  className="rx-quick-chip"
+                                  onClick={() => updateMedication(i, 'frequency', f)}
+                                >
+                                  {f}
+                                </button>
+                              ))}
+                            </div>
                           </div>
                           <div className="form-group">
                             <label className="form-label">Duración</label>
@@ -2002,6 +2030,18 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                               value={med.duration}
                               onChange={(e) => updateMedication(i, 'duration', e.target.value)}
                             />
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                              {DURACIONES_RAPIDAS.map(d => (
+                                <button
+                                  key={d}
+                                  type="button"
+                                  className="rx-quick-chip"
+                                  onClick={() => updateMedication(i, 'duration', d)}
+                                >
+                                  {d}
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2016,8 +2056,12 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
 
               {/* Diagnosis + Notes */}
               <div className="card">
-                <div className="card__header">
-                  <h2 className="card__title">Diagnóstico e indicaciones</h2>
+                <div className="card__header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
+                  <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span className="rx-step-badge">3</span>
+                    Diagnóstico e indicaciones
+                  </h2>
+                  <p className="card__subtitle">Opcional, pero le ayuda al paciente a entender para qué es el tratamiento.</p>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                   <div className="form-group">
@@ -2048,11 +2092,62 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
 
               {/* Send */}
               <div className="card">
-                <div className="card__header">
-                  <h2 className="card__title">Emitir y enviar receta</h2>
+                <div className="card__header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
+                  <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span className="rx-step-badge">4</span>
+                    Confirmar y enviar
+                  </h2>
+                  <p className="card__subtitle">Revisá que esté todo bien antes de emitirla — así es como va a llegar el paciente.</p>
                 </div>
+
+                {(selectedPatientObj || medications.length > 0) && (
+                  <div style={{
+                    backgroundColor: 'var(--neutral-50)', border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)', padding: 'var(--space-4)', marginBottom: 'var(--space-4)',
+                    display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', fontSize: 'var(--text-sm)'
+                  }}>
+                    <div>
+                      <strong style={{ color: 'var(--color-text-secondary)', fontSize: '11px', textTransform: 'uppercase' }}>Paciente</strong>
+                      <div>{selectedPatientObj ? (selectedPatientObj.name || `${selectedPatientObj.nombre || ''} ${selectedPatientObj.apellido || ''}`.trim()) : <em style={{ color: 'var(--color-text-secondary)' }}>Sin seleccionar todavía</em>}</div>
+                    </div>
+                    {diagnosis && (
+                      <div>
+                        <strong style={{ color: 'var(--color-text-secondary)', fontSize: '11px', textTransform: 'uppercase' }}>Diagnóstico</strong>
+                        <div>{diagnosis}</div>
+                      </div>
+                    )}
+                    <div>
+                      <strong style={{ color: 'var(--color-text-secondary)', fontSize: '11px', textTransform: 'uppercase' }}>Medicación ({medications.length})</strong>
+                      {medications.length > 0 ? (
+                        <ul style={{ margin: '2px 0 0', paddingLeft: '18px' }}>
+                          {medications.map((med, i) => (
+                            <li key={i}>
+                              {med.name}
+                              {(med.dosage || med.frequency || med.duration) && (
+                                <span style={{ color: 'var(--color-text-secondary)' }}>
+                                  {' — '}
+                                  {[med.dosage, med.frequency, med.duration].filter(Boolean).join(', ')}
+                                </span>
+                              )}
+                              {med.noSustituible && <span style={{ color: 'var(--color-warning, #b45309)' }}> · No sustituible</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div><em style={{ color: 'var(--color-text-secondary)' }}>Todavía no agregaste ningún medicamento</em></div>
+                      )}
+                    </div>
+                    {notes && (
+                      <div>
+                        <strong style={{ color: 'var(--color-text-secondary)', fontSize: '11px', textTransform: 'uppercase' }}>Indicaciones para el paciente</strong>
+                        <div style={{ whiteSpace: 'pre-wrap' }}>{notes}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)' }}>
-                  Se registrará la receta con los datos profesionales del médico en sesión (<strong>{doctorName} · {doctorMatricula}</strong>) y se enviará la constancia al paciente por WhatsApp y email.
+                  Se emite como receta electrónica oficial (QBI2/Innovamed), firmada con tus datos profesionales (<strong>{doctorName} · {doctorMatricula}</strong>), y se le avisa al paciente por WhatsApp y email con el link para descargarla.
                 </p>
                 <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
                   <button
