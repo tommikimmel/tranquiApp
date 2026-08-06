@@ -510,7 +510,10 @@ public class MedicoService {
                 && u.getEmail() != null && !u.getEmail().trim().isEmpty()
                 && u.getTipoDocumento() != null && !u.getTipoDocumento().trim().isEmpty()
                 && u.getNumeroDocumento() != null
-                && u.getDomicilioAtencion() != null && !u.getDomicilioAtencion().trim().isEmpty()
+                // Only required for professionals who actually offer in-person consultations —
+                // an online-only médico has no consultorio to report. Mirrors the frontend's
+                // getMissingRequirements() in App.tsx, which was fixed for this same reason.
+                && (!u.isOfrecePresencial() || (u.getDomicilioAtencion() != null && !u.getDomicilioAtencion().trim().isEmpty()))
                 && u.getCodigoReFeps() != null
                 && u.getMatriculaTipo() != null && !u.getMatriculaTipo().trim().isEmpty()
                 && u.getMatriculaProvincia() != null && !u.getMatriculaProvincia().trim().isEmpty()
