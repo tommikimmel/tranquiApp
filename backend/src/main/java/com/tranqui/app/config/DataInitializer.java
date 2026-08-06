@@ -87,7 +87,6 @@ public class DataInitializer implements CommandLineRunner {
                     .domicilioAtencion("Av. Santa Fe 1234, CABA")
                     .domicilioLat(-34.5956)
                     .domicilioLng(-58.4234)
-                    .codigoReFeps(123456L)
                     .matriculaTipo("MN")
                     .matriculaProvincia("CABA")
                     .matriculaNumero(49281)

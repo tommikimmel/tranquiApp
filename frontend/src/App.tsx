@@ -2209,7 +2209,7 @@ const SETTINGS_TABS: { id: SettingsTab; label: string; Icon: (props: { size?: nu
   { id: 'integraciones', label: 'Integraciones', Icon: Icon.MercadoPago },
 ]
 
-function getMissingRequirements(m: any): string[] {
+function getMissingRequirements(m: any, mpConnected?: boolean, mpEnabled?: boolean): string[] {
   const missing: string[] = []
   if (!m) return ["Cargando información del perfil..."]
 
@@ -2223,6 +2223,8 @@ function getMissingRequirements(m: any): string[] {
   if (!m.matriculaInfo?.tipo || !m.matriculaInfo?.provincia || !m.matriculaInfo?.numero) {
     missing.push("Datos completos de matrícula (tipo, provincia y número)")
   }
+  if (!m.degree || !m.degree.trim()) missing.push("Título profesional")
+  if (!m.specialty || !m.specialty.trim()) missing.push("Especialidad")
   if (!m.fotoUrl || !m.fotoUrl.trim()) missing.push("Foto de perfil profesional")
   if (!m.descripcionPerfil || !m.descripcionPerfil.trim()) missing.push("Descripción de tu perfil profesional")
   if (!m.tags || m.tags.length === 0) missing.push("Al menos un tratamiento/especialidad que atiendas")
@@ -2230,7 +2232,17 @@ function getMissingRequirements(m: any): string[] {
   if (!m.institucionFormacion || !m.institucionFormacion.trim()) missing.push("Institución donde te formaste")
   if (m.aniosExperiencia === null || m.aniosExperiencia === undefined) missing.push("Años de experiencia clínica")
   if (!m.ofreceOnline && !m.ofrecePresencial) missing.push("Al menos una modalidad de consulta (online o presencial)")
-  if (!m.experiencia || !m.experiencia.trim()) missing.push("Tu Experiencia (Presencia y Contenido)")
+
+  let hasExperienciaLaboral = false
+  try {
+    const parsed = m.experiencia ? JSON.parse(m.experiencia) : []
+    hasExperienciaLaboral = Array.isArray(parsed) && parsed.length > 0
+  } catch {
+    hasExperienciaLaboral = !!(m.experiencia && m.experiencia.trim())
+  }
+  if (!hasExperienciaLaboral) missing.push("Al menos una experiencia laboral en 'Presencia y Experiencia'")
+
+  if (mpEnabled && mpConnected === false) missing.push("Conectar tu cuenta de Mercado Pago (en Integraciones)")
   if (!m.verificadoAdmin) missing.push("Verificación y validación de matrícula por el Administrador de Tranqui")
 
   return missing
@@ -2240,6 +2252,7 @@ function SettingsView({
   medicoInfo,
   onSave,
   mpConnected,
+  mpEnabled,
   onConnect,
   onDisconnect,
   googleConnected,
@@ -2249,6 +2262,7 @@ function SettingsView({
   medicoInfo: any
   onSave: (updated: any) => Promise<void>
   mpConnected: boolean
+  mpEnabled?: boolean
   onConnect: () => void
   onDisconnect: () => void
   googleConnected: boolean
@@ -2268,7 +2282,6 @@ function SettingsView({
   const [domicilioProvincia, setDomicilioProvincia] = useState('')
   const [domicilioLat, setDomicilioLat] = useState<number | null>(medicoInfo?.domicilioLat ?? null)
   const [domicilioLng, setDomicilioLng] = useState<number | null>(medicoInfo?.domicilioLng ?? null)
-  const [codigoReFeps, setCodigoReFeps] = useState(medicoInfo?.codigoReFeps || '')
 
   // MatriculaInfo
   const [matTipo, setMatTipo] = useState(medicoInfo?.matriculaInfo?.tipo || 'MN')
@@ -2492,7 +2505,6 @@ function SettingsView({
         domicilioAtencion: ofrecePresencial ? domicilioAtencion : '',
         domicilioLat: ofrecePresencial ? domicilioLat : null,
         domicilioLng: ofrecePresencial ? domicilioLng : null,
-        codigoReFeps: codigoReFeps ? Number(codigoReFeps) : null,
         matriculaInfo: {
           tipo: matTipo,
           provincia: matProvincia,
@@ -2510,7 +2522,9 @@ function SettingsView({
         specialty,
         matricula: matStr,
         cuit: cuilStr,
-        tariffs,
+        // The Obra Social service always requires cobertura + n° de afiliado — force it here too
+        // in case a médico has legacy data from before this was enforced in the UI.
+        tariffs: tariffs.map(t => (t.id === 'obra_social' || t.id === 'osde') ? { ...t, requiereObraSocial: true } : t),
         fotoUrl,
         tags: selectedTags,
         ofreceOnline,
@@ -2628,7 +2642,7 @@ function SettingsView({
               padding: '10px 14px',
               animation: 'fadeIn 0.2s ease-out'
             }}>
-              {getMissingRequirements(medicoInfo).map((req, idx) => (
+              {getMissingRequirements(medicoInfo, mpConnected, mpEnabled).map((req, idx) => (
                 <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--color-text-primary)' }}>
                   <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', flexShrink: 0 }} />
                   <span>{req}</span>
@@ -3134,7 +3148,9 @@ function SettingsView({
             </tr>
           </thead>
           <tbody>
-            {tariffs.map((t) => (
+            {tariffs.map((t) => {
+              const isObraSocialTariff = t.id === 'obra_social' || t.id === 'osde'
+              return (
               <tr key={t.id} style={{ opacity: t.enabled ? 1 : 0.5, transition: 'opacity 150ms' }}>
                 <td>
                   <label className="toggle" style={{ transform: 'scale(0.8)' }}>
@@ -3165,12 +3181,16 @@ function SettingsView({
                   />
                 </td>
                 <td style={{ textAlign: 'center' }}>
-                  <label className="toggle" style={{ transform: 'scale(0.8)' }} title="Al reservar este servicio, se le pedirá al paciente su Obra Social y número de afiliado">
+                  <label
+                    className="toggle"
+                    style={{ transform: 'scale(0.8)' }}
+                    title={isObraSocialTariff ? 'El servicio de Obra Social siempre pide obra social y número de afiliado al paciente' : 'Al reservar este servicio, se le pedirá al paciente su Obra Social y número de afiliado'}
+                  >
                     <input
                       type="checkbox"
-                      checked={!!t.requiereObraSocial}
+                      checked={isObraSocialTariff ? true : !!t.requiereObraSocial}
                       onChange={(e) => updateTariff(t.id, 'requiereObraSocial', e.target.checked)}
-                      disabled={!t.enabled}
+                      disabled={!t.enabled || isObraSocialTariff}
                     />
                     <span className="toggle__track" />
                   </label>
@@ -3187,7 +3207,8 @@ function SettingsView({
                   </button>
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
 
@@ -3374,6 +3395,7 @@ function SettingsView({
 
 function DashboardHome({
   mpConnected,
+  mpEnabled,
   onConnect,
   onDisconnect,
   googleConnected,
@@ -3391,6 +3413,7 @@ function DashboardHome({
   onNavigate
 }: {
   mpConnected: boolean;
+  mpEnabled?: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
   googleConnected: boolean;
@@ -4955,6 +4978,7 @@ export default function App() {
         return (
           <DashboardHome
             mpConnected={mpConnected}
+            mpEnabled={mpEnabled}
             onConnect={handleConnect}
             onDisconnect={handleDisconnectMercadoPago}
             googleConnected={googleConnected}
@@ -4994,6 +5018,7 @@ export default function App() {
             medicoInfo={medicoInfo}
             onSave={handleSaveSettings}
             mpConnected={mpConnected}
+            mpEnabled={mpEnabled}
             onConnect={handleConnect}
             onDisconnect={handleDisconnectMercadoPago}
             googleConnected={googleConnected}
@@ -5141,7 +5166,7 @@ export default function App() {
                 padding: '10px 12px',
                 animation: 'fadeIn 0.2s ease-out'
               }}>
-                {getMissingRequirements(medicoInfo).map((req, idx) => (
+                {getMissingRequirements(medicoInfo, mpConnected, mpEnabled).map((req, idx) => (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--color-text-primary)' }}>
                     <span style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', flexShrink: 0 }} />
                     <span>{req}</span>

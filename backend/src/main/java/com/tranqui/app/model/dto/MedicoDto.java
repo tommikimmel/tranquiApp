@@ -36,7 +36,6 @@ public class MedicoDto {
     private String domicilioAtencion;
     private Double domicilioLat;
     private Double domicilioLng;
-    private Long codigoReFeps;
     private MatriculaInfoDto matriculaInfo;
     private boolean verificado;
     private Boolean verificadoAdmin;

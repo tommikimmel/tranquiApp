@@ -54,7 +54,6 @@ class MedicoServiceTest {
                 .tipoDocumento("DNI")
                 .numeroDocumento(12345678)
                 .domicilioAtencion("Calle Falsa 123")
-                .codigoReFeps(987654L)
                 .matriculaTipo("Nacional")
                 .matriculaProvincia("Córdoba")
                 .matriculaNumero(12345)

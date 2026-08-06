@@ -149,9 +149,6 @@ public class Usuario {
     @Column(name = "domicilio_lng")
     private Double domicilioLng;
 
-    @Column(name = "codigo_refeps")
-    private Long codigoReFeps;
-
     @Column(name = "matricula_tipo", length = 20)
     private String matriculaTipo;
 

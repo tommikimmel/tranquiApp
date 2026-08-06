@@ -140,7 +140,6 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   const [domicilioProvincia, setDomicilioProvincia] = useState('')
   const [domicilioLat, setDomicilioLat] = useState<number | null>(null)
   const [domicilioLng, setDomicilioLng] = useState<number | null>(null)
-  const [codigoReFeps, setCodigoReFeps] = useState('')
   const [matriculaTipo, setMatriculaTipo] = useState('MN')
   const [matriculaProvincia, setMatriculaProvincia] = useState('')
   const [ofreceOnline, setOfreceOnline] = useState(true)
@@ -343,7 +342,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
         payload.numAfiliado = null
       }
     } else {
-      if (!titulo || !specialty || !matricula || !codigoReFeps) {
+      if (!titulo || !specialty || !matricula) {
         showAlert('Por favor, completá los datos profesionales obligatorios.', 'warning')
         return
       }
@@ -363,7 +362,6 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       payload.domicilioAtencion = ofrecePresencial ? domicilioAtencion : null
       payload.domicilioLat = ofrecePresencial ? domicilioLat : null
       payload.domicilioLng = ofrecePresencial ? domicilioLng : null
-      payload.codigoReFeps = codigoReFeps ? Number(codigoReFeps) : null
       payload.matriculaTipo = matriculaTipo
       payload.matriculaProvincia = matriculaProvincia
       payload.matriculaNumero = Number(matricula)
@@ -1019,7 +1017,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-                      <div className="form-group">
+                      <div className="form-group" style={{ gridColumn: 'span 2' }}>
                         <label className="form-label">CUIT / CUIL</label>
                         <input
                           type="text"
@@ -1027,17 +1025,6 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                           placeholder="20123456789"
                           value={cuil}
                           onChange={(e) => setCuil(e.target.value)}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label form-label--required">Código REFEPS</label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="123456"
-                          value={codigoReFeps}
-                          onChange={(e) => setCodigoReFeps(e.target.value)}
-                          required
                         />
                       </div>
 

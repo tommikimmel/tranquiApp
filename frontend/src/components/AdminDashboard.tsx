@@ -36,7 +36,6 @@ interface User {
   cuit?: string
   cuil?: number
   domicilioAtencion?: string
-  codigoReFeps?: number
   matriculaTipo?: string
   matriculaProvincia?: string
   ofreceOnline?: boolean
@@ -57,8 +56,7 @@ function isProfileComplete(u: User): boolean {
   const hasCuil = !!u.cuil
   const hasTipoDoc = !!(u.tipoDocumento && u.tipoDocumento.trim())
   const hasNumDoc = !!u.numeroDocumento
-  const hasDomicilio = !!(u.domicilioAtencion && u.domicilioAtencion.trim())
-  const hasReFeps = !!u.codigoReFeps
+  const hasDomicilio = !u.ofrecePresencial || !!(u.domicilioAtencion && u.domicilioAtencion.trim())
   const hasMatriculaTipo = !!(u.matriculaTipo && u.matriculaTipo.trim())
   const hasMatriculaProvincia = !!(u.matriculaProvincia && u.matriculaProvincia.trim())
   const hasMatriculaNumero = !!u.matricula
@@ -73,7 +71,6 @@ function isProfileComplete(u: User): boolean {
     hasTipoDoc &&
     hasNumDoc &&
     hasDomicilio &&
-    hasReFeps &&
     hasMatriculaTipo &&
     hasMatriculaProvincia &&
     hasMatriculaNumero &&
@@ -354,10 +351,6 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
                       <div>
                         <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>Especialidad:</span>
                         <strong>{pro.specialty || '-'}</strong>
-                      </div>
-                      <div>
-                        <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>Código ReFeps:</span>
-                        <strong>{pro.codigoReFeps || '-'}</strong>
                       </div>
                       <div>
                         <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>CUIT / CUIL:</span>

@@ -138,7 +138,6 @@ public class RecetaService {
                     .firmalink(medico.getFirmaUrl())
                     .matricula(matriculaDto)
                     .sello(selloDto)
-                    .idREFEPS(medico.getCodigoReFeps() != null ? String.valueOf(medico.getCodigoReFeps()) : null)
                     .idTributario(medico.getCuit())
                     .profesion("Médico")
                     .build();

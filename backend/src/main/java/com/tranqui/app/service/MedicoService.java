@@ -13,6 +13,7 @@ import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.repository.TurnoRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,12 @@ public class MedicoService {
 
     @Autowired
     private TurnoRepository turnoRepository;
+
+    // Same flag MedicoController/MercadoPagoService use to know whether MP is really wired up
+    // (real deployments) vs. simulated (local/dev) — verification only requires a connected MP
+    // account when the integration is actually live, so local dev/tests aren't blocked forever.
+    @Value("${mercadopago.enabled:false}")
+    private boolean mercadoPagoEnabled;
 
     private static final long MAX_FOTO_BYTES = 3L * 1024 * 1024; // 3MB decoded
 
@@ -105,7 +112,6 @@ public class MedicoService {
         medico.setDomicilioAtencion(dto.getDomicilioAtencion());
         medico.setDomicilioLat(dto.getDomicilioLat());
         medico.setDomicilioLng(dto.getDomicilioLng());
-        medico.setCodigoReFeps(dto.getCodigoReFeps());
 
         if (dto.getMatriculaInfo() != null) {
             medico.setMatriculaTipo(dto.getMatriculaInfo().getTipo());
@@ -176,6 +182,12 @@ public class MedicoService {
                     .collect(Collectors.toSet());
 
             for (MedicoDto.TarifaDto tDto : dto.getTariffs()) {
+                // The Obra Social service always requires cobertura + n° de afiliado — enforced
+                // server-side too, not just disabled in the UI, so it can't be bypassed by
+                // calling the API directly.
+                boolean esServicioObraSocial = "obra_social".equals(tDto.getId()) || "osde".equals(tDto.getId());
+                boolean requiereObraSocial = esServicioObraSocial || tDto.isRequiereObraSocial();
+
                 Optional<TarifaMedico> tarifaOpt = tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), tDto.getId());
                 TarifaMedico tarifa;
                 if (tarifaOpt.isPresent()) {
@@ -183,7 +195,7 @@ public class MedicoService {
                     tarifa.setLabel(tDto.getLabel());
                     tarifa.setPrecio(tDto.getPrice());
                     tarifa.setHabilitado(tDto.isEnabled());
-                    tarifa.setRequiereObraSocial(tDto.isRequiereObraSocial());
+                    tarifa.setRequiereObraSocial(requiereObraSocial);
                 } else {
                     tarifa = TarifaMedico.builder()
                             .medico(medico)
@@ -191,7 +203,7 @@ public class MedicoService {
                             .label(tDto.getLabel())
                             .precio(tDto.getPrice())
                             .habilitado(tDto.isEnabled())
-                            .requiereObraSocial(tDto.isRequiereObraSocial())
+                            .requiereObraSocial(requiereObraSocial)
                             .build();
                 }
                 tarifaRepository.save(tarifa);
@@ -323,7 +335,6 @@ public class MedicoService {
                 .domicilioAtencion(m.getDomicilioAtencion())
                 .domicilioLat(m.getDomicilioLat())
                 .domicilioLng(m.getDomicilioLng())
-                .codigoReFeps(m.getCodigoReFeps())
                 .matriculaInfo(matInfo)
                 .verificado(isMedicoVerificado(m))
                 .verificadoAdmin(m.getVerificadoAdmin())
@@ -514,10 +525,11 @@ public class MedicoService {
                 // an online-only médico has no consultorio to report. Mirrors the frontend's
                 // getMissingRequirements() in App.tsx, which was fixed for this same reason.
                 && (!u.isOfrecePresencial() || (u.getDomicilioAtencion() != null && !u.getDomicilioAtencion().trim().isEmpty()))
-                && u.getCodigoReFeps() != null
                 && u.getMatriculaTipo() != null && !u.getMatriculaTipo().trim().isEmpty()
                 && u.getMatriculaProvincia() != null && !u.getMatriculaProvincia().trim().isEmpty()
                 && u.getMatriculaNumero() != null
+                && u.getTitulo() != null && !u.getTitulo().trim().isEmpty()
+                && u.getSpecialty() != null && !u.getSpecialty().trim().isEmpty()
                 && u.getFotoUrl() != null && !u.getFotoUrl().trim().isEmpty()
                 && u.getDescripcionPerfil() != null && !u.getDescripcionPerfil().trim().isEmpty()
                 && u.getPacientesAtiende() != null && !u.getPacientesAtiende().trim().isEmpty()
@@ -525,7 +537,14 @@ public class MedicoService {
                 && u.getAniosExperiencia() != null
                 && u.getTags() != null && !u.getTags().trim().isEmpty()
                 && (u.isOfreceOnline() || u.isOfrecePresencial())
-                && u.getExperiencia() != null && !u.getExperiencia().trim().isEmpty()
+                // "[]" is what the frontend sends when the "Presencia y Experiencia" list is
+                // empty — a non-blank string that isn't real content, so it slipped past the old
+                // isBlank()-only check.
+                && u.getExperiencia() != null && !u.getExperiencia().trim().isEmpty() && !"[]".equals(u.getExperiencia().trim())
+                // Without Mercado Pago conectado, the médico can't actually get paid for a
+                // particular consultation — only enforced once the integration is really live
+                // (mercadopago.enabled=true), so local/dev/test environments aren't blocked.
+                && (!mercadoPagoEnabled || u.getMpAccessTokenEncrypted() != null)
                 && Boolean.TRUE.equals(u.getVerificadoAdmin());
     }
 }
