@@ -197,12 +197,20 @@ export const api = {
       dosage: string
       frequency: string
       duration: string
+      regNo?: string
+      nombreDroga?: string
+      noSustituible?: boolean
     }>
     diagnosis: string
     notes: string
   }) => apiFetch('/recetas/enviar', { method: 'POST', body: data as any }),
   getMisRecetas: () => apiFetch('/recetas/me'),
   getRecetaPorId: (id: number | string) => apiFetch(`/recetas/${id}`),
+
+  // Real QBI2/Innovamed medicamento catalog — replaces the old hardcoded CATALOG_MEDICATIONS
+  // mock so prescriptions carry a real regNo instead of a made-up one.
+  buscarMedicamentos: (texto: string, pagina = 1) =>
+    apiFetch(`/recetas/medicamentos?texto=${encodeURIComponent(texto)}&pagina=${pagina}`),
 
   // Chat API
   getChatHistorial: (destinatarioId: number | string, page = 0, size = 100) =>

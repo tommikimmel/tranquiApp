@@ -1332,35 +1332,6 @@ const COMMON_MEDS = [
   'Pregabalina 75mg',
 ]
 
-const CATALOG_MEDICATIONS = [
-  'Escitalopram 10mg',
-  'Escitalopram 20mg',
-  'Sertralina 50mg',
-  'Sertralina 100mg',
-  'Clonazepam 0.5mg',
-  'Clonazepam 2mg',
-  'Alprazolam 0.25mg',
-  'Alprazolam 0.5mg',
-  'Alprazolam 1mg',
-  'Quetiapina 25mg',
-  'Quetiapina 100mg',
-  'Risperidona 1mg',
-  'Risperidona 2mg',
-  'Melatonina 3mg',
-  'Melatonina 5mg',
-  'Pregabalina 75mg',
-  'Pregabalina 150mg',
-  'Lorazepam 1mg',
-  'Lorazepam 2mg',
-  'Fluoxetina 20mg',
-  'Paroxetina 20mg',
-  'Venlafaxina 75mg',
-  'Valproato de Sodio 500mg',
-  'Lamotrigina 50mg',
-  'Carbamazepina 200mg',
-  'Carbonato de Litio 300mg',
-];
-
 const formatDateDDMMYYYY = (dateVal: any) => {
   if (!dateVal) return 'Sin fecha';
   if (typeof dateVal === 'string') {
@@ -1386,9 +1357,33 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
   const [selectedPatientObj, setSelectedPatientObj] = useState<any | null>(null);
   const [showPatientDropdown, setShowPatientDropdown] = useState(false);
 
-  const [medications, setMedications] = useState<Array<{ name: string; dosage: string; frequency: string; duration: string }>>([]);
+  const [medications, setMedications] = useState<Array<{ name: string; dosage: string; frequency: string; duration: string; regNo?: string; nombreDroga?: string; noSustituible?: boolean }>>([]);
   const [medSearchInput, setMedSearchInput] = useState('');
   const [showMedDropdown, setShowMedDropdown] = useState(false);
+  const [medSearchResults, setMedSearchResults] = useState<any[]>([]);
+  const [medSearching, setMedSearching] = useState(false);
+
+  // Real QBI2 medicamento catalog search (debounced) — replaces the old hardcoded local list so
+  // regNo (ANMAT registration number) comes from a real product instead of a made-up fallback.
+  useEffect(() => {
+    const query = medSearchInput.trim();
+    if (query.length < 2) {
+      setMedSearchResults([]);
+      setMedSearching(false);
+      return;
+    }
+    setMedSearching(true);
+    const handle = setTimeout(() => {
+      api.buscarMedicamentos(query, 1)
+        .then((res: any) => setMedSearchResults(Array.isArray(res?.medicamentos) ? res.medicamentos : []))
+        .catch((err: any) => {
+          console.error("Error al buscar medicamentos en QBI2:", err);
+          setMedSearchResults([]);
+        })
+        .finally(() => setMedSearching(false));
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [medSearchInput]);
 
   const [diagnosis, setDiagnosis] = useState('');
   const [notes, setNotes] = useState('');
@@ -1462,26 +1457,44 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
     setPatientSearch('');
   };
 
-  const filteredMeds = medSearchInput.trim().length > 0
-    ? CATALOG_MEDICATIONS.filter(m => m.toLowerCase().includes(medSearchInput.toLowerCase()))
-    : CATALOG_MEDICATIONS;
-
-  const handleAddMedication = (medNameToAdd?: string) => {
-    const medName = (medNameToAdd || medSearchInput).trim();
-    if (!medName) return;
-    setMedications(prev => [...prev, { name: medName, dosage: '', frequency: '', duration: '' }]);
+  const handleAddMedicationFromCatalog = (item: any) => {
+    setMedications(prev => [...prev, {
+      name: item.nombreProducto,
+      dosage: item.presentacion || '',
+      frequency: '',
+      duration: '',
+      regNo: item.regNo || '',
+      nombreDroga: item.nombreDroga || item.nombreProducto,
+      noSustituible: false
+    }]);
     setMedSearchInput('');
+    setMedSearchResults([]);
+    setShowMedDropdown(false);
+  };
+
+  // Free-text fallback for when QBI2's catalog doesn't have the médico's medication — sent
+  // without a regNo (see RecetaService, which no longer invents one) rather than blocking them.
+  const handleAddCustomMedication = () => {
+    const medName = medSearchInput.trim();
+    if (!medName) return;
+    setMedications(prev => [...prev, { name: medName, dosage: '', frequency: '', duration: '', regNo: '', nombreDroga: medName, noSustituible: false }]);
+    setMedSearchInput('');
+    setMedSearchResults([]);
     setShowMedDropdown(false);
   };
 
   const handleMedKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleAddMedication();
+      if (medSearchResults.length > 0) {
+        handleAddMedicationFromCatalog(medSearchResults[0]);
+      } else {
+        handleAddCustomMedication();
+      }
     }
   };
 
-  const updateMedication = (index: number, field: string, value: string) => {
+  const updateMedication = (index: number, field: string, value: string | boolean) => {
     const updated = [...medications];
     updated[index] = { ...updated[index], [field]: value };
     setMedications(updated);
@@ -1878,36 +1891,43 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                     <button
                       type="button"
                       className="btn btn--secondary"
-                      onClick={() => handleAddMedication()}
+                      onClick={() => handleAddCustomMedication()}
                       disabled={!medSearchInput.trim()}
                     >
                       <Icon.Plus /> Añadir
                     </button>
                   </div>
 
-                  {showMedDropdown && medSearchInput.trim().length > 0 && (
+                  {showMedDropdown && medSearchInput.trim().length >= 2 && (
                     <div style={{
                       position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 90,
                       backgroundColor: '#ffffff', border: '1px solid var(--color-border)',
                       borderRadius: 'var(--radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      maxHeight: '180px', overflowY: 'auto', marginTop: '4px'
+                      maxHeight: '220px', overflowY: 'auto', marginTop: '4px'
                     }}>
-                      {filteredMeds.length > 0 ? (
-                        filteredMeds.map((m, idx) => (
+                      {medSearching ? (
+                        <div style={{ padding: '10px 14px', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
+                          Buscando en el catálogo de QBI2/Innovamed...
+                        </div>
+                      ) : medSearchResults.length > 0 ? (
+                        medSearchResults.map((m: any, idx: number) => (
                           <div
                             key={idx}
-                            onClick={() => handleAddMedication(m)}
+                            onClick={() => handleAddMedicationFromCatalog(m)}
                             style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', fontSize: 'var(--text-sm)' }}
                           >
-                            + {m}
+                            <div>+ {m.nombreProducto}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                              {m.nombreDroga} · {m.presentacion} · Reg. {m.regNo}
+                            </div>
                           </div>
                         ))
                       ) : (
                         <div
-                          onClick={() => handleAddMedication()}
+                          onClick={() => handleAddCustomMedication()}
                           style={{ padding: '10px 14px', cursor: 'pointer', color: 'var(--color-primary)', fontSize: 'var(--text-sm)' }}
                         >
-                          + Añadir personalizado: "{medSearchInput}" (Presioná Enter)
+                          No se encontró en el catálogo de QBI2 — añadir personalizado: "{medSearchInput}" (Presioná Enter)
                         </div>
                       )}
                     </div>
@@ -1936,9 +1956,22 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                         >
                           ×
                         </button>
-                        <div style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)' }}>
+                        <div style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {i + 1}. {med.name}
+                          {!med.regNo && (
+                            <span title="No se encontró en el catálogo de QBI2/Innovamed — se enviará sin número de registro" style={{ fontSize: '10px', fontWeight: 'normal', color: 'var(--color-warning, #b45309)', background: 'var(--neutral-100)', padding: '2px 6px', borderRadius: '4px' }}>
+                              Sin registro QBI2
+                            </span>
+                          )}
                         </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', cursor: 'pointer', width: 'fit-content' }}>
+                          <input
+                            type="checkbox"
+                            checked={!!med.noSustituible}
+                            onChange={(e) => updateMedication(i, 'noSustituible', e.target.checked)}
+                          />
+                          No sustituible (Decreto 987/03 Art.2°)
+                        </label>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)' }}>
                           <div className="form-group">
                             <label className="form-label">Dosis</label>

@@ -3,12 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import { useChat } from '../hooks/useChat'
 import { type Patient, usePatients } from '../hooks/usePatients'
 import PatientDirectorySidebar from './PatientDirectorySidebar'
+import EditPatientModal from './EditPatientModal'
+import { useAlert } from '../context/AlertContext'
 
 export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsChange?: () => void }) {
   const navigate = useNavigate()
-  const { patients, loadingPatients, searchQuery, setSearchQuery, filteredPatients } = usePatients()
+  const { showAlert } = useAlert()
+  const { patients, loadingPatients, searchQuery, setSearchQuery, filteredPatients, fetchPatients } = usePatients()
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [unreadCounts, setUnreadCounts] = useState<Record<number, number>>({})
+  const [showEditModal, setShowEditModal] = useState(false)
 
   const handleMessageReceived = useCallback((msg: any) => {
     if (msg.remitenteId && msg.remitenteId !== selectedPatient?.id) {
@@ -133,6 +137,19 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
                 </div>
 
                 <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    className="btn btn--sm btn--secondary"
+                    style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}
+                    onClick={() => setShowEditModal(true)}
+                    title="Completar DNI, domicilio y obra social — necesarios para emitir recetas electrónicas válidas"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}>
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                    Editar datos
+                  </button>
                   <button
                     type="button"
                     className="btn btn--sm btn--secondary"
@@ -333,6 +350,19 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
           </div>
         )}
       </div>
+
+      {showEditModal && selectedPatient && (
+        <EditPatientModal
+          patient={selectedPatient}
+          onClose={() => setShowEditModal(false)}
+          onSaved={(updated) => {
+            setSelectedPatient(updated)
+            setShowEditModal(false)
+            showAlert('Datos del paciente actualizados.', 'success')
+            fetchPatients()
+          }}
+        />
+      )}
     </div>
   )
 }

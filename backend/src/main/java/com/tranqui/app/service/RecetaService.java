@@ -14,6 +14,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -42,6 +43,27 @@ public class RecetaService {
         Usuario paciente = usuarioRepository.findById(dto.getPacienteId())
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
 
+        // These used to silently fall back to hardcoded placeholder values (a fake DNI, a fake
+        // birth date...) whenever the real data was missing, so a receta could go out to QBI2
+        // carrying identity data that belonged to nobody. Block instead, with a message that
+        // says exactly what to fill in and where.
+        List<String> datosFaltantes = new ArrayList<>();
+        boolean pacienteTieneDni = paciente.getNumeroDocumento() != null
+                || (paciente.getDni() != null && !paciente.getDni().isBlank());
+        if (!pacienteTieneDni) datosFaltantes.add("el DNI del paciente (en su ficha clínica)");
+        if (paciente.getFechaNacimiento() == null) datosFaltantes.add("la fecha de nacimiento del paciente (en su ficha clínica)");
+        boolean medicoTieneDni = medico.getNumeroDocumento() != null
+                || (medico.getDni() != null && !medico.getDni().isBlank());
+        if (!medicoTieneDni) datosFaltantes.add("tu DNI (en Configuración > Perfil profesional)");
+        boolean medicoTieneMatricula = medico.getMatriculaNumero() != null
+                || (medico.getMatricula() != null && !medico.getMatricula().isBlank());
+        if (!medicoTieneMatricula) datosFaltantes.add("tu número de matrícula (en Configuración > Perfil profesional)");
+        if (!datosFaltantes.isEmpty()) {
+            throw new RecetaElectronicaException(
+                    "No se pudo emitir la receta electrónica: falta completar " + String.join(", ", datosFaltantes)
+                    + ". QBI2/Innovamed exige estos datos para validar la receta.", null);
+        }
+
         // Format medication list to single string representation
         String medsFormatted = dto.getMedications().stream()
                 .map(m -> String.format("- %s (%s, %s, %s)", m.getName(),
@@ -51,21 +73,48 @@ public class RecetaService {
                 .collect(Collectors.joining("\n"));
 
         // Build QBI2 / Innovamed Request
+        com.tranqui.app.model.dto.Qbi2RecetaDtos.CoberturaDto coberturaPaciente = null;
+        if (paciente.getCredencialCodEntidad() != null || (paciente.getCredencialPan() != null && !paciente.getCredencialPan().isBlank())) {
+            coberturaPaciente = com.tranqui.app.model.dto.Qbi2RecetaDtos.CoberturaDto.builder()
+                    .idFinanciador(paciente.getCredencialCodEntidad() != null ? String.valueOf(paciente.getCredencialCodEntidad()) : null)
+                    .plan(paciente.getCredencialPlan())
+                    .numero(paciente.getCredencialPan())
+                    .build();
+        }
+
+        com.tranqui.app.model.dto.Qbi2RecetaDtos.DomicilioDto domicilioPaciente = null;
+        if (paciente.getDomicilioCalle() != null && !paciente.getDomicilioCalle().isBlank()) {
+            domicilioPaciente = com.tranqui.app.model.dto.Qbi2RecetaDtos.DomicilioDto.builder()
+                    .calle(paciente.getDomicilioCalle())
+                    .numero(paciente.getDomicilioNumero())
+                    .piso(paciente.getDomicilioPiso())
+                    .dpto(paciente.getDomicilioDpto())
+                    .codigoPostal(paciente.getDomicilioCodigoPostal())
+                    .localidad(paciente.getDomicilioLocalidad())
+                    .provincia(paciente.getDomicilioProvincia())
+                    .pais(paciente.getDomicilioPais() != null && !paciente.getDomicilioPais().isBlank() ? paciente.getDomicilioPais() : "Argentina")
+                    .build();
+        }
+
         com.tranqui.app.model.dto.Qbi2RecetaDtos.PacienteReceta pacienteReceta = com.tranqui.app.model.dto.Qbi2RecetaDtos.PacienteReceta.builder()
                     .nombre(paciente.getNombre())
                     .apellido(paciente.getApellido() != null && !paciente.getApellido().isBlank() ? paciente.getApellido() : paciente.getNombre())
                     .tipoDoc(paciente.getTipoDocumento() != null && !paciente.getTipoDocumento().isBlank() ? paciente.getTipoDocumento() : "DNI")
-                    .nroDoc(paciente.getNumeroDocumento() != null ? String.valueOf(paciente.getNumeroDocumento()) : (paciente.getDni() != null && !paciente.getDni().isBlank() ? paciente.getDni() : "35123456"))
+                    .nroDoc(paciente.getNumeroDocumento() != null ? String.valueOf(paciente.getNumeroDocumento()) : paciente.getDni())
                     .sexo(paciente.getSexo() != null && !paciente.getSexo().isBlank() ? paciente.getSexo() : "M")
-                    .fechaNacimiento(paciente.getFechaNacimiento() != null ? paciente.getFechaNacimiento().toString() : "1990-01-01")
+                    .fechaNacimiento(paciente.getFechaNacimiento().toString())
                     .email(paciente.getEmail())
                     .telefono(paciente.getTelefono())
                     .cuil(paciente.getCuil() != null ? String.valueOf(paciente.getCuil()) : null)
+                    .localidad(paciente.getDomicilioLocalidad())
+                    .provincia(paciente.getDomicilioProvincia())
+                    .cobertura(coberturaPaciente)
+                    .domicilio(domicilioPaciente)
                     .build();
 
             com.tranqui.app.model.dto.Qbi2RecetaDtos.MatriculaDto matriculaDto = com.tranqui.app.model.dto.Qbi2RecetaDtos.MatriculaDto.builder()
                     .tipo(medico.getMatriculaTipo() != null && !medico.getMatriculaTipo().isBlank() ? medico.getMatriculaTipo() : "MP")
-                    .numero(medico.getMatriculaNumero() != null ? String.valueOf(medico.getMatriculaNumero()) : (medico.getMatricula() != null && !medico.getMatricula().isBlank() ? medico.getMatricula() : "12345"))
+                    .numero(medico.getMatriculaNumero() != null ? String.valueOf(medico.getMatriculaNumero()) : medico.getMatricula())
                     .provincia(medico.getMatriculaProvincia() != null && !medico.getMatriculaProvincia().isBlank() ? medico.getMatriculaProvincia() : "Córdoba")
                     .especialidad(medico.getSpecialty() != null ? medico.getSpecialty() : "Psiquiatría")
                     .build();
@@ -81,13 +130,17 @@ public class RecetaService {
                     .apellido(medico.getApellido() != null && !medico.getApellido().isBlank() ? medico.getApellido() : medico.getNombre())
                     .sexo(medico.getSexo() != null && !medico.getSexo().isBlank() ? medico.getSexo() : "M")
                     .tipoDoc(medico.getTipoDocumento() != null && !medico.getTipoDocumento().isBlank() ? medico.getTipoDocumento() : "DNI")
-                    .nroDoc(medico.getNumeroDocumento() != null ? String.valueOf(medico.getNumeroDocumento()) : (medico.getDni() != null && !medico.getDni().isBlank() ? medico.getDni() : "25987654"))
+                    .nroDoc(medico.getNumeroDocumento() != null ? String.valueOf(medico.getNumeroDocumento()) : medico.getDni())
+                    .fechaNacimiento(medico.getFechaNacimiento() != null ? medico.getFechaNacimiento().toString() : null)
                     .email(medico.getEmail())
                     .telefono(medico.getTelefono())
                     .especialidad(medico.getSpecialty() != null ? medico.getSpecialty() : "Psiquiatría")
                     .firmalink(medico.getFirmaUrl())
                     .matricula(matriculaDto)
                     .sello(selloDto)
+                    .idREFEPS(medico.getCodigoReFeps() != null ? String.valueOf(medico.getCodigoReFeps()) : null)
+                    .idTributario(medico.getCuit())
+                    .profesion("Médico")
                     .build();
 
             String consultorioNombre = "Consultorio Dr. " + medico.getNombre() + " " + (medico.getApellido() != null ? medico.getApellido() : "");
@@ -110,11 +163,15 @@ public class RecetaService {
             List<com.tranqui.app.model.dto.Qbi2RecetaDtos.MedicamentoRequest> reqMedicamentos = dto.getMedications().stream()
                     .map(m -> com.tranqui.app.model.dto.Qbi2RecetaDtos.MedicamentoRequest.builder()
                             .nombreProducto(m.getName())
-                            .nombreDroga(m.getName())
+                            .nombreDroga(m.getNombreDroga() != null && !m.getNombreDroga().isBlank() ? m.getNombreDroga() : m.getName())
                             .presentacion(m.getDosage() != null && !m.getDosage().isBlank() ? m.getDosage() : "Comprimidos")
                             .cantidad(1)
                             .posologia((m.getFrequency() != null ? m.getFrequency() : "") + (m.getDuration() != null ? ", " + m.getDuration() : ""))
-                            .regNo(m.getRegNo() != null && !m.getRegNo().isBlank() ? m.getRegNo() : "22283")
+                            // No fallback: a wrong regNo points to the wrong commercial product, which is
+                            // worse than sending none. Only real matches from QBI2's own medicamento
+                            // catalog (GetMedicamento, wired in the frontend's search) populate this.
+                            .regNo(m.getRegNo() != null && !m.getRegNo().isBlank() ? m.getRegNo() : null)
+                            .permiteSustitucion(Boolean.TRUE.equals(m.getNoSustituible()) ? "NO" : "SI")
                             .build())
                     .collect(Collectors.toList());
 

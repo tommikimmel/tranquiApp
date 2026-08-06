@@ -27,6 +27,16 @@ export interface Patient {
     plan?: string | null
     token?: string | null
   }
+  domicilio?: {
+    calle?: string | null
+    numero?: string | null
+    piso?: string | null
+    dpto?: string | null
+    codigoPostal?: string | null
+    localidad?: string | null
+    provincia?: string | null
+    pais?: string | null
+  }
   unreadMessagesCount?: number
 }
 
