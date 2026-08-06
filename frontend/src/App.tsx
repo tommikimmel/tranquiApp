@@ -54,6 +54,19 @@ interface CheckoutTarget {
   tariffs?: { id: string; label: string; price: number; enabled: boolean; requiereObraSocial?: boolean }[]
 }
 
+// Some backend DTOs serialize LocalDate as dd/MM/yyyy directly instead of ISO (see backend's
+// DateConfig.java — MedicoDto.fechaNacimiento passes the raw LocalDate through Jackson's global
+// custom serializer, unlike PacienteDto/TurnoMedicoDto which convert to ISO via .toString()
+// first). Normalize to ISO right when reading from the API so every date input/validation in
+// the app can keep assuming ISO internally, regardless of which format that particular field
+// happens to arrive in.
+function normalizeToIsoDate(value: string | null | undefined): string {
+  if (!value) return ''
+  const ddmm = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  if (ddmm) return `${ddmm[3]}-${ddmm[2]}-${ddmm[1]}`
+  return value
+}
+
 // ── Helper to convert professional name to SEO-friendly slug ────
 export function getDoctorSlug(name: string): string {
   if (!name) return ''
@@ -2369,7 +2382,7 @@ function SettingsView({
   const [name, setName] = useState(medicoInfo?.nombre || '')
   const [apellido, setApellido] = useState(medicoInfo?.apellido || '')
   const [sexo, setSexo] = useState(medicoInfo?.sexo || 'M')
-  const [fechaNacimiento, setFechaNacimiento] = useState(medicoInfo?.fechaNacimiento || '')
+  const [fechaNacimiento, setFechaNacimiento] = useState(normalizeToIsoDate(medicoInfo?.fechaNacimiento))
   const [cuil, setCuil] = useState(medicoInfo?.cuil || '')
   const [tipoDocumento, setTipoDocumento] = useState(medicoInfo?.tipoDocumento || 'DNI')
   const [numeroDocumento, setNumeroDocumento] = useState(medicoInfo?.numeroDocumento || '')

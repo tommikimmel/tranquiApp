@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 // Native <input type="date"> renders in whatever format the browser/OS decides — Chrome/Edge
 // honor the page's `lang` attribute, but Firefox and Safari always use the OS locale regardless,
@@ -17,10 +17,18 @@ interface DateInputDDMMYYYYProps {
 }
 
 function isoToDisplay(iso: string): string {
-  const match = (iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (!match) return ''
-  const [, y, m, d] = match
-  return `${d}/${m}/${y}`
+  const v = (iso || '').trim()
+  if (!v) return ''
+  const isoMatch = v.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (isoMatch) {
+    const [, y, m, d] = isoMatch
+    return `${d}/${m}/${y}`
+  }
+  // Defensive: some backend DTOs (e.g. MedicoDto.fechaNacimiento) serialize LocalDate as
+  // dd/MM/yyyy directly rather than ISO (see DateConfig.java's global LocalDate serializer) —
+  // if a value already arrives in display format, use it as-is instead of blanking the field.
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(v)) return v
+  return ''
 }
 
 function displayToIso(display: string): string | null {
@@ -44,8 +52,29 @@ function maskDigits(raw: string): string {
   return digits
 }
 
+// How many digits sit to the left of the cursor in the raw (pre-mask) input value.
+function digitsBeforeCursor(raw: string, cursorPos: number): number {
+  return raw.slice(0, cursorPos).replace(/\D/g, '').length
+}
+
+// Where the cursor should land in the masked string so it stays right after the digit the
+// user just typed, instead of jumping to the end (the default browser behavior whenever a
+// controlled input's .value is reassigned — the classic bug with DIY masked inputs).
+function cursorPosForDigitCount(masked: string, digitCount: number): number {
+  if (digitCount <= 0) return 0
+  let seen = 0
+  for (let i = 0; i < masked.length; i++) {
+    if (/\d/.test(masked[i])) {
+      seen++
+      if (seen === digitCount) return i + 1
+    }
+  }
+  return masked.length
+}
+
 export default function DateInputDDMMYYYY({ id, value, onChange, min, max, className, style, required }: DateInputDDMMYYYYProps) {
   const [text, setText] = useState(() => isoToDisplay(value))
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Keep the displayed text in sync when the ISO value changes from outside (e.g. loading a
   // saved profile), but don't fight the user's own keystrokes while they're actively typing.
@@ -54,8 +83,21 @@ export default function DateInputDDMMYYYY({ id, value, onChange, min, max, class
   }, [value])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const masked = maskDigits(e.target.value)
+    const raw = e.target.value
+    const cursorPos = e.target.selectionStart ?? raw.length
+    const digitCount = digitsBeforeCursor(raw, cursorPos)
+    const masked = maskDigits(raw)
     setText(masked)
+
+    // Restore the caret instead of letting the browser snap it to the end of the field —
+    // without this, correcting a single digit in an already-complete date (e.g. fixing just
+    // the year) is nearly impossible because every keystroke bounces the cursor to the end.
+    const newCursorPos = cursorPosForDigitCount(masked, digitCount)
+    const el = e.target
+    requestAnimationFrame(() => {
+      el.setSelectionRange(newCursorPos, newCursorPos)
+    })
+
     if (masked === '') {
       onChange('')
       return
@@ -69,6 +111,7 @@ export default function DateInputDDMMYYYY({ id, value, onChange, min, max, class
 
   return (
     <input
+      ref={inputRef}
       id={id}
       type="text"
       inputMode="numeric"
