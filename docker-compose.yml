@@ -53,6 +53,10 @@ services:
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-onboarding@resend.dev}
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:8081}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      QBI2_RECIPE_ENABLED: ${QBI2_RECIPE_ENABLED:-false}
+      QBI2_RECIPE_ENV: ${QBI2_RECIPE_ENV:-hml}
+      QBI2_CLIENTE_APP_ID: ${QBI2_CLIENTE_APP_ID:-}
+      QBI2_RECIPE_TOKEN: ${QBI2_RECIPE_TOKEN:-}
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: DEBUG
     depends_on:
       tranqui-db:
