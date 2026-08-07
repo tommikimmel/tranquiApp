@@ -154,7 +154,17 @@ public class MedicoService {
             medico.setSitioWebUrl(dto.getRedesSociales().getSitioWeb());
         }
 
-        medico.setCodigoRefeps(dto.getCodigoRefeps());
+        // QBI2 rechaza con QBI235 "EL CAMPO MEDICO IDREFEPS NO CUMPLE EL RANGO MÍNIMO O MÁXIMO DE
+        // CARACTERES" cualquier valor que no sea el código numérico de 12 dígitos que SISA asigna
+        // en el Registro Federal de Profesionales de la Salud — pero ese rechazo solo aparecía al
+        // emitir una receta, mucho después de guardar el perfil. Validamos acá para que el error
+        // se vea de inmediato, en el momento en que el médico carga el dato.
+        String refepsTrim = dto.getCodigoRefeps() != null ? dto.getCodigoRefeps().trim() : null;
+        if (refepsTrim != null && !refepsTrim.isEmpty() && !refepsTrim.matches("\\d{12}")) {
+            throw new IllegalArgumentException(
+                    "El código REFEPS debe tener exactamente 12 dígitos numéricos (lo asigna SISA al matricularte, no se inventa). Podés consultarlo en sisa.msal.gov.ar.");
+        }
+        medico.setCodigoRefeps(refepsTrim != null && !refepsTrim.isEmpty() ? refepsTrim : null);
         medico.setSelloLinea1(dto.getSelloLinea1());
         medico.setSelloLinea2(dto.getSelloLinea2());
         medico.setSelloLinea3(dto.getSelloLinea3());

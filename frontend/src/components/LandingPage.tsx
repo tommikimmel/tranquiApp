@@ -453,6 +453,28 @@ function PublicHeader({
                     >
                       Mi Receta
                     </button>
+                    <a
+                      href="/privacidad"
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => setShowDropdown(false)}
+                      style={{
+                        padding: 'var(--space-3) var(--space-4)',
+                        textAlign: 'left',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: '1px solid #f0f2f5',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        color: 'var(--color-text-primary)',
+                        textDecoration: 'none',
+                        display: 'block'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      Privacidad y mis datos
+                    </a>
                     <button
                       onClick={() => {
                         setShowDropdown(false);

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useChat } from '../hooks/useChat'
-import { type Patient, usePatients, getMissingPatientFields } from '../hooks/usePatients'
+import { type Patient, usePatients, getMissingPatientFields, getInitials, calcAge, formatDomicilio } from '../hooks/usePatients'
 import PatientDirectorySidebar from './PatientDirectorySidebar'
 import EditPatientModal from './EditPatientModal'
 import { useAlert } from '../context/AlertContext'
@@ -121,6 +121,14 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
                       <polyline points="15 18 9 12 15 6" />
                     </svg>
                   </button>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                    backgroundColor: 'var(--green-100)', color: 'var(--green-700)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontFamily: 'var(--font-heading)', fontWeight: 'bold', fontSize: 'var(--text-sm)'
+                  }}>
+                    {getInitials(selectedPatient.apellido ? `${selectedPatient.nombre} ${selectedPatient.apellido}` : selectedPatient.nombre)}
+                  </div>
                   <div>
                     <h3 style={{
                       fontFamily: 'var(--font-heading)',
@@ -128,7 +136,7 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
                       fontWeight: 'var(--font-weight-bold)',
                       margin: 0
                     }}>
-                      {selectedPatient.nombre}
+                      {selectedPatient.apellido ? `${selectedPatient.nombre} ${selectedPatient.apellido}` : selectedPatient.nombre}
                     </h3>
                     <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
                       {selectedPatient.email} · {selectedPatient.telefono || 'Sin teléfono'}
@@ -180,23 +188,51 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
                 </div>
               </div>
 
-              {/* Patient metadata ribbon */}
-              <div className="patients-master-detail__meta-grid" style={{
-                display: 'grid',
-                gap: 'var(--space-4)',
-                backgroundColor: 'var(--neutral-50)',
-                padding: 'var(--space-2) var(--space-4)',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--color-border)',
-                fontSize: 'var(--text-xs)'
-              }}>
-                <div><strong>DNI:</strong> {selectedPatient.dni || 'No cargado'}</div>
-                <div><strong>Obra Social:</strong> {selectedPatient.obraSocial || 'Particular'}</div>
-                {selectedPatient.obraSocial && selectedPatient.obraSocial.toLowerCase() !== 'particular' && selectedPatient.numAfiliado && selectedPatient.numAfiliado !== 'N/A' && (
-                  <div><strong>N° Afiliado:</strong> {selectedPatient.numAfiliado}</div>
-                )}
-                <div><strong>Dirección:</strong> {selectedPatient.direccion || 'No cargada'}</div>
-              </div>
+              {/* Patient metadata panel — grouped into Identidad / Cobertura / Domicilio instead of
+                  a single flat strip, and surfacing fields (sexo, edad, CUIL, tipo de documento,
+                  domicilio estructurado) that were already fetched but never shown here. */}
+              {(() => {
+                const age = calcAge(selectedPatient.fechaNacimiento)
+                const domicilio = formatDomicilio(selectedPatient)
+                const tieneCobertura = !!selectedPatient.obraSocial && selectedPatient.obraSocial.toLowerCase() !== 'particular'
+                const fields: { label: string; value: string }[] = [
+                  { label: selectedPatient.tipoDocumento || 'DNI', value: selectedPatient.dni || 'No cargado' },
+                  ...(selectedPatient.cuil ? [{ label: 'CUIL', value: String(selectedPatient.cuil) }] : []),
+                  ...(selectedPatient.sexo ? [{ label: 'Sexo', value: selectedPatient.sexo }] : []),
+                  ...(age != null ? [{ label: 'Edad', value: `${age} años` }] : []),
+                ]
+                const coberturaFields: { label: string; value: string }[] = [
+                  { label: 'Obra Social', value: selectedPatient.obraSocial || 'Particular' },
+                  ...(tieneCobertura && selectedPatient.numAfiliado && selectedPatient.numAfiliado !== 'N/A'
+                    ? [{ label: 'N° Afiliado', value: selectedPatient.numAfiliado }] : []),
+                  ...(tieneCobertura && selectedPatient.credencial?.plan
+                    ? [{ label: 'Plan', value: selectedPatient.credencial.plan }] : []),
+                ]
+                return (
+                  <div className="patients-master-detail__meta-panel">
+                    <div className="patients-master-detail__meta-group">
+                      {fields.map(f => (
+                        <div key={f.label} className="patients-master-detail__meta-field">
+                          <span className="patients-master-detail__meta-label">{f.label}</span>
+                          <span className="patients-master-detail__meta-value">{f.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="patients-master-detail__meta-group">
+                      {coberturaFields.map(f => (
+                        <div key={f.label} className="patients-master-detail__meta-field">
+                          <span className="patients-master-detail__meta-label">{f.label}</span>
+                          <span className="patients-master-detail__meta-value">{f.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="patients-master-detail__meta-field patients-master-detail__meta-field--wide">
+                      <span className="patients-master-detail__meta-label">Dirección</span>
+                      <span className="patients-master-detail__meta-value">{domicilio || 'No cargada'}</span>
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Cartel de Datos Incompletos para el Profesional / Psiquiatra */}
               {(() => {

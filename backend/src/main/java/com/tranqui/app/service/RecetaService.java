@@ -58,7 +58,15 @@ public class RecetaService {
         boolean medicoTieneMatricula = medico.getMatriculaNumero() != null
                 || (medico.getMatricula() != null && !medico.getMatricula().isBlank());
         if (!medicoTieneMatricula) datosFaltantes.add("tu número de matrícula (en Configuración > Perfil profesional)");
-        if (medico.getCodigoRefeps() == null || medico.getCodigoRefeps().isBlank()) datosFaltantes.add("tu código REFEPS (en Configuración > Perfil profesional)");
+        // MedicoService.actualizarPerfil ya exige 12 dígitos exactos para guardados nuevos, pero
+        // médicos que cargaron su REFEPS antes de esa validación pueden tener un valor viejo con
+        // el largo incorrecto — sin este chequeo, esa receta viaja hasta QBI2 y recién ahí la
+        // rechaza con QBI235, en vez de decirle al médico de entrada que tiene que corregir el dato.
+        if (medico.getCodigoRefeps() == null || medico.getCodigoRefeps().isBlank()) {
+            datosFaltantes.add("tu código REFEPS (en Configuración > Perfil profesional)");
+        } else if (!medico.getCodigoRefeps().matches("\\d{12}")) {
+            datosFaltantes.add("tu código REFEPS (tiene que ser el número de 12 dígitos que te asignó SISA — corregilo en Configuración > Perfil profesional)");
+        }
         // QBI2 rechaza la receta con QBI248 "DEBE INFORMAR EL DOMICILIO DONDE SE REALIZÓ LA ATENCIÓN" si
         // no se manda ningún domicilio — esto aplica también a médicos 100% online (confirmado contra hml
         // el 2026-08-06): no hace falta un consultorio físico, pero sí algún domicilio profesional

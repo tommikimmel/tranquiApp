@@ -396,6 +396,12 @@ const Icon = {
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
     </svg>
   ),
+  Shield: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M12 2 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  ),
 }
 
 // Maps a persisted Notificacion's `tipo` (backend/.../NotificacionService.crearNotificacion
@@ -2339,7 +2345,7 @@ export interface ExperienciaLaboral {
   descripcion: string
 }
 
-type SettingsTab = 'perfil-pro' | 'perfil-publico' | 'presencia' | 'honorarios' | 'notificaciones' | 'integraciones'
+type SettingsTab = 'perfil-pro' | 'perfil-publico' | 'presencia' | 'honorarios' | 'notificaciones' | 'integraciones' | 'privacidad'
 
 const SETTINGS_TABS: { id: SettingsTab; label: string; Icon: (props: { size?: number }) => React.JSX.Element }[] = [
   { id: 'perfil-pro', label: 'Perfil profesional', Icon: Icon.User },
@@ -2348,6 +2354,7 @@ const SETTINGS_TABS: { id: SettingsTab; label: string; Icon: (props: { size?: nu
   { id: 'honorarios', label: 'Honorarios y servicios', Icon: Icon.DollarSign },
   { id: 'notificaciones', label: 'Notificaciones', Icon: Icon.BellSimple },
   { id: 'integraciones', label: 'Integraciones', Icon: Icon.MercadoPago },
+  { id: 'privacidad', label: 'Privacidad y Datos', Icon: Icon.Shield },
 ]
 
 function getMissingRequirements(m: any, mpConnected?: boolean, mpEnabled?: boolean): string[] {
@@ -2612,6 +2619,14 @@ function SettingsView({
       return;
     }
 
+    // 3b. Validar Código REFEPS (12 dígitos exactos — QBI2 lo rechaza con QBI235 si no cumple
+    // el largo, y ese rechazo recién aparecía al emitir una receta, muy tarde para el médico)
+    const refepsStr = String(codigoRefeps ?? '').trim();
+    if (refepsStr && !/^\d{12}$/.test(refepsStr)) {
+      showAlert("El código REFEPS debe tener exactamente 12 dígitos numéricos. Lo podés consultar en sisa.msal.gov.ar.", "error");
+      return;
+    }
+
     // 4. Validar Años de Experiencia (número entero no negativo)
     if (aniosExperiencia !== '' && (isNaN(Number(aniosExperiencia)) || Number(aniosExperiencia) < 0 || !/^\d+$/.test(String(aniosExperiencia).trim()))) {
       showAlert("Los años de experiencia deben ser un número entero mayor o igual a 0.", "error");
@@ -2729,6 +2744,7 @@ function SettingsView({
     'integraciones': integracionesPendientes === 0
       ? { label: 'Completo', tone: 'ok' }
       : { label: `${integracionesPendientes} pendiente${integracionesPendientes > 1 ? 's' : ''}`, tone: 'warn' },
+    'privacidad': { label: 'Ley 25.326', tone: 'ok' },
   }
 
   const notImplementedYet = () => showAlert('Esta función va a estar disponible próximamente.', 'info')
@@ -3107,12 +3123,19 @@ function SettingsView({
               id="input-codigo-refeps"
               className="form-input"
               type="text"
-              maxLength={50}
-              placeholder="Ej: 123456789"
+              inputMode="numeric"
+              maxLength={12}
+              placeholder="Ej: 541025987654 (12 dígitos)"
               value={codigoRefeps}
-              onChange={(e) => setCodigoRefeps(e.target.value)}
+              onChange={(e) => setCodigoRefeps(e.target.value.replace(/[^\d]/g, '').slice(0, 12))}
             />
-            <span className="form-helper">Lo pide QBI2/Innovamed para generar la firma electrónica de tus recetas.</span>
+            <span className="form-helper">
+              Código numérico de 12 dígitos que te asigna SISA al matricularte en el Registro Federal de
+              Profesionales de la Salud (REFEPS) — no es un dato que se invente, lo tenés que consultar en{' '}
+              <a href="https://sisa.msal.gov.ar/sisa/" target="_blank" rel="noreferrer">sisa.msal.gov.ar</a>.
+              QBI2/Innovamed lo exige para generar la firma electrónica de tus recetas y rechaza cualquier
+              valor que no tenga exactamente 12 dígitos.
+            </span>
           </div>
 
         </div>
@@ -3534,6 +3557,58 @@ function SettingsView({
         <GoogleCalendarConnectBanner connected={googleConnected} onConnect={onConnectGoogle} onDisconnect={onDisconnectGoogle} />
       </div>
       </>
+      )}
+
+      {/* Privacidad y Datos personales — derechos ARCO (Ley 25.326) */}
+      {activeTab === 'privacidad' && (
+      <div className="card">
+        <div className="card__header">
+          <h2 className="card__title">Privacidad y Datos Personales</h2>
+          <p className="card__subtitle">Cómo accedemos, usamos, guardamos y compartimos tus datos, y cómo ejercer tus derechos.</p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: 0 }}>
+            De acuerdo con la Ley N° 25.326 de Protección de los Datos Personales, tenés derecho a
+            acceder, rectificar, actualizar y suprimir tus datos personales, así como a oponerte a su
+            tratamiento en los casos que la ley prevé (derechos ARCO). También podés solicitar
+            información sobre a quién se los cedimos — el detalle completo está en nuestra{' '}
+            <a href="/privacidad" target="_blank" rel="noreferrer">Política de Privacidad</a>.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-3)' }}>
+            {[
+              { title: 'Acceso', desc: 'Pedir una copia de todos los datos que tenemos sobre vos.' },
+              { title: 'Rectificación', desc: 'Corregir datos incompletos o inexactos.' },
+              { title: 'Supresión', desc: 'Solicitar la eliminación de tus datos cuando ya no sean necesarios.' },
+              { title: 'Oposición', desc: 'Oponerte a un uso puntual de tus datos.' },
+            ].map(r => (
+              <div key={r.title} style={{ padding: 'var(--space-3) var(--space-4)', background: 'var(--neutral-50)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+                <strong style={{ fontSize: 'var(--text-sm)' }}>{r.title}</strong>
+                <p style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>{r.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+            <a
+              className="btn btn--secondary btn--sm"
+              href="mailto:soporte@tranquisalud.com?subject=Ejercicio%20de%20derechos%20ARCO"
+            >
+              Solicitar acceso, rectificación o eliminación de mis datos
+            </a>
+            <a className="btn btn--ghost btn--sm" href="/privacidad" target="_blank" rel="noreferrer">
+              Ver Política de Privacidad completa
+            </a>
+          </div>
+
+          <p style={{ fontSize: '11px', color: 'var(--color-text-secondary)', margin: 0 }}>
+            La AGENCIA DE ACCESO A LA INFORMACIÓN PÚBLICA (AAIP), Órgano de Control de la Ley N° 25.326,
+            tiene la atribución de atender denuncias y reclamos por incumplimiento de las normas de
+            protección de datos personales.
+          </p>
+        </div>
+      </div>
       )}
 
       {/* Modal para Agregar/Editar Experiencia Laboral */}

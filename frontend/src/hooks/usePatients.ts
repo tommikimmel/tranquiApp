@@ -142,3 +142,27 @@ export function getInitials(name: string) {
   const parts = name.split(' ')
   return parts.map(p => p[0]).join('').substring(0, 2).toUpperCase()
 }
+
+export function calcAge(fechaNacimiento?: string | null): number | null {
+  if (!fechaNacimiento) return null
+  const birth = new Date(fechaNacimiento)
+  if (isNaN(birth.getTime())) return null
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const m = today.getMonth() - birth.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--
+  return age >= 0 && age < 130 ? age : null
+}
+
+// Structured domicilio (calle/numero/piso/dpto/localidad/provincia/CP) reads better than the
+// free-text `direccion` field when it's present — falls back to `direccion` otherwise.
+export function formatDomicilio(patient: Patient): string | null {
+  const d = patient.domicilio
+  if (d && (d.calle || d.localidad)) {
+    const linea1 = [d.calle, d.numero].filter(Boolean).join(' ')
+    const piso = [d.piso, d.dpto].filter(Boolean).join(' ')
+    const linea2 = [d.localidad, d.provincia].filter(Boolean).join(', ')
+    return [linea1, piso, linea2, d.codigoPostal ? `CP ${d.codigoPostal}` : ''].filter(Boolean).join(' · ') || null
+  }
+  return patient.direccion || null
+}
