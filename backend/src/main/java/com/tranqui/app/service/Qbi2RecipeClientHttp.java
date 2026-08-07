@@ -91,7 +91,8 @@ public class Qbi2RecipeClientHttp implements Qbi2RecipeClient {
             log.info("QBI2 Recipe ← {} {} | status={} | body={}", request.method(), request.uri(),
                     response.statusCode(), response.body());
             if (response.statusCode() >= 400) {
-                throw new RuntimeException("QBI2 Recipe respondió " + response.statusCode()
+                throw new Qbi2RecipeException(response.statusCode(), response.body(),
+                        "QBI2 Recipe respondió " + response.statusCode()
                         + " para " + request.method() + " " + request.uri()
                         + " — body: " + response.body());
             }

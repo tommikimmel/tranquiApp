@@ -222,9 +222,20 @@ public class RecetaService {
         } catch (Exception e) {
             log.error("QBI2/Innovamed rechazó la generación de la receta electrónica para médico ID {} / paciente ID {}. " +
                     "No se emitirá receta local de respaldo.", medico.getId(), paciente.getId(), e);
-            throw new RecetaElectronicaException(
-                    "No se pudo emitir la receta electrónica: el servicio de validación (QBI2/Innovamed) no la aceptó. " +
-                    "No se generó ningún documento. Verificá la configuración con soporte antes de reintentar.", e);
+            // El error/mensaje que QBI2 devuelve en el body (p.ej. "QBI235: EL CAMPO MEDICO IDREFEPS
+            // NO CUMPLE EL RANGO MÍNIMO O MÁXIMO DE CARACTERES") es exactamente lo que le hace falta
+            // al profesional para corregir el dato — antes se descartaba y solo quedaba en el log,
+            // así que el 422 que veía el médico nunca decía qué campo estaba mal. El frontend
+            // (sanitizeErrorMessage en api.ts) reemplaza cualquier mensaje de más de 250 caracteres
+            // por uno genérico, así que el mensaje final se arma corto y se recorta con margen.
+            String detalleQbi2 = extraerMensajeQbi2(e);
+            String mensaje = "No se pudo emitir la receta: QBI2/Innovamed la rechazó"
+                    + (detalleQbi2 != null ? " (" + detalleQbi2 + ")" : "")
+                    + ". No se generó ningún documento.";
+            if (mensaje.length() > 240) {
+                mensaje = mensaje.substring(0, 237) + "...";
+            }
+            throw new RecetaElectronicaException(mensaje, e);
         }
 
         if (qbiResponse == null || qbiResponse.getRecetas() == null || qbiResponse.getRecetas().isEmpty()) {
@@ -235,9 +246,12 @@ public class RecetaService {
                     : "respuesta vacía";
             log.error("QBI2/Innovamed respondió sin recetas para médico ID {} / paciente ID {}. Errores: {}",
                     medico.getId(), paciente.getId(), erroresMsg);
-            throw new RecetaElectronicaException(
-                    "No se pudo emitir la receta electrónica: QBI2/Innovamed no devolvió una receta válida (" + erroresMsg + "). " +
-                    "No se generó ningún documento.", null);
+            // Mismo límite de 240 caracteres que en el catch de arriba — ver ese comentario.
+            String mensajeSinRecetas = "No se pudo emitir la receta: QBI2/Innovamed no la validó (" + erroresMsg + ").";
+            if (mensajeSinRecetas.length() > 240) {
+                mensajeSinRecetas = mensajeSinRecetas.substring(0, 237) + "...";
+            }
+            throw new RecetaElectronicaException(mensajeSinRecetas, null);
         }
 
         com.tranqui.app.model.dto.Qbi2RecetaDtos.RecetaResult recetaResult = qbiResponse.getRecetas().get(0);
@@ -365,5 +379,22 @@ public class RecetaService {
                 .qbi2FechaVencimiento(receta.getQbi2FechaVencimiento())
                 .fechaEmision(receta.getFechaEmision())
                 .build();
+    }
+
+    // QBI2 devuelve sus errores de validación como JSON {"error":"QBI235","mensaje":"...","requestId":"..."} —
+    // misma forma que Qbi2RecetaDtos.MedicamentoError (alias de su MensajeInvalidoDto), así que lo reusamos
+    // para parsear el body en vez de mostrarle al profesional un mensaje genérico que no dice qué corregir.
+    private String extraerMensajeQbi2(Throwable e) {
+        if (!(e instanceof Qbi2RecipeException qe) || qe.getResponseBody() == null || qe.getResponseBody().isBlank()) {
+            return null;
+        }
+        try {
+            com.tranqui.app.model.dto.Qbi2RecetaDtos.MedicamentoError err = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readValue(qe.getResponseBody(), com.tranqui.app.model.dto.Qbi2RecetaDtos.MedicamentoError.class);
+            if (err.getMensaje() == null || err.getMensaje().isBlank()) return null;
+            return err.getError() != null ? (err.getError() + ": " + err.getMensaje()) : err.getMensaje();
+        } catch (Exception parseError) {
+            return null;
+        }
     }
 }
