@@ -48,6 +48,25 @@ public class InformeClinico {
     @Builder.Default
     private LocalDateTime fechaCreacion = LocalDateTime.now();
 
+    // Ley 26.529/27.706: la historia clínica no puede perder asientos ni editarse en el lugar —
+    // ver .agent/Etapas/09_cumplimiento_legal_historia_clinica.md. VIGENTE | VIGENTE_CORREGIDO
+    // (tiene un anexo posterior) | ANULADO (soft-delete, la fila nunca se borra) |
+    // ANEXO_CORRECCION (fila nueva que corrige a `informeOriginalId`, ver ClinicalService).
+    @Column(name = "estado", length = 30)
+    @Builder.Default
+    private String estado = "VIGENTE";
+
+    @Column(name = "informe_original_id")
+    private Long informeOriginalId;
+
+    @Column(name = "motivo", columnDefinition = "TEXT")
+    private String motivo;
+
+    // SHA-256 sobre el contenido + autor + timestamp al momento de creación de esta fila
+    // (ClinicalService.calcularHash) — sostiene valor probatorio si se cuestiona la integridad.
+    @Column(name = "hash_integridad", length = 64)
+    private String hashIntegridad;
+
     @PrePersist
     protected void onCreate() {
         if (fechaCreacion == null) {

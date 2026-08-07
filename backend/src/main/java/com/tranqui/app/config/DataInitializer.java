@@ -142,7 +142,9 @@ public class DataInitializer implements CommandLineRunner {
             log.info("Updated password for data-less patient: paciente.sindatos@gmail.com / admin123");
         }
 
-        // Fully Complete Patient
+        // Fully Complete Patient — has every field RecetaService.emitirReceta requires/sends to
+        // QBI2 (DNI, fecha de nacimiento, sexo) so it can be used to test receta emission without
+        // hitting the "faltan datos" block or QBI2 silently defaulting sexo to "M".
         if (usuarioRepository.findByEmail("paciente.completo@gmail.com").isEmpty()) {
             Usuario pacienteCompleto = Usuario.builder()
                     .nombre("Juan")
@@ -151,6 +153,11 @@ public class DataInitializer implements CommandLineRunner {
                     .password(passwordEncoder.encode("admin123"))
                     .rol(Rol.PACIENTE)
                     .dni("40123456")
+                    .tipoDocumento("DNI")
+                    .numeroDocumento(40123456)
+                    .fechaNacimiento(LocalDate.of(1992, 3, 15))
+                    .sexo("M")
+                    .cuil(20401234560L)
                     .telefono("+541165432109")
                     .build();
             usuarioRepository.save(pacienteCompleto);

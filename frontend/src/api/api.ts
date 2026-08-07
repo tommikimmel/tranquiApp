@@ -135,6 +135,19 @@ export const api = {
   getMe: () => apiFetch('/auth/me'),
   logout: () => apiFetch('/auth/logout', { method: 'POST' }),
 
+  // Fills in the Paso 2 data missing after a Google sign-in (see CompleteProfileModal).
+  completeProfile: (data: {
+    nombre: string
+    apellido: string
+    sexo: string
+    fechaNacimiento: string
+    tipoDocumento: string
+    numeroDocumento: string
+    telefono: string
+    obraSocial?: string
+    numAfiliado?: string
+  }) => apiFetch('/auth/complete-profile', { method: 'POST', body: data as any }),
+
   // Admin APIs
   getAdminUsers: () => apiFetch('/admin/users'),
   updateUserRol: (id: number | string, rol: string) => 

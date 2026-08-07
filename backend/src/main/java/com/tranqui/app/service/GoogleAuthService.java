@@ -72,12 +72,15 @@ public class GoogleAuthService {
                     if (name == null) {
                         name = email.split("@")[0];
                     }
-                    // Default role is PACIENTE
+                    // Default role is PACIENTE. Google only gives us email+name, so the rest of
+                    // the Paso 2 profile data is missing — perfilCompleto=false gates access
+                    // until the frontend collects it via /auth/complete-profile.
                     Usuario nuevo = Usuario.builder()
                             .nombre(name)
                             .email(email)
                             .rol(Rol.PACIENTE)
                             .emailVerificado(true)
+                            .perfilCompleto(false)
                             .build();
                     return usuarioRepository.save(nuevo);
                 });

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useChat } from '../hooks/useChat'
-import { type Patient, usePatients } from '../hooks/usePatients'
+import { type Patient, usePatients, getMissingPatientFields } from '../hooks/usePatients'
 import PatientDirectorySidebar from './PatientDirectorySidebar'
 import EditPatientModal from './EditPatientModal'
 import { useAlert } from '../context/AlertContext'
@@ -200,14 +200,7 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
 
               {/* Cartel de Datos Incompletos para el Profesional / Psiquiatra */}
               {(() => {
-                const missing: string[] = []
-                if (!selectedPatient.dni && !selectedPatient.numeroDocumento) missing.push('DNI / Documento')
-                if (!selectedPatient.fechaNacimiento) missing.push('Fecha de Nacimiento')
-                if (!selectedPatient.telefono || selectedPatient.telefono === 'Sin teléfono') missing.push('Teléfono')
-                if (!selectedPatient.direccion || selectedPatient.direccion === 'No cargada') missing.push('Dirección')
-                if (selectedPatient.obraSocial && selectedPatient.obraSocial.toLowerCase() !== 'particular' && (!selectedPatient.numAfiliado || selectedPatient.numAfiliado === 'N/A')) {
-                  missing.push('N° de Afiliado')
-                }
+                const missing = getMissingPatientFields(selectedPatient)
                 if (missing.length === 0) return null
                 return (
                   <div style={{

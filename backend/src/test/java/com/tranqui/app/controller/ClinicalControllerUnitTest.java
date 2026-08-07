@@ -182,14 +182,14 @@ class ClinicalControllerUnitTest {
 
     @Test
     void eliminarInforme_shouldReturn401WhenAnonymous() {
-        assertEquals(401, controller.eliminarInforme(1L, 2L, null).getStatusCodeValue());
+        assertEquals(401, controller.eliminarInforme(1L, 2L, "motivo", null).getStatusCodeValue());
     }
 
     @Test
     void eliminarInforme_shouldDelegateToService() {
-        ResponseEntity<Void> response = controller.eliminarInforme(1L, 2L, medico);
+        ResponseEntity<Void> response = controller.eliminarInforme(1L, 2L, "cargado por error", medico);
         assertEquals(200, response.getStatusCodeValue());
-        verify(clinicalService).eliminarInforme(2L, "dra@mail.com");
+        verify(clinicalService).eliminarInforme(2L, "dra@mail.com", "cargado por error");
     }
 
     @Test
@@ -199,9 +199,9 @@ class ClinicalControllerUnitTest {
 
     @Test
     void editarInforme_shouldDelegateToServiceWithDtoFields() {
-        InformeClinicoDto dto = InformeClinicoDto.builder().tipoInforme("GENERAL").planTrabajo("p").contenido("c").build();
+        InformeClinicoDto dto = InformeClinicoDto.builder().tipoInforme("GENERAL").planTrabajo("p").contenido("c").motivo("corrección").build();
         InformeClinico updated = InformeClinico.builder().id(2L).build();
-        when(clinicalService.editarInforme(2L, "dra@mail.com", "GENERAL", "p", "c")).thenReturn(updated);
+        when(clinicalService.editarInforme(2L, "dra@mail.com", "GENERAL", "p", "c", "corrección")).thenReturn(updated);
 
         ResponseEntity<InformeClinico> response = controller.editarInforme(1L, 2L, dto, medico);
 
@@ -211,13 +211,13 @@ class ClinicalControllerUnitTest {
 
     @Test
     void eliminarSeguimiento_shouldReturn401WhenAnonymous() {
-        assertEquals(401, controller.eliminarSeguimiento(1L, 2L, null).getStatusCodeValue());
+        assertEquals(401, controller.eliminarSeguimiento(1L, 2L, "motivo", null).getStatusCodeValue());
     }
 
     @Test
     void eliminarSeguimiento_shouldDelegateToService() {
-        ResponseEntity<Void> response = controller.eliminarSeguimiento(1L, 2L, medico);
+        ResponseEntity<Void> response = controller.eliminarSeguimiento(1L, 2L, "duplicado", medico);
         assertEquals(200, response.getStatusCodeValue());
-        verify(clinicalService).eliminarSeguimiento(2L, "dra@mail.com");
+        verify(clinicalService).eliminarSeguimiento(2L, "dra@mail.com", "duplicado");
     }
 }

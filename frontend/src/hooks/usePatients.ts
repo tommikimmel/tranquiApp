@@ -120,6 +120,23 @@ export function usePatients() {
   }
 }
 
+// The patient fields QBI2/Innovamed requires to emit an electronic prescription (see
+// RecetaService.emitirReceta's datosFaltantes check on the backend) plus the ones a
+// psiquiatra needs to actually reach/identify the patient. Shared by PatientsView's
+// chat-header banner and ClinicalHistoryView's datos panel so both list the exact same
+// missing fields instead of drifting out of sync.
+export function getMissingPatientFields(patient: Patient): string[] {
+  const missing: string[] = []
+  if (!patient.dni && !patient.numeroDocumento) missing.push('DNI / Documento')
+  if (!patient.fechaNacimiento) missing.push('Fecha de Nacimiento')
+  if (!patient.telefono || patient.telefono === 'Sin teléfono') missing.push('Teléfono')
+  if (!patient.direccion || patient.direccion === 'No cargada') missing.push('Dirección')
+  if (patient.obraSocial && patient.obraSocial.toLowerCase() !== 'particular' && (!patient.numAfiliado || patient.numAfiliado === 'N/A')) {
+    missing.push('N° de Afiliado')
+  }
+  return missing
+}
+
 export function getInitials(name: string) {
   if (!name) return 'P'
   const parts = name.split(' ')

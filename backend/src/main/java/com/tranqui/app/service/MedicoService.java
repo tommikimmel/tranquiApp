@@ -154,11 +154,7 @@ public class MedicoService {
             medico.setSitioWebUrl(dto.getRedesSociales().getSitioWeb());
         }
 
-        if (dto.getFirmaUrl() != null && com.tranqui.app.util.ImageUtils.decodedByteSize(dto.getFirmaUrl()) > MAX_FOTO_BYTES) {
-            throw new IllegalArgumentException(
-                    "La imagen de firma es demasiado grande (máx. " + (MAX_FOTO_BYTES / (1024 * 1024)) + "MB). Elegí una imagen más liviana.");
-        }
-        medico.setFirmaUrl(dto.getFirmaUrl());
+        medico.setCodigoRefeps(dto.getCodigoRefeps());
         medico.setSelloLinea1(dto.getSelloLinea1());
         medico.setSelloLinea2(dto.getSelloLinea2());
         medico.setSelloLinea3(dto.getSelloLinea3());
@@ -344,7 +340,7 @@ public class MedicoService {
                 .aniosExperiencia(m.getAniosExperiencia())
                 .duracionTurnoMinutos(m.getDuracionTurnoMinutos() != null ? m.getDuracionTurnoMinutos() : DEFAULT_DURACION_TURNO_MINUTOS)
                 .intervaloEntreTurnosMinutos(m.getIntervaloEntreTurnosMinutos() != null ? m.getIntervaloEntreTurnosMinutos() : DEFAULT_INTERVALO_ENTRE_TURNOS_MINUTOS)
-                .firmaUrl(m.getFirmaUrl())
+                .codigoRefeps(m.getCodigoRefeps())
                 .selloLinea1(m.getSelloLinea1())
                 .selloLinea2(m.getSelloLinea2())
                 .selloLinea3(m.getSelloLinea3())

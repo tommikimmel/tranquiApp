@@ -109,8 +109,6 @@ public class Qbi2RecetaDtos {
         private String email;
         private String telefono;
         private String pais;
-        private String firmalink;
-        private String firmabase64;
         private SelloDto sello;
         private String logoInstitucion;
         private MatriculaDto matricula;
@@ -225,8 +223,14 @@ public class Qbi2RecetaDtos {
     @Builder
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class RecetaResponse {
+        // Real shape is ApiRecipe.UseCases.NewReceta.RecetaPdfResponse (per the live swagger):
+        // "recetas" only carries the PDF/CUIR data (Core.Dtos.RecetaPdfResponseDto — no
+        // fechavencimiento/status there). Those two live in the separate "response" array
+        // (Core.Dtos.RecetaResponseDto), which we weren't reading at all before — every receta
+        // was persisted locally with qbi2FechaVencimiento/status silently null.
         private List<RecetaResult> recetas;
         private List<MedicamentoError> errores;
+        private List<RecetaDetalle> response;
         private String idTransaccion;
     }
 
@@ -244,6 +248,17 @@ public class Qbi2RecetaDtos {
         private String s3Link;
         private String verificador;
         private String linkECommerce;
+    }
+
+    // Subset of Core.Dtos.RecetaResponseDto — only the fields RecetaService actually reads.
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class RecetaDetalle {
+        private String fecha;
         private String fechavencimiento;
         private String status;
     }

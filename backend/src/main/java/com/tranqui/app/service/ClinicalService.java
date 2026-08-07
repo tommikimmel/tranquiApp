@@ -8,6 +8,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -16,6 +19,11 @@ import java.util.stream.Collectors;
 
 @Service
 public class ClinicalService {
+
+    private static final String ESTADO_VIGENTE = "VIGENTE";
+    private static final String ESTADO_VIGENTE_CORREGIDO = "VIGENTE_CORREGIDO";
+    private static final String ESTADO_ANULADO = "ANULADO";
+    private static final String ESTADO_ANEXO_CORRECCION = "ANEXO_CORRECCION";
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -34,6 +42,25 @@ public class ClinicalService {
 
     @Autowired
     private MensajeRepository mensajeRepository;
+
+    // Sella la integridad de un asiento clínico en el momento de su creación (o de su anexo de
+    // corrección) — no es una firma digital en el sentido de la Ley 25.506 (eso requeriría un
+    // certificador licenciado), pero permite detectar si el contenido persistido fue alterado
+    // por fuera de los caminos de la aplicación, sosteniendo valor probatorio bajo Ley 27.706.
+    private String calcularHash(String... partes) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            String contenido = String.join("|", java.util.Arrays.stream(partes)
+                    .map(p -> p == null ? "" : p)
+                    .toArray(String[]::new));
+            byte[] hash = digest.digest(contenido.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(hash.length * 2);
+            for (byte b : hash) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 no disponible", e);
+        }
+    }
 
     @Transactional(readOnly = true)
     public List<PacienteDto> obtenerPacientesAtendidos(String medicoEmail) {
@@ -153,9 +180,14 @@ public class ClinicalService {
         if (entry.getFecha() == null) {
             entry.setFecha(LocalDate.now());
         }
-        
+        LocalDateTime ahora = LocalDateTime.now();
+        entry.setFechaCreacion(ahora);
+        entry.setEstado(ESTADO_VIGENTE);
+        entry.setHashIntegridad(calcularHash(medico.getEmail(), String.valueOf(paciente.getId()),
+                entry.getEstadoAnimo(), entry.getSintomas(), entry.getNotas(), ahora.toString()));
+
         SeguimientoDiario saved = seguimientoDiarioRepository.save(entry);
-        
+
         // Notify professional/patient (in this case, since the professional logged it or the patient logged it, we can notify the user)
         notificacionService.crearNotificacion(
                 medico, 
@@ -181,14 +213,19 @@ public class ClinicalService {
         Usuario paciente = usuarioRepository.findById(pacienteId)
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
 
+        LocalDateTime ahora = LocalDateTime.now();
         InformeClinico informe = InformeClinico.builder()
                 .medico(medico)
                 .paciente(paciente)
                 .fecha(LocalDate.now())
+                .fechaCreacion(ahora)
                 .tipoInforme(tipoInforme)
                 .planTrabajo(planTrabajo)
                 .contenido(contenido)
                 .nombreArchivo(nombreArchivo)
+                .estado(ESTADO_VIGENTE)
+                .hashIntegridad(calcularHash(medico.getEmail(), String.valueOf(paciente.getId()),
+                        tipoInforme, planTrabajo, contenido, ahora.toString()))
                 .build();
 
         InformeClinico saved = informeClinicoRepository.save(informe);
@@ -232,6 +269,11 @@ public class ClinicalService {
         if (entry.getFecha() == null) {
             entry.setFecha(LocalDate.now());
         }
+        LocalDateTime ahora = LocalDateTime.now();
+        entry.setFechaCreacion(ahora);
+        entry.setEstado(ESTADO_VIGENTE);
+        entry.setHashIntegridad(calcularHash(entry.getMedico().getEmail(), String.valueOf(paciente.getId()),
+                entry.getEstadoAnimo(), entry.getSintomas(), entry.getNotas(), ahora.toString()));
 
         SeguimientoDiario saved = seguimientoDiarioRepository.save(entry);
 
@@ -252,6 +294,81 @@ public class ClinicalService {
         return informeClinicoRepository.findByPacienteIdOrderByFechaDesc(paciente.getId());
     }
 
+    private static final java.util.Set<String> TIPOS_DOCUMENTO_VALIDOS = java.util.Set.of("DNI", "LC", "LE", "Pasaporte");
+
+    // Same manual accumulate-and-throw convention as RecetaService.emitirReceta's
+    // datosFaltantes check: collect every problem instead of failing on the first one, so a
+    // psiquiatra correcting a form sees all the issues at once instead of one per submit.
+    // Fields are only validated when present — this endpoint doubles as the "borrar datos
+    // cargados" action (Historia Clínica), which intentionally sends most fields as null.
+    private void validarDatosPaciente(PacienteDto dto) {
+        List<String> errores = new ArrayList<>();
+
+        if (dto.getNombre() == null || dto.getNombre().trim().isEmpty()) {
+            errores.add("el nombre del paciente es obligatorio");
+        }
+
+        if (dto.getTipoDocumento() != null && !dto.getTipoDocumento().trim().isEmpty()
+                && !TIPOS_DOCUMENTO_VALIDOS.contains(dto.getTipoDocumento().trim())) {
+            errores.add("el tipo de documento debe ser DNI, LC, LE o Pasaporte");
+        }
+
+        if (dto.getNumeroDocumento() != null) {
+            int digits = String.valueOf(Math.abs(dto.getNumeroDocumento())).length();
+            if (dto.getNumeroDocumento() <= 0 || digits < 6 || digits > 9) {
+                errores.add("el número de documento debe tener entre 6 y 9 dígitos");
+            }
+        }
+
+        if (dto.getFechaNacimiento() != null && !dto.getFechaNacimiento().trim().isEmpty()) {
+            try {
+                LocalDate fecha = LocalDate.parse(dto.getFechaNacimiento().trim());
+                if (fecha.isAfter(LocalDate.now())) {
+                    errores.add("la fecha de nacimiento no puede ser futura");
+                } else if (fecha.isBefore(LocalDate.of(1900, 1, 1))) {
+                    errores.add("la fecha de nacimiento no es válida");
+                }
+            } catch (java.time.format.DateTimeParseException e) {
+                errores.add("la fecha de nacimiento no tiene un formato válido");
+            }
+        }
+
+        if (dto.getTelefono() != null && !dto.getTelefono().trim().isEmpty()) {
+            String soloDigitos = dto.getTelefono().trim().replaceFirst("^\\+54\\s*", "").replaceAll("\\D", "");
+            if (!soloDigitos.matches("\\d{6,15}")) {
+                errores.add("el teléfono debe contener solo números, entre 6 y 15 dígitos");
+            }
+        }
+
+        if (dto.getDomicilio() != null) {
+            PacienteDto.DomicilioDto d = dto.getDomicilio();
+            List<String> partes = List.of(
+                    d.getCalle() == null ? "" : d.getCalle().trim(),
+                    d.getNumero() == null ? "" : d.getNumero().trim(),
+                    d.getLocalidad() == null ? "" : d.getLocalidad().trim(),
+                    d.getProvincia() == null ? "" : d.getProvincia().trim());
+            boolean algunaCompleta = partes.stream().anyMatch(p -> !p.isEmpty());
+            boolean todasCompletas = partes.stream().allMatch(p -> !p.isEmpty());
+            if (algunaCompleta && !todasCompletas) {
+                errores.add("el domicilio requiere calle, número, localidad y provincia completos");
+            }
+        }
+
+        if (dto.getCredencial() != null) {
+            PacienteDto.CredencialInfoDto c = dto.getCredencial();
+            if (c.getCodEntidad() == null) {
+                errores.add("falta seleccionar la obra social");
+            }
+            if (c.getPan() == null || c.getPan().trim().isEmpty()) {
+                errores.add("el número de afiliado es obligatorio cuando hay obra social");
+            }
+        }
+
+        if (!errores.isEmpty()) {
+            throw new IllegalArgumentException("Datos del paciente inválidos: " + String.join("; ", errores) + ".");
+        }
+    }
+
     @Transactional
     public PacienteDto actualizarPaciente(Long pacienteId, String medicoEmail, PacienteDto dto) {
         Usuario medico = usuarioRepository.findByEmail(medicoEmail)
@@ -259,6 +376,8 @@ public class ClinicalService {
 
         Usuario paciente = usuarioRepository.findById(pacienteId)
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
+
+        validarDatosPaciente(dto);
 
         paciente.setNombre(dto.getNombre());
         paciente.setApellido(dto.getApellido());
@@ -316,36 +435,68 @@ public class ClinicalService {
         return construirPacienteDto(saved, "Hoy", false, false, unreadMessagesCount);
     }
 
+    // Soft-delete: la historia clínica no puede perder asientos (Ley 26.529 art. 15), así que
+    // esto nunca borra la fila — solo la marca ANULADO con motivo y quién la anuló. Ver
+    // .agent/Etapas/09_cumplimiento_legal_historia_clinica.md, Fase A.1.
     @Transactional
-    public void eliminarInforme(Long id, String medicoEmail) {
+    public void eliminarInforme(Long id, String medicoEmail, String motivo) {
         InformeClinico informe = informeClinicoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Informe no encontrado"));
         if (!informe.getMedico().getEmail().equals(medicoEmail)) {
             throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para eliminar este informe");
         }
-        informeClinicoRepository.delete(informe);
+        informe.setEstado(ESTADO_ANULADO);
+        informe.setMotivo(motivo);
+        informeClinicoRepository.save(informe);
     }
 
+    // Corrección por anexo, no edición en el lugar (Ley 26.529 art. 15 + Ley 27.706): el
+    // original queda intacto y marcado VIGENTE_CORREGIDO, y se crea una fila nueva
+    // (ANEXO_CORRECCION) con el contenido corregido, enlazada a través de informeOriginalId.
+    // Ambas quedan visibles y en orden cronológico para el paciente y el profesional.
     @Transactional
-    public InformeClinico editarInforme(Long id, String medicoEmail, String tipoInforme, String planTrabajo, String contenido) {
-        InformeClinico informe = informeClinicoRepository.findById(id)
+    public InformeClinico editarInforme(Long id, String medicoEmail, String tipoInforme, String planTrabajo, String contenido, String motivo) {
+        InformeClinico original = informeClinicoRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Informe no encontrado"));
-        if (!informe.getMedico().getEmail().equals(medicoEmail)) {
+        if (!original.getMedico().getEmail().equals(medicoEmail)) {
             throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para editar este informe");
         }
-        informe.setTipoInforme(tipoInforme);
-        informe.setPlanTrabajo(planTrabajo);
-        informe.setContenido(contenido);
-        return informeClinicoRepository.save(informe);
+        if (ESTADO_ANULADO.equals(original.getEstado())) {
+            throw new IllegalStateException("No se puede corregir un informe anulado");
+        }
+
+        original.setEstado(ESTADO_VIGENTE_CORREGIDO);
+        informeClinicoRepository.save(original);
+
+        LocalDateTime ahora = LocalDateTime.now();
+        InformeClinico anexo = InformeClinico.builder()
+                .medico(original.getMedico())
+                .paciente(original.getPaciente())
+                .fecha(LocalDate.now())
+                .fechaCreacion(ahora)
+                .tipoInforme(tipoInforme)
+                .planTrabajo(planTrabajo)
+                .contenido(contenido)
+                .nombreArchivo(original.getNombreArchivo())
+                .estado(ESTADO_ANEXO_CORRECCION)
+                .informeOriginalId(original.getId())
+                .motivo(motivo)
+                .hashIntegridad(calcularHash(original.getMedico().getEmail(), String.valueOf(original.getPaciente().getId()),
+                        tipoInforme, planTrabajo, contenido, ahora.toString()))
+                .build();
+
+        return informeClinicoRepository.save(anexo);
     }
 
     @Transactional
-    public void eliminarSeguimiento(Long id, String medicoEmail) {
+    public void eliminarSeguimiento(Long id, String medicoEmail, String motivo) {
         SeguimientoDiario seguimiento = seguimientoDiarioRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Seguimiento no encontrado"));
         if (!seguimiento.getMedico().getEmail().equals(medicoEmail)) {
             throw new org.springframework.security.access.AccessDeniedException("No tiene permisos para eliminar este seguimiento");
         }
-        seguimientoDiarioRepository.delete(seguimiento);
+        seguimiento.setEstado(ESTADO_ANULADO);
+        seguimiento.setMotivo(motivo);
+        seguimientoDiarioRepository.save(seguimiento);
     }
 }

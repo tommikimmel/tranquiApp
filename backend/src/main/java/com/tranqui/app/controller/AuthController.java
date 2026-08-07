@@ -256,7 +256,7 @@ public class AuthController {
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
-        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono()));
+        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto()));
     }
 
     @PostMapping("/google")
@@ -291,7 +291,52 @@ public class AuthController {
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
-        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono()));
+        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto()));
+    }
+
+    // Fills in the Paso 2 profile data (nombre, apellido, sexo, fechaNacimiento,
+    // tipoDocumento, numeroDocumento, telefono) that Google sign-in never collects. Called
+    // from the "complete your profile" prompt shown on the main screen while
+    // usuario.perfilCompleto is false — see GoogleAuthService.getOrCreateUsuario.
+    @PostMapping("/complete-profile")
+    public ResponseEntity<?> completeProfile(
+            @RequestBody com.tranqui.app.model.dto.CompleteProfileDto dto,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        if (dto.getNombre() == null || dto.getNombre().trim().isEmpty()
+                || dto.getApellido() == null || dto.getApellido().trim().isEmpty()
+                || dto.getSexo() == null || dto.getSexo().trim().isEmpty()
+                || dto.getFechaNacimiento() == null
+                || dto.getTipoDocumento() == null || dto.getTipoDocumento().trim().isEmpty()
+                || dto.getNumeroDocumento() == null
+                || dto.getTelefono() == null || dto.getTelefono().trim().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Completá todos los campos obligatorios.");
+        }
+
+        Usuario usuario = usuarioRepository.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+
+        String tel = dto.getTelefono().trim();
+        if (!tel.isEmpty() && !tel.startsWith("+54")) {
+            tel = "+54 " + tel;
+        }
+
+        usuario.setNombre(dto.getNombre().trim());
+        usuario.setApellido(dto.getApellido().trim());
+        usuario.setSexo(dto.getSexo());
+        usuario.setFechaNacimiento(dto.getFechaNacimiento());
+        usuario.setTipoDocumento(dto.getTipoDocumento());
+        usuario.setNumeroDocumento(dto.getNumeroDocumento());
+        usuario.setTelefono(tel);
+        usuario.setObraSocial(dto.getObraSocial());
+        usuario.setNumAfiliado(dto.getNumAfiliado());
+        usuario.setPerfilCompleto(true);
+        usuarioRepository.save(usuario);
+
+        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto()));
     }
 
     @GetMapping("/me")
@@ -301,7 +346,7 @@ public class AuthController {
         }
         Usuario usuario = usuarioRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
-        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono()));
+        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto()));
     }
 
     @PostMapping("/logout")

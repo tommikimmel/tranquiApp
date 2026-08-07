@@ -8,6 +8,11 @@ interface Financiador {
   nombreComercial: string
 }
 
+function FieldError({ message }: { message: string | null }) {
+  if (!message) return null
+  return <span style={{ color: '#ff4d4f', fontSize: '11px', marginTop: '2px', display: 'block' }}>{message}</span>
+}
+
 // Collects the data QBI2/Innovamed actually needs to emit a valid electronic prescription
 // (DNI, fecha de nacimiento, domicilio estructurado, cobertura de obra social) — none of this
 // had an editable form anywhere before; api.actualizarPaciente existed but nothing called it.
@@ -20,6 +25,8 @@ export default function EditPatientModal({
   onClose: () => void
   onSaved: (updated: Patient) => void
 }) {
+  const [apellido, setApellido] = useState(patient.apellido || '')
+  const [sexo, setSexo] = useState(patient.sexo || '')
   const [tipoDocumento, setTipoDocumento] = useState(patient.tipoDocumento || 'DNI')
   const [numeroDocumento, setNumeroDocumento] = useState(patient.numeroDocumento ? String(patient.numeroDocumento) : (patient.dni || ''))
   const [fechaNacimiento, setFechaNacimiento] = useState(patient.fechaNacimiento || '')
@@ -45,8 +52,32 @@ export default function EditPatientModal({
       .catch((err: any) => console.error('Error al cargar financiadores:', err))
   }, [])
 
-  const canSave = numeroDocumento.trim().length > 0 && !!fechaNacimiento &&
-    (!tieneObraSocial || (idFinanciador.trim().length > 0 && numAfiliado.trim().length > 0))
+  // Field-level validation, shown inline so every value this form accepts is checked before
+  // it ever reaches actualizarPaciente — mirrors the same rules the backend now enforces in
+  // ClinicalService.actualizarPaciente, so a value rejected here would also be rejected there.
+  const docDigits = numeroDocumento.trim()
+  const docError = docDigits.length > 0 && (docDigits.length < 6 || docDigits.length > 9)
+    ? 'El número de documento debe tener entre 6 y 9 dígitos.'
+    : null
+
+  const telefonoDigits = telefono.trim()
+  const telefonoError = telefonoDigits.length > 0 && !/^\d{6,15}$/.test(telefonoDigits)
+    ? 'El teléfono debe contener solo números, entre 6 y 15 dígitos.'
+    : null
+
+  const domicilioFields = [calle.trim(), numero.trim(), localidad.trim(), provincia.trim()]
+  const domicilioStarted = domicilioFields.some(v => v.length > 0)
+  const domicilioComplete = domicilioFields.every(v => v.length > 0)
+  const domicilioError = domicilioStarted && !domicilioComplete
+    ? 'Completá calle, número, localidad y provincia, o dejá todos los campos de domicilio vacíos.'
+    : null
+
+  const numAfiliadoError = tieneObraSocial && numAfiliado.trim().length > 0 && !/^[A-Za-z0-9\-/. ]{1,30}$/.test(numAfiliado.trim())
+    ? 'El número de afiliado tiene caracteres inválidos.'
+    : null
+
+  const canSave = apellido.trim().length > 0 && !!sexo && docDigits.length > 0 && !docError && !!fechaNacimiento && !telefonoError && !domicilioError &&
+    (!tieneObraSocial || (idFinanciador.trim().length > 0 && numAfiliado.trim().length > 0 && !numAfiliadoError))
 
   const handleSave = () => {
     if (!canSave || saving) return
@@ -61,13 +92,13 @@ export default function EditPatientModal({
     // to avoid silently wiping data this form never touched.
     api.actualizarPaciente(patient.id, {
       nombre: patient.nombre,
-      apellido: patient.apellido,
+      apellido: apellido.trim(),
       dni: tipoDocumento === 'DNI' ? numeroDocumento.trim() : patient.dni,
       tipoDocumento,
       numeroDocumento: numeroDocumento.trim() ? Number(numeroDocumento.trim()) : null,
       fechaNacimiento,
       telefono: formattedPhone,
-      sexo: patient.sexo,
+      sexo,
       cuil: patient.cuil,
       datosOfuscado: patient.datosOfuscado,
       direccion: calle.trim() ? `${calle.trim()} ${numero.trim()}, ${localidad.trim()}` : patient.direccion,
@@ -111,6 +142,22 @@ export default function EditPatientModal({
           Estos datos son los que exige QBI2/Innovamed para validar una receta electrónica a nombre de este paciente.
         </p>
 
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-3)' }}>
+          <div className="form-group">
+            <label className="form-label form-label--required">Apellido</label>
+            <input className="form-input" type="text" value={apellido} onChange={(e) => setApellido(e.target.value)} placeholder="Ej: Pérez" />
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required">Sexo</label>
+            <select className="form-input" value={sexo} onChange={(e) => setSexo(e.target.value)}>
+              <option value="">Seleccionar...</option>
+              <option value="M">Masculino</option>
+              <option value="F">Femenino</option>
+              <option value="X">Otro / No especifica</option>
+            </select>
+          </div>
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--space-3)' }}>
           <div className="form-group">
             <label className="form-label form-label--required">Tipo Doc.</label>
@@ -124,6 +171,7 @@ export default function EditPatientModal({
           <div className="form-group">
             <label className="form-label form-label--required">Número de documento</label>
             <input className="form-input" type="text" inputMode="numeric" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value.replace(/\D/g, ''))} />
+            <FieldError message={docError} />
           </div>
         </div>
 
@@ -134,7 +182,8 @@ export default function EditPatientModal({
 
         <div className="form-group">
           <label className="form-label">Teléfono</label>
-          <input className="form-input" type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="Ej: 3515998822" />
+          <input className="form-input" type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value.replace(/[^\d]/g, ''))} placeholder="Ej: 3515998822" />
+          <FieldError message={telefonoError} />
         </div>
 
         <div className="settings-section-label">Domicilio</div>
@@ -158,6 +207,7 @@ export default function EditPatientModal({
             <input className="form-input" type="text" value={provincia} onChange={(e) => setProvincia(e.target.value)} placeholder="Ej: Córdoba" />
           </div>
         </div>
+        <FieldError message={domicilioError} />
 
         <label className="check-chip" style={{ width: 'fit-content' }}>
           <input type="checkbox" checked={tieneObraSocial} onChange={(e) => setTieneObraSocial(e.target.checked)} />
@@ -183,6 +233,7 @@ export default function EditPatientModal({
               <div className="form-group">
                 <label className="form-label form-label--required">N° de afiliado</label>
                 <input className="form-input" type="text" value={numAfiliado} onChange={(e) => setNumAfiliado(e.target.value)} />
+                <FieldError message={numAfiliadoError} />
               </div>
             </div>
           </>

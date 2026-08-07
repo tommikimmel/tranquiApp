@@ -45,6 +45,19 @@ public class SeguimientoDiario {
     @Builder.Default
     private LocalDateTime fechaCreacion = LocalDateTime.now();
 
+    // Mismo régimen de inalterabilidad que InformeClinico (ver ese modelo y
+    // .agent/Etapas/09_cumplimiento_legal_historia_clinica.md): nunca se borra la fila, solo se
+    // anula (soft-delete) dejando motivo y hash de integridad.
+    @Column(name = "estado", length = 30)
+    @Builder.Default
+    private String estado = "VIGENTE";
+
+    @Column(name = "motivo", columnDefinition = "TEXT")
+    private String motivo;
+
+    @Column(name = "hash_integridad", length = 64)
+    private String hashIntegridad;
+
     @PrePersist
     protected void onCreate() {
         if (fechaCreacion == null) {

@@ -15,6 +15,7 @@ const ClinicalHistoryView = lazy(() => import('./components/ClinicalHistoryView'
 const VisitorsView = lazy(() => import('./components/VisitorsView'))
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
 const NotFoundView = lazy(() => import('./components/NotFoundView'))
+const CompleteProfileModal = lazy(() => import('./components/CompleteProfileModal'))
 import AddressMapPicker from './components/AddressMapPicker'
 import DateInputDDMMYYYY from './components/DateInputDDMMYYYY'
 import { api } from './api/api'
@@ -1349,6 +1350,24 @@ const COMMON_MEDS = [
   'Pregabalina 75mg',
 ]
 
+const getPatientInitials = (fullName: string) => {
+  const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const calcAge = (fechaNacimiento?: string | null) => {
+  if (!fechaNacimiento) return null;
+  const birth = new Date(fechaNacimiento);
+  if (isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age >= 0 && age < 130 ? age : null;
+};
+
 const formatDateDDMMYYYY = (dateVal: any) => {
   if (!dateVal) return 'Sin fecha';
   if (typeof dateVal === 'string') {
@@ -1432,17 +1451,9 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
         if (statePatient) {
           const found = list.find((p: any) => p.id === statePatient.id) || statePatient;
           setSelectedPatientObj(found);
-          const pName = found.name || `${found.nombre || ''} ${found.apellido || ''}`.trim();
-          const pDni = found.dni || found.numeroDocumento || 'S/D';
-          setPatientSearch(`${pName} — DNI: ${pDni}`);
         } else if (location.state?.patientId) {
           const found = list.find((p: any) => p.id === location.state.patientId);
-          if (found) {
-            setSelectedPatientObj(found);
-            const pName = found.name || `${found.nombre || ''} ${found.apellido || ''}`.trim();
-            const pDni = found.dni || found.numeroDocumento || 'S/D';
-            setPatientSearch(`${pName} — DNI: ${pDni}`);
-          }
+          if (found) setSelectedPatientObj(found);
         }
       })
       .catch(() => setPatients(MOCK_PATIENTS));
@@ -1452,6 +1463,13 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
 
   const doctorName = medicoInfo ? `${medicoInfo.nombre || ''} ${medicoInfo.apellido || ''}`.trim() : 'Médico';
   const doctorMatricula = medicoInfo?.matricula || medicoInfo?.matriculaNumero ? `MN ${medicoInfo.matricula || medicoInfo.matriculaNumero}` : 'MN S/N';
+
+  const selectedPatientName = selectedPatientObj
+    ? (selectedPatientObj.name || `${selectedPatientObj.nombre || ''} ${selectedPatientObj.apellido || ''}`.trim())
+    : '';
+  const selectedPatientDni = selectedPatientObj?.dni || selectedPatientObj?.numeroDocumento || 'S/D';
+  const selectedPatientTipoDoc = selectedPatientObj?.tipoDocumento || 'DNI';
+  const selectedPatientAge = calcAge(selectedPatientObj?.fechaNacimiento);
 
   const filteredPatients = patientSearch.trim().length >= 3
     ? patients.filter(p => {
@@ -1465,7 +1483,7 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
 
   const handleSelectPatient = (patient: any) => {
     setSelectedPatientObj(patient);
-    setPatientSearch(`${patient.name || `${patient.nombre || ''} ${patient.apellido || ''}`.trim()} — DNI: ${patient.dni || patient.numeroDocumento || 'S/D'}`);
+    setPatientSearch('');
     setShowPatientDropdown(false);
   };
 
@@ -1823,9 +1841,34 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                   </h2>
                   <p className="card__subtitle">Buscá y seleccioná a quién le vas a recetar.</p>
                 </div>
-                <div className="form-group" style={{ position: 'relative' }}>
-                  <label className="form-label form-label--required">Buscador de paciente</label>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+
+                {selectedPatientObj ? (
+                  <div className="rx-selected-patient">
+                    <div className="rx-selected-patient__avatar">{getPatientInitials(selectedPatientName)}</div>
+                    <div className="rx-selected-patient__info">
+                      <div className="rx-selected-patient__name">{selectedPatientName || 'Paciente sin nombre'}</div>
+                      <div className="rx-selected-patient__meta">
+                        <span><strong>{selectedPatientTipoDoc}</strong> {selectedPatientDni}</span>
+                        {selectedPatientAge != null && <span>{selectedPatientAge} años</span>}
+                        {selectedPatientObj.obraSocial && (
+                          <span>{selectedPatientObj.obraSocial}{selectedPatientObj.numAfiliado ? ` · Afiliado ${selectedPatientObj.numAfiliado}` : ''}</span>
+                        )}
+                        {selectedPatientObj.telefono && <span>{selectedPatientObj.telefono}</span>}
+                        {selectedPatientObj.email && <span>{selectedPatientObj.email}</span>}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      onClick={handleClearPatient}
+                      title="Elegir otro paciente"
+                    >
+                      Cambiar
+                    </button>
+                  </div>
+                ) : (
+                  <div className="form-group" style={{ position: 'relative', marginBottom: 0 }}>
+                    <label className="form-label form-label--required">Buscador de paciente</label>
                     <input
                       id="rx-patient-search"
                       className="form-input"
@@ -1834,57 +1877,46 @@ function PrescriptionView({ onSend, medicoInfo }: { onSend: (data: any) => Promi
                       value={patientSearch}
                       onChange={(e) => {
                         setPatientSearch(e.target.value);
-                        if (selectedPatientObj) setSelectedPatientObj(null);
                         setShowPatientDropdown(true);
                       }}
                       onFocus={() => setShowPatientDropdown(true)}
                     />
-                    {selectedPatientObj && (
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--sm"
-                        onClick={handleClearPatient}
-                        title="Limpiar paciente seleccionado"
-                      >
-                        ✕
-                      </button>
+
+                    {showPatientDropdown && patientSearch.trim().length >= 3 && (
+                      <div className="rx-patient-dropdown">
+                        {filteredPatients.length > 0 ? (
+                          filteredPatients.map(p => {
+                            const pName = p.name || `${p.nombre || ''} ${p.apellido || ''}`.trim();
+                            const pDni = p.dni || p.numeroDocumento || 'S/D';
+                            const pAge = calcAge(p.fechaNacimiento);
+                            return (
+                              <div
+                                key={p.id}
+                                onClick={() => handleSelectPatient(p)}
+                                className="patient-search-item"
+                              >
+                                <div className="rx-selected-patient__avatar rx-selected-patient__avatar--sm">{getPatientInitials(pName)}</div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontWeight: 'bold', fontSize: 'var(--text-sm)' }}>{pName}</div>
+                                  <div className="rx-selected-patient__meta rx-selected-patient__meta--sm">
+                                    <span>DNI {pDni}</span>
+                                    {pAge != null && <span>{pAge} años</span>}
+                                    {p.obraSocial && <span>{p.obraSocial}</span>}
+                                    {(p.email || p.telefono) && <span>{p.email || p.telefono}</span>}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div style={{ padding: '12px', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', textAlign: 'center' }}>
+                            No se encontraron pacientes que coincidan con "{patientSearch}"
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
-
-                  {showPatientDropdown && patientSearch.trim().length >= 3 && (
-                    <div style={{
-                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
-                      backgroundColor: '#ffffff', border: '1px solid var(--color-border)',
-                      borderRadius: 'var(--radius-md)', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      maxHeight: '220px', overflowY: 'auto', marginTop: '4px'
-                    }}>
-                      {filteredPatients.length > 0 ? (
-                        filteredPatients.map(p => {
-                          const pName = p.name || `${p.nombre || ''} ${p.apellido || ''}`.trim();
-                          const pDni = p.dni || p.numeroDocumento || 'S/D';
-                          return (
-                            <div
-                              key={p.id}
-                              onClick={() => handleSelectPatient(p)}
-                              style={{
-                                padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9',
-                                fontSize: 'var(--text-sm)', display: 'flex', justifyContent: 'space-between'
-                              }}
-                              className="patient-search-item"
-                            >
-                              <strong>{pName} — DNI {pDni}</strong>
-                              <span style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>{p.email}</span>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div style={{ padding: '12px', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)', textAlign: 'center' }}>
-                          No se encontraron pacientes que coincidan con "{patientSearch}"
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
 
               {/* Medication Search & Addition */}
@@ -2327,13 +2359,19 @@ function getMissingRequirements(m: any, mpConnected?: boolean, mpEnabled?: boole
   if (!m.fechaNacimiento) missing.push("Fecha de nacimiento")
   if (!m.cuil) missing.push("CUIL profesional")
   if (!m.tipoDocumento || !m.numeroDocumento) missing.push("Tipo y número de documento")
-  if (m.ofrecePresencial && (!m.domicilioAtencion || !m.domicilioAtencion.trim())) missing.push("Dirección física del consultorio")
+  // Requerido para cualquier médico, no solo los presenciales: QBI2/Innovamed exige un domicilio
+  // declarado para emitir recetas electrónicas incluso en atención 100% online (error QBI248).
+  if (!m.domicilioAtencion || !m.domicilioAtencion.trim()) missing.push("Dirección profesional (la exige QBI2/Innovamed para emitir recetas, aunque atiendas 100% online)")
   if (!m.matriculaInfo?.tipo || !m.matriculaInfo?.provincia || !m.matriculaInfo?.numero) {
     missing.push("Datos completos de matrícula (tipo, provincia y número)")
   }
   if (!m.degree || !m.degree.trim()) missing.push("Título profesional")
   if (!m.specialty || !m.specialty.trim()) missing.push("Especialidad")
   if (!m.fotoUrl || !m.fotoUrl.trim()) missing.push("Foto de perfil profesional")
+  if (!m.codigoRefeps || !m.codigoRefeps.trim()) missing.push("Código REFEPS (en Configuración > Perfil profesional)")
+  if (!m.selloLinea1?.trim() || !m.selloLinea2?.trim() || !m.selloLinea3?.trim()) {
+    missing.push("Sello para recetas electrónicas (en Configuración > Perfil profesional)")
+  }
   if (!m.descripcionPerfil || !m.descripcionPerfil.trim()) missing.push("Descripción de tu perfil profesional")
   if (!m.tags || m.tags.length === 0) missing.push("Al menos un tratamiento/especialidad que atiendas")
   if (!m.pacientesAtiende || m.pacientesAtiende.length === 0) missing.push("Al menos un tipo de paciente que atiendas")
@@ -2387,7 +2425,6 @@ function SettingsView({
   const [tipoDocumento, setTipoDocumento] = useState(medicoInfo?.tipoDocumento || 'DNI')
   const [numeroDocumento, setNumeroDocumento] = useState(medicoInfo?.numeroDocumento || '')
   const [domicilioAtencion, setDomicilioAtencion] = useState(medicoInfo?.domicilioAtencion || '')
-  const [domicilioProvincia, setDomicilioProvincia] = useState('')
   const [domicilioLat, setDomicilioLat] = useState<number | null>(medicoInfo?.domicilioLat ?? null)
   const [domicilioLng, setDomicilioLng] = useState<number | null>(medicoInfo?.domicilioLng ?? null)
 
@@ -2414,6 +2451,21 @@ function SettingsView({
   const [matricula, setMatricula] = useState(medicoInfo?.matricula || (medicoInfo?.matriculaInfo?.numero ? String(medicoInfo.matriculaInfo.numero) : ''))
   const [tariffs, setTariffs] = useState<any[]>(medicoInfo?.tariffs || [])
   const [fotoUrl, setFotoUrl] = useState(medicoInfo?.fotoUrl || '')
+  // Sello y código REFEPS para recetas electrónicas — QBI2 los usa para generar la receta
+  // (incluida la firma electrónica, que ahora arma la API automáticamente a partir del REFEPS).
+  // El sello se pre-completa con un texto sugerido a partir de los datos que ya cargó el
+  // médico, para que la mayoría no tenga que escribir nada — solo revisar y guardar.
+  const [codigoRefeps, setCodigoRefeps] = useState(medicoInfo?.codigoRefeps || '')
+  const [selloLinea1, setSelloLinea1] = useState(
+    medicoInfo?.selloLinea1 || (medicoInfo?.nombre ? `Dr. ${medicoInfo.nombre} ${medicoInfo.apellido || ''}`.trim() : '')
+  )
+  const [selloLinea2, setSelloLinea2] = useState(medicoInfo?.selloLinea2 || medicoInfo?.specialty || '')
+  const [selloLinea3, setSelloLinea3] = useState(() => {
+    if (medicoInfo?.selloLinea3) return medicoInfo.selloLinea3
+    const tipo = medicoInfo?.matriculaInfo?.tipo || 'MP'
+    const numero = medicoInfo?.matricula || medicoInfo?.matriculaInfo?.numero || ''
+    return numero ? `${tipo} ${numero}` : ''
+  })
   const [ofreceOnline, setOfreceOnline] = useState(medicoInfo?.ofreceOnline !== undefined ? medicoInfo.ofreceOnline : true)
   const [ofrecePresencial, setOfrecePresencial] = useState(medicoInfo?.ofrecePresencial !== undefined ? medicoInfo.ofrecePresencial : false)
   const [experienciasLaborales, setExperienciasLaborales] = useState<ExperienciaLaboral[]>(() => {
@@ -2610,7 +2662,7 @@ function SettingsView({
         cuil: cuilStr ? Number(cuilStr) : null,
         tipoDocumento,
         numeroDocumento: numDocStr ? Number(numDocStr) : null,
-        domicilioAtencion: ofrecePresencial ? domicilioAtencion : '',
+        domicilioAtencion,
         domicilioLat: ofrecePresencial ? domicilioLat : null,
         domicilioLng: ofrecePresencial ? domicilioLng : null,
         matriculaInfo: {
@@ -2630,6 +2682,10 @@ function SettingsView({
         specialty,
         matricula: matStr,
         cuit: cuilStr,
+        codigoRefeps,
+        selloLinea1,
+        selloLinea2,
+        selloLinea3,
         // The Obra Social service always requires cobertura + n° de afiliado — force it here too
         // in case a médico has legacy data from before this was enforced in the UI.
         tariffs: tariffs.map(t => (t.id === 'obra_social' || t.id === 'osde') ? { ...t, requiereObraSocial: true } : t),
@@ -2921,18 +2977,23 @@ function SettingsView({
             </div>
           </div>
 
-          {ofrecePresencial && (
-            <AddressMapPicker
-              provincia={domicilioProvincia}
-              onProvinciaChange={setDomicilioProvincia}
-              direccion={domicilioAtencion}
-              onDireccionChange={setDomicilioAtencion}
-              lat={domicilioLat}
-              lng={domicilioLng}
-              onLocationChange={(lat, lng) => { setDomicilioLat(lat); setDomicilioLng(lng) }}
-              provinciasList={PROVINCIAS_ARGENTINA}
-            />
-          )}
+          {/* QBI2/Innovamed rechaza toda receta electrónica que no declare un domicilio (error QBI248 "DEBE
+              INFORMAR EL DOMICILIO DONDE SE REALIZÓ LA ATENCIÓN"), sin excepción para médicos 100% online
+              — confirmado contra el ambiente real el 2026-08-06. No hace falta un consultorio físico ni
+              que el paciente lo visite; alcanza con declarar el domicilio profesional (puede ser el
+              particular). Por eso este campo ya no depende de "Consulta Presencial". */}
+          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', gridColumn: 'span 2', margin: '0' }}>
+            {ofrecePresencial
+              ? 'Esta dirección es la que verán los pacientes para ubicar tu consultorio.'
+              : 'Aunque atiendas 100% online, QBI2/Innovamed exige declarar un domicilio profesional para poder emitir recetas electrónicas (puede ser tu domicilio particular — no se muestra a los pacientes).'}
+          </p>
+          <AddressMapPicker
+            direccion={domicilioAtencion}
+            onDireccionChange={setDomicilioAtencion}
+            lat={domicilioLat}
+            lng={domicilioLng}
+            onLocationChange={(lat, lng) => { setDomicilioLat(lat); setDomicilioLng(lng) }}
+          />
 
           <div className="settings-section-label">Título y matrícula</div>
           <div className="form-group">
@@ -2989,6 +3050,68 @@ function SettingsView({
             <label className="form-label form-label--required" htmlFor="input-matricula">Número de Matrícula</label>
             <input id="input-matricula" className="form-input" type="text" inputMode="numeric" maxLength={10} value={matricula} onChange={(e) => setMatricula(e.target.value.replace(/[^\d]/g, '').slice(0, 10))} />
             <span className="form-helper">Verificada ✓</span>
+          </div>
+
+          <div className="settings-section-label" style={{ gridColumn: 'span 2' }}>Sello y código REFEPS para recetas electrónicas</div>
+          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', gridColumn: 'span 2', margin: '-6px 0 0' }}>
+            Aparecen en el PDF de tus recetas electrónicas. Ya completamos un sello sugerido con tus datos — revisalo y ajustalo si querés. La firma electrónica la genera QBI2/Innovamed automáticamente a partir de tu código REFEPS.
+          </p>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-sello-1">Sello — Línea 1</label>
+            <input id="input-sello-1" className="form-input" type="text" maxLength={40} placeholder="Ej: Dr. Juan Pérez" value={selloLinea1} onChange={(e) => setSelloLinea1(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-sello-2">Sello — Línea 2</label>
+            <input id="input-sello-2" className="form-input" type="text" maxLength={40} placeholder="Ej: Psiquiatría" value={selloLinea2} onChange={(e) => setSelloLinea2(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-sello-3">Sello — Línea 3</label>
+            <input id="input-sello-3" className="form-input" type="text" maxLength={25} placeholder="Ej: MN 12345" value={selloLinea3} onChange={(e) => setSelloLinea3(e.target.value)} />
+          </div>
+
+          <div className="form-group" style={{ gridColumn: 'span 2' }}>
+            <label className="form-label">Vista previa del sello</label>
+            <div style={{
+              width: '220px',
+              padding: 'var(--space-3) var(--space-4)',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: '#f8fafc',
+              border: '1.5px solid var(--color-border)',
+              boxShadow: 'inset 0 0 0 3px #f8fafc, inset 0 0 0 4px var(--color-border)'
+            }}>
+              {[selloLinea1, selloLinea2, selloLinea3].map((linea, i) => (
+                <div
+                  key={i}
+                  style={{
+                    fontFamily: 'var(--font-mono, monospace)',
+                    fontSize: 'var(--text-xs)',
+                    color: linea ? 'var(--color-text-primary)' : '#9ca3af',
+                    textAlign: 'center',
+                    lineHeight: 1.6,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}
+                >
+                  {linea || '—'}
+                </div>
+              ))}
+            </div>
+            <span className="form-helper">Así se verá el sello impreso en el PDF de tus recetas.</span>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="input-codigo-refeps">Código REFEPS</label>
+            <input
+              id="input-codigo-refeps"
+              className="form-input"
+              type="text"
+              maxLength={50}
+              placeholder="Ej: 123456789"
+              value={codigoRefeps}
+              onChange={(e) => setCodigoRefeps(e.target.value)}
+            />
+            <span className="form-helper">Lo pide QBI2/Innovamed para generar la firma electrónica de tus recetas.</span>
           </div>
 
         </div>
@@ -5592,6 +5715,13 @@ export default function App() {
         />
         <Route path="*" element={<NotFoundView currentUser={currentUser} />} />
       </Routes>
+      {currentUser && currentUser.rol === 'PACIENTE' && currentUser.perfilCompleto === false && (
+        <CompleteProfileModal
+          user={currentUser}
+          onComplete={(updatedUser) => setCurrentUser(updatedUser)}
+          onLogout={handleLogout}
+        />
+      )}
     </Suspense>
   )
 }

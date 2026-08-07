@@ -58,6 +58,15 @@ public class RecetaService {
         boolean medicoTieneMatricula = medico.getMatriculaNumero() != null
                 || (medico.getMatricula() != null && !medico.getMatricula().isBlank());
         if (!medicoTieneMatricula) datosFaltantes.add("tu número de matrícula (en Configuración > Perfil profesional)");
+        if (medico.getCodigoRefeps() == null || medico.getCodigoRefeps().isBlank()) datosFaltantes.add("tu código REFEPS (en Configuración > Perfil profesional)");
+        // QBI2 rechaza la receta con QBI248 "DEBE INFORMAR EL DOMICILIO DONDE SE REALIZÓ LA ATENCIÓN" si
+        // no se manda ningún domicilio — esto aplica también a médicos 100% online (confirmado contra hml
+        // el 2026-08-06): no hace falta un consultorio físico, pero sí algún domicilio profesional
+        // declarado (puede ser el domicilio particular). No hay excepción por modalidad de atención.
+        boolean medicoTieneDomicilio = (medico.getDomicilioAtencion() != null && !medico.getDomicilioAtencion().isBlank())
+                || (medico.getDireccion() != null && !medico.getDireccion().isBlank())
+                || (medico.getDomicilioCalle() != null && !medico.getDomicilioCalle().isBlank());
+        if (!medicoTieneDomicilio) datosFaltantes.add("tu dirección profesional (en Configuración > Perfil profesional — QBI2 la exige aunque atiendas 100% online)");
         if (!datosFaltantes.isEmpty()) {
             throw new RecetaElectronicaException(
                     "No se pudo emitir la receta electrónica: falta completar " + String.join(", ", datosFaltantes)
@@ -108,6 +117,12 @@ public class RecetaService {
                     .cuil(paciente.getCuil() != null ? String.valueOf(paciente.getCuil()) : null)
                     .localidad(paciente.getDomicilioLocalidad())
                     .provincia(paciente.getDomicilioProvincia())
+                    // QBI2's propio swagger (PacienteRecetaDto.pais) documenta este campo como
+                    // "Requerido si el tipo de documento es Pasaporte" — es un campo de nivel
+                    // superior, distinto del pais dentro de domicilio, y hasta ahora nunca se
+                    // mandaba: toda receta a nombre de un paciente con Pasaporte era rechazada
+                    // por QBI2 aunque el resto del payload fuera correcto.
+                    .pais(paciente.getDomicilioPais() != null && !paciente.getDomicilioPais().isBlank() ? paciente.getDomicilioPais() : "Argentina")
                     .cobertura(coberturaPaciente)
                     .domicilio(domicilioPaciente)
                     .build();
@@ -122,7 +137,7 @@ public class RecetaService {
             com.tranqui.app.model.dto.Qbi2RecetaDtos.SelloDto selloDto = com.tranqui.app.model.dto.Qbi2RecetaDtos.SelloDto.builder()
                     .linea1(medico.getSelloLinea1() != null && !medico.getSelloLinea1().isBlank() ? medico.getSelloLinea1() : ("Dr. " + medico.getNombre() + " " + (medico.getApellido() != null ? medico.getApellido() : "")))
                     .linea2(medico.getSelloLinea2() != null && !medico.getSelloLinea2().isBlank() ? medico.getSelloLinea2() : (medico.getSpecialty() != null ? medico.getSpecialty() : "Psiquiatría"))
-                    .linea3(medico.getSelloLinea3() != null && !medico.getSelloLinea3().isBlank() ? medico.getSelloLinea3() : ("MP " + (medico.getMatricula() != null ? medico.getMatricula() : "12345")))
+                    .linea3(medico.getSelloLinea3() != null && !medico.getSelloLinea3().isBlank() ? medico.getSelloLinea3() : ((medico.getMatriculaTipo() != null && !medico.getMatriculaTipo().isBlank() ? medico.getMatriculaTipo() : "MP") + " " + (medico.getMatricula() != null ? medico.getMatricula() : "12345")))
                     .build();
 
             com.tranqui.app.model.dto.Qbi2RecetaDtos.MedicoReceta medicoReceta = com.tranqui.app.model.dto.Qbi2RecetaDtos.MedicoReceta.builder()
@@ -135,24 +150,37 @@ public class RecetaService {
                     .email(medico.getEmail())
                     .telefono(medico.getTelefono())
                     .especialidad(medico.getSpecialty() != null ? medico.getSpecialty() : "Psiquiatría")
-                    .firmalink(medico.getFirmaUrl())
+                    // Mismo campo requerido-si-Pasaporte que en PacienteReceta, ver comentario ahí.
+                    .pais("Argentina")
                     .matricula(matriculaDto)
                     .sello(selloDto)
                     .idTributario(medico.getCuit())
                     .profesion("Médico")
+                    .idREFEPS(medico.getCodigoRefeps())
                     .build();
 
+            // Not every médico has a physical consultorio — many work 100% online (ofrecePresencial=false),
+            // so there's often no real address to send. QBI2's lugarAtencion.domicilio is entirely optional
+            // (every field nullable, nothing in RecetaRequestDto.required references it), so instead of
+            // inventing a placeholder address, we only include what the médico actually entered and omit
+            // "domicilio" altogether when there's none — never send a fabricated address on a legal document.
             String consultorioNombre = "Consultorio Dr. " + medico.getNombre() + " " + (medico.getApellido() != null ? medico.getApellido() : "");
-            String direccionStr = medico.getDomicilioAtencion() != null && !medico.getDomicilioAtencion().isBlank() ? medico.getDomicilioAtencion() : (medico.getDireccion() != null && !medico.getDireccion().isBlank() ? medico.getDireccion() : "Av. Colón 1234");
+            String direccionStr = medico.getDomicilioAtencion() != null && !medico.getDomicilioAtencion().isBlank() ? medico.getDomicilioAtencion() : (medico.getDireccion() != null && !medico.getDireccion().isBlank() ? medico.getDireccion() : null);
 
-            com.tranqui.app.model.dto.Qbi2RecetaDtos.DomicilioDto domicilioConsultorio = com.tranqui.app.model.dto.Qbi2RecetaDtos.DomicilioDto.builder()
-                    .calle(medico.getDomicilioCalle() != null && !medico.getDomicilioCalle().isBlank() ? medico.getDomicilioCalle() : "Av. Colón")
-                    .numero(medico.getDomicilioNumero() != null && !medico.getDomicilioNumero().isBlank() ? medico.getDomicilioNumero() : "1234")
-                    .localidad(medico.getDomicilioLocalidad() != null && !medico.getDomicilioLocalidad().isBlank() ? medico.getDomicilioLocalidad() : "Córdoba")
-                    .provincia(medico.getDomicilioProvincia() != null && !medico.getDomicilioProvincia().isBlank() ? medico.getDomicilioProvincia() : "Córdoba")
-                    .pais("Argentina")
-                    .direccion(direccionStr)
-                    .build();
+            boolean tieneDomicilioEstructurado = medico.getDomicilioCalle() != null && !medico.getDomicilioCalle().isBlank();
+            boolean tieneAlgunDomicilio = tieneDomicilioEstructurado || (direccionStr != null && !direccionStr.isBlank());
+
+            com.tranqui.app.model.dto.Qbi2RecetaDtos.DomicilioDto domicilioConsultorio = null;
+            if (tieneAlgunDomicilio) {
+                domicilioConsultorio = com.tranqui.app.model.dto.Qbi2RecetaDtos.DomicilioDto.builder()
+                        .calle(medico.getDomicilioCalle())
+                        .numero(medico.getDomicilioNumero())
+                        .localidad(medico.getDomicilioLocalidad())
+                        .provincia(medico.getDomicilioProvincia())
+                        .pais(tieneDomicilioEstructurado ? "Argentina" : null)
+                        .direccion(direccionStr)
+                        .build();
+            }
 
             com.tranqui.app.model.dto.Qbi2RecetaDtos.LugarAtencionDto lugarAtencion = com.tranqui.app.model.dto.Qbi2RecetaDtos.LugarAtencionDto.builder()
                     .nombreConsultorio(consultorioNombre)
@@ -170,7 +198,11 @@ public class RecetaService {
                             // worse than sending none. Only real matches from QBI2's own medicamento
                             // catalog (GetMedicamento, wired in the frontend's search) populate this.
                             .regNo(m.getRegNo() != null && !m.getRegNo().isBlank() ? m.getRegNo() : null)
-                            .permiteSustitucion(Boolean.TRUE.equals(m.getNoSustituible()) ? "NO" : "SI")
+                            // QBI2's GetRecipe/apirecipe/Receta swagger (Core.Dtos.MedicamentoDto.permiteSustitucion)
+                            // only accepts "S" | "N" | null — NOT "SI"/"NO". Sending "SI"/"NO" made every
+                            // receta fail with error QBI34 "REVISE LOS TIPOS DE DATO DE LOS CAMPOS INGRESADOS",
+                            // confirmed 2026-08-06 against the real HML endpoint (see audit notes).
+                            .permiteSustitucion(Boolean.TRUE.equals(m.getNoSustituible()) ? "N" : "S")
                             .build())
                     .collect(Collectors.toList());
 
@@ -209,6 +241,11 @@ public class RecetaService {
         }
 
         com.tranqui.app.model.dto.Qbi2RecetaDtos.RecetaResult recetaResult = qbiResponse.getRecetas().get(0);
+        // fechavencimiento/status no viven en "recetas" (Core.Dtos.RecetaPdfResponseDto) sino en el
+        // array separado "response" (Core.Dtos.RecetaResponseDto) — ver comentario en Qbi2RecetaDtos.
+        String fechaVencimiento = qbiResponse.getResponse() != null && !qbiResponse.getResponse().isEmpty()
+                ? qbiResponse.getResponse().get(0).getFechavencimiento()
+                : null;
         log.info("Receta oficial generada en QBI2/Innovamed para médico ID {} / paciente ID {}. idReceta={} verificador={}",
                 medico.getId(), paciente.getId(), recetaResult.getIdReceta(), recetaResult.getVerificador());
 
@@ -222,7 +259,7 @@ public class RecetaService {
                 .qbi2IdReceta(recetaResult.getIdReceta())
                 .qbi2Verificador(recetaResult.getVerificador())
                 .qbi2NroCuir(recetaResult.getNroCUIR() != null ? String.join(", ", recetaResult.getNroCUIR()) : null)
-                .qbi2FechaVencimiento(recetaResult.getFechavencimiento())
+                .qbi2FechaVencimiento(fechaVencimiento)
                 .qbi2IdTransaccion(qbiResponse.getIdTransaccion())
                 .build();
 

@@ -91,11 +91,15 @@ public class Qbi2RecipeClientMock implements Qbi2RecipeClient {
                 .s3Link(null)
                 .verificador("MOCK-VERIFICADOR")
                 .linkECommerce(null)
+                .build();
+        Qbi2RecetaDtos.RecetaDetalle detalle = Qbi2RecetaDtos.RecetaDetalle.builder()
+                .fecha(null)
                 .fechavencimiento(null)
                 .status("MOCK")
                 .build();
         return Qbi2RecetaDtos.RecetaResponse.builder()
                 .recetas(List.of(result))
+                .response(List.of(detalle))
                 .errores(Collections.emptyList())
                 .idTransaccion("MOCK-" + System.currentTimeMillis())
                 .build();

@@ -47,8 +47,16 @@ public class Qbi2RecipeClientHttp implements Qbi2RecipeClient {
     private String token;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
+    // NON_NULL only affects serialization (outgoing requests), never deserialization — needed
+    // because QBI2's schema has several non-nullable value-type fields (RecetaRequestDto.fechaEmision:
+    // DateTime, PacienteRecetaDto.ocultarPaciente: bool, MedicamentoDto.tratamiento: int) that we never
+    // populate. Without this, Jackson wrote them out as explicit JSON `null`, which .NET's model binder
+    // rejects for non-nullable value types with error QBI34 "REVISE LOS TIPOS DE DATO DE LOS CAMPOS
+    // INGRESADOS" — omitting the property entirely (this fix) makes it fall back to QBI2's own default
+    // instead, which is exactly what their spec describes as the intended "not specified" behavior.
     private final ObjectMapper objectMapper = new ObjectMapper()
-            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            .setDefaultPropertyInclusion(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL);
 
     private String baseUrl() {
         return "prod".equalsIgnoreCase(environment) ? baseUrlProd : baseUrlHml;

@@ -173,19 +173,24 @@ public class ClinicalController {
         return ResponseEntity.ok(clinicalService.actualizarPaciente(pacienteId, userDetails.getUsername(), dto));
     }
 
+    // Soft-delete (ver ClinicalService.eliminarInforme): la fila nunca se borra, solo se marca
+    // ANULADO con el motivo recibido acá.
     @DeleteMapping("/pacientes/{pacienteId}/informes/{informeId}")
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<Void> eliminarInforme(
             @PathVariable Long pacienteId,
             @PathVariable Long informeId,
+            @RequestParam(required = false, defaultValue = "No especificado") String motivo,
             @AuthenticationPrincipal UserDetails userDetails) {
         if (userDetails == null) {
             return ResponseEntity.status(401).build();
         }
-        clinicalService.eliminarInforme(informeId, userDetails.getUsername());
+        clinicalService.eliminarInforme(informeId, userDetails.getUsername(), motivo);
         return ResponseEntity.ok().build();
     }
 
+    // Corrección por anexo (ver ClinicalService.editarInforme): devuelve la fila nueva
+    // (ANEXO_CORRECCION), no el original modificado.
     @PutMapping("/pacientes/{pacienteId}/informes/{informeId}")
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<InformeClinico> editarInforme(
@@ -196,14 +201,15 @@ public class ClinicalController {
         if (userDetails == null) {
             return ResponseEntity.status(401).build();
         }
-        InformeClinico updated = clinicalService.editarInforme(
+        InformeClinico anexo = clinicalService.editarInforme(
                 informeId,
                 userDetails.getUsername(),
                 dto.getTipoInforme(),
                 dto.getPlanTrabajo(),
-                dto.getContenido()
+                dto.getContenido(),
+                dto.getMotivo()
         );
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(anexo);
     }
 
     @DeleteMapping("/pacientes/{pacienteId}/seguimientos/{seguimientoId}")
@@ -211,11 +217,12 @@ public class ClinicalController {
     public ResponseEntity<Void> eliminarSeguimiento(
             @PathVariable Long pacienteId,
             @PathVariable Long seguimientoId,
+            @RequestParam(required = false, defaultValue = "No especificado") String motivo,
             @AuthenticationPrincipal UserDetails userDetails) {
         if (userDetails == null) {
             return ResponseEntity.status(401).build();
         }
-        clinicalService.eliminarSeguimiento(seguimientoId, userDetails.getUsername());
+        clinicalService.eliminarSeguimiento(seguimientoId, userDetails.getUsername(), motivo);
         return ResponseEntity.ok().build();
     }
 }

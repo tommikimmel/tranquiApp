@@ -16,6 +16,7 @@ public class UserResponseDto {
     private String email;
     private Rol rol;
     private String telefono;
+    private Boolean perfilCompleto;
 
     public UserResponseDto(Long id, String nombre, String email, Rol rol) {
         this.id = id;

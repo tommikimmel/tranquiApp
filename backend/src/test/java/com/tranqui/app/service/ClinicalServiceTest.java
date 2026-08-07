@@ -432,12 +432,12 @@ class ClinicalServiceTest {
         assertNull(paciente.getObraSocial());
     }
 
-    // ── eliminarInforme ──────────────────────────────────────────────
+    // ── eliminarInforme (soft-delete, nunca hard delete) ─────────────
 
     @Test
     void eliminarInforme_shouldThrowWhenNotFound() {
         when(informeClinicoRepository.findById(1L)).thenReturn(Optional.empty());
-        assertThrows(EntityNotFoundException.class, () -> clinicalService.eliminarInforme(1L, "dra@mail.com"));
+        assertThrows(EntityNotFoundException.class, () -> clinicalService.eliminarInforme(1L, "dra@mail.com", "motivo"));
     }
 
     @Test
@@ -445,27 +445,32 @@ class ClinicalServiceTest {
         InformeClinico informe = InformeClinico.builder().id(1L).medico(medico("otra@mail.com")).build();
         when(informeClinicoRepository.findById(1L)).thenReturn(Optional.of(informe));
 
-        assertThrows(AccessDeniedException.class, () -> clinicalService.eliminarInforme(1L, "dra@mail.com"));
+        assertThrows(AccessDeniedException.class, () -> clinicalService.eliminarInforme(1L, "dra@mail.com", "motivo"));
         verify(informeClinicoRepository, never()).delete(any());
+        verify(informeClinicoRepository, never()).save(any());
     }
 
     @Test
-    void eliminarInforme_shouldDeleteWhenOwner() {
+    void eliminarInforme_shouldSoftDeleteWithMotivoWhenOwner() {
         InformeClinico informe = InformeClinico.builder().id(1L).medico(medico("dra@mail.com")).build();
         when(informeClinicoRepository.findById(1L)).thenReturn(Optional.of(informe));
+        when(informeClinicoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        clinicalService.eliminarInforme(1L, "dra@mail.com");
+        clinicalService.eliminarInforme(1L, "dra@mail.com", "cargado por error");
 
-        verify(informeClinicoRepository).delete(informe);
+        assertEquals("ANULADO", informe.getEstado());
+        assertEquals("cargado por error", informe.getMotivo());
+        verify(informeClinicoRepository, never()).delete(any());
+        verify(informeClinicoRepository).save(informe);
     }
 
-    // ── editarInforme ────────────────────────────────────────────────
+    // ── editarInforme (corrección por anexo, no edición en el lugar) ─
 
     @Test
     void editarInforme_shouldThrowWhenNotFound() {
         when(informeClinicoRepository.findById(1L)).thenReturn(Optional.empty());
         assertThrows(EntityNotFoundException.class,
-                () -> clinicalService.editarInforme(1L, "dra@mail.com", "GENERAL", "plan", "contenido"));
+                () -> clinicalService.editarInforme(1L, "dra@mail.com", "GENERAL", "plan", "contenido", "motivo"));
     }
 
     @Test
@@ -474,28 +479,49 @@ class ClinicalServiceTest {
         when(informeClinicoRepository.findById(1L)).thenReturn(Optional.of(informe));
 
         assertThrows(AccessDeniedException.class,
-                () -> clinicalService.editarInforme(1L, "dra@mail.com", "GENERAL", "plan", "contenido"));
+                () -> clinicalService.editarInforme(1L, "dra@mail.com", "GENERAL", "plan", "contenido", "motivo"));
     }
 
     @Test
-    void editarInforme_shouldUpdateFieldsWhenOwner() {
-        InformeClinico informe = InformeClinico.builder().id(1L).medico(medico("dra@mail.com")).tipoInforme("VIEJO").build();
+    void editarInforme_shouldThrowWhenOriginalAlreadyAnulado() {
+        InformeClinico informe = InformeClinico.builder().id(1L).medico(medico("dra@mail.com")).estado("ANULADO").build();
         when(informeClinicoRepository.findById(1L)).thenReturn(Optional.of(informe));
-        when(informeClinicoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        InformeClinico result = clinicalService.editarInforme(1L, "dra@mail.com", "NUEVO", "plan-x", "contenido-x");
-
-        assertEquals("NUEVO", result.getTipoInforme());
-        assertEquals("plan-x", result.getPlanTrabajo());
-        assertEquals("contenido-x", result.getContenido());
+        assertThrows(IllegalStateException.class,
+                () -> clinicalService.editarInforme(1L, "dra@mail.com", "GENERAL", "plan", "contenido", "motivo"));
     }
 
-    // ── eliminarSeguimiento ──────────────────────────────────────────
+    @Test
+    void editarInforme_shouldCreateAnexoAndKeepOriginalIntact() {
+        Usuario medico = medico("dra@mail.com");
+        Usuario paciente = paciente(5L, "Ana");
+        InformeClinico original = InformeClinico.builder().id(1L).medico(medico).paciente(paciente).tipoInforme("VIEJO").build();
+        when(informeClinicoRepository.findById(1L)).thenReturn(Optional.of(original));
+        when(informeClinicoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        InformeClinico anexo = clinicalService.editarInforme(1L, "dra@mail.com", "NUEVO", "plan-x", "contenido-x", "corrección de diagnóstico");
+
+        // El original no pierde su contenido — solo cambia de estado.
+        assertEquals("VIEJO", original.getTipoInforme());
+        assertEquals("VIGENTE_CORREGIDO", original.getEstado());
+
+        // El anexo es una fila nueva, enlazada al original, con el contenido corregido.
+        assertEquals("NUEVO", anexo.getTipoInforme());
+        assertEquals("plan-x", anexo.getPlanTrabajo());
+        assertEquals("contenido-x", anexo.getContenido());
+        assertEquals("ANEXO_CORRECCION", anexo.getEstado());
+        assertEquals(1L, anexo.getInformeOriginalId());
+        assertEquals("corrección de diagnóstico", anexo.getMotivo());
+        assertNotNull(anexo.getHashIntegridad());
+        verify(informeClinicoRepository, times(2)).save(any());
+    }
+
+    // ── eliminarSeguimiento (soft-delete, nunca hard delete) ─────────
 
     @Test
     void eliminarSeguimiento_shouldThrowWhenNotFound() {
         when(seguimientoDiarioRepository.findById(1L)).thenReturn(Optional.empty());
-        assertThrows(EntityNotFoundException.class, () -> clinicalService.eliminarSeguimiento(1L, "dra@mail.com"));
+        assertThrows(EntityNotFoundException.class, () -> clinicalService.eliminarSeguimiento(1L, "dra@mail.com", "motivo"));
     }
 
     @Test
@@ -503,17 +529,55 @@ class ClinicalServiceTest {
         SeguimientoDiario seguimiento = SeguimientoDiario.builder().id(1L).medico(medico("otra@mail.com")).build();
         when(seguimientoDiarioRepository.findById(1L)).thenReturn(Optional.of(seguimiento));
 
-        assertThrows(AccessDeniedException.class, () -> clinicalService.eliminarSeguimiento(1L, "dra@mail.com"));
+        assertThrows(AccessDeniedException.class, () -> clinicalService.eliminarSeguimiento(1L, "dra@mail.com", "motivo"));
         verify(seguimientoDiarioRepository, never()).delete(any());
+        verify(seguimientoDiarioRepository, never()).save(any());
     }
 
     @Test
-    void eliminarSeguimiento_shouldDeleteWhenOwner() {
+    void eliminarSeguimiento_shouldSoftDeleteWithMotivoWhenOwner() {
         SeguimientoDiario seguimiento = SeguimientoDiario.builder().id(1L).medico(medico("dra@mail.com")).build();
         when(seguimientoDiarioRepository.findById(1L)).thenReturn(Optional.of(seguimiento));
+        when(seguimientoDiarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        clinicalService.eliminarSeguimiento(1L, "dra@mail.com");
+        clinicalService.eliminarSeguimiento(1L, "dra@mail.com", "duplicado");
 
-        verify(seguimientoDiarioRepository).delete(seguimiento);
+        assertEquals("ANULADO", seguimiento.getEstado());
+        assertEquals("duplicado", seguimiento.getMotivo());
+        verify(seguimientoDiarioRepository, never()).delete(any());
+        verify(seguimientoDiarioRepository).save(seguimiento);
+    }
+
+    // ── hash de integridad al crear ───────────────────────────────────
+
+    @Test
+    void guardarInforme_shouldSetEstadoVigenteAndComputeHash() {
+        Usuario medico = medico("dra@mail.com");
+        Usuario paciente = paciente(5L, "Ana");
+        when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico));
+        when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
+        when(informeClinicoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        InformeClinico saved = clinicalService.guardarInforme("dra@mail.com", 5L, "GENERAL", "plan", "contenido", "archivo.pdf");
+
+        assertEquals("VIGENTE", saved.getEstado());
+        assertNotNull(saved.getHashIntegridad());
+        assertEquals(64, saved.getHashIntegridad().length()); // SHA-256 en hex
+    }
+
+    @Test
+    void guardarSeguimiento_shouldSetEstadoVigenteAndComputeHash() {
+        Usuario medico = medico("dra@mail.com");
+        Usuario paciente = paciente(5L, "Ana");
+        when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico));
+        when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
+        when(seguimientoDiarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SeguimientoDiario entry = SeguimientoDiario.builder().estadoAnimo("Bueno").build();
+        SeguimientoDiario saved = clinicalService.guardarSeguimiento(5L, "dra@mail.com", entry);
+
+        assertEquals("VIGENTE", saved.getEstado());
+        assertNotNull(saved.getHashIntegridad());
+        assertEquals(64, saved.getHashIntegridad().length());
     }
 }

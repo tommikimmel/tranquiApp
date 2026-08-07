@@ -63,8 +63,8 @@ public class MedicoDto {
     private Integer duracionTurnoMinutos;
     private Integer intervaloEntreTurnosMinutos;
 
-    // QBI2 Recipe integration — digital signature + PDF stamp. See Usuario for field docs.
-    private String firmaUrl;
+    // QBI2 Recipe integration — REFEPS code + PDF stamp. See Usuario for field docs.
+    private String codigoRefeps;
     private String selloLinea1;
     private String selloLinea2;
     private String selloLinea3;

@@ -307,6 +307,99 @@
   border-color: var(--color-primary);
 }
 
+/* Selected-patient card (step 1 of "Nueva Receta") and its matching dropdown result rows,
+   so a doctor sees name + DNI + edad + obra social + contacto at a glance instead of a bare
+   "Nombre — DNI 123" string. */
+.rx-selected-patient {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--green-50, var(--neutral-50));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.rx-selected-patient__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: var(--green-100);
+  color: var(--green-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  font-weight: bold;
+  font-family: var(--font-heading);
+  flex-shrink: 0;
+}
+
+.rx-selected-patient__avatar--sm {
+  width: 34px;
+  height: 34px;
+  font-size: 12px;
+}
+
+.rx-selected-patient__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rx-selected-patient__name {
+  font-weight: bold;
+  font-size: var(--text-md);
+}
+
+.rx-selected-patient__meta {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 4px;
+  column-gap: 14px;
+  margin-top: 4px;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.rx-selected-patient__meta--sm {
+  column-gap: 10px;
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+.rx-patient-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background-color: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 280px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.patient-search-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s;
+}
+
+.patient-search-item:last-child {
+  border-bottom: none;
+}
+
+.patient-search-item:hover {
+  background-color: var(--neutral-100);
+}
+
 /* ── Stat Cards ────────────────────────────────────────────── */
 .stats-grid {
   display: grid;
@@ -1020,6 +1113,38 @@
 
 .form-input--error:focus {
   box-shadow: 0 0 0 3px rgb(192 57 43 / 0.12);
+}
+
+.form-select {
+  padding: var(--space-3) var(--space-4);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-family: var(--font-body);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  outline: none;
+  width: 100%;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23767975' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  background-size: 18px;
+  padding-right: var(--space-8, 2rem);
+}
+
+.form-select:focus {
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 3px rgb(27 138 90 / 0.12);
+}
+
+.form-select:disabled {
+  background-color: var(--neutral-100);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
 }
 
 .form-helper {

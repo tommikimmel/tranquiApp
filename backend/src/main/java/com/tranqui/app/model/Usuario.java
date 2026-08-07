@@ -225,6 +225,19 @@ public class Usuario {
     @Column(name = "verificado_admin")
     private Boolean verificadoAdmin;
 
+    // Whether the user has filled in the Paso 2 profile data (nombre, apellido, sexo,
+    // fechaNacimiento, tipoDocumento, numeroDocumento, telefono). Null/true means complete —
+    // every pre-existing user and every account created through the normal multi-step register
+    // flow already has this data, so they don't need a migration backfill. Only Google sign-in
+    // creates a user with just email+nombre and explicitly sets this to false, which gates the
+    // "complete your profile" prompt on the frontend until PATCHed true via /auth/complete-profile.
+    @Column(name = "perfil_completo")
+    private Boolean perfilCompleto;
+
+    public boolean isPerfilCompleto() {
+        return perfilCompleto == null || perfilCompleto;
+    }
+
     @Column(name = "descripcion_perfil", columnDefinition = "TEXT")
     private String descripcionPerfil;
 
@@ -264,12 +277,11 @@ public class Usuario {
     private String sitioWebUrl;
 
     // ── QBI2 Recipe integration fields (médico) ────────────────────────────
-    // Digital signature image, required on every electronic prescription. Same
-    // shape as fotoUrl (a URL or a base64 data-uri) and validated the same way
-    // (see MedicoService.MAX_FOTO_BYTES) so médicos reuse the upload flow they
-    // already know from their profile photo.
-    @Column(name = "firma_url", columnDefinition = "TEXT")
-    private String firmaUrl;
+    // REFEPS registry code — QBI2/Innovamed requires it to generate the electronic
+    // signature on every prescription automatically; we no longer collect a signature
+    // image ourselves.
+    @Column(name = "codigo_refeps", length = 50)
+    private String codigoRefeps;
 
     // "Sello" — the 3-line stamp block QBI2 prints on the PDF (e.g. "Dr. Juan Pérez" /
     // "Psiquiatría" / "MN 12345"). Kept editable/separate from nombre+especialidad+matricula

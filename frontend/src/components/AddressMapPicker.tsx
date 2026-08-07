@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { loadGoogleMapsScript } from '../utils/loadGoogleMaps'
-import { PROVINCIA_BOUNDS } from '../utils/provinciaBounds'
 
 const GOOGLE_MAPS_API_KEY = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 
@@ -52,25 +51,19 @@ function loadLeafletScript(): Promise<void> {
 }
 
 interface AddressMapPickerProps {
-  provincia: string
-  onProvinciaChange: (provincia: string) => void
   direccion: string
   onDireccionChange: (direccion: string) => void
   lat: number | null
   lng: number | null
   onLocationChange: (lat: number, lng: number) => void
-  provinciasList: string[]
 }
 
 export default function AddressMapPicker({
-  provincia,
-  onProvinciaChange,
   direccion,
   onDireccionChange,
   lat,
   lng,
   onLocationChange,
-  provinciasList,
 }: AddressMapPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -88,7 +81,17 @@ export default function AddressMapPicker({
   const [leafletReady, setLeafletReady] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [searching, setSearching] = useState(false)
-  
+
+  // Live suggestions-as-you-type for the Nominatim/Leaflet path (no Google Maps API key
+  // configured today, so this is the branch actually in use). Google's own Places Autocomplete
+  // widget already gives native live suggestions when mapsReady, so this only kicks in there.
+  const [suggestions, setSuggestions] = useState<{ label: string; lat: number; lon: number }[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [suggestLoading, setSuggestLoading] = useState(false)
+  const suggestDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const skipNextSuggestFetch = useRef(false)
+  const suggestBoxRef = useRef<HTMLDivElement>(null)
+
   const onDireccionChangeRef = useRef(onDireccionChange)
   useEffect(() => {
     onDireccionChangeRef.current = onDireccionChange
@@ -141,6 +144,83 @@ export default function AddressMapPicker({
 
   const searchedRef = useRef('')
 
+  // Debounced live suggestions from Nominatim as the user types — this replaces the old "type
+  // then click Ubicar" flow with normal map-style autocomplete. No provincia filter: the address
+  // text itself is enough for Nominatim to disambiguate within Argentina.
+  useEffect(() => {
+    if (mapsReady) return // Google's native Places widget already provides its own dropdown
+    if (skipNextSuggestFetch.current) { skipNextSuggestFetch.current = false; return }
+    if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current)
+
+    const query = direccion.trim()
+    if (query.length < 3) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+
+    suggestDebounceRef.current = setTimeout(async () => {
+      setSuggestLoading(true)
+      try {
+        const params = new URLSearchParams({
+          format: 'json',
+          q: `${query}, Argentina`,
+          countrycodes: 'ar',
+          limit: '6',
+          addressdetails: '1',
+        })
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+          headers: { 'Accept-Language': 'es', 'User-Agent': 'TranquiApp/1.0' }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setSuggestions((Array.isArray(data) ? data : []).map((d: any) => ({
+            label: d.display_name as string,
+            lat: parseFloat(d.lat),
+            lon: parseFloat(d.lon),
+          })))
+          setShowSuggestions(true)
+        }
+      } catch (err) {
+        console.error('Error buscando sugerencias de dirección:', err)
+      } finally {
+        setSuggestLoading(false)
+      }
+    }, 400)
+
+    return () => { if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current) }
+  }, [direccion, mapsReady])
+
+  // Close the suggestions dropdown when clicking outside of it or the input
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (suggestBoxRef.current?.contains(e.target as Node)) return
+      if (inputRef.current?.contains(e.target as Node)) return
+      setShowSuggestions(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleSelectSuggestion = (s: { label: string; lat: number; lon: number }) => {
+    skipNextSuggestFetch.current = true
+    setSuggestions([])
+    setShowSuggestions(false)
+    setManualAdjustmentEnabled(false) // Lock pin position on new selection, same as a normal search
+    onDireccionChange(s.label)
+    onLocationChange(s.lat, s.lon)
+
+    if (leafletMapRef.current) {
+      leafletMapRef.current.setView([s.lat, s.lon], ZOOM_WITH_PIN)
+    }
+    if (leafletMarkerRef.current) {
+      leafletMarkerRef.current.setLatLng([s.lat, s.lon])
+      if (!leafletMapRef.current.hasLayer(leafletMarkerRef.current)) {
+        leafletMarkerRef.current.addTo(leafletMapRef.current)
+      }
+    }
+  }
+
   // Load appropriate map library
   useEffect(() => {
     let cancelled = false
@@ -171,7 +251,7 @@ export default function AddressMapPicker({
     if (!queryStr) return
     
     // Prevent double geocoding if nothing changed
-    const fullQuery = `${queryStr}, ${provincia ? provincia + ', ' : ''}Argentina`
+    const fullQuery = `${queryStr}, Argentina`
     if (fullQuery === searchedRef.current) return
     searchedRef.current = fullQuery
 
@@ -386,18 +466,6 @@ export default function AddressMapPicker({
     }
   }, [leafletReady])
 
-  // Bias Google Autocomplete bounds towards the selected province
-  useEffect(() => {
-    if (!mapsReady || !autocompleteRef.current) return
-    const bounds = PROVINCIA_BOUNDS[provincia]
-    if (!bounds) return
-    const google = (window as any).google
-    autocompleteRef.current.setBounds(new google.maps.LatLngBounds(
-      { lat: bounds.south, lng: bounds.west },
-      { lat: bounds.north, lng: bounds.east }
-    ))
-  }, [provincia, mapsReady])
-
   // Synchronize Google Maps marker position with lat/lng props (if changed externally)
   useEffect(() => {
     if (!mapRef.current || !markerRef.current || lat == null || lng == null) return
@@ -448,19 +516,13 @@ export default function AddressMapPicker({
     return (
       <div className="form-group" style={{ gridColumn: 'span 2' }}>
         <label className="form-label form-label--required">Domicilio de Atención</label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--space-3)' }}>
-          <select className="form-input" value={provincia} onChange={(e) => onProvinciaChange(e.target.value)}>
-            <option value="">Provincia</option>
-            {provinciasList.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <input
-            className="form-input"
-            type="text"
-            placeholder="Calle y altura, ej: Av. Colón 123"
-            value={direccion}
-            onChange={(e) => onDireccionChange(e.target.value)}
-          />
-        </div>
+        <input
+          className="form-input"
+          type="text"
+          placeholder="Calle y altura, ej: Av. Colón 123"
+          value={direccion}
+          onChange={(e) => onDireccionChange(e.target.value)}
+        />
         <span className="form-helper">
           El mapa interactivo no está disponible. Podés ingresar tu dirección de consultorio en el campo de texto.
         </span>
@@ -468,41 +530,66 @@ export default function AddressMapPicker({
     )
   }
 
+  // With Google Maps configured, its native Places widget already renders its own dropdown —
+  // our custom one is Nominatim-only so the two never show up at the same time.
+  const showCustomSuggestions = !mapsReady && showSuggestions && (suggestLoading || suggestions.length > 0)
+
   return (
     <div className="form-group" style={{ gridColumn: 'span 2' }}>
       <label className="form-label form-label--required">Domicilio de Atención</label>
-      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-        <select 
-          className="form-input" 
-          value={provincia} 
-          onChange={(e) => onProvinciaChange(e.target.value)}
-          style={{ width: '150px', flexShrink: 0 }}
-        >
-          <option value="">Provincia</option>
-          {provinciasList.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
-        <input
-          ref={inputRef}
-          className="form-input"
-          type="text"
-          placeholder="Calle y altura, ej: Av. Colón 123"
-          value={direccion}
-          onChange={(e) => onDireccionChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={handleSearchAddress}
-          style={{ flexGrow: 1 }}
-        />
-        <button
-          type="button"
-          onClick={handleSearchAddress}
-          disabled={searching}
-          className="btn btn--secondary"
-          style={{ padding: '0 16px', height: '38px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--text-sm)', fontWeight: 'bold' }}
-        >
-          {searching ? 'Buscando...' : 'Ubicar'}
-        </button>
+      <div style={{ marginBottom: 'var(--space-2)' }}>
+        <div style={{ position: 'relative' }}>
+          <input
+            ref={inputRef}
+            className="form-input"
+            type="text"
+            placeholder="Calle y altura, ej: Av. Colón 123"
+            value={direccion}
+            onChange={(e) => onDireccionChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true) }}
+            autoComplete="off"
+            style={{ width: '100%' }}
+          />
+          {showCustomSuggestions && (
+            <div
+              ref={suggestBoxRef}
+              style={{
+                // Leaflet's own controls (.leaflet-top/.leaflet-bottom) use z-index up to 1000 and
+                // aren't trapped in a local stacking context by .leaflet-container, so they leak
+                // above lower z-index siblings — this has to clear that.
+                position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 1001,
+                backgroundColor: 'var(--color-surface)', border: '1.5px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-md, 0 4px 12px rgba(0,0,0,0.12))',
+                maxHeight: '220px', overflowY: 'auto',
+              }}
+            >
+              {suggestLoading && suggestions.length === 0 ? (
+                <div style={{ padding: '10px 12px', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+                  Buscando direcciones...
+                </div>
+              ) : (
+                suggestions.map((s, i) => (
+                  <div
+                    key={`${s.lat}-${s.lon}-${i}`}
+                    onClick={() => handleSelectSuggestion(s)}
+                    style={{
+                      padding: '9px 12px', fontSize: 'var(--text-sm)', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      borderBottom: i < suggestions.length - 1 ? '1px solid var(--color-border)' : 'none',
+                    }}
+                    onMouseDown={(e) => e.preventDefault()}
+                  >
+                    <IconMapPin size={13} />
+                    <span>{s.label}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </div>
-      
+
       <div
         ref={mapContainerRef}
         style={{ width: '100%', height: '220px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)', marginTop: '8px' }}
@@ -528,7 +615,7 @@ export default function AddressMapPicker({
       ) : (
         <span className="form-helper" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
           <IconMapPin />
-          Escribí la dirección y hacé clic en "Ubicar" para posicionar el marcador.
+          Escribí la dirección: te van a aparecer sugerencias para seleccionar.
         </span>
       )}
     </div>

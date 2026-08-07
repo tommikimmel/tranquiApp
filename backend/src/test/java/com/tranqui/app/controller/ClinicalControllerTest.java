@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -44,7 +45,7 @@ class ClinicalControllerTest {
                 .contenido("Nuevo contenido")
                 .build();
 
-        when(clinicalService.editarInforme(eq(1L), eq("medico@test.com"), eq("Evaluativo"), eq("Nuevo plan"), eq("Nuevo contenido")))
+        when(clinicalService.editarInforme(eq(1L), eq("medico@test.com"), eq("Evaluativo"), eq("Nuevo plan"), eq("Nuevo contenido"), isNull()))
                 .thenReturn(mockInforme);
 
         mockMvc.perform(put("/api/pacientes/2/informes/1")

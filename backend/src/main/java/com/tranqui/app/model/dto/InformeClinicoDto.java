@@ -14,4 +14,5 @@ public class InformeClinicoDto {
     private String planTrabajo;
     private String contenido;
     private String nombreArchivo;
+    private String motivo; // solo usado por PUT: motivo de la corrección que genera el anexo
 }

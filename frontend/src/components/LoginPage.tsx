@@ -137,7 +137,6 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   const [specialty, setSpecialty] = useState('')
   const [cuil, setCuil] = useState('')
   const [domicilioAtencion, setDomicilioAtencion] = useState('')
-  const [domicilioProvincia, setDomicilioProvincia] = useState('')
   const [domicilioLat, setDomicilioLat] = useState<number | null>(null)
   const [domicilioLng, setDomicilioLng] = useState<number | null>(null)
   const [matriculaTipo, setMatriculaTipo] = useState('MN')
@@ -350,8 +349,8 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
         showAlert('Seleccioná al menos una modalidad de consulta (Online o Presencial).', 'warning')
         return
       }
-      if (ofrecePresencial && !domicilioAtencion) {
-        showAlert('Si ofrecés consultas presenciales, indicá el domicilio de atención.', 'warning')
+      if (!domicilioAtencion) {
+        showAlert('Indicá tu dirección profesional: QBI2/Innovamed la exige para emitir recetas electrónicas, incluso si atendés 100% online.', 'warning')
         return
       }
       payload.matricula = matricula
@@ -359,9 +358,9 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       payload.specialty = specialty
       payload.cuit = cuil
       payload.cuil = cuil ? Number(cuil) : null
-      payload.domicilioAtencion = ofrecePresencial ? domicilioAtencion : null
-      payload.domicilioLat = ofrecePresencial ? domicilioLat : null
-      payload.domicilioLng = ofrecePresencial ? domicilioLng : null
+      payload.domicilioAtencion = domicilioAtencion
+      payload.domicilioLat = domicilioLat
+      payload.domicilioLng = domicilioLng
       payload.matriculaTipo = matriculaTipo
       payload.matriculaProvincia = matriculaProvincia
       payload.matriculaNumero = Number(matricula)
@@ -1042,24 +1041,27 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                         </div>
                       </div>
 
-                      {ofrecePresencial && (
-                        <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                          <label className="form-label form-label--required">Domicilio de Atención Presencial</label>
-                          <AddressMapPicker
-                            direccion={domicilioAtencion}
-                            onDireccionChange={setDomicilioAtencion}
-                            provincia={domicilioProvincia}
-                            onProvinciaChange={setDomicilioProvincia}
-                            lat={domicilioLat}
-                            lng={domicilioLng}
-                            onLocationChange={(lat: number, lng: number) => {
-                              setDomicilioLat(lat)
-                              setDomicilioLng(lng)
-                            }}
-                            provinciasList={PROVINCIAS_ARGENTINA}
-                          />
-                        </div>
-                      )}
+                      <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                        <label className="form-label form-label--required">
+                          {ofrecePresencial ? 'Domicilio de Atención Presencial' : 'Dirección Profesional'}
+                        </label>
+                        {!ofrecePresencial && (
+                          <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: '0 0 6px' }}>
+                            QBI2/Innovamed exige un domicilio profesional para emitir recetas electrónicas
+                            aunque atiendas 100% online (puede ser tu domicilio particular; no se muestra a pacientes).
+                          </p>
+                        )}
+                        <AddressMapPicker
+                          direccion={domicilioAtencion}
+                          onDireccionChange={setDomicilioAtencion}
+                          lat={domicilioLat}
+                          lng={domicilioLng}
+                          onLocationChange={(lat: number, lng: number) => {
+                            setDomicilioLat(lat)
+                            setDomicilioLng(lng)
+                          }}
+                        />
+                      </div>
                     </div>
                   </>
                 )}
