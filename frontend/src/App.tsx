@@ -16,6 +16,7 @@ const VisitorsView = lazy(() => import('./components/VisitorsView'))
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
 const NotFoundView = lazy(() => import('./components/NotFoundView'))
 const CompleteProfileModal = lazy(() => import('./components/CompleteProfileModal'))
+const PrivacyPolicyPage = lazy(() => import('./components/PrivacyPolicyPage'))
 import AddressMapPicker from './components/AddressMapPicker'
 import DateInputDDMMYYYY from './components/DateInputDDMMYYYY'
 import { api } from './api/api'
@@ -5701,6 +5702,7 @@ export default function App() {
           }
         />
         <Route path="/reserva/:proId" element={<CheckoutRoute currentUser={currentUser} loadingSession={loadingSession} />} />
+        <Route path="/privacidad" element={<PrivacyPolicyPage currentUser={currentUser} />} />
         <Route
           path="/panel/*"
           element={

@@ -681,6 +681,12 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
             </div>
 
             <div id="google-signin-btn" style={{ display: 'flex', justifyContent: 'center' }} />
+            <p style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textAlign: 'center', margin: 'var(--space-2) 0 0' }}>
+              Al continuar con Google, aceptás nuestra{' '}
+              <a href="/privacidad" target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)' }}>
+                Política de Privacidad
+              </a>.
+            </p>
           </form>
         )}
 

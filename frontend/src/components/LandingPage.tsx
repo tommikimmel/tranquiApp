@@ -1264,6 +1264,13 @@ export default function LandingPage({
         </section>
       )}
 
+      <footer className="site-footer">
+        <div className="site-footer__inner">
+          <span>© {new Date().getFullYear()} Tranqui App — por Tranqui Neurociencias</span>
+          <a href="/privacidad">Política de Privacidad</a>
+        </div>
+      </footer>
+
       {/* Mis Turnos Modal */}
       {showAppointmentsModal && (
         <div style={{

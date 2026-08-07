@@ -1060,7 +1060,11 @@ function StepSelect({
                   style={{ marginTop: '3px' }}
                 />
                 <label htmlFor="acceptedTerms" style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
-                  Acepto los términos de servicio, políticas de privacidad y cancelaciones de la plataforma Tranqui.
+                  Acepto los términos de servicio, la{' '}
+                  <a href="/privacidad" target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)' }}>
+                    política de privacidad
+                  </a>{' '}
+                  y las cancelaciones de la plataforma Tranqui.
                 </label>
               </div>
 
