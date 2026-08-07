@@ -2464,15 +2464,20 @@ function SettingsView({
   // El sello se pre-completa con un texto sugerido a partir de los datos que ya cargó el
   // médico, para que la mayoría no tenga que escribir nada — solo revisar y guardar.
   const [codigoRefeps, setCodigoRefeps] = useState(medicoInfo?.codigoRefeps || '')
+  // selloLinea1/2/3 columns are varchar(40)/varchar(40)/varchar(25) — the auto-generated
+  // "Dr. {nombre} {apellido}" default bypasses the inputs' maxLength (that HTML attribute only
+  // limits typing, not a value set programmatically via React state) and, for médicos with long
+  // names, crashed the save with an unhandled Postgres "value too long" 500. Same slice() bound
+  // as the input's maxLength and the backend check in MedicoService.actualizarPerfil.
   const [selloLinea1, setSelloLinea1] = useState(
-    medicoInfo?.selloLinea1 || (medicoInfo?.nombre ? `Dr. ${medicoInfo.nombre} ${medicoInfo.apellido || ''}`.trim() : '')
+    (medicoInfo?.selloLinea1 || (medicoInfo?.nombre ? `Dr. ${medicoInfo.nombre} ${medicoInfo.apellido || ''}`.trim() : '')).slice(0, 40)
   )
-  const [selloLinea2, setSelloLinea2] = useState(medicoInfo?.selloLinea2 || medicoInfo?.specialty || '')
+  const [selloLinea2, setSelloLinea2] = useState((medicoInfo?.selloLinea2 || medicoInfo?.specialty || '').slice(0, 40))
   const [selloLinea3, setSelloLinea3] = useState(() => {
-    if (medicoInfo?.selloLinea3) return medicoInfo.selloLinea3
+    if (medicoInfo?.selloLinea3) return medicoInfo.selloLinea3.slice(0, 25)
     const tipo = medicoInfo?.matriculaInfo?.tipo || 'MP'
     const numero = medicoInfo?.matricula || medicoInfo?.matriculaInfo?.numero || ''
-    return numero ? `${tipo} ${numero}` : ''
+    return numero ? `${tipo} ${numero}`.slice(0, 25) : ''
   })
   const [ofreceOnline, setOfreceOnline] = useState(medicoInfo?.ofreceOnline !== undefined ? medicoInfo.ofreceOnline : true)
   const [ofrecePresencial, setOfrecePresencial] = useState(medicoInfo?.ofrecePresencial !== undefined ? medicoInfo.ofrecePresencial : false)
@@ -2624,6 +2629,15 @@ function SettingsView({
     const refepsStr = String(codigoRefeps ?? '').trim();
     if (refepsStr && !/^\d{12}$/.test(refepsStr)) {
       showAlert("El código REFEPS debe tener exactamente 12 dígitos numéricos. Lo podés consultar en sisa.msal.gov.ar.", "error");
+      return;
+    }
+
+    // 3b-2. Validar largo del Sello (varchar(40)/varchar(40)/varchar(25) en la base) — el valor
+    // por defecto autogenerado ("Dr. {nombre} {apellido}") ya se recorta al crear el estado, pero
+    // validamos igual antes de guardar: sin este chequeo, un médico con nombre largo se topaba con
+    // un 500 sin explicación al guardar el perfil.
+    if (selloLinea1.length > 40 || selloLinea2.length > 40 || selloLinea3.length > 25) {
+      showAlert("El sello de la receta es demasiado largo. Línea 1 y 2: máx. 40 caracteres. Línea 3: máx. 25 caracteres.", "error");
       return;
     }
 

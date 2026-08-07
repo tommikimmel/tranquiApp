@@ -175,6 +175,21 @@ public class MedicoService {
                     "El código REFEPS debe tener exactamente 12 dígitos numéricos (lo asigna SISA al matricularte, no se inventa). Podés consultarlo en sisa.msal.gov.ar.");
         }
         medico.setCodigoRefeps(refepsTrim != null && !refepsTrim.isEmpty() ? refepsTrim : null);
+
+        // sello_linea1/2 son varchar(40) y sello_linea3 varchar(25) en la base. El frontend
+        // autogenera un valor por defecto para linea1 ("Dr. {nombre} {apellido}") que puede superar
+        // 40 caracteres para médicos con nombres largos — sin este chequeo, guardar el perfil
+        // rompía con un PSQLException "value too long for type character varying(40)" sin capturar,
+        // que Spring convierte en un 500 pelado sin ningún mensaje útil para el médico.
+        if (dto.getSelloLinea1() != null && dto.getSelloLinea1().length() > 40) {
+            throw new IllegalArgumentException("La línea 1 del sello no puede superar los 40 caracteres.");
+        }
+        if (dto.getSelloLinea2() != null && dto.getSelloLinea2().length() > 40) {
+            throw new IllegalArgumentException("La línea 2 del sello no puede superar los 40 caracteres.");
+        }
+        if (dto.getSelloLinea3() != null && dto.getSelloLinea3().length() > 25) {
+            throw new IllegalArgumentException("La línea 3 del sello no puede superar los 25 caracteres.");
+        }
         medico.setSelloLinea1(dto.getSelloLinea1());
         medico.setSelloLinea2(dto.getSelloLinea2());
         medico.setSelloLinea3(dto.getSelloLinea3());
