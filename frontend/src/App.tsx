@@ -2627,6 +2627,17 @@ function SettingsView({
       return;
     }
 
+    // 3c. Validar largo del Domicilio de Atención — el buscador de direcciones (AddressMapPicker)
+    // podía guardar el display_name completo de Nominatim con todos los niveles administrativos
+    // ("Fray Miguel de Mojica 800, Miguel de Mojica, Jerónimo Luis de Cabrera, Córdoba, Municipio
+    // de Córdoba, Pedanía Capital, Departamento Capital, Córdoba, X5019, Argentina") en vez de una
+    // dirección corta — ya se corrigió en el picker, pero validamos igual por si se tipea a mano.
+    const domicilioStr = String(domicilioAtencion ?? '').trim();
+    if (domicilioStr && (domicilioStr.length < 8 || domicilioStr.length > 140)) {
+      showAlert("El domicilio de atención debe tener entre 8 y 140 caracteres. Usá el buscador y elegí una sugerencia en vez de pegar la dirección completa.", "error");
+      return;
+    }
+
     // 4. Validar Años de Experiencia (número entero no negativo)
     if (aniosExperiencia !== '' && (isNaN(Number(aniosExperiencia)) || Number(aniosExperiencia) < 0 || !/^\d+$/.test(String(aniosExperiencia).trim()))) {
       showAlert("Los años de experiencia deben ser un número entero mayor o igual a 0.", "error");

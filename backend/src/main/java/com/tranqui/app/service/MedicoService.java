@@ -109,7 +109,17 @@ public class MedicoService {
         medico.setCuil(dto.getCuil());
         medico.setTipoDocumento(dto.getTipoDocumento());
         medico.setNumeroDocumento(dto.getNumeroDocumento());
-        medico.setDomicilioAtencion(dto.getDomicilioAtencion());
+        // AddressMapPicker's Nominatim autocomplete used to store the full display_name for an
+        // Argentine address — every administrative level it knows about (barrio, pedanía,
+        // municipio, departamento, provincia twice, CP, país), 150+ characters of noise that
+        // prints on the QBI2 prescription PDF. The picker builds a short "Calle Altura, Localidad"
+        // now, but validate here too since this DTO can be hit directly, not just through the UI.
+        String domicilioTrim = dto.getDomicilioAtencion() != null ? dto.getDomicilioAtencion().trim() : null;
+        if (domicilioTrim != null && !domicilioTrim.isEmpty() && (domicilioTrim.length() < 8 || domicilioTrim.length() > 140)) {
+            throw new IllegalArgumentException(
+                    "El domicilio de atención debe tener entre 8 y 140 caracteres. Usá el buscador de direcciones y elegí una sugerencia en vez de pegar la dirección completa.");
+        }
+        medico.setDomicilioAtencion(domicilioTrim != null && !domicilioTrim.isEmpty() ? domicilioTrim : null);
         medico.setDomicilioLat(dto.getDomicilioLat());
         medico.setDomicilioLng(dto.getDomicilioLng());
 

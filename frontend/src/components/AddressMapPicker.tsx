@@ -3,6 +3,11 @@ import { loadGoogleMapsScript } from '../utils/loadGoogleMaps'
 
 const GOOGLE_MAPS_API_KEY = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 
+// Keeps the domicilio short enough to print cleanly on the QBI2 prescription PDF and to fit
+// the backend's domicilio_atencion column (255 chars) with margin — matches the validation in
+// MedicoService.actualizarPerfil / AuthController.register.
+export const MAX_DIRECCION_LEN = 140
+
 const ARGENTINA_CENTER = { lat: -35.5, lng: -65.0 }
 const ZOOM_NO_PIN = 4
 const ZOOM_WITH_PIN = 16
@@ -14,6 +19,35 @@ function IconMapPin({ size = 14 }: { size?: number }) {
       <circle cx="12" cy="10" r="3" />
     </svg>
   )
+}
+
+// Nominatim's `display_name` for an Argentine address routinely strings together every
+// administrative level it knows about (barrio, pedanía, municipio, departamento, provincia
+// twice, CP, país...) — e.g. "Fray Miguel de Mojica 800, Miguel de Mojica, Jerónimo Luis de
+// Cabrera, Córdoba, Municipio de Córdoba, Pedanía Capital, Departamento Capital, Córdoba,
+// X5019, Argentina". That's useless as a domicilio: it's what gets printed on the QBI2
+// prescription PDF and stored in a 255-char column, so we build "Calle Altura, Localidad"
+// from the structured `address` object Nominatim already returns (addressdetails=1) instead
+// of ever using the raw display_name for the *stored* value.
+function shortenNominatimAddress(address: any, fallbackDisplayName: string): string {
+  if (address) {
+    const road = address.road || address.pedestrian || address.suburb || ''
+    const num = address.house_number || ''
+    const city = address.city || address.town || address.village || address.municipality || ''
+    if (road) {
+      return city ? `${road} ${num}`.trim() + `, ${city}` : `${road} ${num}`.trim()
+    }
+  }
+  // No structured road on this result (rural pin, POI, etc.) — display_name is all we have,
+  // so keep only its first 3 comma-separated segments instead of the full admin-level dump.
+  return fallbackDisplayName.split(',').slice(0, 3).join(',').trim()
+}
+
+// Belt-and-suspenders cap applied to every programmatically-set address (Google's own
+// formatted_address is normally already short, but nothing guarantees it always is) — the
+// input's `maxLength` only constrains manual typing, not values set via onDireccionChange.
+function capLength(value: string): string {
+  return value.length > MAX_DIRECCION_LEN ? value.slice(0, MAX_DIRECCION_LEN).trim() : value
 }
 
 // Global promise to prevent double loading Leaflet script/styles
@@ -85,7 +119,7 @@ export default function AddressMapPicker({
   // Live suggestions-as-you-type for the Nominatim/Leaflet path (no Google Maps API key
   // configured today, so this is the branch actually in use). Google's own Places Autocomplete
   // widget already gives native live suggestions when mapsReady, so this only kicks in there.
-  const [suggestions, setSuggestions] = useState<{ label: string; lat: number; lon: number }[]>([])
+  const [suggestions, setSuggestions] = useState<{ label: string; value: string; lat: number; lon: number }[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [suggestLoading, setSuggestLoading] = useState(false)
   const suggestDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -104,8 +138,7 @@ export default function AddressMapPicker({
         const geocoder = new google.maps.Geocoder()
         geocoder.geocode({ location: { lat: newLat, lng: newLng } }, (results: any, status: string) => {
           if (status === 'OK' && results?.[0]) {
-            const formatted = results[0].formatted_address
-            onDireccionChangeRef.current(formatted)
+            onDireccionChangeRef.current(capLength(results[0].formatted_address))
           }
         })
       } else if (leafletReady) {
@@ -118,17 +151,7 @@ export default function AddressMapPicker({
         if (res.ok) {
           const data = await res.json()
           if (data && data.address) {
-            const road = data.address.road || data.address.pedestrian || data.address.suburb || ''
-            const num = data.address.house_number || ''
-            const city = data.address.city || data.address.town || data.address.village || ''
-            let formatted = ''
-            if (road) {
-              formatted = `${road} ${num}`.trim()
-              if (city) formatted += `, ${city}`
-            } else {
-              formatted = data.display_name.split(',').slice(0, 3).join(',').trim()
-            }
-            onDireccionChangeRef.current(formatted)
+            onDireccionChangeRef.current(capLength(shortenNominatimAddress(data.address, data.display_name || '')))
           }
         }
       }
@@ -174,11 +197,15 @@ export default function AddressMapPicker({
         })
         if (res.ok) {
           const data = await res.json()
-          setSuggestions((Array.isArray(data) ? data : []).map((d: any) => ({
-            label: d.display_name as string,
-            lat: parseFloat(d.lat),
-            lon: parseFloat(d.lon),
-          })))
+          setSuggestions((Array.isArray(data) ? data : []).map((d: any) => {
+            const short = shortenNominatimAddress(d.address, d.display_name || '')
+            return {
+              label: short,
+              value: short,
+              lat: parseFloat(d.lat),
+              lon: parseFloat(d.lon),
+            }
+          }))
           setShowSuggestions(true)
         }
       } catch (err) {
@@ -202,12 +229,12 @@ export default function AddressMapPicker({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleSelectSuggestion = (s: { label: string; lat: number; lon: number }) => {
+  const handleSelectSuggestion = (s: { label: string; value: string; lat: number; lon: number }) => {
     skipNextSuggestFetch.current = true
     setSuggestions([])
     setShowSuggestions(false)
     setManualAdjustmentEnabled(false) // Lock pin position on new selection, same as a normal search
-    onDireccionChange(s.label)
+    onDireccionChange(s.value)
     onLocationChange(s.lat, s.lon)
 
     if (leafletMapRef.current) {
@@ -384,7 +411,7 @@ export default function AddressMapPicker({
         map.setZoom(ZOOM_WITH_PIN)
         marker.setPosition({ lat: newLat, lng: newLng })
         marker.setVisible(true)
-        const formatted = place.formatted_address || direccion
+        const formatted = capLength(place.formatted_address || direccion)
         onDireccionChange(formatted)
         onLocationChange(newLat, newLng)
         setManualAdjustmentEnabled(false) // Lock pin position on new Autocomplete selection
@@ -520,6 +547,7 @@ export default function AddressMapPicker({
           className="form-input"
           type="text"
           placeholder="Calle y altura, ej: Av. Colón 123"
+          maxLength={MAX_DIRECCION_LEN}
           value={direccion}
           onChange={(e) => onDireccionChange(e.target.value)}
         />
@@ -544,6 +572,7 @@ export default function AddressMapPicker({
             className="form-input"
             type="text"
             placeholder="Calle y altura, ej: Av. Colón 123"
+            maxLength={MAX_DIRECCION_LEN}
             value={direccion}
             onChange={(e) => onDireccionChange(e.target.value)}
             onKeyDown={handleKeyDown}

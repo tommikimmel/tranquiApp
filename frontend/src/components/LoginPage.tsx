@@ -353,6 +353,10 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
         showAlert('Indicá tu dirección profesional: QBI2/Innovamed la exige para emitir recetas electrónicas, incluso si atendés 100% online.', 'warning')
         return
       }
+      if (domicilioAtencion.trim().length < 8 || domicilioAtencion.trim().length > 140) {
+        showAlert('El domicilio de atención debe tener entre 8 y 140 caracteres. Usá el buscador y elegí una sugerencia en vez de pegar la dirección completa.', 'warning')
+        return
+      }
       payload.matricula = matricula
       payload.titulo = titulo
       payload.specialty = specialty

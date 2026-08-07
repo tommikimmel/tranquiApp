@@ -70,6 +70,16 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La foto de perfil es demasiado grande (máx. 3MB). Elegí una imagen más liviana.");
         }
 
+        // Same domicilio length bounds as MedicoService.actualizarPerfil — see that comment for
+        // why (Nominatim's raw display_name for an Argentine address used to end up stored here).
+        String domicilioAtencionTrim = registerRequestDto.getDomicilioAtencion() != null
+                ? registerRequestDto.getDomicilioAtencion().trim() : null;
+        if (domicilioAtencionTrim != null && !domicilioAtencionTrim.isEmpty()
+                && (domicilioAtencionTrim.length() < 8 || domicilioAtencionTrim.length() > 140)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                    "El domicilio de atención debe tener entre 8 y 140 caracteres. Usá el buscador de direcciones y elegí una sugerencia en vez de pegar la dirección completa.");
+        }
+
         String codigoVerificacion = String.format("%06d", new java.util.Random().nextInt(1000000));
         java.time.LocalDateTime expiresAt = java.time.LocalDateTime.now().plusMinutes(15);
 
@@ -96,7 +106,7 @@ public class AuthController {
                 .specialty(registerRequestDto.getSpecialty())
                 .cuit(registerRequestDto.getCuit())
                 .cuil(registerRequestDto.getCuil())
-                .domicilioAtencion(registerRequestDto.getDomicilioAtencion())
+                .domicilioAtencion(domicilioAtencionTrim)
                 .domicilioLat(registerRequestDto.getDomicilioLat())
                 .domicilioLng(registerRequestDto.getDomicilioLng())
                 .matriculaTipo(registerRequestDto.getMatriculaTipo())
