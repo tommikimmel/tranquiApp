@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom'
 import './styles/index.css'
 import './styles/dashboard.css'
+import { OBRAS_SOCIALES } from './constants/obrasSociales'
 // LandingPage stays a static import — it's what almost every first-time visitor (anonymous
 // patients hitting "/") needs immediately, so there's nothing to gain from lazy-loading it.
 // Everything below is only needed by a subset of visitors (professionals, admins, someone
@@ -16,7 +17,10 @@ const VisitorsView = lazy(() => import('./components/VisitorsView'))
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
 const NotFoundView = lazy(() => import('./components/NotFoundView'))
 const CompleteProfileModal = lazy(() => import('./components/CompleteProfileModal'))
+const TermsAcceptanceModal = lazy(() => import('./components/TermsAcceptanceModal'))
 const PrivacyPolicyPage = lazy(() => import('./components/PrivacyPolicyPage'))
+const TermsPage = lazy(() => import('./components/TermsPage'))
+const MiCuentaView = lazy(() => import('./components/MiCuentaView'))
 import AddressMapPicker from './components/AddressMapPicker'
 import DateInputDDMMYYYY from './components/DateInputDDMMYYYY'
 import { api } from './api/api'
@@ -53,7 +57,7 @@ interface CheckoutTarget {
     linkedin?: string
     sitioWeb?: string
   }
-  tariffs?: { id: string; label: string; price: number; enabled: boolean; requiereObraSocial?: boolean }[]
+  tariffs?: { id: string; label: string; price: number; enabled: boolean; requiereObraSocial?: boolean; obraSocial?: string }[]
 }
 
 // Some backend DTOs serialize LocalDate as dd/MM/yyyy directly instead of ISO (see backend's
@@ -839,8 +843,28 @@ function ExternalEventCard({ event, compact }: { event: ExternalEvent; compact?:
   )
 }
 
-function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[]; onSave: (data: any[]) => Promise<void> }) {
-  const { showAlert } = useAlert();
+type AgendaModalidadGridHandle = {
+  getDtos: () => any[]
+  hasSlots: () => boolean
+  applySlots: (slots: { [key: number]: Set<string> }) => void
+  getSelectedSlots: () => { [key: number]: Set<string> }
+}
+
+// One weekly grid of bookable slots for a single modalidad (presencial or online). Extracted
+// out of AgendaView so a médico who offers both modalidades can have two of these mounted at
+// once (see AgendaView) — each keeps its own selectedSlots, but duracionTurno/intervaloTurno
+// are shared settings passed down as props since they're the same underlying médico setting
+// regardless of modalidad. Exposes getDtos/applySlots via ref so AgendaView's single "Guardar
+// cambios" button and "copiar de la otra agenda" action can reach into whichever grid(s) are
+// mounted without lifting all of selectedSlots up.
+const AgendaModalidadGrid = React.forwardRef(function AgendaModalidadGrid(
+  { initialAvailability, duracionTurno, intervaloTurno }: {
+    initialAvailability: any[]
+    duracionTurno: number
+    intervaloTurno: number
+  },
+  ref: React.Ref<AgendaModalidadGridHandle>
+) {
   const weekdays = [
     { name: 'Lunes', abbr: 'Lun', num: 1 },
     { name: 'Martes', abbr: 'Mar', num: 2 },
@@ -857,27 +881,285 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
     1: new Set(), 2: new Set(), 3: new Set(), 4: new Set(), 5: new Set()
   })
 
-  // "Duración de turno" / "Intervalo entre turnos" — per-médico agenda settings. Loaded from
-  // the existing profile endpoint (which now also returns these two fields) and persisted
-  // through a small dedicated endpoint so we don't have to send the whole profile DTO from
-  // here. Backend defaults (45 / 10) are mirrored here so the selects have a sane value
-  // before the profile fetch resolves.
-  const [duracionTurno, setDuracionTurno] = useState(45)
-  const [intervaloTurno, setIntervaloTurno] = useState(10)
-  const [perfilLoaded, setPerfilLoaded] = useState(false)
+  const toMinutes = (t: string) => {
+    const [h, m] = t.split(':').map(Number)
+    return h * 60 + m
+  }
+  const toTimeStr = (mins: number) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
 
-  useEffect(() => {
-    let cancelled = false
-    api.getPerfil()
-      .then((perfil: any) => {
-        if (cancelled || !perfil) return
-        if (perfil.duracionTurnoMinutos != null) setDuracionTurno(perfil.duracionTurnoMinutos)
-        if (perfil.intervaloEntreTurnosMinutos != null) setIntervaloTurno(perfil.intervaloEntreTurnosMinutos)
+  // ── Bookable-slot grid geometry ──────────────────────────────────────────
+  // The grid spans a fixed 07:00–21:00 window, generous enough for virtually any clinical
+  // schedule. Candidate slot start times are anchored to GRID_START_HOUR and stepped by
+  // duracionTurno+intervaloTurno ("paso") — this is the actual set of times a médico can
+  // toggle on/off, so it reflows whenever either setting changes.
+  const GRID_START_HOUR = 7
+  const GRID_END_HOUR = 21
+  const HOUR_PX = 46
+  const pxPerMinute = HOUR_PX / 60
+  const gridHeightPx = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_PX
+  const gridHours = Array.from({ length: GRID_END_HOUR - GRID_START_HOUR + 1 }, (_, i) => GRID_START_HOUR + i)
+
+  const computeCandidateStarts = (dur: number, interval: number): string[] => {
+    const starts: string[] = []
+    const step = dur + interval
+    if (step > 0) {
+      let cursor = GRID_START_HOUR * 60
+      const limit = GRID_END_HOUR * 60
+      while (cursor + dur <= limit) {
+        starts.push(toTimeStr(cursor))
+        cursor += step
+      }
+    }
+    return starts
+  }
+
+  const candidateStarts = computeCandidateStarts(duracionTurno, intervaloTurno)
+
+  // Collapses a day's individually-toggled slots (picked from `candidates`, each `dur` minutes
+  // long) back into contiguous { start, end } ranges — the inverse of slotsFromRanges below.
+  const rangesFromDaySlots = (daySet: Set<string>, candidates: string[], dur: number): { start: string; end: string }[] => {
+    const ranges: { start: string; end: string }[] = []
+    let runStart: string | null = null
+    candidates.forEach((cand, idx) => {
+      const isSelected = daySet.has(cand)
+      if (isSelected && runStart === null) runStart = cand
+      const nextSelected = isSelected && candidates[idx + 1] !== undefined && daySet.has(candidates[idx + 1])
+      if (isSelected && !nextSelected && runStart !== null) {
+        ranges.push({ start: runStart, end: toTimeStr(toMinutes(cand) + dur) })
+        runStart = null
+      }
+    })
+    return ranges
+  }
+
+  // Selects every candidate grid slot that fully fits inside one of the given ranges — used
+  // both to import saved availability and to re-fit existing ranges onto a new grid.
+  const slotsFromRanges = (ranges: { horaInicio?: string; horaFin?: string; start?: string; end?: string }[], candidates: string[], dur: number): Set<string> => {
+    const set = new Set<string>()
+    candidates.forEach((cand) => {
+      const candMin = toMinutes(cand)
+      const fits = ranges.some((r) => {
+        const startMin = toMinutes((r.horaInicio ?? r.start)!)
+        const endMin = toMinutes((r.horaFin ?? r.end)!)
+        return candMin >= startMin && candMin + dur <= endMin
       })
-      .catch((err) => console.error('Error cargando configuración de agenda', err))
-      .finally(() => { if (!cancelled) setPerfilLoaded(true) })
-    return () => { cancelled = true }
+      if (fits) set.add(cand)
+    })
+    return set
+  }
+
+  // Tracks the duración/intervalo the grid was last built against, so a later change can diff
+  // against it.
+  const prevGridRef = React.useRef<{ duracion: number; intervalo: number } | null>(null)
+
+  // One-time import: translate the médico's previously saved availability ranges for this
+  // modalidad (already fetched by AgendaView before this component ever mounts) into the
+  // equivalent set of selected grid slots. Any saved boundary that doesn't line up with the
+  // fixed grid is naturally dropped — expected, since availability is now defined purely by
+  // toggling grid slots.
+  const importedRef = React.useRef(false)
+  useEffect(() => {
+    if (importedRef.current) return
+    importedRef.current = true
+    const byDay: { [key: number]: any[] } = { 1: [], 2: [], 3: [], 4: [], 5: [] }
+    initialAvailability.forEach((disp: any) => {
+      const dayNum = disp.diaSemana
+      if (dayNum < 1 || dayNum > 5) return
+      byDay[dayNum].push(disp)
+    })
+    const next: { [key: number]: Set<string> } = { 1: new Set(), 2: new Set(), 3: new Set(), 4: new Set(), 5: new Set() }
+    weekdays.forEach((d) => { next[d.num] = slotsFromRanges(byDay[d.num], candidateStarts, duracionTurno) })
+    setSelectedSlots(next)
+    prevGridRef.current = { duracion: duracionTurno, intervalo: intervaloTurno }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Whenever duración/intervalo change AFTER the initial import (i.e. the médico tweaks the
+  // shared selects in AgendaView mid-session), the grid's candidate positions shift. Rather
+  // than dropping every selected slot that no longer lines up (wiping out the whole schedule),
+  // we translate the previously selected slots into { start, end } ranges under the OLD grid,
+  // then re-fit those same ranges onto the NEW grid — the médico's franjas horarias survive.
+  useEffect(() => {
+    if (!importedRef.current || prevGridRef.current === null) return
+    const { duracion: prevDuracion, intervalo: prevIntervalo } = prevGridRef.current
+    if (prevDuracion === duracionTurno && prevIntervalo === intervaloTurno) return
+    const prevCandidates = computeCandidateStarts(prevDuracion, prevIntervalo)
+    setSelectedSlots((prev) => {
+      const next: { [key: number]: Set<string> } = {}
+      weekdays.forEach((d) => {
+        const daySet = prev[d.num] || new Set<string>()
+        const ranges = rangesFromDaySlots(daySet, prevCandidates, prevDuracion)
+        next[d.num] = slotsFromRanges(ranges, candidateStarts, duracionTurno)
+      })
+      return next
+    })
+    prevGridRef.current = { duracion: duracionTurno, intervalo: intervaloTurno }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duracionTurno, intervaloTurno])
+
+  const toggleSlot = (dayNum: number, slotStart: string) => {
+    setSelectedSlots((prev) => {
+      const daySet = new Set(prev[dayNum])
+      if (daySet.has(slotStart)) daySet.delete(slotStart)
+      else daySet.add(slotStart)
+      return { ...prev, [dayNum]: daySet }
+    })
+  }
+
+  // Merges a day's individually-toggled slots back into contiguous { start, end } ranges for
+  // saving — e.g. three consecutive selected slots collapse into one range dto, which the
+  // backend re-expands into the same slots via the same duración+intervalo stepping.
+  const buildRangesForDay = (dayNum: number): { start: string; end: string }[] =>
+    rangesFromDaySlots(selectedSlots[dayNum] || new Set<string>(), candidateStarts, duracionTurno)
+
+  // "Copiar horario a todos los días": overwrites every weekday's selection with a copy of the
+  // given day's selected slots — a one-click way to avoid re-toggling the same schedule 5 times.
+  // Distinct from AgendaView's "copiar de la otra agenda" (between modalidades) — this one only
+  // ever touches days within THIS grid.
+  const copySlotsToAllDays = (dayNum: number) => {
+    const source = selectedSlots[dayNum]
+    if (!source || source.size === 0) return
+    setSelectedSlots((prev) => {
+      const next: { [key: number]: Set<string> } = { ...prev }
+      weekdays.forEach((d) => { next[d.num] = new Set(source) })
+      return next
+    })
+  }
+
+  // The day whose slots the "copy to all days" action would use — the first weekday (in
+  // Lun→Vie order) that already has a schedule defined, defaulting to Lunes.
+  const copySourceDay = weekdays.find((d) => (selectedSlots[d.num]?.size || 0) > 0) || weekdays[0]
+
+  React.useImperativeHandle(ref, () => ({
+    getDtos: () => {
+      const dtos: any[] = []
+      weekdays.forEach((day) => {
+        buildRangesForDay(day.num).forEach((range) => {
+          dtos.push({ diaSemana: day.num, horaInicio: range.start, horaFin: range.end })
+        })
+      })
+      return dtos
+    },
+    hasSlots: () => weekdays.some((d) => (selectedSlots[d.num]?.size || 0) > 0),
+    applySlots: (slots) => {
+      setSelectedSlots({
+        1: new Set(slots[1] || []), 2: new Set(slots[2] || []), 3: new Set(slots[3] || []),
+        4: new Set(slots[4] || []), 5: new Set(slots[5] || [])
+      })
+    },
+    getSelectedSlots: () => selectedSlots,
+  }), [selectedSlots, duracionTurno])
+
+  return (
+    <>
+      {copySourceDay && (selectedSlots[copySourceDay.num]?.size || 0) > 0 && (
+        <div className="agenda-view-copy-row">
+          <button type="button" className="agenda-view-copy-btn" onClick={() => copySlotsToAllDays(copySourceDay.num)}>
+            Copiar horario de {copySourceDay.name} a todos los días
+          </button>
+        </div>
+      )}
+
+      <div className="agenda-view-preview">
+        <div className="agenda-view-preview-head">
+          <div className="agenda-view-preview-title">Horarios reservables</div>
+          <div className="agenda-view-preview-legend">
+            <span className="agenda-view-preview-legend-item">
+              <span className="agenda-view-preview-legend-swatch agenda-view-preview-legend-swatch--on" /> Disponible
+            </span>
+            <span className="agenda-view-preview-legend-item">
+              <span className="agenda-view-preview-legend-swatch" /> Clic para agregar
+            </span>
+          </div>
+        </div>
+        <div className="agenda-view-agenda">
+          <div className="agenda-view-agenda-headrow">
+            <div className="agenda-view-agenda-corner" />
+            <div className="agenda-view-agenda-daynames">
+              {weekdays.map((day) => <div key={day.num}>{day.abbr}</div>)}
+            </div>
+          </div>
+          <div className="agenda-view-agenda-body">
+            <div className="agenda-view-agenda-hours" style={{ height: `${gridHeightPx}px` }}>
+              {gridHours.map((h) => (
+                <div key={h} className="agenda-view-agenda-hour-label" style={{ top: `${(h - GRID_START_HOUR) * HOUR_PX}px` }}>
+                  {String(h).padStart(2, '0')}:00
+                </div>
+              ))}
+            </div>
+            <div className="agenda-view-agenda-days">
+              {weekdays.map((day) => {
+                const daySet = selectedSlots[day.num] || new Set<string>()
+                return (
+                  <div
+                    key={day.num}
+                    className="agenda-view-agenda-day-col"
+                    style={{
+                      height: `${gridHeightPx}px`,
+                      backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR_PX - 1}px, var(--av-line) ${HOUR_PX - 1}px, var(--av-line) ${HOUR_PX}px)`
+                    }}
+                  >
+                    {candidateStarts.map((slotStart) => {
+                      const isSelected = daySet.has(slotStart)
+                      return (
+                        <button
+                          key={slotStart}
+                          type="button"
+                          className={`agenda-view-agenda-slot${isSelected ? '' : ' agenda-view-agenda-slot--empty'}`}
+                          style={{
+                            top: `${(toMinutes(slotStart) - GRID_START_HOUR * 60) * pxPerMinute}px`,
+                            height: `${Math.max(duracionTurno * pxPerMinute, 20)}px`
+                          }}
+                          onClick={() => toggleSlot(day.num, slotStart)}
+                          aria-pressed={isSelected}
+                          aria-label={`${isSelected ? 'Quitar' : 'Agregar'} horario ${slotStart} de ${day.name}`}
+                        >
+                          <div className="agenda-view-agenda-slot-time">{slotStart}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+})
+
+function AgendaView({ medicoInfo, initialAvailabilityPresencial, initialAvailabilityOnline, onSave }: {
+  medicoInfo: any
+  initialAvailabilityPresencial: any[]
+  initialAvailabilityOnline: any[]
+  onSave: (modalidad: 'PRESENCIAL' | 'ONLINE', data: any[]) => Promise<void>
+}) {
+  const { showAlert } = useAlert();
+
+  // Same detection the backend uses (Usuario.isOfrecePresencial/isOfreceOnline): ofrecePresencial
+  // defaults to false, ofreceOnline defaults to true, when the médico never set them explicitly.
+  const ofrecePresencial = !!medicoInfo?.ofrecePresencial
+  const ofreceOnline = medicoInfo?.ofreceOnline !== false
+  const ofreceAmbasModalidades = ofrecePresencial && ofreceOnline
+
+  const [duracionTurno, setDuracionTurno] = useState(medicoInfo?.duracionTurnoMinutos ?? 45)
+  const [intervaloTurno, setIntervaloTurno] = useState(medicoInfo?.intervaloEntreTurnosMinutos ?? 10)
+  const [activeModalidad, setActiveModalidad] = useState<'PRESENCIAL' | 'ONLINE'>(ofrecePresencial ? 'PRESENCIAL' : 'ONLINE')
+
+  const presencialGridRef = React.useRef<AgendaModalidadGridHandle>(null)
+  const onlineGridRef = React.useRef<AgendaModalidadGridHandle>(null)
+
+  // Copies the slots already loaded into the OTHER modalidad's grid onto the currently active
+  // one, in memory only — nothing is persisted until "Guardar cambios" is pressed, so it's a
+  // reversible starting point rather than a permanent link between the two agendas.
+  const handleCopyFromOtherAgenda = () => {
+    const sourceRef = activeModalidad === 'PRESENCIAL' ? onlineGridRef : presencialGridRef
+    const targetRef = activeModalidad === 'PRESENCIAL' ? presencialGridRef : onlineGridRef
+    const source = sourceRef.current
+    if (!source || !source.hasSlots()) return
+    targetRef.current?.applySlots(source.getSelectedSlots())
+  }
 
   // To-Do List state and hooks
   const [tasks, setTasks] = useState<{ id: string; text: string; completed: boolean; category: 'clinical' | 'admin' | 'urgent' }[]>(() => {
@@ -940,177 +1222,15 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
 
   const [saving, setSaving] = useState(false)
 
-  const toMinutes = (t: string) => {
-    const [h, m] = t.split(':').map(Number)
-    return h * 60 + m
-  }
-  const toTimeStr = (mins: number) => `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
-
-  // ── Bookable-slot grid geometry ──────────────────────────────────────────
-  // The grid spans a fixed 07:00–21:00 window, generous enough for virtually any clinical
-  // schedule. Candidate slot start times are anchored to GRID_START_HOUR and stepped by
-  // duracionTurno+intervaloTurno ("paso") — this is the actual set of times a médico can
-  // toggle on/off, so it reflows whenever either setting changes.
-  const GRID_START_HOUR = 7
-  const GRID_END_HOUR = 21
-  const HOUR_PX = 46
-  const pxPerMinute = HOUR_PX / 60
-  const gridHeightPx = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_PX
-  const gridHours = Array.from({ length: GRID_END_HOUR - GRID_START_HOUR + 1 }, (_, i) => GRID_START_HOUR + i)
-
-  const computeCandidateStarts = (dur: number, interval: number): string[] => {
-    const starts: string[] = []
-    const step = dur + interval
-    if (step > 0) {
-      let cursor = GRID_START_HOUR * 60
-      const limit = GRID_END_HOUR * 60
-      while (cursor + dur <= limit) {
-        starts.push(toTimeStr(cursor))
-        cursor += step
-      }
-    }
-    return starts
-  }
-
-  const paso = duracionTurno + intervaloTurno
-  const candidateStarts = computeCandidateStarts(duracionTurno, intervaloTurno)
-
-  // Collapses a day's individually-toggled slots (picked from `candidates`, each `dur` minutes
-  // long) back into contiguous { start, end } ranges — the inverse of slotsFromRanges below.
-  const rangesFromDaySlots = (daySet: Set<string>, candidates: string[], dur: number): { start: string; end: string }[] => {
-    const ranges: { start: string; end: string }[] = []
-    let runStart: string | null = null
-    candidates.forEach((cand, idx) => {
-      const isSelected = daySet.has(cand)
-      if (isSelected && runStart === null) runStart = cand
-      const nextSelected = isSelected && candidates[idx + 1] !== undefined && daySet.has(candidates[idx + 1])
-      if (isSelected && !nextSelected && runStart !== null) {
-        ranges.push({ start: runStart, end: toTimeStr(toMinutes(cand) + dur) })
-        runStart = null
-      }
-    })
-    return ranges
-  }
-
-  // Selects every candidate grid slot that fully fits inside one of the given ranges — used
-  // both to import saved availability and to re-fit existing ranges onto a new grid.
-  const slotsFromRanges = (ranges: { horaInicio?: string; horaFin?: string; start?: string; end?: string }[], candidates: string[], dur: number): Set<string> => {
-    const set = new Set<string>()
-    candidates.forEach((cand) => {
-      const candMin = toMinutes(cand)
-      const fits = ranges.some((r) => {
-        const startMin = toMinutes((r.horaInicio ?? r.start)!)
-        const endMin = toMinutes((r.horaFin ?? r.end)!)
-        return candMin >= startMin && candMin + dur <= endMin
-      })
-      if (fits) set.add(cand)
-    })
-    return set
-  }
-
-  // Tracks the duración/intervalo the grid was last built against, so a later change can diff
-  // against it. Set by the import effect below as soon as real data lands — NOT lazily from
-  // seeing duracionTurno/intervaloTurno "change", because when the médico's saved settings
-  // equal the hook's own default state (45/10, the same values the backend defaults to), the
-  // setDuracionTurno/setIntervaloTurno calls during profile load are no-ops (same value in,
-  // same value out) and React never re-renders for them — so an effect keyed off those values
-  // "changing" would never fire and this would stay uninitialized.
-  const prevGridRef = React.useRef<{ duracion: number; intervalo: number } | null>(null)
-
-  // One-time import: once we know the médico's real duración/intervalo, translate their
-  // previously saved availability ranges into the equivalent set of selected grid slots.
-  // Any saved boundary that doesn't line up with the fixed grid is naturally dropped —
-  // expected, since availability is now defined purely by toggling grid slots.
-  const importedRef = React.useRef(false)
-  useEffect(() => {
-    if (!perfilLoaded || importedRef.current) return
-    importedRef.current = true
-    const byDay: { [key: number]: any[] } = { 1: [], 2: [], 3: [], 4: [], 5: [] }
-    initialAvailability.forEach((disp: any) => {
-      const dayNum = disp.diaSemana
-      if (dayNum < 1 || dayNum > 5) return
-      byDay[dayNum].push(disp)
-    })
-    const next: { [key: number]: Set<string> } = { 1: new Set(), 2: new Set(), 3: new Set(), 4: new Set(), 5: new Set() }
-    weekdays.forEach((d) => { next[d.num] = slotsFromRanges(byDay[d.num], candidateStarts, duracionTurno) })
-    setSelectedSlots(next)
-    prevGridRef.current = { duracion: duracionTurno, intervalo: intervaloTurno }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [perfilLoaded, duracionTurno, intervaloTurno])
-
-  // Whenever duración/intervalo change AFTER the initial import (i.e. the médico tweaks the
-  // selects mid-session), the grid's candidate positions shift. Rather than dropping every
-  // selected slot that no longer lines up (wiping out the whole schedule), we translate the
-  // previously selected slots into { start, end } ranges under the OLD grid, then re-fit those
-  // same ranges onto the NEW grid — the médico's franjas horarias survive the change.
-  useEffect(() => {
-    if (!importedRef.current || prevGridRef.current === null) return
-    const { duracion: prevDuracion, intervalo: prevIntervalo } = prevGridRef.current
-    if (prevDuracion === duracionTurno && prevIntervalo === intervaloTurno) return
-    const prevCandidates = computeCandidateStarts(prevDuracion, prevIntervalo)
-    setSelectedSlots((prev) => {
-      const next: { [key: number]: Set<string> } = {}
-      weekdays.forEach((d) => {
-        const daySet = prev[d.num] || new Set<string>()
-        const ranges = rangesFromDaySlots(daySet, prevCandidates, prevDuracion)
-        next[d.num] = slotsFromRanges(ranges, candidateStarts, duracionTurno)
-      })
-      return next
-    })
-    prevGridRef.current = { duracion: duracionTurno, intervalo: intervaloTurno }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [duracionTurno, intervaloTurno])
-
-  const toggleSlot = (dayNum: number, slotStart: string) => {
-    setSelectedSlots((prev) => {
-      const daySet = new Set(prev[dayNum])
-      if (daySet.has(slotStart)) daySet.delete(slotStart)
-      else daySet.add(slotStart)
-      return { ...prev, [dayNum]: daySet }
-    })
-  }
-
-  // Merges a day's individually-toggled slots back into contiguous { start, end } ranges for
-  // saving — e.g. three consecutive selected slots collapse into one range dto, which the
-  // backend re-expands into the same slots via the same duración+intervalo stepping.
-  const buildRangesForDay = (dayNum: number): { start: string; end: string }[] =>
-    rangesFromDaySlots(selectedSlots[dayNum] || new Set<string>(), candidateStarts, duracionTurno)
-
-  // "Copiar horario a todos los días": overwrites every weekday's selection with a copy of the
-  // given day's selected slots — a one-click way to avoid re-toggling the same schedule 5 times.
-  const copySlotsToAllDays = (dayNum: number) => {
-    const source = selectedSlots[dayNum]
-    if (!source || source.size === 0) return
-    setSelectedSlots((prev) => {
-      const next: { [key: number]: Set<string> } = { ...prev }
-      weekdays.forEach((d) => { next[d.num] = new Set(source) })
-      return next
-    })
-  }
-
-  // The day whose slots the "copy to all days" action would use — the first weekday (in
-  // Lun→Vie order) that already has a schedule defined, defaulting to Lunes.
-  const copySourceDay = weekdays.find((d) => (selectedSlots[d.num]?.size || 0) > 0) || weekdays[0]
-
   const handleSave = async () => {
     setSaving(true)
-    const dtos: any[] = []
-
-    weekdays.forEach((day) => {
-      buildRangesForDay(day.num).forEach((range) => {
-        dtos.push({
-          diaSemana: day.num,
-          horaInicio: range.start,
-          horaFin: range.end
-        })
-      })
-    })
-
     try {
-      await Promise.all([
-        onSave(dtos),
+      const saves: Promise<any>[] = [
         api.actualizarConfigAgenda({ duracionTurnoMinutos: duracionTurno, intervaloEntreTurnosMinutos: intervaloTurno })
-      ])
+      ]
+      if (ofrecePresencial) saves.push(onSave('PRESENCIAL', presencialGridRef.current?.getDtos() || []))
+      if (ofreceOnline) saves.push(onSave('ONLINE', onlineGridRef.current?.getDtos() || []))
+      await Promise.all(saves)
       showAlert("Disponibilidad guardada correctamente ✓", "success")
     } catch (err) {
       console.error(err)
@@ -1159,79 +1279,50 @@ function AgendaView({ initialAvailability, onSave }: { initialAvailability: any[
           </div>
         </div>
 
-        {copySourceDay && (selectedSlots[copySourceDay.num]?.size || 0) > 0 && (
-          <div className="agenda-view-copy-row">
-            <button type="button" className="agenda-view-copy-btn" onClick={() => copySlotsToAllDays(copySourceDay.num)}>
-              Copiar horario de {copySourceDay.name} a todos los días
+        {ofreceAmbasModalidades && (
+          <div className="agenda-view-copy-row" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <button
+                type="button"
+                className={`btn btn--sm ${activeModalidad === 'PRESENCIAL' ? 'btn--primary' : 'btn--secondary'}`}
+                onClick={() => setActiveModalidad('PRESENCIAL')}
+              >
+                Presencial
+              </button>
+              <button
+                type="button"
+                className={`btn btn--sm ${activeModalidad === 'ONLINE' ? 'btn--primary' : 'btn--secondary'}`}
+                onClick={() => setActiveModalidad('ONLINE')}
+              >
+                Online
+              </button>
+            </div>
+            <button type="button" className="agenda-view-copy-btn" onClick={handleCopyFromOtherAgenda}>
+              Copiar horarios de la agenda {activeModalidad === 'PRESENCIAL' ? 'online' : 'presencial'}
             </button>
           </div>
         )}
 
-        <div className="agenda-view-preview">
-          <div className="agenda-view-preview-head">
-            <div className="agenda-view-preview-title">Horarios reservables</div>
-            <div className="agenda-view-preview-legend">
-              <span className="agenda-view-preview-legend-item">
-                <span className="agenda-view-preview-legend-swatch agenda-view-preview-legend-swatch--on" /> Disponible
-              </span>
-              <span className="agenda-view-preview-legend-item">
-                <span className="agenda-view-preview-legend-swatch" /> Clic para agregar
-              </span>
-            </div>
+        {ofrecePresencial && (
+          <div style={ofreceAmbasModalidades && activeModalidad !== 'PRESENCIAL' ? { display: 'none' } : undefined}>
+            <AgendaModalidadGrid
+              ref={presencialGridRef}
+              initialAvailability={initialAvailabilityPresencial}
+              duracionTurno={duracionTurno}
+              intervaloTurno={intervaloTurno}
+            />
           </div>
-          <div className="agenda-view-agenda">
-            <div className="agenda-view-agenda-headrow">
-              <div className="agenda-view-agenda-corner" />
-              <div className="agenda-view-agenda-daynames">
-                {weekdays.map((day) => <div key={day.num}>{day.abbr}</div>)}
-              </div>
-            </div>
-            <div className="agenda-view-agenda-body">
-              <div className="agenda-view-agenda-hours" style={{ height: `${gridHeightPx}px` }}>
-                {gridHours.map((h) => (
-                  <div key={h} className="agenda-view-agenda-hour-label" style={{ top: `${(h - GRID_START_HOUR) * HOUR_PX}px` }}>
-                    {String(h).padStart(2, '0')}:00
-                  </div>
-                ))}
-              </div>
-              <div className="agenda-view-agenda-days">
-                {weekdays.map((day) => {
-                  const daySet = selectedSlots[day.num] || new Set<string>()
-                  return (
-                    <div
-                      key={day.num}
-                      className="agenda-view-agenda-day-col"
-                      style={{
-                        height: `${gridHeightPx}px`,
-                        backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR_PX - 1}px, var(--av-line) ${HOUR_PX - 1}px, var(--av-line) ${HOUR_PX}px)`
-                      }}
-                    >
-                      {candidateStarts.map((slotStart) => {
-                        const isSelected = daySet.has(slotStart)
-                        return (
-                          <button
-                            key={slotStart}
-                            type="button"
-                            className={`agenda-view-agenda-slot${isSelected ? '' : ' agenda-view-agenda-slot--empty'}`}
-                            style={{
-                              top: `${(toMinutes(slotStart) - GRID_START_HOUR * 60) * pxPerMinute}px`,
-                              height: `${Math.max(duracionTurno * pxPerMinute, 20)}px`
-                            }}
-                            onClick={() => toggleSlot(day.num, slotStart)}
-                            aria-pressed={isSelected}
-                            aria-label={`${isSelected ? 'Quitar' : 'Agregar'} horario ${slotStart} de ${day.name}`}
-                          >
-                            <div className="agenda-view-agenda-slot-time">{slotStart}</div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+        )}
+        {ofreceOnline && (
+          <div style={ofreceAmbasModalidades && activeModalidad !== 'ONLINE' ? { display: 'none' } : undefined}>
+            <AgendaModalidadGrid
+              ref={onlineGridRef}
+              initialAvailability={initialAvailabilityOnline}
+              duracionTurno={duracionTurno}
+              intervaloTurno={intervaloTurno}
+            />
           </div>
-        </div>
+        )}
       </div>
 
       {/* Notes / pendientes panel */}
@@ -2536,7 +2627,7 @@ function SettingsView({
     setList(list.includes(value) ? list.filter(v => v !== value) : [...list, value])
   }
 
-  const updateTariff = (id: string, field: 'price' | 'enabled' | 'label' | 'requiereObraSocial', value: number | boolean | string) => {
+  const updateTariff = (id: string, field: 'price' | 'enabled' | 'label' | 'requiereObraSocial' | 'obraSocial', value: number | boolean | string) => {
     setTariffs(tariffs.map(t => t.id === id ? { ...t, [field]: value } : t))
   }
 
@@ -2554,8 +2645,11 @@ function SettingsView({
     return id
   }
 
-  const addTariff = (label: string, price: number) => {
-    setTariffs([...tariffs, { id: slugifyTariffId(label), label, price, enabled: true, requiereObraSocial: false }])
+  const addTariff = (label: string, price: number, obraSocial: string) => {
+    setTariffs([...tariffs, {
+      id: slugifyTariffId(label), label, price, enabled: true,
+      requiereObraSocial: !!obraSocial, obraSocial: obraSocial || undefined
+    }])
   }
 
   const deleteTariff = (id: string) => {
@@ -2565,14 +2659,16 @@ function SettingsView({
   const [showAddTariff, setShowAddTariff] = useState(false)
   const [newTariffName, setNewTariffName] = useState('')
   const [newTariffPrice, setNewTariffPrice] = useState('')
+  const [newTariffObraSocial, setNewTariffObraSocial] = useState('')
 
   const handleAddTariff = () => {
     const name = newTariffName.trim()
     const price = Number(newTariffPrice)
     if (!name || newTariffPrice.trim() === '' || Number.isNaN(price)) return
-    addTariff(name, price)
+    addTariff(name, price, newTariffObraSocial)
     setNewTariffName('')
     setNewTariffPrice('')
+    setNewTariffObraSocial('')
     setShowAddTariff(false)
   }
 
@@ -2727,9 +2823,13 @@ function SettingsView({
         selloLinea1,
         selloLinea2,
         selloLinea3,
-        // The Obra Social service always requires cobertura + n° de afiliado — force it here too
-        // in case a médico has legacy data from before this was enforced in the UI.
-        tariffs: tariffs.map(t => (t.id === 'obra_social' || t.id === 'osde') ? { ...t, requiereObraSocial: true } : t),
+        // The legacy generic Obra Social/OSDE service always requires cobertura + n° de
+        // afiliado, and defaults its obra social to OSDE if the médico never edited it — but
+        // stays fully editable, so a médico who repointed it at a different obra social keeps
+        // that choice instead of it snapping back to OSDE on every save.
+        tariffs: tariffs.map(t => (t.id === 'obra_social' || t.id === 'osde')
+          ? { ...t, requiereObraSocial: true, obraSocial: t.obraSocial || 'OSDE' }
+          : t),
         fotoUrl,
         tags: selectedTags,
         ofreceOnline,
@@ -3423,12 +3523,15 @@ function SettingsView({
               <th style={{ width: '44px' }}></th>
               <th>Servicio</th>
               <th>Valor (ARS)</th>
-              <th style={{ width: '150px' }}>Requiere Obra Social</th>
+              <th style={{ width: '170px' }}>Obra Social</th>
               <th style={{ width: '40px' }}></th>
             </tr>
           </thead>
           <tbody>
             {tariffs.map((t) => {
+              // Legacy default service ("obra_social"/"osde" ids) — its obra social defaults
+              // to OSDE for display when never set explicitly, but stays fully editable like
+              // any other service; the médico can point it at a different obra social.
               const isObraSocialTariff = t.id === 'obra_social' || t.id === 'osde'
               return (
               <tr key={t.id} style={{ opacity: t.enabled ? 1 : 0.5, transition: 'opacity 150ms' }}>
@@ -3461,19 +3564,18 @@ function SettingsView({
                   />
                 </td>
                 <td style={{ textAlign: 'center' }}>
-                  <label
-                    className="toggle"
-                    style={{ transform: 'scale(0.8)' }}
-                    title={isObraSocialTariff ? 'El servicio de Obra Social siempre pide obra social y número de afiliado al paciente' : 'Al reservar este servicio, se le pedirá al paciente su Obra Social y número de afiliado'}
+                  <select
+                    className="form-input"
+                    value={t.obraSocial || (isObraSocialTariff ? 'OSDE' : '')}
+                    onChange={(e) => updateTariff(t.id, 'obraSocial', e.target.value)}
+                    disabled={!t.enabled}
+                    title="Con qué obra social específica trabaja este servicio — al reservarlo, se le pedirá al paciente su número de afiliado"
                   >
-                    <input
-                      type="checkbox"
-                      checked={isObraSocialTariff ? true : !!t.requiereObraSocial}
-                      onChange={(e) => updateTariff(t.id, 'requiereObraSocial', e.target.checked)}
-                      disabled={!t.enabled || isObraSocialTariff}
-                    />
-                    <span className="toggle__track" />
-                  </label>
+                    <option value="">Ninguna (particular)</option>
+                    {OBRAS_SOCIALES.filter(os => os !== 'Otra').map((os) => (
+                      <option key={os} value={os}>{os}</option>
+                    ))}
+                  </select>
                 </td>
                 <td>
                   <button
@@ -3510,11 +3612,23 @@ function SettingsView({
               onChange={(e) => setNewTariffPrice(e.target.value)}
               style={{ width: '140px' }}
             />
+            <select
+              className="form-input"
+              value={newTariffObraSocial}
+              onChange={(e) => setNewTariffObraSocial(e.target.value)}
+              style={{ width: '170px' }}
+              title="Con qué obra social específica trabaja este servicio (dejalo en 'Ninguna' para un servicio particular)"
+            >
+              <option value="">Ninguna (particular)</option>
+              {OBRAS_SOCIALES.filter(os => os !== 'Otra').map((os) => (
+                <option key={os} value={os}>{os}</option>
+              ))}
+            </select>
             <button type="button" className="btn btn--primary btn--sm" onClick={handleAddTariff}>Agregar</button>
             <button
               type="button"
               className="btn btn--secondary btn--sm"
-              onClick={() => { setShowAddTariff(false); setNewTariffName(''); setNewTariffPrice('') }}
+              onClick={() => { setShowAddTariff(false); setNewTariffName(''); setNewTariffPrice(''); setNewTariffObraSocial('') }}
             >
               Cancelar
             </button>
@@ -4909,7 +5023,8 @@ export default function App() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [showNotifications, setShowNotifications] = useState(false)
   const [newPatientAlert, setNewPatientAlert] = useState<{ nombre: string; fecha: string; hora: string } | null>(null)
-  const [availability, setAvailability] = useState<any[]>([])
+  const [availabilityPresencial, setAvailabilityPresencial] = useState<any[]>([])
+  const [availabilityOnline, setAvailabilityOnline] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
   const [loadingSession, setLoadingSession] = useState(true)
@@ -4995,19 +5110,24 @@ export default function App() {
       Promise.all([
         api.getPerfil(),
         api.getTurnosHoy(),
-        api.getDisponibilidad(),
+        api.getDisponibilidad('PRESENCIAL'),
+        api.getDisponibilidad('ONLINE'),
         api.getStats(),
         api.getTurnos(),
         api.getNotificaciones(),
         api.getMercadoPagoStatus().catch(() => ({ connected: false })),
         api.getGoogleCalendarStatus().catch(() => ({ connected: false })),
         api.getTieneNoLeidos().catch(() => false),
-        api.getEventosExternosGoogleCalendar().catch(() => [])
+        api.getEventosExternosGoogleCalendar().catch((err) => {
+          console.error("Error al obtener eventos externos de Google Calendar:", err)
+          return []
+        })
       ])
-        .then(([perfil, turnos, disp, statsData, allTurnos, notifData, mpStatus, googleStatus, unreadStatus, eventosExternos]) => {
+        .then(([perfil, turnos, dispPresencial, dispOnline, statsData, allTurnos, notifData, mpStatus, googleStatus, unreadStatus, eventosExternos]) => {
           setMedicoInfo(perfil)
           setTodayAppointments(turnos || [])
-          setAvailability(disp || [])
+          setAvailabilityPresencial(dispPresencial || [])
+          setAvailabilityOnline(dispOnline || [])
           setStats(statsData)
           setAllAppointments(allTurnos || [])
           setNotifications(notifData || [])
@@ -5097,9 +5217,10 @@ export default function App() {
     }
   }, [currentUser, view, loadingSession])
 
-  const handleSaveAvailability = async (data: any[]) => {
-    const updated = await api.actualizarDisponibilidad(data)
-    setAvailability(updated || data)
+  const handleSaveAvailability = async (modalidad: 'PRESENCIAL' | 'ONLINE', data: any[]) => {
+    const updated = await api.actualizarDisponibilidad(modalidad, data)
+    if (modalidad === 'PRESENCIAL') setAvailabilityPresencial(updated || data)
+    else setAvailabilityOnline(updated || data)
   }
 
   const handleSaveSettings = async (data: any) => {
@@ -5196,6 +5317,11 @@ export default function App() {
     if (googleResult === 'success') {
       showAlert('¡Tu Google Calendar quedó vinculado!', 'success')
       setGoogleConnected(true)
+      // The backend seeds the eventos externos cache during the OAuth callback, so pull it
+      // now instead of waiting for the next dashboard mount/reload.
+      api.getEventosExternosGoogleCalendar()
+        .then((eventos) => setExternalEvents((eventos as ExternalEvent[]) || []))
+        .catch((err) => console.error("Error al obtener eventos de Google Calendar tras vincular:", err))
     } else if (googleResult === 'error') {
       showAlert('No se pudo vincular tu Google Calendar. Intentá de nuevo.', 'error')
     }
@@ -5319,7 +5445,7 @@ export default function App() {
             appointments={todayAppointments}
             allAppointments={allAppointments}
             externalEvents={externalEvents}
-            availability={availability}
+            availability={[...availabilityPresencial, ...availabilityOnline]}
             stats={stats} 
             onCancelAppointment={handleCancelAppointment}
             onUpdateAttendance={handleUpdateAttendance}
@@ -5329,7 +5455,14 @@ export default function App() {
           />
         )
       case 'agenda':
-        return <AgendaView initialAvailability={availability} onSave={handleSaveAvailability} />
+        return (
+          <AgendaView
+            medicoInfo={medicoInfo}
+            initialAvailabilityPresencial={availabilityPresencial}
+            initialAvailabilityOnline={availabilityOnline}
+            onSave={handleSaveAvailability}
+          />
+        )
       case 'patients':
         return <PatientsView onUnreadChatsChange={refreshUnreadChatsStatus} />
       case 'clinical-history':
@@ -5803,6 +5936,17 @@ export default function App() {
         />
         <Route path="/reserva/:proId" element={<CheckoutRoute currentUser={currentUser} loadingSession={loadingSession} />} />
         <Route path="/privacidad" element={<PrivacyPolicyPage currentUser={currentUser} />} />
+        <Route path="/terminos" element={<TermsPage currentUser={currentUser} />} />
+        <Route
+          path="/mi-cuenta"
+          element={
+            loadingSession ? null : currentUser?.rol === 'PACIENTE' ? (
+              <MiCuentaView onLogout={handleLogout} onUserUpdated={setCurrentUser} />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
         <Route
           path="/panel/*"
           element={
@@ -5817,12 +5961,19 @@ export default function App() {
         />
         <Route path="*" element={<NotFoundView currentUser={currentUser} />} />
       </Routes>
-      {currentUser && currentUser.rol === 'PACIENTE' && currentUser.perfilCompleto === false && (
-        <CompleteProfileModal
-          user={currentUser}
+      {currentUser && currentUser.requiereAceptarTerminos ? (
+        <TermsAcceptanceModal
           onComplete={(updatedUser) => setCurrentUser(updatedUser)}
           onLogout={handleLogout}
         />
+      ) : (
+        currentUser && currentUser.rol === 'PACIENTE' && currentUser.perfilCompleto === false && (
+          <CompleteProfileModal
+            user={currentUser}
+            onComplete={(updatedUser) => setCurrentUser(updatedUser)}
+            onLogout={handleLogout}
+          />
+        )
       )}
     </Suspense>
   )

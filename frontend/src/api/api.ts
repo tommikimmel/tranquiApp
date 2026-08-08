@@ -81,19 +81,21 @@ export const api = {
   // Public
   getMedicos: () => apiFetch('/medicos'),
   
-  getTurnosDisponibles: (medicoId: number | string, fecha: string) =>
-    apiFetch(`/medicos/${medicoId}/turnos-disponibles?fecha=${fecha}`),
+  getTurnosDisponibles: (medicoId: number | string, fecha: string, modalidad: 'PRESENCIAL' | 'ONLINE') =>
+    apiFetch(`/medicos/${medicoId}/turnos-disponibles?fecha=${fecha}&modalidad=${modalidad}`),
 
   // Batched counterpart of getTurnosDisponibles — one request for every médicoId's slot count
-  // instead of one request per professional (used by the homepage date filter).
-  getConteosDisponibilidad: (medicoIds: (number | string)[], fecha: string): Promise<Record<string, number>> =>
-    apiFetch(`/medicos/turnos-disponibles-conteo?fecha=${fecha}&${medicoIds.map(id => `medicoIds=${id}`).join('&')}`),
-  
+  // instead of one request per professional (used by the homepage date filter). modalidad is
+  // optional here — the homepage shows this badge before the patient picks presencial/online.
+  getConteosDisponibilidad: (medicoIds: (number | string)[], fecha: string, modalidad?: 'PRESENCIAL' | 'ONLINE'): Promise<Record<string, number>> =>
+    apiFetch(`/medicos/turnos-disponibles-conteo?fecha=${fecha}${modalidad ? `&modalidad=${modalidad}` : ''}&${medicoIds.map(id => `medicoIds=${id}`).join('&')}`),
+
   reservarTurno: (data: {
     medicoId: number
     fecha: string
     hora: string
     tipo: 'PARTICULAR' | 'OBRA_SOCIAL' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'
+    modalidad?: 'PRESENCIAL' | 'ONLINE'
     servicioId?: string
     obraSocial?: string
     idFinanciador?: string
@@ -134,6 +136,17 @@ export const api = {
 
   getMe: () => apiFetch('/auth/me'),
   logout: () => apiFetch('/auth/logout', { method: 'POST' }),
+  aceptarTerminos: () => apiFetch('/auth/aceptar-terminos', { method: 'POST' }),
+
+  // "Mi Cuenta" — configuración de perfil del paciente (también usable por médicos).
+  getMiCuenta: () => apiFetch('/auth/mi-cuenta'),
+  actualizarMiCuenta: (data: any) => apiFetch('/auth/mi-cuenta', { method: 'PUT', body: data }),
+  actualizarPreferenciasNotificacion: (data: { emailHabilitado: boolean; whatsappHabilitado: boolean }) =>
+    apiFetch('/auth/mi-cuenta/notificaciones', { method: 'PUT', body: data as any }),
+  cambiarPassword: (data: { currentPassword?: string; newPassword: string }) =>
+    apiFetch('/auth/mi-cuenta/password', { method: 'POST', body: data as any }),
+  eliminarCuenta: (data?: { password?: string }) =>
+    apiFetch('/auth/mi-cuenta/eliminar', { method: 'POST', body: (data || {}) as any }),
 
   // Fills in the Paso 2 data missing after a Google sign-in (see CompleteProfileModal).
   completeProfile: (data: {
@@ -165,10 +178,11 @@ export const api = {
   actualizarPerfil: (data: any) => 
     apiFetch('/medicos/perfil', { method: 'PUT', body: data }),
   
-  getDisponibilidad: () => apiFetch('/medicos/disponibilidad'),
+  getDisponibilidad: (modalidad: 'PRESENCIAL' | 'ONLINE') =>
+    apiFetch(`/medicos/disponibilidad?modalidad=${modalidad}`),
 
-  actualizarDisponibilidad: (data: any[]) =>
-    apiFetch('/medicos/disponibilidad', { method: 'PUT', body: data as any }),
+  actualizarDisponibilidad: (modalidad: 'PRESENCIAL' | 'ONLINE', data: any[]) =>
+    apiFetch(`/medicos/disponibilidad?modalidad=${modalidad}`, { method: 'PUT', body: data as any }),
 
   // Agenda settings ("Duración de turno" / "Intervalo entre turnos"). Current values also
   // come back on getPerfil() (duracionTurnoMinutos / intervaloEntreTurnosMinutos), so this

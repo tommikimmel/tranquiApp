@@ -1,5 +1,6 @@
 package com.tranqui.app.controller;
 
+import com.tranqui.app.model.Modalidad;
 import com.tranqui.app.model.dto.ReservaTurnoDto;
 import com.tranqui.app.model.dto.TurnoResponseDto;
 import com.tranqui.app.service.TurnoService;
@@ -33,9 +34,9 @@ class TurnoControllerUnitTest {
     @Test
     void obtenerTurnosDisponibles_shouldDelegateToService() {
         LocalDate fecha = LocalDate.now();
-        when(turnoService.obtenerHorariosDisponibles(1L, fecha)).thenReturn(List.of(LocalTime.of(9, 0)));
+        when(turnoService.obtenerHorariosDisponibles(1L, fecha, Modalidad.ONLINE)).thenReturn(List.of(LocalTime.of(9, 0)));
 
-        ResponseEntity<List<LocalTime>> response = controller.obtenerTurnosDisponibles(1L, fecha);
+        ResponseEntity<List<LocalTime>> response = controller.obtenerTurnosDisponibles(1L, fecha, Modalidad.ONLINE);
 
         assertEquals(200, response.getStatusCodeValue());
         assertEquals(1, response.getBody().size());

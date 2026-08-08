@@ -3,6 +3,7 @@ import '../styles/checkout.css'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { OBRAS_SOCIALES } from '../constants/obrasSociales'
 
 let leafletLoadingPromise: Promise<void> | null = null
 function loadLeafletScript(): Promise<void> {
@@ -85,7 +86,7 @@ interface Professional {
   tags?: string[]
   experiencia?: string
   redesSociales?: RedesSociales
-  tariffs?: { id: string; label: string; price: number; enabled: boolean; requiereObraSocial?: boolean }[]
+  tariffs?: { id: string; label: string; price: number; enabled: boolean; requiereObraSocial?: boolean; obraSocial?: string }[]
 }
 
 interface Financiador {
@@ -118,6 +119,7 @@ interface PatientBookingData {
   email: string
   phone: string
   tipo: 'PARTICULAR' | 'OBRA_SOCIAL' | 'OSDE' | 'RECETA' | 'CERTIFICADO' | 'SOBRETUNO'
+  modalidad: 'PRESENCIAL' | 'ONLINE'
   servicioId?: string
   obraSocial?: string
   idFinanciador?: string
@@ -232,12 +234,31 @@ function StepSelect({
   const [showFirstTimeAlert, setShowFirstTimeAlert] = useState(false)
   const [hasShownAlert, setHasShownAlert] = useState(false)
 
+  // Same detection the backend uses (Usuario.isOfrecePresencial/isOfreceOnline): ofrecePresencial
+  // defaults to false, ofreceOnline defaults to true, when the profesional never set them
+  // explicitly. Which modalidad's agenda we query determines what "días disponibles" means.
+  const ofrecePresencial = !!professional.ofrecePresencial
+  const ofreceOnlineProf = professional.ofreceOnline !== false
+  const ofreceAmbasModalidades = ofrecePresencial && ofreceOnlineProf
+  const [modalidad, setModalidad] = useState<'PRESENCIAL' | 'ONLINE'>(ofrecePresencial ? 'PRESENCIAL' : 'ONLINE')
+
+  const handleSelectModalidad = (next: 'PRESENCIAL' | 'ONLINE') => {
+    if (next === modalidad) return
+    setModalidad(next)
+    setSelectedDayIdx(null)
+    setSelectedSlot(null)
+  }
+
   // Custom services the médico configured in Honorarios y Servicios (beyond the 5 defaults
   // below), selected by their real servicioId. Some of them may require Obra Social + n° de
   // afiliado, in which case the financiador combo is populated from QBI2's real catalog.
   const customTariffs = (professional.tariffs || []).filter(t => t.enabled && !DEFAULT_SERVICE_IDS.has(t.id))
   const selectedCustomTariff = customTariffs.find(t => t.id === tipo)
   const isCustomObraSocialType = !!selectedCustomTariff?.requiereObraSocial
+  // When the médico assigned this service a specific obra social (Honorarios y Servicios), skip
+  // asking the patient to pick one — it's already fixed — and go straight to número de afiliado.
+  const fixedObraSocial = selectedCustomTariff?.obraSocial || ''
+  const isFixedObraSocialType = isCustomObraSocialType && !!fixedObraSocial
 
   const [financiadores, setFinanciadores] = useState<Financiador[]>([])
   const [idFinanciadorSel, setIdFinanciadorSel] = useState('')
@@ -249,23 +270,6 @@ function StepSelect({
       .catch((err: any) => console.error("Error al cargar financiadores:", err))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasCustomObraSocialTariff])
-
-  const OBRAS_SOCIALES = [
-    'OSDE',
-    'Swiss Medical',
-    'Galeno',
-    'Medifé',
-    'Omint',
-    'OSECAC',
-    'IOMA',
-    'PAMI',
-    'SanCor Salud',
-    'Medicus',
-    'Accord Salud',
-    'Unión Personal',
-    'Prevención Salud',
-    'Otra'
-  ]
 
   // A plain useRef here would miss the map entirely whenever this component's `loading` early
   // return (below) is still showing the spinner when the map-init effect first runs — the ref
@@ -458,8 +462,8 @@ function StepSelect({
 
       try {
         const results = await Promise.all(
-          datesToFetch.map(item => 
-            api.getTurnosDisponibles(professional.id, item.dateStr)
+          datesToFetch.map(item =>
+            api.getTurnosDisponibles(professional.id, item.dateStr, modalidad)
               .then(slots => ({ ...item, slots: slots || [] }))
               .catch(err => {
                 console.error("Error fetching single day:", err)
@@ -505,11 +509,11 @@ function StepSelect({
     }
 
     fetchAvailability()
-  }, [professional.id])
+  }, [professional.id, modalidad])
 
   const services = [
     { id: 'PARTICULAR', label: 'Consulta Particular', price: professional.price, desc: 'Consulta estándar de 50 minutos' },
-    { id: 'OBRA_SOCIAL', label: 'Obra Social', price: 10500, desc: 'Requiere Obra Social y número de afiliado' },
+    { id: 'OBRA_SOCIAL', label: 'Obra Social OSDE', price: 10500, desc: 'Requiere Obra Social y número de afiliado' },
     { id: 'RECETA', label: 'Receta fuera de turno', price: 45000, desc: 'Solicitud de recetas o órdenes médicas' },
     { id: 'CERTIFICADO', label: 'Certificado', price: 55000, desc: 'Emisión de certificados aptos y licencias' },
     { id: 'SOBRETUNO', label: 'Sobre turno', price: 90000, desc: 'Horario personalizado fuera de agenda' }
@@ -538,14 +542,21 @@ function StepSelect({
 
   const isObraSocialType = tipo === 'OBRA_SOCIAL' || tipo === 'OSDE';
   const effectiveObraSocial = obraSocial === 'Otra' ? customObraSocial : obraSocial;
+  // The médico already picked a specific obra social for this service in Honorarios y
+  // Servicios (TarifaMedico.obraSocial) — don't ask the patient to pick one again, just show
+  // it fixed and collect número de afiliado. Falls back to the old "let the patient choose"
+  // behavior only for médicos who never set one (legacy tariff, obraSocial still blank).
+  const obraSocialTariff = (professional.tariffs || []).find(t => (t.id === 'obra_social' || t.id === 'osde') && t.enabled)
+  const fixedGenericObraSocial = obraSocialTariff?.obraSocial || ''
+  const isFixedGenericObraSocialType = isObraSocialType && !!fixedGenericObraSocial
 
   const canPay = name.trim().length > 2 &&
                   email.includes('@') &&
                   phone.length >= 8 &&
                   selectedDayIdx !== null &&
                   (selectedSlot !== null || tipo === 'SOBRETUNO') &&
-                  (!isObraSocialType || (effectiveObraSocial.trim().length > 0 && afiliado.trim().length > 4)) &&
-                  (!isCustomObraSocialType || (idFinanciadorSel.trim().length > 0 && afiliado.trim().length > 4)) &&
+                  (!isObraSocialType || ((isFixedGenericObraSocialType || effectiveObraSocial.trim().length > 0) && afiliado.trim().length > 4)) &&
+                  (!isCustomObraSocialType || (isFixedObraSocialType ? afiliado.trim().length > 4 : (idFinanciadorSel.trim().length > 0 && afiliado.trim().length > 4))) &&
                   (tipo !== 'SOBRETUNO' || /^([01]\d|2[0-3]):[0-5]\d$/.test(customTime)) &&
                   acceptedTerms &&
                   paymentStatus !== 'processing';
@@ -557,9 +568,9 @@ function StepSelect({
   if (name.trim().length <= 2) missingRequirements.push('tu nombre completo')
   if (!email.includes('@')) missingRequirements.push('un email válido')
   if (phone.length < 8) missingRequirements.push('tu teléfono')
-  if (isObraSocialType && !effectiveObraSocial.trim()) missingRequirements.push('seleccionar tu Obra Social')
+  if (isObraSocialType && !isFixedGenericObraSocialType && !effectiveObraSocial.trim()) missingRequirements.push('seleccionar tu Obra Social')
   if (isObraSocialType && afiliado.trim().length <= 4) missingRequirements.push('tu número de afiliado')
-  if (isCustomObraSocialType && !idFinanciadorSel.trim()) missingRequirements.push('seleccionar tu Obra Social')
+  if (isCustomObraSocialType && !isFixedObraSocialType && !idFinanciadorSel.trim()) missingRequirements.push('seleccionar tu Obra Social')
   if (isCustomObraSocialType && afiliado.trim().length <= 4) missingRequirements.push('tu número de afiliado')
   if (tipo === 'SOBRETUNO' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(customTime)) missingRequirements.push('un horario válido (HH:MM)')
   if (!acceptedTerms) missingRequirements.push('aceptar los términos de servicio')
@@ -567,20 +578,23 @@ function StepSelect({
   const handlePayClick = () => {
     if (canPay) {
       const formattedPhone = `+54 ${phone.trim().replace(/^\+54\s*/, '')}`;
-      const financiadorElegido = isCustomObraSocialType
+      const financiadorElegido = isCustomObraSocialType && !isFixedObraSocialType
         ? financiadores.find(f => String(f.idfinanciador) === idFinanciadorSel)
         : undefined;
       onSelect(currentDay!, selectedSlot || { time: customTime, available: true }, {
         name,
         email,
         phone: formattedPhone,
+        modalidad,
         // Custom tariffs always travel as PARTICULAR at the TipoTurno-enum level — their real
         // identity/price is carried by servicioId, which the backend resolves directly (see
         // TurnoService.reservarTurno's custom-tariff branch).
         tipo: selectedCustomTariff ? 'PARTICULAR' : (isObraSocialType ? 'OBRA_SOCIAL' : tipo as PatientBookingData['tipo']),
         servicioId: selectedCustomTariff ? selectedCustomTariff.id : undefined,
-        obraSocial: isObraSocialType ? effectiveObraSocial.trim() : (isCustomObraSocialType ? financiadorElegido?.nombreComercial : undefined),
-        idFinanciador: isCustomObraSocialType ? idFinanciadorSel : undefined,
+        obraSocial: isObraSocialType
+          ? (isFixedGenericObraSocialType ? fixedGenericObraSocial : effectiveObraSocial.trim())
+          : (isFixedObraSocialType ? fixedObraSocial : (isCustomObraSocialType ? financiadorElegido?.nombreComercial : undefined)),
+        idFinanciador: (isCustomObraSocialType && !isFixedObraSocialType) ? idFinanciadorSel : undefined,
         afiliado: (isObraSocialType || isCustomObraSocialType) ? afiliado.trim() : undefined,
         customTime: tipo === 'SOBRETUNO' ? customTime : undefined
       });
@@ -674,6 +688,36 @@ function StepSelect({
       <div className="grid-2">
         {/* Izquierda: tipo + día + horario + pagar */}
         <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          {ofreceAmbasModalidades && (
+            <div>
+              <div className="book-title sora"><span className="dot"></span>Modalidad de la consulta</div>
+              <div className="types">
+                <button
+                  type="button"
+                  className={`type ${modalidad === 'PRESENCIAL' ? 'selected' : ''}`}
+                  onClick={() => handleSelectModalidad('PRESENCIAL')}
+                >
+                  <span className="radio"></span>
+                  <span style={{ flex: 1 }}>
+                    <span className="t-name">Presencial</span>
+                    <div className="t-desc">Consulta en el consultorio del profesional</div>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className={`type ${modalidad === 'ONLINE' ? 'selected' : ''}`}
+                  onClick={() => handleSelectModalidad('ONLINE')}
+                >
+                  <span className="radio"></span>
+                  <span style={{ flex: 1 }}>
+                    <span className="t-name">Online</span>
+                    <div className="t-desc">Videollamada por Google Meet</div>
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+
           <div>
             <div className="book-title sora"><span className="dot"></span>Tipo de turno</div>
             <div className="types">
@@ -939,48 +983,64 @@ function StepSelect({
 
               {isObraSocialType && (
                 <>
-                  <div className="checkout-form__group">
-                    <label htmlFor="obra-social-select" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>
-                      Obra Social *
-                    </label>
-                    <select
-                      id="obra-social-select"
-                      className="checkout-form__input"
-                      value={OBRAS_SOCIALES.includes(obraSocial) ? obraSocial : (obraSocial ? 'Otra' : '')}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setObraSocial(val);
-                        if (val !== 'Otra') {
-                          setCustomObraSocial('');
-                        }
-                      }}
-                      style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none', backgroundColor: '#fff' }}
-                    >
-                      <option value="">Seleccionar Obra Social...</option>
-                      {OBRAS_SOCIALES.map(os => (
-                        <option key={os} value={os}>{os}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {(obraSocial === 'Otra' || (!OBRAS_SOCIALES.includes(obraSocial) && obraSocial !== '')) && (
+                  {isFixedGenericObraSocialType ? (
                     <div className="checkout-form__group">
-                      <label htmlFor="custom-obra-social" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>
-                        Nombre de tu Obra Social *
+                      <label className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                        Obra Social
                       </label>
-                      <input
-                        id="custom-obra-social"
-                        type="text"
-                        placeholder="Ej: OSAPM, Mutualidad, etc."
+                      <div
                         className="checkout-form__input"
-                        value={customObraSocial || (OBRAS_SOCIALES.includes(obraSocial) ? '' : obraSocial)}
-                        onChange={(e) => {
-                          setCustomObraSocial(e.target.value);
-                          setObraSocial('Otra');
-                        }}
-                        style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none' }}
-                      />
+                        style={{ padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-secondary, #f0f4f1)', display: 'flex', alignItems: 'center' }}
+                      >
+                        {fixedGenericObraSocial}
+                      </div>
                     </div>
+                  ) : (
+                    <>
+                      <div className="checkout-form__group">
+                        <label htmlFor="obra-social-select" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                          Obra Social *
+                        </label>
+                        <select
+                          id="obra-social-select"
+                          className="checkout-form__input"
+                          value={OBRAS_SOCIALES.includes(obraSocial) ? obraSocial : (obraSocial ? 'Otra' : '')}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setObraSocial(val);
+                            if (val !== 'Otra') {
+                              setCustomObraSocial('');
+                            }
+                          }}
+                          style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none', backgroundColor: '#fff' }}
+                        >
+                          <option value="">Seleccionar Obra Social...</option>
+                          {OBRAS_SOCIALES.map(os => (
+                            <option key={os} value={os}>{os}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {(obraSocial === 'Otra' || (!OBRAS_SOCIALES.includes(obraSocial) && obraSocial !== '')) && (
+                        <div className="checkout-form__group">
+                          <label htmlFor="custom-obra-social" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                            Nombre de tu Obra Social *
+                          </label>
+                          <input
+                            id="custom-obra-social"
+                            type="text"
+                            placeholder="Ej: OSAPM, Mutualidad, etc."
+                            className="checkout-form__input"
+                            value={customObraSocial || (OBRAS_SOCIALES.includes(obraSocial) ? '' : obraSocial)}
+                            onChange={(e) => {
+                              setCustomObraSocial(e.target.value);
+                              setObraSocial('Otra');
+                            }}
+                            style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none' }}
+                          />
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <div className="checkout-form__group">
@@ -1002,23 +1062,37 @@ function StepSelect({
 
               {isCustomObraSocialType && (
                 <>
-                  <div className="checkout-form__group">
-                    <label htmlFor="financiador-select" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>
-                      Obra Social *
-                    </label>
-                    <select
-                      id="financiador-select"
-                      className="checkout-form__input"
-                      value={idFinanciadorSel}
-                      onChange={(e) => setIdFinanciadorSel(e.target.value)}
-                      style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none', backgroundColor: '#fff' }}
-                    >
-                      <option value="">Seleccionar Obra Social...</option>
-                      {financiadores.map(f => (
-                        <option key={f.idfinanciador} value={f.idfinanciador}>{f.nombreComercial}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {isFixedObraSocialType ? (
+                    <div className="checkout-form__group">
+                      <label className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                        Obra Social
+                      </label>
+                      <div
+                        className="checkout-form__input"
+                        style={{ padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg-secondary, #f0f4f1)', display: 'flex', alignItems: 'center' }}
+                      >
+                        {fixedObraSocial}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="checkout-form__group">
+                      <label htmlFor="financiador-select" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                        Obra Social *
+                      </label>
+                      <select
+                        id="financiador-select"
+                        className="checkout-form__input"
+                        value={idFinanciadorSel}
+                        onChange={(e) => setIdFinanciadorSel(e.target.value)}
+                        style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none', backgroundColor: '#fff' }}
+                      >
+                        <option value="">Seleccionar Obra Social...</option>
+                        {financiadores.map(f => (
+                          <option key={f.idfinanciador} value={f.idfinanciador}>{f.nombreComercial}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div className="checkout-form__group">
                     <label htmlFor="afiliado-custom" className="checkout-form__label" style={{ fontWeight: 'bold', fontSize: '13px' }}>
@@ -1060,7 +1134,11 @@ function StepSelect({
                   style={{ marginTop: '3px' }}
                 />
                 <label htmlFor="acceptedTerms" style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
-                  Acepto los términos de servicio, la{' '}
+                  Acepto los{' '}
+                  <a href="/terminos" target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)' }}>
+                    términos de servicio
+                  </a>
+                  , la{' '}
                   <a href="/privacidad" target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)' }}>
                     política de privacidad
                   </a>{' '}
@@ -1503,13 +1581,9 @@ export default function CheckoutFlow({
   ) => {
     setSelectedDay(day)
     setSelectedSlot(slot)
-    
-    // Automatically derive modality
-    if (patientData.tipo === 'PARTICULAR' || patientData.tipo === 'OBRA_SOCIAL' || (patientData.tipo as string) === 'OSDE') {
-      setModality(professional.ofrecePresencial ? 'presencial' : 'online')
-    } else {
-      setModality('online')
-    }
+    // The patient already chose presencial/online explicitly in StepSelect (or it was
+    // preselected when the profesional only offers one) — no need to re-infer it here.
+    setModality(patientData.modalidad === 'PRESENCIAL' ? 'presencial' : 'online')
 
     handlePay(day, slot, patientData)
   }
@@ -1529,6 +1603,7 @@ export default function CheckoutFlow({
       fecha: day.date,
       hora: finalTime + ":00",
       tipo: patientData.tipo,
+      modalidad: patientData.modalidad,
       servicioId: patientData.servicioId,
       obraSocial: patientData.obraSocial,
       idFinanciador: patientData.idFinanciador,

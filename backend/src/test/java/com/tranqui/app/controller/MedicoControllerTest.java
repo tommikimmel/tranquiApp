@@ -1,5 +1,6 @@
 package com.tranqui.app.controller;
 
+import com.tranqui.app.model.Modalidad;
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.model.dto.DashboardStatsDto;
@@ -95,18 +96,19 @@ class MedicoControllerTest {
     @Test
     @WithMockUser(username = "medico@test.com", roles = "PSIQUIATRA")
     void testObtenerDisponibilidad() throws Exception {
-        when(disponibilidadService.obtenerDisponibilidades("medico@test.com")).thenReturn(Collections.emptyList());
+        when(disponibilidadService.obtenerDisponibilidades(eq("medico@test.com"), any())).thenReturn(Collections.emptyList());
 
-        mockMvc.perform(get("/api/medicos/disponibilidad"))
+        mockMvc.perform(get("/api/medicos/disponibilidad").param("modalidad", "ONLINE"))
                 .andExpect(status().isOk());
     }
 
     @Test
     @WithMockUser(username = "medico@test.com", roles = "PSIQUIATRA")
     void testActualizarDisponibilidad() throws Exception {
-        when(disponibilidadService.guardarDisponibilidades(eq("medico@test.com"), any())).thenReturn(Collections.emptyList());
+        when(disponibilidadService.guardarDisponibilidades(eq("medico@test.com"), eq(Modalidad.ONLINE), any())).thenReturn(Collections.emptyList());
 
         mockMvc.perform(put("/api/medicos/disponibilidad")
+                        .param("modalidad", "ONLINE")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("[]"))
                 .andExpect(status().isOk());

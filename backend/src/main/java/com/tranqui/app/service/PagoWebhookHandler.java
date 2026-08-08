@@ -104,9 +104,12 @@ public class PagoWebhookHandler {
             log.error("Error al crear notificaciones de confirmación para el turno ID: {}", turnoId, e);
         }
 
-        // Intentar notificar por WhatsApp
+        // Intentar notificar por WhatsApp — salvo que el paciente haya desactivado estas
+        // notificaciones desde "Mi Cuenta".
         try {
-            whatsAppService.enviarMensajeRecordatorio(turno);
+            if (turno.getPaciente().isNotificacionesWhatsappHabilitadas()) {
+                whatsAppService.enviarMensajeRecordatorio(turno);
+            }
         } catch (Exception e) {
             log.error("Error al enviar recordatorio de WhatsApp para el turno ID: {}", turnoId, e);
         }

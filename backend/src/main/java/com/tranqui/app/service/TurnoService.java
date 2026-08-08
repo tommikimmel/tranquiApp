@@ -1,6 +1,7 @@
 package com.tranqui.app.service;
 
 import com.tranqui.app.model.EstadoTurno;
+import com.tranqui.app.model.Modalidad;
 import com.tranqui.app.model.TipoTurno;
 import com.tranqui.app.model.Turno;
 import com.tranqui.app.model.Usuario;
@@ -54,8 +55,12 @@ public class TurnoService {
     private boolean paymentSimulationEnabled;
 
     @Transactional(readOnly = true)
-    public List<java.time.LocalTime> obtenerHorariosDisponibles(Long medicoId, java.time.LocalDate fecha) {
-        List<com.tranqui.app.model.Disponibilidad> disponibilidades = disponibilidadRepository.findByMedicoId(medicoId);
+    public List<java.time.LocalTime> obtenerHorariosDisponibles(Long medicoId, java.time.LocalDate fecha, Modalidad modalidad) {
+        List<com.tranqui.app.model.Disponibilidad> disponibilidades = disponibilidadRepository.findByMedicoIdAndModalidadOLegacy(medicoId, modalidad);
+        // IMPORTANT: turnosExistentes is loaded WITHOUT any modalidad filter on purpose — a
+        // médico can't be in two consultas at once, so a turno booked in PRESENCIAL must also
+        // block that same horario when calculating ONLINE availability (and vice versa). Do not
+        // "fix" this by filtering turnosExistentes by modalidad, that would break the mutual lock.
         List<Turno> turnosRaw = turnoRepository.findByMedicoIdAndFechaAndEstadoNot(medicoId, fecha, EstadoTurno.CANCELADO);
         java.time.LocalDateTime limiteCincoMin = java.time.LocalDateTime.now().minusMinutes(5);
 
@@ -138,11 +143,29 @@ public class TurnoService {
     // the exact same per-médico logic (including the Google Calendar overlay) unchanged — this
     // only collapses the *transport* into a single request/response instead of N of them.
     @Transactional(readOnly = true)
-    public java.util.Map<Long, Integer> obtenerConteosDisponibilidad(List<Long> medicoIds, java.time.LocalDate fecha) {
+    public java.util.Map<Long, Integer> obtenerConteosDisponibilidad(List<Long> medicoIds, java.time.LocalDate fecha, Modalidad modalidad) {
         java.util.Map<Long, Integer> conteos = new java.util.LinkedHashMap<>();
         for (Long medicoId : medicoIds) {
             try {
-                conteos.put(medicoId, obtenerHorariosDisponibles(medicoId, fecha).size());
+                if (modalidad != null) {
+                    conteos.put(medicoId, obtenerHorariosDisponibles(medicoId, fecha, modalidad).size());
+                    continue;
+                }
+                // No modalidad chosen yet (public homepage badge, before the patient picks
+                // presencial/online) — count the union of whatever modalidades this médico offers.
+                Usuario medico = usuarioRepository.findById(medicoId).orElse(null);
+                if (medico == null) {
+                    conteos.put(medicoId, 0);
+                    continue;
+                }
+                java.util.Set<java.time.LocalTime> union = new java.util.LinkedHashSet<>();
+                if (medico.isOfrecePresencial()) {
+                    union.addAll(obtenerHorariosDisponibles(medicoId, fecha, Modalidad.PRESENCIAL));
+                }
+                if (medico.isOfreceOnline()) {
+                    union.addAll(obtenerHorariosDisponibles(medicoId, fecha, Modalidad.ONLINE));
+                }
+                conteos.put(medicoId, union.size());
             } catch (Exception e) {
                 conteos.put(medicoId, 0);
             }
@@ -166,9 +189,21 @@ public class TurnoService {
         Usuario medico = usuarioRepository.findById(dto.getMedicoId())
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
+        // Resolve which agenda (presencial/online) this turno books against. Only ambiguous
+        // when the médico offers both and the caller didn't say — reject rather than guess,
+        // since guessing wrong would silently book against the wrong agenda's horarios.
+        boolean ofreceAmbasModalidades = medico.isOfrecePresencial() && medico.isOfreceOnline();
+        Modalidad modalidad = dto.getModalidad();
+        if (modalidad == null) {
+            if (ofreceAmbasModalidades) {
+                throw new IllegalArgumentException("Debés indicar si el turno es presencial u online.");
+            }
+            modalidad = medico.isOfrecePresencial() ? Modalidad.PRESENCIAL : Modalidad.ONLINE;
+        }
+
         // Check if slot is still available (only for standard/non-sobreturno appointments)
         if (dto.getTipo() != TipoTurno.SOBRETUNO) {
-            List<java.time.LocalTime> disponibles = obtenerHorariosDisponibles(medico.getId(), dto.getFecha());
+            List<java.time.LocalTime> disponibles = obtenerHorariosDisponibles(medico.getId(), dto.getFecha(), modalidad);
             if (!disponibles.contains(dto.getHora())) {
                 throw new IllegalStateException("El horario seleccionado ya no está disponible");
             }
@@ -225,9 +260,14 @@ public class TurnoService {
                 : Optional.empty();
 
         boolean usoTarifaCustom = tarifaCustomOpt.isPresent() && tarifaCustomOpt.get().isHabilitado();
+        // Whether this booking requires a número de afiliado — resolved from the actual tarifa
+        // (its specific obra social, see TarifaMedico.obraSocial) rather than trusting the
+        // frontend, so the requirement can't be bypassed by calling this endpoint directly.
+        boolean requiereAfiliado;
         if (usoTarifaCustom) {
             servicioId = dto.getServicioId();
             precio = tarifaCustomOpt.get().getPrecio();
+            requiereAfiliado = tarifaCustomOpt.get().isRequiereObraSocial();
         } else {
             if (dto.getTipo() == TipoTurno.OBRA_SOCIAL || dto.getTipo() == TipoTurno.OSDE) {
                 servicioId = "obra_social";
@@ -243,6 +283,9 @@ public class TurnoService {
             if (!tarifaOpt.isPresent() && (dto.getTipo() == TipoTurno.OBRA_SOCIAL || dto.getTipo() == TipoTurno.OSDE)) {
                 tarifaOpt = tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), "osde");
             }
+
+            boolean esTipoObraSocial = dto.getTipo() == TipoTurno.OBRA_SOCIAL || dto.getTipo() == TipoTurno.OSDE;
+            requiereAfiliado = esTipoObraSocial || (tarifaOpt.isPresent() && tarifaOpt.get().isRequiereObraSocial());
 
             if (tarifaOpt.isPresent() && tarifaOpt.get().isHabilitado()) {
                 precio = tarifaOpt.get().getPrecio();
@@ -260,6 +303,10 @@ public class TurnoService {
                     precio = medico.getPrecio() != null ? medico.getPrecio() : new java.math.BigDecimal("60000");
                 }
             }
+        }
+
+        if (requiereAfiliado && (dto.getMetadataAfiliado() == null || dto.getMetadataAfiliado().isBlank())) {
+            throw new IllegalStateException("Este servicio requiere número de afiliado.");
         }
 
         // If it is the first consultation, apply a 30% surcharge and round to nearest whole number
@@ -285,6 +332,7 @@ public class TurnoService {
                 .horaInicio(dto.getHora())
                 .horaFin(dto.getHora().plusMinutes(45))
                 .tipo(dto.getTipo())
+                .modalidad(modalidad)
                 .estado(EstadoTurno.PENDIENTE_PAGO)
                 .precio(precio)
                 .metadataAfiliado(metaAfiliado)
@@ -590,7 +638,9 @@ public class TurnoService {
                 horaStr,
                 linkInfo
             );
-            whatsappService.enviarMensajeWhatsApp(turno.getPaciente().getTelefono(), body);
+            if (turno.getPaciente().isNotificacionesWhatsappHabilitadas()) {
+                whatsappService.enviarMensajeWhatsApp(turno.getPaciente().getTelefono(), body);
+            }
         } catch (Exception e) {
             System.err.println("Fallo al enviar notificación de reprogramación: " + e.getMessage());
         }

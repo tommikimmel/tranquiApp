@@ -1140,6 +1140,11 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
+  /* Leaflet's internal panes/controls use z-index up to 1000 — without its own stacking
+     context, position:static .map-box lets those panes escape and render above sticky
+     siblings elsewhere on the page (e.g. .checkout-header) instead of staying contained. */
+  position: relative;
+  isolation: isolate;
 }
 
 .map-addr {

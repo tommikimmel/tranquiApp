@@ -51,7 +51,9 @@ public class NotificationScheduler {
 
         for (Turno turno : turnosMañana) {
             try {
-                whatsappService.enviarMensajeRecordatorio(turno);
+                if (turno.getPaciente().isNotificacionesWhatsappHabilitadas()) {
+                    whatsappService.enviarMensajeRecordatorio(turno);
+                }
                 turno.setRecordatorioEnviado(true);
                 turnoRepository.save(turno);
                 log.info("Recordatorio enviado con exito para el turno ID: {}", turno.getId());

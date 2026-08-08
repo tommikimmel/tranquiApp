@@ -42,4 +42,7 @@ public class RegisterRequestDto {
     private Boolean ofreceOnline;
     private Boolean ofrecePresencial;
     private String fotoUrl;
+
+    // Debe venir en true para poder registrarse — ver AuthController.register().
+    private Boolean aceptaTerminos;
 }

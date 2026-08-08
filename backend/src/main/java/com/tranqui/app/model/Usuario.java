@@ -327,6 +327,46 @@ public class Usuario {
     @Column(name = "domicilio_pais", length = 45)
     private String domicilioPais;
 
+    // ── Cuenta (paciente/médico) ────────────────────────────────────────────
+    // Eliminar cuenta never deletes this row (Turno/InformeClinico/SeguimientoDiario point at
+    // it without cascade, and historia clínica has a legal minimum retention) — it anonymizes
+    // the PII fields and sets these two instead. See AccountService.eliminarCuenta.
+    @Builder.Default
+    @Column(name = "cuenta_eliminada")
+    private Boolean cuentaEliminada = false;
+
+    @Column(name = "anonimizado_en")
+    private LocalDateTime anonimizadoEn;
+
+    public boolean isCuentaEliminada() {
+        return cuentaEliminada != null && cuentaEliminada;
+    }
+
+    // Opt-out notification preferences — default true so nobody stops receiving notifications
+    // just because this column got added. See AccountService.actualizarPreferenciasNotificacion
+    // and the checks added to WhatsAppService/ResendEmailService/NotificationScheduler.
+    @Builder.Default
+    @Column(name = "notificaciones_email_habilitadas")
+    private Boolean notificacionesEmailHabilitadas = true;
+
+    @Builder.Default
+    @Column(name = "notificaciones_whatsapp_habilitadas")
+    private Boolean notificacionesWhatsappHabilitadas = true;
+
+    public boolean isNotificacionesEmailHabilitadas() {
+        return notificacionesEmailHabilitadas == null || notificacionesEmailHabilitadas;
+    }
+
+    public boolean isNotificacionesWhatsappHabilitadas() {
+        return notificacionesWhatsappHabilitadas == null || notificacionesWhatsappHabilitadas;
+    }
+
+    // Null means "not accepted yet" — set once, at register() time, and never cleared. Existing
+    // rows from before this column existed are backfilled once via a manual SQL UPDATE at
+    // deploy time (see runbook), not by app code, so they never see the acceptance modal.
+    @Column(name = "terminos_aceptados_en")
+    private LocalDateTime terminosAceptadosEn;
+
     @PrePersist
     protected void onCreate() {
         if (fechaRegistro == null) {

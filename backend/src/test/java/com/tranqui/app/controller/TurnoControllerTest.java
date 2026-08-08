@@ -1,5 +1,6 @@
 package com.tranqui.app.controller;
 
+import com.tranqui.app.model.Modalidad;
 import com.tranqui.app.model.dto.ReservaTurnoDto;
 import com.tranqui.app.model.dto.TurnoResponseDto;
 import com.tranqui.app.service.TurnoService;
@@ -34,10 +35,11 @@ class TurnoControllerTest {
     @Test
     @WithMockUser(username = "paciente@test.com", roles = "PACIENTE")
     void testObtenerTurnosDisponibles() throws Exception {
-        when(turnoService.obtenerHorariosDisponibles(eq(1L), any(LocalDate.class))).thenReturn(Collections.emptyList());
+        when(turnoService.obtenerHorariosDisponibles(eq(1L), any(LocalDate.class), eq(Modalidad.ONLINE))).thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/api/medicos/1/turnos-disponibles")
-                        .param("fecha", "2026-07-02"))
+                        .param("fecha", "2026-07-02")
+                        .param("modalidad", "ONLINE"))
                 .andExpect(status().isOk());
     }
 

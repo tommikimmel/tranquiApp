@@ -98,7 +98,7 @@ class TurnoServiceGoogleCalendarTest {
         when(googleCalendarService.obtenerEventosDelDia(any(Usuario.class), eq(fecha)))
                 .thenReturn(Collections.singletonList(eventoOcupado));
 
-        List<LocalTime> disponibles = turnoService.obtenerHorariosDisponibles(medico.getId(), fecha);
+        List<LocalTime> disponibles = turnoService.obtenerHorariosDisponibles(medico.getId(), fecha, Modalidad.ONLINE);
         
         // La disponibilidad local de 9:00 a 12:00 en bloques de 1 hora es:
         // 9:00 (9:00 - 9:45)

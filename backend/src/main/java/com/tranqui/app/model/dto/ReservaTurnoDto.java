@@ -1,5 +1,6 @@
 package com.tranqui.app.model.dto;
 
+import com.tranqui.app.model.Modalidad;
 import com.tranqui.app.model.TipoTurno;
 import lombok.*;
 import java.time.LocalDate;
@@ -15,6 +16,7 @@ public class ReservaTurnoDto {
     private LocalDate fecha;
     private LocalTime hora;
     private TipoTurno tipo; // PARTICULAR, OBRA_SOCIAL, OSDE
+    private Modalidad modalidad; // PRESENCIAL u ONLINE — requerido si el médico ofrece ambas
     private String servicioId; // id de la tarifa elegida en Honorarios y Servicios (para servicios custom del médico)
     private String obraSocial; // Nombre de la Obra Social (e.g. OSDE, Swiss Medical)
     private String idFinanciador; // id del financiador QBI2 elegido en el combo (cuando la tarifa requiere obra social)

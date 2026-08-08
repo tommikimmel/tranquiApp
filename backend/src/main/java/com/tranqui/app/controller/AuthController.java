@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -45,6 +46,9 @@ public class AuthController {
     @Autowired
     private com.tranqui.app.service.ResendEmailService resendEmailService;
 
+    @Autowired
+    private com.tranqui.app.service.AccountService accountService;
+
     @org.springframework.beans.factory.annotation.Value("${google.client-id:dummy-client-id}")
     private String clientId;
 
@@ -63,6 +67,10 @@ public class AuthController {
 
         if (usuarioRepository.findByEmail(emailClean).isPresent()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El email ya está registrado");
+        }
+
+        if (!Boolean.TRUE.equals(registerRequestDto.getAceptaTerminos())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Debés aceptar los términos y condiciones para registrarte.");
         }
 
         if (registerRequestDto.getFotoUrl() != null
@@ -119,6 +127,7 @@ public class AuthController {
                 .emailVerificado(false)
                 .codigoVerificacion(codigoVerificacion)
                 .codigoVerificacionExpiresAt(expiresAt)
+                .terminosAceptadosEn(java.time.LocalDateTime.now())
                 .build();
 
         usuarioRepository.save(usuario);
@@ -243,6 +252,10 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Credenciales incorrectas");
         }
 
+        if (usuario.isCuentaEliminada()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Esta cuenta fue eliminada.");
+        }
+
         if (Boolean.FALSE.equals(usuario.getEmailVerificado()) && usuario.getRol() != Rol.ADMIN) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Debés verificar tu correo electrónico antes de ingresar. Te enviamos un código al registrarte.");
         }
@@ -266,7 +279,7 @@ public class AuthController {
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
-        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto()));
+        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto(), usuario.getTerminosAceptadosEn() == null));
     }
 
     @PostMapping("/google")
@@ -301,7 +314,7 @@ public class AuthController {
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
-        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto()));
+        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto(), usuario.getTerminosAceptadosEn() == null));
     }
 
     // Fills in the Paso 2 profile data (nombre, apellido, sexo, fechaNacimiento,
@@ -346,7 +359,7 @@ public class AuthController {
         usuario.setPerfilCompleto(true);
         usuarioRepository.save(usuario);
 
-        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto()));
+        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto(), usuario.getTerminosAceptadosEn() == null));
     }
 
     @GetMapping("/me")
@@ -356,7 +369,103 @@ public class AuthController {
         }
         Usuario usuario = usuarioRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
-        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto()));
+        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto(), usuario.getTerminosAceptadosEn() == null));
+    }
+
+    // Cuentas creadas por Google sign-in (getOrCreateUsuario) nunca piden aceptar los términos
+    // en el momento de la creación — quedan con terminosAceptadosEn == null hasta que llaman a
+    // este endpoint, gatillado por el modal de aceptación que el frontend muestra mientras
+    // currentUser.requiereAceptarTerminos sea true (ver App.tsx).
+    @PostMapping("/aceptar-terminos")
+    public ResponseEntity<?> aceptarTerminos(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        Usuario usuario = usuarioRepository.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+        usuario.setTerminosAceptadosEn(java.time.LocalDateTime.now());
+        usuarioRepository.save(usuario);
+        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto(), usuario.getTerminosAceptadosEn() == null));
+    }
+
+    // ── Mi Cuenta ────────────────────────────────────────────────────────────
+    @GetMapping("/mi-cuenta")
+    public ResponseEntity<?> obtenerMiCuenta(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(accountService.obtenerMiCuenta(userDetails.getUsername()));
+    }
+
+    @PutMapping("/mi-cuenta")
+    public ResponseEntity<?> actualizarMiCuenta(
+            @RequestBody com.tranqui.app.model.dto.MiCuentaDto dto,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(accountService.actualizarDatosPersonales(userDetails.getUsername(), dto));
+    }
+
+    @PutMapping("/mi-cuenta/notificaciones")
+    public ResponseEntity<?> actualizarPreferenciasNotificacion(
+            @RequestBody com.tranqui.app.model.dto.PreferenciasNotificacionDto dto,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(accountService.actualizarPreferenciasNotificacion(
+                userDetails.getUsername(), dto.isEmailHabilitado(), dto.isWhatsappHabilitado()));
+    }
+
+    @PostMapping("/mi-cuenta/password")
+    public ResponseEntity<?> cambiarPassword(
+            @RequestBody com.tranqui.app.model.dto.CambiarPasswordDto dto,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        try {
+            accountService.cambiarPassword(userDetails.getUsername(), dto.getCurrentPassword(), dto.getNewPassword());
+            return ResponseEntity.ok("Contraseña actualizada correctamente.");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/mi-cuenta/eliminar")
+    public ResponseEntity<?> eliminarCuenta(
+            @RequestBody(required = false) com.tranqui.app.model.dto.EliminarCuentaDto dto,
+            @AuthenticationPrincipal UserDetails userDetails,
+            HttpServletResponse response) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        try {
+            accountService.eliminarCuenta(userDetails.getUsername(), dto != null ? dto.getPassword() : null);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+
+        // Same cookie-clearing mechanism as /logout — the account is gone, so the session
+        // shouldn't keep authenticating as it.
+        boolean secureCookie = true;
+        String sameSiteVal = "Strict";
+        boolean isDev = java.util.Arrays.asList(env.getActiveProfiles()).contains("dev");
+        if (isDev || "dummy-client-id".equals(clientId)) {
+            secureCookie = false;
+            sameSiteVal = "Lax";
+        }
+        ResponseCookie cookie = ResponseCookie.from("SESSION-TOKEN", "")
+                .httpOnly(true)
+                .secure(secureCookie)
+                .path("/")
+                .maxAge(0)
+                .sameSite(sameSiteVal)
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        return ResponseEntity.ok("Cuenta eliminada.");
     }
 
     @PostMapping("/logout")

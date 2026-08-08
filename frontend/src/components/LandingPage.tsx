@@ -86,6 +86,7 @@ interface Tariff {
   price: number
   enabled: boolean
   requiereObraSocial?: boolean
+  obraSocial?: string
 }
 
 interface RedesSociales {
@@ -454,6 +455,26 @@ function PublicHeader({
                       Mi Receta
                     </button>
                     <a
+                      href="/mi-cuenta"
+                      onClick={() => setShowDropdown(false)}
+                      style={{
+                        padding: 'var(--space-3) var(--space-4)',
+                        textAlign: 'left',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: '1px solid #f0f2f5',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        color: 'var(--color-text-primary)',
+                        textDecoration: 'none',
+                        display: 'block'
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      Mi Cuenta
+                    </a>
+                    <a
                       href="/privacidad"
                       target="_blank"
                       rel="noreferrer"
@@ -761,6 +782,7 @@ export default function LandingPage({
             price: t.price,
             enabled: t.enabled,
             requiereObraSocial: t.requiereObraSocial,
+            obraSocial: t.obraSocial,
           })),
         }))
         setProfessionals(mapped)
@@ -1289,7 +1311,10 @@ export default function LandingPage({
       <footer className="site-footer">
         <div className="site-footer__inner">
           <span>© {new Date().getFullYear()} Tranqui App — por Tranqui Neurociencias</span>
-          <a href="/privacidad">Política de Privacidad</a>
+          <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
+            <a href="/privacidad">Política de Privacidad</a>
+            <a href="/terminos">Términos y Condiciones</a>
+          </div>
         </div>
       </footer>
 

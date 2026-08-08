@@ -97,16 +97,18 @@ public class MedicoController {
     @GetMapping("/disponibilidad")
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<List<com.tranqui.app.model.dto.DisponibilidadDto>> obtenerDisponibilidad(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.ok(disponibilidadService.obtenerDisponibilidades(userDetails.getUsername()));
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam com.tranqui.app.model.Modalidad modalidad) {
+        return ResponseEntity.ok(disponibilidadService.obtenerDisponibilidades(userDetails.getUsername(), modalidad));
     }
 
     @PutMapping("/disponibilidad")
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<List<com.tranqui.app.model.dto.DisponibilidadDto>> actualizarDisponibilidad(
             @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam com.tranqui.app.model.Modalidad modalidad,
             @RequestBody List<com.tranqui.app.model.dto.DisponibilidadDto> dtos) {
-        return ResponseEntity.ok(disponibilidadService.guardarDisponibilidades(userDetails.getUsername(), dtos));
+        return ResponseEntity.ok(disponibilidadService.guardarDisponibilidades(userDetails.getUsername(), modalidad, dtos));
     }
 
     private Usuario obtenerMedicoAutenticado(UserDetails userDetails) {
@@ -285,6 +287,14 @@ public class MedicoController {
         try {
             Usuario medico = googleCalendarOAuthService.procesarCallback(medicoId, code);
             googleCalendarWatchService.registrarCanal(medico); // best-effort — see registrarCanal's own try/catch
+            // Seed the eventos externos cache right away instead of waiting for the next
+            // polling cycle (up to 5 min) — otherwise "Próximos Eventos" looks empty right
+            // after connecting even though the link succeeded.
+            try {
+                googleCalendarSyncService.sincronizacionCompleta(medico);
+            } catch (Exception syncEx) {
+                log.error("Fallo al sincronizar eventos de Google Calendar tras vincular el médico ID {}", medicoId, syncEx);
+            }
             response.sendRedirect(frontendUrl + "/?googleCalendar=success");
         } catch (Exception e) {
             log.error("Error al procesar el callback de OAuth de Google Calendar", e);

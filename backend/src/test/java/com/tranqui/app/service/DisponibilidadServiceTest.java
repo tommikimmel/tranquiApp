@@ -1,6 +1,7 @@
 package com.tranqui.app.service;
 
 import com.tranqui.app.model.Disponibilidad;
+import com.tranqui.app.model.Modalidad;
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.model.dto.DisponibilidadDto;
@@ -50,15 +51,17 @@ class DisponibilidadServiceTest {
 
     @Test
     void testObtenerDisponibilidadesEmpty() {
-        List<DisponibilidadDto> result = disponibilidadService.obtenerDisponibilidades(medico.getEmail());
+        // medico here doesn't set ofrecePresencial/ofreceOnline, so isOfreceOnline() defaults
+        // true and isOfrecePresencial() defaults false — ONLINE is the prioritized modalidad.
+        List<DisponibilidadDto> result = disponibilidadService.obtenerDisponibilidades(medico.getEmail(), Modalidad.ONLINE);
         assertFalse(result.isEmpty());
         assertEquals(10, result.size());
     }
 
     @Test
     void testObtenerDisponibilidadesWithData() {
-        disponibilidadService.obtenerDisponibilidades(medico.getEmail()); // initializes default
-        List<DisponibilidadDto> result = disponibilidadService.obtenerDisponibilidades(medico.getEmail());
+        disponibilidadService.obtenerDisponibilidades(medico.getEmail(), Modalidad.ONLINE); // initializes default
+        List<DisponibilidadDto> result = disponibilidadService.obtenerDisponibilidades(medico.getEmail(), Modalidad.ONLINE);
         assertEquals(10, result.size());
     }
 
@@ -67,7 +70,7 @@ class DisponibilidadServiceTest {
         List<DisponibilidadDto> dtos = Arrays.asList(
                 new DisponibilidadDto(1, "09:00", "12:00")
         );
-        List<DisponibilidadDto> result = disponibilidadService.guardarDisponibilidades(medico.getEmail(), dtos);
+        List<DisponibilidadDto> result = disponibilidadService.guardarDisponibilidades(medico.getEmail(), Modalidad.ONLINE, dtos);
         assertEquals(1, result.size());
         assertEquals(1, disponibilidadRepository.findByMedicoId(medico.getId()).size());
     }

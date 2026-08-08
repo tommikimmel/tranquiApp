@@ -29,4 +29,13 @@ public class Disponibilidad {
 
     @Column(name = "hora_fin", nullable = false)
     private LocalTime horaFin;
+
+    // Nullable on purpose: Hibernate's ddl-auto=update can't backfill a NOT NULL default onto
+    // existing rows, so legacy rows (created before per-modalidad agendas existed) keep this
+    // null. A null modalidad is treated as valid for BOTH modalidades until the médico explicitly
+    // saves either grid, at which point that save adopts (and replaces) the legacy rows — see
+    // DisponibilidadRepository/DisponibilidadService.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "modalidad", length = 20)
+    private Modalidad modalidad;
 }

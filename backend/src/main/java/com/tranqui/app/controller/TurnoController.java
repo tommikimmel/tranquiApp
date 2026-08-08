@@ -23,19 +23,23 @@ public class TurnoController {
     @GetMapping("/medicos/{medicoId}/turnos-disponibles")
     public ResponseEntity<List<LocalTime>> obtenerTurnosDisponibles(
             @PathVariable Long medicoId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
-        return ResponseEntity.ok(turnoService.obtenerHorariosDisponibles(medicoId, fecha));
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+            @RequestParam com.tranqui.app.model.Modalidad modalidad) {
+        return ResponseEntity.ok(turnoService.obtenerHorariosDisponibles(medicoId, fecha, modalidad));
     }
 
     /**
      * Batched counterpart used by the public homepage's date filter: instead of one request per
      * visible professional, the frontend sends every médicoId once and gets back a count per id.
+     * modalidad is optional here — the homepage shows this badge before the patient has picked
+     * a modalidad, so it counts the union of whatever the médico offers (see TurnoService).
      */
     @GetMapping("/medicos/turnos-disponibles-conteo")
     public ResponseEntity<java.util.Map<Long, Integer>> obtenerConteosDisponibilidad(
             @RequestParam List<Long> medicoIds,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
-        return ResponseEntity.ok(turnoService.obtenerConteosDisponibilidad(medicoIds, fecha));
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+            @RequestParam(required = false) com.tranqui.app.model.Modalidad modalidad) {
+        return ResponseEntity.ok(turnoService.obtenerConteosDisponibilidad(medicoIds, fecha, modalidad));
     }
 
     @PostMapping("/turnos/reservar")

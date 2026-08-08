@@ -17,6 +17,7 @@ public class UserResponseDto {
     private Rol rol;
     private String telefono;
     private Boolean perfilCompleto;
+    private Boolean requiereAceptarTerminos; // true = terminosAceptadosEn == null, ver AuthController
 
     public UserResponseDto(Long id, String nombre, String email, Rol rol) {
         this.id = id;

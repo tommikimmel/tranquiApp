@@ -49,13 +49,18 @@ public class MedicoService {
     private static final int DEFAULT_DURACION_TURNO_MINUTOS = 45;
     private static final int DEFAULT_INTERVALO_ENTRE_TURNOS_MINUTOS = 10;
 
+    // "osde" replaces the old generic "obra_social" default as the seed for NEW médicos with no
+    // tariffs yet — a specific obra social ("OSDE") instead of a generic "any obra social"
+    // service, matching the new per-servicio obraSocial model. Médicos who already have an
+    // "obra_social" row persisted keep it untouched; TurnoService.reservarTurno still treats
+    // "obra_social"/"osde" as synonyms so both keep working.
     private static final List<MedicoDto.TarifaDto> DEFAULT_TARIFFS = Arrays.asList(
-            new MedicoDto.TarifaDto("particular", "Consulta particular", new BigDecimal("60000"), true, false),
-            new MedicoDto.TarifaDto("sobreturno", "Sobreturno", new BigDecimal("90000"), true, false),
-            new MedicoDto.TarifaDto("obra_social", "Obra Social", new BigDecimal("10500"), true, true),
-            new MedicoDto.TarifaDto("receta-fuera", "Receta fuera de turno", new BigDecimal("45000"), true, false),
-            new MedicoDto.TarifaDto("certificado", "Certificado", new BigDecimal("55000"), true, false),
-            new MedicoDto.TarifaDto("informe-apto", "Informe / Apto médico", new BigDecimal("165000"), true, false)
+            new MedicoDto.TarifaDto("particular", "Consulta particular", new BigDecimal("60000"), true, false, null),
+            new MedicoDto.TarifaDto("sobreturno", "Sobreturno", new BigDecimal("90000"), true, false, null),
+            new MedicoDto.TarifaDto("osde", "Obra Social OSDE", new BigDecimal("10500"), true, true, "OSDE"),
+            new MedicoDto.TarifaDto("receta-fuera", "Receta fuera de turno", new BigDecimal("45000"), true, false, null),
+            new MedicoDto.TarifaDto("certificado", "Certificado", new BigDecimal("55000"), true, false, null),
+            new MedicoDto.TarifaDto("informe-apto", "Informe / Apto médico", new BigDecimal("165000"), true, false, null)
     );
 
     @Transactional(readOnly = true)
@@ -213,11 +218,14 @@ public class MedicoService {
                     .collect(Collectors.toSet());
 
             for (MedicoDto.TarifaDto tDto : dto.getTariffs()) {
-                // The Obra Social service always requires cobertura + n° de afiliado — enforced
-                // server-side too, not just disabled in the UI, so it can't be bypassed by
-                // calling the API directly.
+                // A service "requiere obra social" if it has a specific obra social assigned
+                // (the new per-servicio model), or is one of the legacy generic ids, or the
+                // médico explicitly flagged it — enforced server-side too, not just in the UI,
+                // so it can't be bypassed by calling the API directly.
                 boolean esServicioObraSocial = "obra_social".equals(tDto.getId()) || "osde".equals(tDto.getId());
-                boolean requiereObraSocial = esServicioObraSocial || tDto.isRequiereObraSocial();
+                String obraSocialTrim = tDto.getObraSocial() != null ? tDto.getObraSocial().trim() : null;
+                if (obraSocialTrim != null && obraSocialTrim.isEmpty()) obraSocialTrim = null;
+                boolean requiereObraSocial = esServicioObraSocial || obraSocialTrim != null || tDto.isRequiereObraSocial();
 
                 Optional<TarifaMedico> tarifaOpt = tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), tDto.getId());
                 TarifaMedico tarifa;
@@ -227,6 +235,7 @@ public class MedicoService {
                     tarifa.setPrecio(tDto.getPrice());
                     tarifa.setHabilitado(tDto.isEnabled());
                     tarifa.setRequiereObraSocial(requiereObraSocial);
+                    tarifa.setObraSocial(obraSocialTrim);
                 } else {
                     tarifa = TarifaMedico.builder()
                             .medico(medico)
@@ -235,6 +244,7 @@ public class MedicoService {
                             .precio(tDto.getPrice())
                             .habilitado(tDto.isEnabled())
                             .requiereObraSocial(requiereObraSocial)
+                            .obraSocial(obraSocialTrim)
                             .build();
                 }
                 tarifaRepository.save(tarifa);
@@ -270,6 +280,7 @@ public class MedicoService {
                         .precio(def.getPrice())
                         .habilitado(def.isEnabled())
                         .requiereObraSocial(def.isRequiereObraSocial())
+                        .obraSocial(def.getObraSocial())
                         .build();
                 tarifasDb.add(tarifaRepository.save(t));
             }
@@ -283,6 +294,7 @@ public class MedicoService {
                         .price(t.getPrecio())
                         .enabled(t.isHabilitado())
                         .requiereObraSocial(t.isRequiereObraSocial())
+                        .obraSocial(t.getObraSocial())
                         .build())
                 .collect(Collectors.toList());
 

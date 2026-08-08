@@ -1,6 +1,7 @@
 package com.tranqui.app.service;
 
 import com.tranqui.app.model.EstadoTurno;
+import com.tranqui.app.model.Modalidad;
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.TipoTurno;
 import com.tranqui.app.model.Turno;
@@ -272,7 +273,7 @@ class TurnoServiceTest {
 
     @Test
     void testObtenerHorariosDisponibles() {
-        java.util.List<LocalTime> result = turnoService.obtenerHorariosDisponibles(medico.getId(), LocalDate.now());
+        java.util.List<LocalTime> result = turnoService.obtenerHorariosDisponibles(medico.getId(), LocalDate.now(), Modalidad.ONLINE);
         assertNotNull(result);
     }
 

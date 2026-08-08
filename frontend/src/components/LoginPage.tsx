@@ -144,6 +144,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   const [ofreceOnline, setOfreceOnline] = useState(true)
   const [ofrecePresencial, setOfrecePresencial] = useState(false)
   const [fotoUrl, setFotoUrl] = useState('')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
 
   // Email Verification State
   const [pendingEmail, setPendingEmail] = useState('')
@@ -315,6 +316,11 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       return
     }
 
+    if (!acceptedTerms) {
+      showAlert('Debés aceptar los términos y condiciones para registrarte.', 'warning')
+      return
+    }
+
     const payload: any = {
       email: cleanEmail,
       password,
@@ -326,6 +332,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       tipoDocumento,
       numeroDocumento: Number(numeroDocumento),
       telefono: `+54 ${telefono.trim().replace(/^\+54\s*/, '')}`,
+      aceptaTerminos: acceptedTerms,
     }
 
     if (role === 'PACIENTE') {
@@ -921,6 +928,22 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                   </div>
                 )}
 
+                {totalSteps <= 2 && (
+                  <div className="form-group form-group--checkbox" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <input
+                      id="acceptedTermsRegisterStep2"
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      style={{ marginTop: '3px' }}
+                    />
+                    <label htmlFor="acceptedTermsRegisterStep2" style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: '1.4', cursor: 'pointer' }}>
+                      Acepto los <a href="/terminos" target="_blank" rel="noreferrer">términos de servicio</a> y la{' '}
+                      <a href="/privacidad" target="_blank" rel="noreferrer">política de privacidad</a> de Tranqui App.
+                    </label>
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                   <button type="button" className="btn btn--ghost" onClick={handlePrevStep} style={{ flex: 1 }}>
                     ← Anterior
@@ -930,7 +953,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                       Siguiente →
                     </button>
                   ) : (
-                    <button type="submit" disabled={loading} className="btn btn--primary" style={{ flex: 1 }}>
+                    <button type="submit" disabled={loading || !acceptedTerms} className="btn btn--primary" style={{ flex: 1 }}>
                       {loading ? 'Creando cuenta...' : 'Finalizar Registro'}
                     </button>
                   )}
@@ -1076,11 +1099,25 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                   </>
                 )}
 
+                <div className="form-group form-group--checkbox" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <input
+                    id="acceptedTermsRegisterStep3"
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    style={{ marginTop: '3px' }}
+                  />
+                  <label htmlFor="acceptedTermsRegisterStep3" style={{ fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: '1.4', cursor: 'pointer' }}>
+                    Acepto los <a href="/terminos" target="_blank" rel="noreferrer">términos de servicio</a> y la{' '}
+                    <a href="/privacidad" target="_blank" rel="noreferrer">política de privacidad</a> de Tranqui App.
+                  </label>
+                </div>
+
                 <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                   <button type="button" className="btn btn--ghost" onClick={handlePrevStep} style={{ flex: 1 }}>
                     ← Anterior
                   </button>
-                  <button type="submit" disabled={loading} className="btn btn--primary" style={{ flex: 1 }}>
+                  <button type="submit" disabled={loading || !acceptedTerms} className="btn btn--primary" style={{ flex: 1 }}>
                     {loading ? 'Creando cuenta...' : 'Finalizar Registro'}
                   </button>
                 </div>

@@ -39,4 +39,11 @@ public class TarifaMedico {
     // can't backfill existing rows — see 2026-08-05 incident where this broke /api/medicos/perfil.
     @Column(name = "requiere_obra_social", columnDefinition = "boolean not null default false")
     private boolean requiereObraSocial;
+
+    // The specific obra social this service is for (e.g. "OSDE", "Swiss Medical") — a médico who
+    // works with several obras sociales creates one service per obra social rather than one
+    // generic "Obra Social" service. Nullable: legacy services (the "obra_social"/"osde" default
+    // ids) predate this column and keep requiereObraSocial as their only signal.
+    @Column(name = "obra_social", length = 100)
+    private String obraSocial;
 }

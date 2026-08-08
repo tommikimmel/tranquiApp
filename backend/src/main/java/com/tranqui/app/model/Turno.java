@@ -46,6 +46,12 @@ public class Turno {
     @Column(name = "tipo", nullable = false, length = 20)
     private TipoTurno tipo;
 
+    // Nullable: turnos reservados antes de que existieran agendas separadas por modalidad
+    // quedan null. Turnos nuevos siempre la traen (ver TurnoService.reservarTurno).
+    @Enumerated(EnumType.STRING)
+    @Column(name = "modalidad", length = 20)
+    private Modalidad modalidad;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false, length = 30)
     private EstadoTurno estado;

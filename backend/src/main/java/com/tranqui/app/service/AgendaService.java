@@ -53,9 +53,13 @@ public class AgendaService {
             LocalTime inicio = disp.getHoraInicio();
             LocalTime fin = disp.getHoraFin();
 
-            while (inicio.plusMinutes(pasoMinutos).isBefore(fin) || inicio.plusMinutes(pasoMinutos).equals(fin)) {
-                LocalTime finalBloque = inicio.plusMinutes(pasoMinutos);
-
+            // Fit-check uses only duracionTurnoMinutos (does THIS candidate's own slot fit in
+            // the window?), matching the frontend grid's computeCandidateStarts (`cursor + dur
+            // <= limit`) — the grid never requires trailing room for an intervalo after the
+            // last slot, so a franja exactly duracionTurnoMinutos long (a single selected slot,
+            // common with narrow modalidad-specific agendas) must still produce that one slot.
+            // Only the STEP between candidates uses duracion+intervalo.
+            while (inicio.plusMinutes(duracionTurnoMinutos).isBefore(fin) || inicio.plusMinutes(duracionTurnoMinutos).equals(fin)) {
                 // If the target date is today, ensure the slot starts in the future
                 boolean enElPasado = fecha.equals(hoy) && inicio.isBefore(ahora);
 
@@ -64,7 +68,7 @@ public class AgendaService {
                 if (!ocupado && !enElPasado) {
                     bloquesDisponibles.add(inicio);
                 }
-                inicio = finalBloque;
+                inicio = inicio.plusMinutes(pasoMinutos);
             }
         }
         bloquesDisponibles.sort(java.util.Comparator.naturalOrder());
