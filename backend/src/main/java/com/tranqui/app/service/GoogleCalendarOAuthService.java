@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -194,6 +195,13 @@ public class GoogleCalendarOAuthService {
         return result == 0;
     }
 
+    // @Transactional is required here: deleteByMedicoId is a Spring Data JPA derived delete
+    // query, which (unlike save()) isn't itself annotated @Transactional on SimpleJpaRepository,
+    // so without a surrounding writable transaction it falls back to the repository's
+    // class-level @Transactional(readOnly = true) — and Postgres rejects a DELETE run inside a
+    // read-only transaction ("cannot execute DELETE in a read-only transaction"), which is
+    // exactly why disconnecting used to fail with a 500 and never actually unlink the account.
+    @Transactional
     public void desvincular(Usuario medico) {
         medico.setGoogleAccessTokenEncrypted(null);
         medico.setGoogleRefreshTokenEncrypted(null);

@@ -395,5 +395,24 @@ public class Usuario {
         if (fechaRegistro == null) {
             fechaRegistro = LocalDateTime.now();
         }
+        normalizeEmail();
+    }
+
+    // Belt-and-suspenders: every write path (AuthController.register/login already normalize
+    // before calling in, but GoogleAuthService/TurnoService historically didn't — see the bug
+    // where a mixed-case or padded email created via one of those paths would silently bypass
+    // the "email already registered" check done via findByEmail elsewhere) ends up here before
+    // hitting the DB, so `email` is guaranteed lowercase/trimmed no matter which code path wrote
+    // it. Combined with the UNIQUE constraint on this column, this makes duplicate accounts for
+    // the same address (just differing by case/whitespace) impossible going forward.
+    @PreUpdate
+    protected void onUpdate() {
+        normalizeEmail();
+    }
+
+    private void normalizeEmail() {
+        if (email != null) {
+            email = email.trim().toLowerCase();
+        }
     }
 }

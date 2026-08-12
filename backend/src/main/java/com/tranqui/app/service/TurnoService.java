@@ -206,8 +206,15 @@ public class TurnoService {
 
     @Transactional
     public com.tranqui.app.model.dto.TurnoResponseDto reservarTurno(com.tranqui.app.model.dto.ReservaTurnoDto dto) {
+        // Normalize the same way AuthController.register/login do — this "find or create
+        // patient" path (used when a médico books/registers a turno for a patient who doesn't
+        // have an account yet) used to look up and store dto.getEmailPaciente() verbatim, so a
+        // mixed-case or padded email here could create a second Usuario row for an address that
+        // already had an account, silently bypassing the "email already registered" check.
+        String emailPacienteClean = dto.getEmailPaciente() != null ? dto.getEmailPaciente().trim().toLowerCase() : null;
+
         // Check if patient already has an active or pending appointment in the future
-        boolean tieneTurnoActivo = turnoRepository.existsActiveTurnoByPacienteEmail(dto.getEmailPaciente(), java.time.LocalDate.now());
+        boolean tieneTurnoActivo = turnoRepository.existsActiveTurnoByPacienteEmail(emailPacienteClean, java.time.LocalDate.now());
         if (tieneTurnoActivo) {
             throw new IllegalStateException("Ya tenés un turno activo o pendiente de pago. No podés reservar más de un turno a la vez.");
         }
@@ -318,11 +325,11 @@ public class TurnoService {
 
         // Find or create patient
         String finalTel = formattedTelefono;
-        Usuario paciente = usuarioRepository.findByEmail(dto.getEmailPaciente())
+        Usuario paciente = usuarioRepository.findByEmail(emailPacienteClean)
                 .orElseGet(() -> {
                     Usuario nuevo = Usuario.builder()
                             .nombre(dto.getNombrePaciente())
-                            .email(dto.getEmailPaciente())
+                            .email(emailPacienteClean)
                             .telefono(finalTel)
                             .rol(com.tranqui.app.model.Rol.PACIENTE)
                             .build();

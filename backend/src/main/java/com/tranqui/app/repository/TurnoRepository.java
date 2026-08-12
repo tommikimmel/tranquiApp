@@ -62,7 +62,11 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT t.paciente.email FROM Turno t WHERE t.paciente.email IN :emails AND t.estado != 'CANCELADO'")
     List<String> findPacienteEmailsConTurnoNoCancelado(@org.springframework.data.repository.query.Param("emails") List<String> emails);
 
-    @org.springframework.data.jpa.repository.Query("SELECT COUNT(t) > 0 FROM Turno t WHERE t.paciente.email = :email AND t.fecha >= :fecha AND t.estado != 'CANCELADO'")
+    // Excludes both CANCELADO and EXPIRADO: a turno whose 5-minute payment hold timed out
+    // (LiberarTurnosScheduler) must not keep blocking this patient from booking anything else —
+    // including a document-only purchase — indefinitely. EXPIRADO used to be left out of this
+    // exclusion, which turned any turno a cleanup pass marked EXPIRADO into a permanent block.
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(t) > 0 FROM Turno t WHERE t.paciente.email = :email AND t.fecha >= :fecha AND t.estado NOT IN ('CANCELADO', 'EXPIRADO')")
     boolean existsActiveTurnoByPacienteEmail(@org.springframework.data.repository.query.Param("email") String email, @org.springframework.data.repository.query.Param("fecha") LocalDate fecha);
 
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT t.paciente FROM Turno t WHERE t.medico.id = :medicoId AND t.estado IN ('CONFIRMADO', 'PENDIENTE_VALIDACION')")
@@ -74,4 +78,9 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
     List<Turno> findByPacienteIdAndEstadoNot(@org.springframework.data.repository.query.Param("pacienteId") Long pacienteId, @org.springframework.data.repository.query.Param("estado") EstadoTurno estado);
 
     boolean existsByMedicoIdAndGoogleEventId(Long medicoId, String googleEventId);
+
+    // All turnos that still have a live Google Calendar event (i.e. TranquiApp created a Meet
+    // event for them) — used to clean up the médico's real Google Calendar when they disconnect
+    // the integration, since those events would otherwise be orphaned there forever.
+    List<Turno> findByMedicoIdAndGoogleEventIdIsNotNull(Long medicoId);
 }

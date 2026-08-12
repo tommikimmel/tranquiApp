@@ -42,6 +42,9 @@ public class GoogleCalendarSyncService {
     private GoogleCalendarOAuthService googleCalendarOAuthService;
 
     @Autowired
+    private GoogleCalendarService googleCalendarService;
+
+    @Autowired
     private GoogleCalendarEventoExternoRepository eventoExternoRepository;
 
     @Autowired
@@ -215,6 +218,30 @@ public class GoogleCalendarSyncService {
 
     private String calendarId(Usuario medico) {
         return medico.getGoogleCalendarId() != null ? medico.getGoogleCalendarId() : "primary";
+    }
+
+    // Deletes every Google Calendar event TranquiApp created for this médico's turnos (the
+    // Meet events tracked via Turno.googleEventId — distinct from GoogleCalendarEventoExterno,
+    // which caches the médico's own personal events and is never something we'd delete from
+    // their real calendar). Must run BEFORE GoogleCalendarOAuthService.desvincular() clears the
+    // OAuth tokens, since eliminarEventoReunion needs a still-valid access token to call the
+    // Calendar API. A failure deleting one event never blocks the rest — same best-effort
+    // pattern eliminarEventoReunion already uses when a turno is cancelled individually.
+    @Transactional
+    public void eliminarEventosCreadosPorLaApp(Usuario medico) {
+        List<com.tranqui.app.model.Turno> turnos = turnoRepository.findByMedicoIdAndGoogleEventIdIsNotNull(medico.getId());
+        if (turnos.isEmpty()) {
+            return;
+        }
+        for (com.tranqui.app.model.Turno turno : turnos) {
+            try {
+                googleCalendarService.eliminarEventoReunion(turno);
+            } catch (Exception e) {
+                log.error("Fallo al eliminar el evento de Google Calendar del turno ID {} al desvincular al médico ID {}", turno.getId(), medico.getId(), e);
+            }
+            turno.setGoogleEventId(null);
+        }
+        turnoRepository.saveAll(turnos);
     }
 
     @Transactional(readOnly = true)

@@ -52,6 +52,20 @@ public class AuthController {
     @org.springframework.beans.factory.annotation.Value("${google.client-id:dummy-client-id}")
     private String clientId;
 
+    // Same length caps as MedicoService.trimToNull for the equivalent edit-profile fields —
+    // keep the two in sync so a doctor's Torre/Piso/Depto/Barrio survive registration and later
+    // edits identically.
+    private static String trimToNull(String value, int maxLen) {
+        String trimmed = value != null ? value.trim() : null;
+        if (trimmed == null || trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > maxLen) {
+            throw new IllegalArgumentException("Uno de los campos de la dirección de atención supera el largo máximo permitido (" + maxLen + " caracteres).");
+        }
+        return trimmed;
+    }
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody com.tranqui.app.model.dto.RegisterRequestDto registerRequestDto) {
         String emailClean = registerRequestDto.getEmail() != null ? registerRequestDto.getEmail().trim().toLowerCase() : "";
@@ -88,6 +102,23 @@ public class AuthController {
                     "El domicilio de atención debe tener entre 8 y 140 caracteres. Usá el buscador de direcciones y elegí una sugerencia en vez de pegar la dirección completa.");
         }
 
+        // Torre/Piso/Depto/Barrio solo tienen sentido si el médico atiende de forma presencial —
+        // misma regla que MedicoService.actualizarPerfil para el flujo de edición de perfil.
+        String domicilioAtencionTorre = null;
+        String domicilioAtencionPiso = null;
+        String domicilioAtencionDepto = null;
+        String domicilioAtencionBarrio = null;
+        if (Boolean.TRUE.equals(registerRequestDto.getOfrecePresencial())) {
+            try {
+                domicilioAtencionTorre = trimToNull(registerRequestDto.getDomicilioAtencionTorre(), 50);
+                domicilioAtencionPiso = trimToNull(registerRequestDto.getDomicilioAtencionPiso(), 20);
+                domicilioAtencionDepto = trimToNull(registerRequestDto.getDomicilioAtencionDepto(), 20);
+                domicilioAtencionBarrio = trimToNull(registerRequestDto.getDomicilioAtencionBarrio(), 100);
+            } catch (IllegalArgumentException ex) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+            }
+        }
+
         String codigoVerificacion = String.format("%06d", new java.util.Random().nextInt(1000000));
         java.time.LocalDateTime expiresAt = java.time.LocalDateTime.now().plusMinutes(15);
 
@@ -117,6 +148,10 @@ public class AuthController {
                 .domicilioAtencion(domicilioAtencionTrim)
                 .domicilioLat(registerRequestDto.getDomicilioLat())
                 .domicilioLng(registerRequestDto.getDomicilioLng())
+                .domicilioAtencionTorre(domicilioAtencionTorre)
+                .domicilioAtencionPiso(domicilioAtencionPiso)
+                .domicilioAtencionDepto(domicilioAtencionDepto)
+                .domicilioAtencionBarrio(domicilioAtencionBarrio)
                 .matriculaTipo(registerRequestDto.getMatriculaTipo())
                 .matriculaProvincia(registerRequestDto.getMatriculaProvincia())
                 .matriculaNumero(registerRequestDto.getMatriculaNumero())
@@ -130,7 +165,15 @@ public class AuthController {
                 .terminosAceptadosEn(java.time.LocalDateTime.now())
                 .build();
 
-        usuarioRepository.save(usuario);
+        try {
+            usuarioRepository.save(usuario);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // Defense in depth against the race where two concurrent /register requests for the
+            // same email both pass the findByEmail check above before either commits: the DB's
+            // UNIQUE constraint on usuario.email still rejects the second INSERT, so surface the
+            // same "already registered" message instead of letting it bubble up as a 500.
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El email ya está registrado");
+        }
         resendEmailService.enviarCodigoVerificacion(usuario.getEmail(), usuario.getNombre(), codigoVerificacion);
 
         java.util.Map<String, Object> response = new java.util.HashMap<>();

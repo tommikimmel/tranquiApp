@@ -65,7 +65,12 @@ public class GoogleAuthService {
     }
 
     public Usuario getOrCreateUsuario(GoogleIdToken.Payload payload) {
-        String email = payload.getEmail();
+        // Must match the trim().toLowerCase() normalization AuthController.register/login use,
+        // otherwise a Google sign-in for "John@Gmail.com" and a password registration for
+        // "john@gmail.com" are treated as different users by findByEmail's exact-match lookup —
+        // letting someone register a password account for an email that already has a Google
+        // account (or vice versa), which is exactly the duplicate-email bug this closes.
+        String email = payload.getEmail() != null ? payload.getEmail().trim().toLowerCase() : null;
         return usuarioRepository.findByEmail(email)
                 .orElseGet(() -> {
                     String name = (String) payload.get("name");

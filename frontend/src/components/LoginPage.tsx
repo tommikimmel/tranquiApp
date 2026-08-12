@@ -4,6 +4,7 @@ import AddressMapPicker from './AddressMapPicker'
 import DateInputDDMMYYYY from './DateInputDDMMYYYY'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAlert } from '../context/AlertContext'
+import { OBRAS_SOCIALES } from '../constants/obrasSociales'
 
 interface LoginPageProps {
   onLoginSuccess: (user: any) => void
@@ -120,6 +121,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
   // Patient spec
   const [obraSocial, setObraSocial] = useState('')
+  const [customObraSocial, setCustomObraSocial] = useState('')
   const [numAfiliado, setNumAfiliado] = useState('')
 
   // Pro spec
@@ -130,6 +132,10 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   const [domicilioAtencion, setDomicilioAtencion] = useState('')
   const [domicilioLat, setDomicilioLat] = useState<number | null>(null)
   const [domicilioLng, setDomicilioLng] = useState<number | null>(null)
+  const [domicilioAtencionTorre, setDomicilioAtencionTorre] = useState('')
+  const [domicilioAtencionPiso, setDomicilioAtencionPiso] = useState('')
+  const [domicilioAtencionDepto, setDomicilioAtencionDepto] = useState('')
+  const [domicilioAtencionBarrio, setDomicilioAtencionBarrio] = useState('')
   const [matriculaTipo, setMatriculaTipo] = useState('MN')
   const [matriculaProvincia, setMatriculaProvincia] = useState('')
   const [ofreceOnline, setOfreceOnline] = useState(true)
@@ -180,7 +186,10 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       if (window.google) {
         // @ts-ignore
         window.google.accounts.id.initialize({
-          client_id: "224301140079-2pa672f7sqcner9nut04j0g99md88n3p.apps.googleusercontent.com",
+          // Must match the backend's GOOGLE_CLIENT_ID (google.client-id) — otherwise the ID
+          // token's audience won't match what GoogleAuthService verifies and every Google
+          // sign-in attempt is rejected with 401 "Token de Google inválido".
+          client_id: "468339217921-8i4vi6uhsu09rf87f1sovgiltd9rdc61.apps.googleusercontent.com",
           callback: (response: any) => {
             handleGoogleLogin(response.credential)
           }
@@ -328,11 +337,12 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
     if (role === 'PACIENTE') {
       if (hasObraSocial) {
-        if (!obraSocial || !numAfiliado) {
+        const effectiveObraSocial = obraSocial === 'Otra' ? customObraSocial.trim() : obraSocial
+        if (!effectiveObraSocial || !numAfiliado) {
           showAlert('Por favor, completá los datos de tu obra social.', 'warning')
           return
         }
-        payload.obraSocial = obraSocial
+        payload.obraSocial = effectiveObraSocial
         payload.numAfiliado = numAfiliado
       } else {
         payload.obraSocial = null
@@ -363,6 +373,10 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       payload.domicilioAtencion = domicilioAtencion
       payload.domicilioLat = domicilioLat
       payload.domicilioLng = domicilioLng
+      payload.domicilioAtencionTorre = ofrecePresencial ? domicilioAtencionTorre.trim() : ''
+      payload.domicilioAtencionPiso = ofrecePresencial ? domicilioAtencionPiso.trim() : ''
+      payload.domicilioAtencionDepto = ofrecePresencial ? domicilioAtencionDepto.trim() : ''
+      payload.domicilioAtencionBarrio = ofrecePresencial ? domicilioAtencionBarrio.trim() : ''
       payload.matriculaTipo = matriculaTipo
       payload.matriculaProvincia = matriculaProvincia
       payload.matriculaNumero = Number(matricula)
@@ -958,15 +972,40 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                   <>
                     <div className="form-group">
                       <label className="form-label form-label--required">Obra Social / Prepaga</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="OSDE, Swiss Medical, Galeno, etc."
-                        value={obraSocial}
-                        onChange={(e) => setObraSocial(e.target.value)}
+                      <select
+                        className="form-select"
+                        value={OBRAS_SOCIALES.includes(obraSocial) ? obraSocial : (obraSocial ? 'Otra' : '')}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setObraSocial(val)
+                          if (val !== 'Otra') {
+                            setCustomObraSocial('')
+                          }
+                        }}
                         required
-                      />
+                      >
+                        <option value="">Seleccionar Obra Social...</option>
+                        {OBRAS_SOCIALES.map((os) => (
+                          <option key={os} value={os}>{os}</option>
+                        ))}
+                      </select>
                     </div>
+                    {(obraSocial === 'Otra' || (!OBRAS_SOCIALES.includes(obraSocial) && obraSocial !== '')) && (
+                      <div className="form-group">
+                        <label className="form-label form-label--required">Nombre de tu Obra Social</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="Ej: OSAPM, Mutualidad, etc."
+                          value={customObraSocial || (OBRAS_SOCIALES.includes(obraSocial) ? '' : obraSocial)}
+                          onChange={(e) => {
+                            setCustomObraSocial(e.target.value)
+                            setObraSocial('Otra')
+                          }}
+                          required
+                        />
+                      </div>
+                    )}
                     <div className="form-group">
                       <label className="form-label form-label--required">Número de Afiliado</label>
                       <input
@@ -1086,6 +1125,27 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                           }}
                         />
                       </div>
+
+                      {ofrecePresencial && (
+                        <>
+                          <div className="form-group">
+                            <label className="form-label" htmlFor="reg-domicilio-torre">Torre</label>
+                            <input id="reg-domicilio-torre" className="form-input" type="text" maxLength={50} placeholder="Ej: B" value={domicilioAtencionTorre} onChange={(e) => setDomicilioAtencionTorre(e.target.value)} />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label" htmlFor="reg-domicilio-piso">Piso</label>
+                            <input id="reg-domicilio-piso" className="form-input" type="text" maxLength={20} placeholder="Ej: 3" value={domicilioAtencionPiso} onChange={(e) => setDomicilioAtencionPiso(e.target.value)} />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label" htmlFor="reg-domicilio-depto">Depto</label>
+                            <input id="reg-domicilio-depto" className="form-input" type="text" maxLength={20} placeholder="Ej: A" value={domicilioAtencionDepto} onChange={(e) => setDomicilioAtencionDepto(e.target.value)} />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label" htmlFor="reg-domicilio-barrio">Barrio</label>
+                            <input id="reg-domicilio-barrio" className="form-input" type="text" maxLength={100} placeholder="Ej: Nueva Córdoba" value={domicilioAtencionBarrio} onChange={(e) => setDomicilioAtencionBarrio(e.target.value)} />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </>
                 )}

@@ -216,6 +216,10 @@ public class MedicoController {
     public ResponseEntity<Void> desvincularGoogleCalendar(@AuthenticationPrincipal UserDetails userDetails) {
         Usuario medico = obtenerMedicoAutenticado(userDetails);
         googleCalendarWatchService.detenerCanal(medico);
+        // Must run before desvincular() below: it still needs the médico's (still valid) Google
+        // access token to delete the turno events TranquiApp created in their real calendar —
+        // once desvincular() clears the tokens there's no way left to call the Calendar API.
+        googleCalendarSyncService.eliminarEventosCreadosPorLaApp(medico);
         googleCalendarOAuthService.desvincular(medico);
         return ResponseEntity.noContent().build();
     }

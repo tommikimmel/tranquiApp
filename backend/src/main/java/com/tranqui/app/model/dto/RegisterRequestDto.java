@@ -36,6 +36,10 @@ public class RegisterRequestDto {
     private String domicilioAtencion;
     private Double domicilioLat;
     private Double domicilioLng;
+    private String domicilioAtencionTorre;
+    private String domicilioAtencionPiso;
+    private String domicilioAtencionDepto;
+    private String domicilioAtencionBarrio;
     private String matriculaTipo;
     private String matriculaProvincia;
     private Integer matriculaNumero;
