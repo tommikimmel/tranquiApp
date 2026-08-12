@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { api } from '../api/api'
 import AddressMapPicker from './AddressMapPicker'
 import DateInputDDMMYYYY from './DateInputDDMMYYYY'
@@ -178,10 +178,16 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
     }
   }
 
-  // Load Google Identity Services dynamically
-  useState(() => {
+  // Load Google Identity Services and (re)render the button every time the login tab's
+  // <div id="google-signin-btn"> mounts. That div only exists while activeTab === 'login' —
+  // switching to "Registrarse" unmounts it (destroying the GSI iframe inside), and GSI never
+  // redraws it on its own when the div reappears, so this must re-run on every switch back to
+  // "Iniciar Sesión", not just once on the component's first mount.
+  useEffect(() => {
+    if (activeTab !== 'login') return
+
     const scriptId = 'google-gsi-client'
-    const initGoogle = () => {
+    const renderGoogleButton = () => {
       // @ts-ignore
       if (window.google) {
         // @ts-ignore
@@ -208,12 +214,12 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       script.src = 'https://accounts.google.com/gsi/client'
       script.async = true;
       script.defer = true;
-      script.onload = initGoogle
+      script.onload = renderGoogleButton
       document.body.appendChild(script)
     } else {
-      setTimeout(initGoogle, 100)
+      setTimeout(renderGoogleButton, 100)
     }
-  })
+  }, [activeTab])
 
   const handleFormLogin = async (e: React.FormEvent) => {
     e.preventDefault()

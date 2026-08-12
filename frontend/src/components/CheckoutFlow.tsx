@@ -1016,8 +1016,13 @@ function StepSelect({
             </div>
           )}
 
-          {/* Patient Form Fields + Pago (debajo del mapa para acortar la columna izquierda) */}
-          {(selectedSlot || tipo === 'SOBRETUNO') && selectedDayIdx !== null && (
+          {/* Patient Form Fields + Pago (debajo del mapa para acortar la columna izquierda).
+              Document-only services (isDocumentOnly) never set selectedSlot/selectedDayIdx —
+              the day/horario picker above is hidden entirely for them (line ~849) — so this must
+              also accept isDocumentOnly on its own, same as `canPay` already does, or the whole
+              "datos personales" + "Confirmar y pagar" section (and the Mercado Pago flow it
+              triggers) never renders for them at all. */}
+          {(isDocumentOnly || ((selectedSlot || tipo === 'SOBRETUNO') && selectedDayIdx !== null)) && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', borderTop: '1px solid var(--color-border)', marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)', animation: 'pop 0.25s ease' }}>
               <div className="book-title sora"><span className="dot"></span>Tus datos personales</div>
 

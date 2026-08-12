@@ -1367,14 +1367,8 @@ export default function SettingsView({
                     type="number"
                     value={t.price}
                     onChange={(e) => updateTariff(t.id, 'price', Number(e.target.value))}
-                    disabled={!t.enabled}
-                    title={isPricingExpanded ? 'Precio por defecto: se usa en la modalidad que dejes vacía abajo' : undefined}
+                    disabled={!t.enabled || isPricingExpanded}
                   />
-                  {isPricingExpanded && (
-                    <span style={{ display: 'block', marginTop: '2px', fontSize: '10px', color: 'var(--color-text-secondary)' }}>
-                      Precio por defecto
-                    </span>
-                  )}
                   {canDifferentiateByModalidad && (
                     <button
                       type="button"

@@ -151,12 +151,20 @@ export default function DashboardHome({
   }, [externalEvents, todayDateStr]);
 
   // "Próximos Eventos": turnos + personal Google Calendar events, merged into one chronological
-  // list and capped so the side panel doesn't grow unbounded once it spans multiple days.
+  // list and capped so it can't grow unbounded once it spans multiple days — paginated below,
+  // 5 at a time, instead of just truncating the list with no way to see the rest.
   const upcomingCombinedEvents = useMemo(() => {
     const turnoItems = upcomingAppointments.map(a => ({ kind: 'turno' as const, sortKey: `${a.fecha} ${a.hour}`, data: a }));
     const externalItems = upcomingExternalEvents.map(e => ({ kind: 'external' as const, sortKey: `${e.fecha} ${e.allDay ? '00:00' : e.hour}`, data: e }));
-    return [...turnoItems, ...externalItems].sort((a, b) => a.sortKey.localeCompare(b.sortKey)).slice(0, 8);
+    return [...turnoItems, ...externalItems].sort((a, b) => a.sortKey.localeCompare(b.sortKey)).slice(0, 50);
   }, [upcomingAppointments, upcomingExternalEvents]);
+
+  const eventsPerPage = 5;
+  const [eventsPage, setEventsPage] = useState(1);
+  const eventsTotalPages = Math.max(1, Math.ceil(upcomingCombinedEvents.length / eventsPerPage));
+  const eventsValidPage = Math.min(eventsPage, eventsTotalPages);
+  const eventsStartIndex = (eventsValidPage - 1) * eventsPerPage;
+  const paginatedUpcomingEvents = upcomingCombinedEvents.slice(eventsStartIndex, eventsStartIndex + eventsPerPage);
 
   // "Hoy" / "Mañana" / "DD/MM" — lets the compact "Próximos Eventos" rows stay unambiguous now
   // that the list can span more than one day.
@@ -928,13 +936,38 @@ export default function DashboardHome({
               No tenés sesiones ni eventos próximos programados.
             </p>
           ) : (
-            <ul className="appointment-list appointment-list--compact" role="list" aria-label="Próximos eventos">
-              {upcomingCombinedEvents.map((item) => (
-                item.kind === 'turno'
-                  ? <AppointmentCard key={`turno-${item.data.id}`} appt={item.data} compact dateLabel={relativeDayLabel(item.data.fecha)} />
-                  : <ExternalEventCard key={`gcal-${item.data.id}`} event={item.data} compact dateLabel={relativeDayLabel(item.data.fecha)} />
-              ))}
-            </ul>
+            <>
+              <ul className="appointment-list appointment-list--compact" role="list" aria-label="Próximos eventos">
+                {paginatedUpcomingEvents.map((item) => (
+                  item.kind === 'turno'
+                    ? <AppointmentCard key={`turno-${item.data.id}`} appt={item.data} compact dateLabel={relativeDayLabel(item.data.fecha)} />
+                    : <ExternalEventCard key={`gcal-${item.data.id}`} event={item.data} compact dateLabel={relativeDayLabel(item.data.fecha)} />
+                ))}
+              </ul>
+              {eventsTotalPages > 1 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 'var(--space-3)', marginTop: 'var(--space-2)', borderTop: '1px solid var(--color-border)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setEventsPage(p => Math.max(1, p - 1))}
+                    disabled={eventsValidPage === 1}
+                    className="btn btn--ghost btn--sm"
+                  >
+                    ◀ Anterior
+                  </button>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+                    Página {eventsValidPage} de {eventsTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setEventsPage(p => Math.min(eventsTotalPages, p + 1))}
+                    disabled={eventsValidPage === eventsTotalPages}
+                    className="btn btn--ghost btn--sm"
+                  >
+                    Siguiente ▶
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 
