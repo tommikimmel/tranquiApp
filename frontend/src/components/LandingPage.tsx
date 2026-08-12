@@ -19,6 +19,21 @@ const formatDateDDMMYYYY = (dateStr?: string) => {
   return dateStr;
 };
 
+// A confirmed (paid) document-only turno (receta/certificado/informe, see Turno.ocupaAgenda)
+// isn't waiting on anything scheduled — what matters to the patient is whether the médico
+// already sent it, so it gets its own "Documento pendiente/enviado" label instead of "Confirmado".
+const getTurnoBadge = (appt: { status?: string; ocupaAgenda?: boolean; documentoEnviado?: boolean }) => {
+  const isConfirmed = appt.status === 'confirmed';
+  if (isConfirmed && appt.ocupaAgenda === false) {
+    return appt.documentoEnviado
+      ? { label: 'Documento enviado', cls: 'badge--success' }
+      : { label: 'Documento pendiente', cls: 'badge--warning' };
+  }
+  return isConfirmed
+    ? { label: 'Confirmado', cls: 'badge--success' }
+    : { label: 'Pendiente', cls: 'badge--warning' };
+};
+
 // ── Icons ────────────────────────────────────────────────────────
 function IconCheck({ size = 12 }: { size?: number }) {
   return (
@@ -966,7 +981,22 @@ export default function LandingPage({
       showAlert('El pago no pudo completarse. Podés reintentarlo desde "Mis Turnos".', 'error')
     }
 
-    refreshPatientData()
+    // Mercado Pago's async webhook is what normally confirms the turno server-side, but webhook
+    // delivery isn't guaranteed — when it's delayed or dropped, the turno used to stay stuck
+    // showing "Pendiente" forever even though the patient already paid. Since MP already told us
+    // right here (via these same query params) that the payment was approved, verify it directly
+    // against Mercado Pago's API as a fallback instead of just trusting the webhook to eventually
+    // show up — see WebhookController#verificarPago. Safe to call even if the webhook already
+    // processed it (idempotent no-op).
+    const externalReference = params.get('external_reference')
+    const paymentId = params.get('payment_id') || params.get('collection_id')
+    if (mpStatus === 'approved' && externalReference && paymentId) {
+      api.verificarPagoTurno(externalReference, paymentId)
+        .catch(err => console.error('Error al verificar el pago manualmente:', err))
+        .finally(refreshPatientData)
+    } else {
+      refreshPatientData()
+    }
 
     ;['collection_status', 'status', 'payment_id', 'collection_id', 'external_reference', 'payment_type', 'merchant_order_id', 'preference_id', 'site_id', 'processing_mode', 'merchant_account_id']
       .forEach(key => params.delete(key))
@@ -1322,9 +1352,11 @@ export default function LandingPage({
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                        <span className={`badge ${isConfirmed ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '11px' }}>
-                          {isConfirmed ? 'Confirmado' : 'Pendiente'}
-                        </span>
+                        {(() => { const b = getTurnoBadge(appt); return (
+                          <span className={`badge ${b.cls}`} style={{ fontSize: '11px' }}>
+                            {b.label}
+                          </span>
+                        ) })()}
 
                         {isOnline && appt.meetLink && isConfirmed && isTodayAppt && (
                           <a
@@ -1545,9 +1577,11 @@ export default function LandingPage({
                           {formatDateDDMMYYYY(appt.fecha)} · {appt.hour} hs
                         </span>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                          <span className={`badge ${isConfirmed ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '9px' }}>
-                            {isConfirmed ? 'Confirmado' : 'Pendiente'}
-                          </span>
+                          {(() => { const b = getTurnoBadge(appt); return (
+                            <span className={`badge ${b.cls}`} style={{ fontSize: '9px' }}>
+                              {b.label}
+                            </span>
+                          ) })()}
                           {appt.status !== 'completed' && (
                             <button 
                               onClick={() => handleCancelAppointmentByPatient(appt.id)}
@@ -1707,9 +1741,11 @@ export default function LandingPage({
                   <span style={{ fontSize: 'var(--text-md)', fontWeight: 'bold' }}>
                     {formatDateDDMMYYYY(appt.fecha)} · {appt.hour} hs
                   </span>
-                  <span className={`badge ${isConfirmed ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '11px', marginLeft: 'auto' }}>
-                    {isConfirmed ? 'Confirmado' : 'Pendiente'}
-                  </span>
+                  {(() => { const b = getTurnoBadge(appt); return (
+                    <span className={`badge ${b.cls}`} style={{ fontSize: '11px', marginLeft: 'auto' }}>
+                      {b.label}
+                    </span>
+                  ) })()}
                 </div>
 
                 <div style={{ fontSize: 'var(--text-sm)' }}>

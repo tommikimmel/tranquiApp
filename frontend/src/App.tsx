@@ -480,6 +480,17 @@ export default function App() {
       });
   }
 
+  const handleMarcarDocumentoEnviado = (turnoId: string) => {
+    api.marcarDocumentoEnviado(turnoId)
+      .then(() => {
+        refreshDashboardAppointments();
+      })
+      .catch(err => {
+        console.error(err);
+        showAlert("Error al marcar el documento como enviado.", "error");
+      });
+  }
+
   const handleRescheduleAppointment = (turnoId: number, fecha: string, hora: string) => {
     api.reprogramarTurno(turnoId, fecha, hora)
       .then(() => {
@@ -534,6 +545,7 @@ export default function App() {
             onCancelAppointment={handleCancelAppointment}
             onUpdateAttendance={handleUpdateAttendance}
             onRescheduleAppointment={handleRescheduleAppointment}
+            onMarcarDocumentoEnviado={handleMarcarDocumentoEnviado}
             medicoInfo={medicoInfo}
             onNavigate={(section) => navigate('/panel/' + section)}
           />

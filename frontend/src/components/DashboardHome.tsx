@@ -26,6 +26,7 @@ export default function DashboardHome({
   onCancelAppointment,
   onUpdateAttendance,
   onRescheduleAppointment,
+  onMarcarDocumentoEnviado,
   medicoInfo,
   onNavigate
 }: {
@@ -46,6 +47,7 @@ export default function DashboardHome({
   onCancelAppointment: (id: number) => void;
   onUpdateAttendance: (id: number, status: string) => void;
   onRescheduleAppointment: (id: number, date: string, hour: string) => void;
+  onMarcarDocumentoEnviado?: (id: string) => void;
   medicoInfo?: any;
   onNavigate?: (section: NavSection) => void;
 }) {
@@ -918,7 +920,7 @@ export default function DashboardHome({
             </div>
             <ul className="appointment-list appointment-list--compact" role="list" aria-label="Documentos solicitados">
               {documentAppointments.map((appt) => (
-                <AppointmentCard key={`doc-${appt.id}`} appt={appt} compact />
+                <AppointmentCard key={`doc-${appt.id}`} appt={appt} compact onMarcarDocumentoEnviado={onMarcarDocumentoEnviado} />
               ))}
             </ul>
           </div>

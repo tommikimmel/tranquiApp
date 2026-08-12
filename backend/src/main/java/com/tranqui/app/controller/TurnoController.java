@@ -90,6 +90,15 @@ public class TurnoController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/turnos/{turnoId}/documento-enviado")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<Void> marcarDocumentoEnviado(
+            @PathVariable Long turnoId,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
+        turnoService.marcarDocumentoEnviado(turnoId, userDetails.getUsername());
+        return ResponseEntity.ok().build();
+    }
+
     @PutMapping("/turnos/{turnoId}/reprogramar")
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<Void> reprogramarTurno(

@@ -45,6 +45,15 @@ public class PagoWebhookHandler {
         SolicitudDocumento solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
+        // Idempotent: this can now be reached twice for the same payment — once from the real
+        // Mercado Pago webhook and once from WebhookController#verificarPago's fallback, which
+        // exists precisely because the webhook alone isn't reliable enough (delayed/dropped
+        // deliveries used to leave turnos stuck "pending" forever even though the patient paid).
+        if (solicitud.getEstado() == EstadoPago.APROBADO) {
+            log.info("Aprobación de concepto para solicitud ID {} ya estaba procesada; ignorando.", solicitudId);
+            return;
+        }
+
         solicitud.setEstado(EstadoPago.APROBADO);
         solicitud.setTransactionId(transactionId);
         solicitudRepository.save(solicitud);
@@ -68,6 +77,15 @@ public class PagoWebhookHandler {
     public void procesarAprobacionTurno(Long turnoId, String transactionId) {
         Turno turno = turnoRepository.findById(turnoId)
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado con ID: " + turnoId));
+
+        // Idempotent for the same reason as procesarAprobacionConcepto above — this now has two
+        // callers (the async webhook and the synchronous fallback WebhookController#verificarPago
+        // runs right after the patient returns from Checkout Pro) that can legitimately race to
+        // process the very same approved payment.
+        if (turno.getEstado() == EstadoTurno.CONFIRMADO) {
+            log.info("Aprobación de pago para turno ID {} ya estaba procesada; ignorando.", turnoId);
+            return;
+        }
 
         turno.setEstado(EstadoTurno.CONFIRMADO);
 

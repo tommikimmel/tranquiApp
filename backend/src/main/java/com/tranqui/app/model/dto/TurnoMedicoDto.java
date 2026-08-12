@@ -33,4 +33,6 @@ public class TurnoMedicoDto {
     // False for pure document services (recetas, certificados, informes) — see
     // Turno.ocupaAgenda. The frontend uses this to keep them out of hour-based/calendar views.
     private boolean ocupaAgenda;
+    // Only meaningful when ocupaAgenda is false — see Turno.documentoEnviado.
+    private boolean documentoEnviado;
 }

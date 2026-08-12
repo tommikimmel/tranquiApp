@@ -108,6 +108,15 @@ public class Turno {
     @Column(name = "recordatorio_enviado", nullable = false)
     private Boolean recordatorioEnviado = false;
 
+    // Only meaningful for document-only turnos (ocupaAgenda == false): whether the médico has
+    // marked the receta/certificado/informe as sent to the patient (via email or WhatsApp,
+    // through their own client — see TurnoController#marcarDocumentoEnviado). Drives the
+    // "Documento pendiente" / "Documento enviado" state shown to the patient in "Mis Turnos".
+    // Same safe-backfill reasoning as ocupaAgenda: this table already has production rows.
+    @Builder.Default
+    @Column(name = "documento_enviado", columnDefinition = "boolean not null default false")
+    private boolean documentoEnviado = false;
+
     @Builder.Default
     @Column(name = "fecha_creacion", nullable = false)
     private LocalDateTime fechaCreacion = LocalDateTime.now();

@@ -109,7 +109,12 @@ public class TurnoService {
         return locales.stream()
                 .filter(hora -> {
                     java.time.LocalTime bloqueInicio = hora;
-                    java.time.LocalTime bloqueFin = hora.plusMinutes(45);
+                    // Must match the médico's actual configured session length (same
+                    // duracionTurnoMinutos used above to generate `locales` itself) — a
+                    // hardcoded 45 here under-checks the overlap window for any médico who
+                    // configured a different duration, letting a slot near the edge of a Google
+                    // Calendar event through when it shouldn't be offered.
+                    java.time.LocalTime bloqueFin = hora.plusMinutes(duracionTurnoMinutos);
 
                     for (com.google.api.services.calendar.model.Event event : finalEventos) {
                         // Eventos transparent (disponibles) no bloquean la agenda
@@ -496,6 +501,7 @@ public class TurnoService {
                             .patientInfo(construirPacienteDto(t.getPaciente()))
                             .metadataAfiliado(t.getMetadataAfiliado())
                             .ocupaAgenda(t.isOcupaAgenda())
+                            .documentoEnviado(t.isDocumentoEnviado())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -559,6 +565,7 @@ public class TurnoService {
                             .patientInfo(construirPacienteDto(t.getPaciente()))
                             .metadataAfiliado(t.getMetadataAfiliado())
                             .ocupaAgenda(t.isOcupaAgenda())
+                            .documentoEnviado(t.isDocumentoEnviado())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -613,6 +620,7 @@ public class TurnoService {
                             .domicilioAtencionDepto(t.getMedico().getDomicilioAtencionDepto())
                             .domicilioAtencionBarrio(t.getMedico().getDomicilioAtencionBarrio())
                             .ocupaAgenda(t.isOcupaAgenda())
+                            .documentoEnviado(t.isDocumentoEnviado())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -689,6 +697,30 @@ public class TurnoService {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Estado de asistencia inválido: " + asistenciaStr);
         }
+    }
+
+    // Only for document-only turnos (ocupaAgenda == false): the médico sends the actual
+    // receta/certificado/informe through their own email or WhatsApp client (see
+    // AppointmentCard's mailto:/wa.me links — there's no file storage/generation pipeline behind
+    // these purchases to send server-side), then clicks this to record that it went out, which is
+    // what flips the patient's "Mis Turnos" from "Documento pendiente" to "Documento enviado".
+    @Transactional
+    public void marcarDocumentoEnviado(Long turnoId, String medicoEmail) {
+        Turno turno = turnoRepository.findById(turnoId)
+                .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
+
+        if (!turno.getMedico().getEmail().equalsIgnoreCase(medicoEmail)) {
+            throw new IllegalStateException("No tenés permiso para modificar este turno.");
+        }
+        if (turno.isOcupaAgenda()) {
+            throw new IllegalStateException("Este turno no corresponde a un documento.");
+        }
+        if (turno.getEstado() != EstadoTurno.CONFIRMADO) {
+            throw new IllegalStateException("El documento todavía no fue pagado.");
+        }
+
+        turno.setDocumentoEnviado(true);
+        turnoRepository.save(turno);
     }
 
     @Transactional

@@ -287,6 +287,12 @@ export const api = {
   abandonarReservaPendiente: (turnoId: number | string) => apiFetch(`/turnos/${turnoId}/abandonar-pago`, { method: 'POST' }),
   actualizarAsistencia: (turnoId: number | string, asistencia: string) => 
     apiFetch(`/turnos/${turnoId}/asistencia?asistencia=${encodeURIComponent(asistencia)}`, { method: 'PUT' }),
-  reprogramarTurno: (turnoId: number | string, fecha: string, hora: string) => 
-    apiFetch(`/turnos/${turnoId}/reprogramar?fecha=${encodeURIComponent(fecha)}&hora=${encodeURIComponent(hora)}`, { method: 'PUT' })
+  reprogramarTurno: (turnoId: number | string, fecha: string, hora: string) =>
+    apiFetch(`/turnos/${turnoId}/reprogramar?fecha=${encodeURIComponent(fecha)}&hora=${encodeURIComponent(hora)}`, { method: 'PUT' }),
+  marcarDocumentoEnviado: (turnoId: number | string) =>
+    apiFetch(`/turnos/${turnoId}/documento-enviado`, { method: 'POST' }),
+  // Fallback reconciliation for when Mercado Pago's webhook is delayed/dropped — see
+  // WebhookController#verificarPago. Called right after the patient returns from Checkout Pro.
+  verificarPagoTurno: (externalReference: string, paymentId: string) =>
+    apiFetch(`/payments/verificar?externalReference=${encodeURIComponent(externalReference)}&paymentId=${encodeURIComponent(paymentId)}`, { method: 'POST' })
 };

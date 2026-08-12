@@ -10,6 +10,9 @@ export interface Appointment {
   // False for pure document services (recetas, certificados, informes) — the booking has no real
   // scheduled time, so views that bucket/sort by hour must exclude these. See Turno.ocupaAgenda.
   ocupaAgenda?: boolean
+  // Only meaningful when ocupaAgenda is false — see Turno.documentoEnviado.
+  documentoEnviado?: boolean
+  patientInfo?: { email?: string; telefono?: string }
 }
 
 // A médico's personal Google Calendar event (read-only, never a Turno) — see

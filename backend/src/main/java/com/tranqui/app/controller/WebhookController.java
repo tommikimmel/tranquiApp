@@ -5,7 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mercadopago.client.payment.PaymentClient;
 import com.mercadopago.resources.payment.Payment;
 import com.mercadopago.core.MPRequestOptions;
+import com.tranqui.app.model.Turno;
 import com.tranqui.app.model.Usuario;
+import com.tranqui.app.repository.TurnoRepository;
 import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.util.EncryptionUtil;
 import com.tranqui.app.service.MercadoPagoOAuthService;
@@ -35,6 +37,9 @@ public class WebhookController {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private TurnoRepository turnoRepository;
 
     @Autowired
     private EncryptionUtil encryptionUtil;
@@ -121,5 +126,56 @@ public class WebhookController {
         }
 
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Fallback reconciliation for when Mercado Pago's async webhook is delayed or never arrives
+     * at all — real-world webhook delivery isn't guaranteed, and relying on it exclusively used
+     * to leave a paid turno stuck showing "pending" in "Mis Turnos" forever, with nothing to ever
+     * re-check it. The frontend calls this right after the patient is redirected back from
+     * Checkout Pro, using the payment_id/external_reference Mercado Pago appends to the return
+     * URL. Public/unauthenticated like /turnos/{id}/abandonar-pago, since booking doesn't require
+     * a logged-in session — safe because the payment is re-verified against Mercado Pago's own
+     * API (using the médico's token) rather than trusted from the client, and the fetched
+     * payment's externalReference must match the turno being confirmed.
+     */
+    @PostMapping("/verificar")
+    public ResponseEntity<?> verificarPago(
+            @RequestParam String externalReference,
+            @RequestParam Long paymentId) {
+        try {
+            Long turnoId = Long.parseLong(externalReference);
+            Turno turno = turnoRepository.findById(turnoId).orElse(null);
+            if (turno == null) {
+                return ResponseEntity.notFound().build();
+            }
+            if (turno.getEstado() == com.tranqui.app.model.EstadoTurno.CONFIRMADO) {
+                return ResponseEntity.ok().build();
+            }
+
+            Usuario medico = turno.getMedico();
+            String accessToken = oauthService.obtenerAccessTokenValido(medico);
+            if (accessToken == null) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body("No se pudo verificar el pago.");
+            }
+
+            PaymentClient paymentClient = new PaymentClient();
+            MPRequestOptions options = MPRequestOptions.builder().accessToken(accessToken).build();
+            Payment payment = paymentClient.get(paymentId, options);
+
+            if (payment == null || !externalReference.equals(payment.getExternalReference())) {
+                log.warn("Verificación manual de pago: el payment {} no corresponde al turno {}.", paymentId, turnoId);
+                return ResponseEntity.status(HttpStatus.CONFLICT).body("El pago no corresponde a este turno.");
+            }
+            if ("approved".equals(payment.getStatus())) {
+                pagoWebhookHandler.procesarAprobacionTurno(turnoId, String.valueOf(payment.getId()));
+            }
+            return ResponseEntity.ok().build();
+        } catch (NumberFormatException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Referencia externa inválida.");
+        } catch (Exception e) {
+            log.error("Error al verificar manualmente el pago (externalReference={}, paymentId={})", externalReference, paymentId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }
