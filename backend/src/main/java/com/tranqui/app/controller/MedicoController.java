@@ -75,8 +75,9 @@ public class MedicoController {
     @GetMapping("/stats")
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<com.tranqui.app.model.dto.DashboardStatsDto> obtenerStats(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.ok(medicoService.obtenerStats(userDetails.getUsername()));
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(defaultValue = "MENSUAL") String periodo) {
+        return ResponseEntity.ok(medicoService.obtenerStats(userDetails.getUsername(), periodo));
     }
 
     /**

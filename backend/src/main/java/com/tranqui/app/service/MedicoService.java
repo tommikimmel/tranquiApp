@@ -1,6 +1,7 @@
 package com.tranqui.app.service;
 
 import com.tranqui.app.model.EstadoAsistencia;
+import com.tranqui.app.model.EstadoPago;
 import com.tranqui.app.model.EstadoTurno;
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.TarifaMedico;
@@ -23,6 +24,7 @@ import java.time.DayOfWeek;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class MedicoService {
@@ -55,12 +57,14 @@ public class MedicoService {
     // "obra_social" row persisted keep it untouched; TurnoService.reservarTurno still treats
     // "obra_social"/"osde" as synonyms so both keep working.
     private static final List<MedicoDto.TarifaDto> DEFAULT_TARIFFS = Arrays.asList(
-            new MedicoDto.TarifaDto("particular", "Consulta particular", new BigDecimal("60000"), true, false, null),
-            new MedicoDto.TarifaDto("sobreturno", "Sobreturno", new BigDecimal("90000"), true, false, null),
-            new MedicoDto.TarifaDto("osde", "Obra Social OSDE", new BigDecimal("10500"), true, true, "OSDE"),
-            new MedicoDto.TarifaDto("receta-fuera", "Receta fuera de turno", new BigDecimal("45000"), true, false, null),
-            new MedicoDto.TarifaDto("certificado", "Certificado", new BigDecimal("55000"), true, false, null),
-            new MedicoDto.TarifaDto("informe-apto", "Informe / Apto médico", new BigDecimal("165000"), true, false, null)
+            new MedicoDto.TarifaDto("particular", "Consulta particular", new BigDecimal("60000"), true, false, null, null, null, true),
+            new MedicoDto.TarifaDto("sobreturno", "Sobreturno", new BigDecimal("90000"), true, false, null, null, null, true),
+            new MedicoDto.TarifaDto("osde", "Obra Social OSDE", new BigDecimal("10500"), true, true, "OSDE", null, null, true),
+            // These three are pure document services — no consultorio, no videollamada — so they
+            // don't reserve a slot on the médico's agenda. See TarifaMedico.requiereAgenda.
+            new MedicoDto.TarifaDto("receta-fuera", "Receta fuera de turno", new BigDecimal("45000"), true, false, null, null, null, false),
+            new MedicoDto.TarifaDto("certificado", "Certificado", new BigDecimal("55000"), true, false, null, null, null, false),
+            new MedicoDto.TarifaDto("informe-apto", "Informe / Apto médico", new BigDecimal("165000"), true, false, null, null, null, false)
     );
 
     @Transactional(readOnly = true)
@@ -102,6 +106,17 @@ public class MedicoService {
         return construirMedicoDto(medico);
     }
 
+    private static String trimToNull(String value, int maxLen) {
+        String trimmed = value != null ? value.trim() : null;
+        if (trimmed == null || trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > maxLen) {
+            throw new IllegalArgumentException("Uno de los campos de la dirección de atención supera el largo máximo permitido (" + maxLen + " caracteres).");
+        }
+        return trimmed;
+    }
+
     @Transactional
     public MedicoDto actualizarPerfil(String email, MedicoDto dto) {
         Usuario medico = usuarioRepository.findByEmail(email)
@@ -109,6 +124,12 @@ public class MedicoService {
 
         medico.setNombre(dto.getNombre());
         medico.setApellido(dto.getApellido());
+        medico.setTelefono(dto.getTelefono() != null ? dto.getTelefono().trim() : null);
+        String emailContactoTrim = dto.getEmailContacto() != null ? dto.getEmailContacto().trim() : null;
+        if (emailContactoTrim != null && !emailContactoTrim.isEmpty() && !emailContactoTrim.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            throw new IllegalArgumentException("El email de contacto no tiene un formato válido.");
+        }
+        medico.setEmailContacto(emailContactoTrim != null && !emailContactoTrim.isEmpty() ? emailContactoTrim : null);
         medico.setSexo(dto.getSexo());
         medico.setFechaNacimiento(dto.getFechaNacimiento());
         medico.setCuil(dto.getCuil());
@@ -127,6 +148,18 @@ public class MedicoService {
         medico.setDomicilioAtencion(domicilioTrim != null && !domicilioTrim.isEmpty() ? domicilioTrim : null);
         medico.setDomicilioLat(dto.getDomicilioLat());
         medico.setDomicilioLng(dto.getDomicilioLng());
+        // Torre/Piso/Depto/Barrio solo tienen sentido si el médico atiende de forma presencial.
+        if (dto.isOfrecePresencial()) {
+            medico.setDomicilioAtencionTorre(trimToNull(dto.getDomicilioAtencionTorre(), 50));
+            medico.setDomicilioAtencionPiso(trimToNull(dto.getDomicilioAtencionPiso(), 20));
+            medico.setDomicilioAtencionDepto(trimToNull(dto.getDomicilioAtencionDepto(), 20));
+            medico.setDomicilioAtencionBarrio(trimToNull(dto.getDomicilioAtencionBarrio(), 100));
+        } else {
+            medico.setDomicilioAtencionTorre(null);
+            medico.setDomicilioAtencionPiso(null);
+            medico.setDomicilioAtencionDepto(null);
+            medico.setDomicilioAtencionBarrio(null);
+        }
 
         if (dto.getMatriculaInfo() != null) {
             medico.setMatriculaTipo(dto.getMatriculaInfo().getTipo());
@@ -161,6 +194,7 @@ public class MedicoService {
         medico.setOfreceOnline(dto.isOfreceOnline());
         medico.setOfrecePresencial(dto.isOfrecePresencial());
         medico.setExperiencia(dto.getExperiencia());
+        medico.setPublicaciones(dto.getPublicaciones());
 
         if (dto.getRedesSociales() != null) {
             medico.setInstagramUrl(dto.getRedesSociales().getInstagram());
@@ -236,6 +270,9 @@ public class MedicoService {
                     tarifa.setHabilitado(tDto.isEnabled());
                     tarifa.setRequiereObraSocial(requiereObraSocial);
                     tarifa.setObraSocial(obraSocialTrim);
+                    tarifa.setPrecioOnline(tDto.getPrecioOnline());
+                    tarifa.setPrecioPresencial(tDto.getPrecioPresencial());
+                    tarifa.setRequiereAgenda(tDto.isRequiereAgenda());
                 } else {
                     tarifa = TarifaMedico.builder()
                             .medico(medico)
@@ -245,6 +282,9 @@ public class MedicoService {
                             .habilitado(tDto.isEnabled())
                             .requiereObraSocial(requiereObraSocial)
                             .obraSocial(obraSocialTrim)
+                            .precioOnline(tDto.getPrecioOnline())
+                            .precioPresencial(tDto.getPrecioPresencial())
+                            .requiereAgenda(tDto.isRequiereAgenda())
                             .build();
                 }
                 tarifaRepository.save(tarifa);
@@ -281,6 +321,7 @@ public class MedicoService {
                         .habilitado(def.isEnabled())
                         .requiereObraSocial(def.isRequiereObraSocial())
                         .obraSocial(def.getObraSocial())
+                        .requiereAgenda(def.isRequiereAgenda())
                         .build();
                 tarifasDb.add(tarifaRepository.save(t));
             }
@@ -295,6 +336,9 @@ public class MedicoService {
                         .enabled(t.isHabilitado())
                         .requiereObraSocial(t.isRequiereObraSocial())
                         .obraSocial(t.getObraSocial())
+                        .precioOnline(t.getPrecioOnline())
+                        .precioPresencial(t.getPrecioPresencial())
+                        .requiereAgenda(t.isRequiereAgenda())
                         .build())
                 .collect(Collectors.toList());
 
@@ -357,6 +401,8 @@ public class MedicoService {
                 .name(nombreCompleto)
                 .nombre(m.getNombre())
                 .email(m.getEmail())
+                .emailContacto(m.getEmailContacto())
+                .telefono(m.getTelefono())
                 .initials(initials)
                 .degree(m.getTitulo() != null ? m.getTitulo() : "Médico/a")
                 .specialty(m.getSpecialty() != null ? m.getSpecialty() : "General")
@@ -378,6 +424,10 @@ public class MedicoService {
                 .domicilioAtencion(m.getDomicilioAtencion())
                 .domicilioLat(m.getDomicilioLat())
                 .domicilioLng(m.getDomicilioLng())
+                .domicilioAtencionTorre(m.getDomicilioAtencionTorre())
+                .domicilioAtencionPiso(m.getDomicilioAtencionPiso())
+                .domicilioAtencionDepto(m.getDomicilioAtencionDepto())
+                .domicilioAtencionBarrio(m.getDomicilioAtencionBarrio())
                 .matriculaInfo(matInfo)
                 .verificado(isMedicoVerificado(m))
                 .verificadoAdmin(m.getVerificadoAdmin())
@@ -392,6 +442,7 @@ public class MedicoService {
                 .selloLinea2(m.getSelloLinea2())
                 .selloLinea3(m.getSelloLinea3())
                 .experiencia(m.getExperiencia())
+                .publicaciones(m.getPublicaciones())
                 .redesSociales(MedicoDto.RedesSocialesDto.builder()
                         .instagram(m.getInstagramUrl())
                         .facebook(m.getFacebookUrl())
@@ -429,128 +480,182 @@ public class MedicoService {
     }
 
     @Transactional(readOnly = true)
-    public DashboardStatsDto obtenerStats(String email) {
+    public DashboardStatsDto obtenerStats(String email, String periodo) {
         Usuario medico = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado con el email: " + email));
 
-        List<Turno> turnos = turnoRepository.findByMedicoIdAndEstadoNot(medico.getId(), EstadoTurno.CANCELADO);
-
         LocalDate hoy = LocalDate.now();
-        LocalDate ayer = hoy.minusDays(1);
 
-        // 1. Sessions today
-        int sessionsToday = (int) turnos.stream()
-                .filter(t -> t.getFecha().equals(hoy))
-                .count();
+        // Every metric on the dashboard's stat cards used to be hardcoded to its own fixed
+        // window (sessions=today, earnings=this week, no-shows=this month) — the médico now
+        // picks one shared window (Diario/Semanal/Mensual) and all four cards + their "vs
+        // período anterior" comparison follow it.
+        LocalDate currentStart;
+        LocalDate currentEnd;
+        LocalDate previousStart;
+        LocalDate previousEnd;
+        String changeSuffix;
+        String flatMessage;
+        String periodoNorm = periodo == null ? "MENSUAL" : periodo.trim().toUpperCase();
 
-        // Sessions yesterday
-        int sessionsYesterday = (int) turnos.stream()
-                .filter(t -> t.getFecha().equals(ayer))
-                .count();
-
-        String sessionsTodayChange;
-        int diffToday = sessionsToday - sessionsYesterday;
-        if (diffToday > 0) {
-            sessionsTodayChange = "+" + diffToday + " vs ayer";
-        } else if (diffToday < 0) {
-            sessionsTodayChange = diffToday + " vs ayer";
-        } else {
-            sessionsTodayChange = "igual que ayer";
+        switch (periodoNorm) {
+            case "DIARIO":
+                currentStart = hoy;
+                currentEnd = hoy;
+                previousStart = hoy.minusDays(1);
+                previousEnd = hoy.minusDays(1);
+                changeSuffix = "vs ayer";
+                flatMessage = "igual que ayer";
+                break;
+            case "SEMANAL":
+                currentStart = hoy.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+                currentEnd = currentStart.plusDays(6);
+                previousStart = currentStart.minusWeeks(1);
+                previousEnd = previousStart.plusDays(6);
+                changeSuffix = "vs sem. anterior";
+                flatMessage = "igual que la semana anterior";
+                break;
+            case "MENSUAL":
+            default:
+                currentStart = hoy.with(TemporalAdjusters.firstDayOfMonth());
+                currentEnd = hoy.with(TemporalAdjusters.lastDayOfMonth());
+                previousStart = currentStart.minusMonths(1);
+                previousEnd = currentStart.minusDays(1);
+                changeSuffix = "vs mes anterior";
+                flatMessage = "igual que el mes anterior";
+                break;
         }
 
-        // 2. Earnings this week vs last week
-        LocalDate startOfThisWeek = hoy.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        LocalDate endOfThisWeek = startOfThisWeek.plusDays(6);
-        LocalDate startOfLastWeek = startOfThisWeek.minusWeeks(1);
-        LocalDate endOfLastWeek = startOfLastWeek.plusDays(6);
+        // Bounded to [previousStart, currentEnd] — used to load the médico's ENTIRE turno
+        // history on every dashboard refresh, which grows unbounded with account age. The one
+        // metric that genuinely needs full history (has this patient EVER been seen before this
+        // period, for "new patients") is computed separately below via a lightweight aggregate
+        // query instead of scanning every Turno entity.
+        List<Turno> turnos = turnoRepository.findByMedicoIdAndEstadoNotAndFechaBetween(medico.getId(), EstadoTurno.CANCELADO, previousStart, currentEnd);
 
-        BigDecimal earningsThisWeek = turnos.stream()
-                .filter(t -> t.getEstado() == EstadoTurno.CONFIRMADO && !t.getFecha().isBefore(startOfThisWeek) && !t.getFecha().isAfter(endOfThisWeek))
-                .map(Turno::getPrecio)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Turnos cancelados: se cuentan aparte de `turnos` (que los excluye) para poder distinguir,
+        // dentro de las ganancias, los cancelados SIN reembolso (el paciente no recupera el dinero,
+        // así que el profesional sigue ganando ese turno) de los cancelados CON reembolso (pago pasa
+        // a REEMBOLSADO, no cuenta como ganancia). Ver ReembolsoService: bloquea el reembolso
+        // automático si la cancelación ocurre dentro de las 48hs previas al turno.
+        List<Turno> turnosCancelados = turnoRepository.findByMedicoIdAndEstadoAndFechaBetween(medico.getId(), EstadoTurno.CANCELADO, previousStart, currentEnd);
+        List<Turno> canceladosSinReembolso = turnosCancelados.stream()
+                .filter(t -> t.getPago() != null && t.getPago().getEstado() == EstadoPago.APROBADO)
+                .collect(Collectors.toList());
 
-        BigDecimal earningsLastWeek = turnos.stream()
-                .filter(t -> t.getEstado() == EstadoTurno.CONFIRMADO && !t.getFecha().isBefore(startOfLastWeek) && !t.getFecha().isAfter(endOfLastWeek))
-                .map(Turno::getPrecio)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // 1. Sessions in the selected period vs the equivalent previous period
+        int sessionsCurrent = (int) turnos.stream()
+                .filter(t -> !t.getFecha().isBefore(currentStart) && !t.getFecha().isAfter(currentEnd))
+                .count();
+        int sessionsPrevious = (int) turnos.stream()
+                .filter(t -> !t.getFecha().isBefore(previousStart) && !t.getFecha().isAfter(previousEnd))
+                .count();
 
-        String earningsThisWeekChange;
-        if (earningsLastWeek.compareTo(BigDecimal.ZERO) == 0) {
-            if (earningsThisWeek.compareTo(BigDecimal.ZERO) == 0) {
-                earningsThisWeekChange = "0% vs sem. anterior";
-            } else {
-                earningsThisWeekChange = "+100% vs sem. anterior";
-            }
+        String sessionsChange;
+        int diffSessions = sessionsCurrent - sessionsPrevious;
+        if (diffSessions > 0) {
+            sessionsChange = "+" + diffSessions + " " + changeSuffix;
+        } else if (diffSessions < 0) {
+            sessionsChange = diffSessions + " " + changeSuffix;
         } else {
-            BigDecimal percentChange = earningsThisWeek.subtract(earningsLastWeek)
+            sessionsChange = flatMessage;
+        }
+
+        // 2. Earnings in the selected period vs the equivalent previous period. Includes turnos
+        // cancelados sin reembolso: el dinero no vuelve al paciente, así que sigue siendo ganancia
+        // del profesional.
+        BigDecimal earningsCurrent = Stream.concat(
+                        turnos.stream().filter(t -> t.getEstado() == EstadoTurno.CONFIRMADO),
+                        canceladosSinReembolso.stream())
+                .filter(t -> !t.getFecha().isBefore(currentStart) && !t.getFecha().isAfter(currentEnd))
+                .map(Turno::getPrecio)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal earningsPrevious = Stream.concat(
+                        turnos.stream().filter(t -> t.getEstado() == EstadoTurno.CONFIRMADO),
+                        canceladosSinReembolso.stream())
+                .filter(t -> !t.getFecha().isBefore(previousStart) && !t.getFecha().isAfter(previousEnd))
+                .map(Turno::getPrecio)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        String earningsChange;
+        if (earningsPrevious.compareTo(BigDecimal.ZERO) == 0) {
+            earningsChange = earningsCurrent.compareTo(BigDecimal.ZERO) == 0
+                    ? "0% " + changeSuffix
+                    : "+100% " + changeSuffix;
+        } else {
+            BigDecimal percentChange = earningsCurrent.subtract(earningsPrevious)
                     .multiply(new BigDecimal("100"))
-                    .divide(earningsLastWeek, 1, java.math.RoundingMode.HALF_UP);
+                    .divide(earningsPrevious, 1, java.math.RoundingMode.HALF_UP);
             if (percentChange.compareTo(BigDecimal.ZERO) > 0) {
-                earningsThisWeekChange = "+" + percentChange + "% vs sem. anterior";
+                earningsChange = "+" + percentChange + "% " + changeSuffix;
             } else if (percentChange.compareTo(BigDecimal.ZERO) < 0) {
-                earningsThisWeekChange = percentChange + "% vs sem. anterior";
+                earningsChange = percentChange + "% " + changeSuffix;
             } else {
-                earningsThisWeekChange = "0% vs sem. anterior";
+                earningsChange = "0% " + changeSuffix;
             }
         }
 
-        // 3. Active patients
+        // 3. Distinct patients seen within the selected period, and how many of those are new
+        // (their first-ever appointment with this médico falls inside the period)
         Set<Long> activePatientIds = turnos.stream()
+                .filter(t -> !t.getFecha().isBefore(currentStart) && !t.getFecha().isAfter(currentEnd))
                 .map(t -> t.getPaciente().getId())
                 .collect(Collectors.toSet());
         int activePatients = activePatientIds.size();
 
-        // Active patients added this month (meaning their first appointment was this month)
-        LocalDate startOfThisMonth = hoy.with(TemporalAdjusters.firstDayOfMonth());
-        Map<Long, LocalDate> firstAppointmentDate = new HashMap<>();
-        for (Turno t : turnos) {
-            Long pId = t.getPaciente().getId();
-            LocalDate pDate = t.getFecha();
-            if (!firstAppointmentDate.containsKey(pId) || pDate.isBefore(firstAppointmentDate.get(pId))) {
-                firstAppointmentDate.put(pId, pDate);
-            }
-        }
-        long newPatientsThisMonth = firstAppointmentDate.values().stream()
-                .filter(d -> !d.isBefore(startOfThisMonth))
+        // "New patient" needs each patient's true first-ever appointment date across the médico's
+        // whole history, which the date-bounded `turnos` list above no longer contains — resolved
+        // with a lightweight grouped aggregate (2 columns per patient) instead of loading every
+        // Turno entity ever created for this médico just to find a MIN(fecha).
+        Map<Long, LocalDate> firstAppointmentDate = turnoRepository.findPrimeraFechaPorPaciente(medico.getId(), EstadoTurno.CANCELADO).stream()
+                .collect(Collectors.toMap(
+                        com.tranqui.app.repository.TurnoRepository.PrimeraFechaPorPaciente::getPacienteId,
+                        com.tranqui.app.repository.TurnoRepository.PrimeraFechaPorPaciente::getPrimeraFecha));
+        long newPatientsInPeriod = firstAppointmentDate.values().stream()
+                .filter(d -> !d.isBefore(currentStart) && !d.isAfter(currentEnd))
                 .count();
 
-        String activePatientsChange = "+" + newPatientsThisMonth + " este mes";
+        String activePatientsChange = "+" + newPatientsInPeriod + " en el período";
 
-        // 4. No shows this month
-        LocalDate endOfThisMonth = hoy.with(TemporalAdjusters.lastDayOfMonth());
-
-        int noShowsThisMonthVal = (int) turnos.stream()
+        // 4. Inasistencias a turnos in the selected period vs the equivalent previous period:
+        // turnos marcados AUSENTE por el médico + turnos cancelados (con o sin reembolso; toda
+        // cancelación cuenta como una inasistencia).
+        int noShowsCurrent = (int) turnos.stream()
                 .filter(t -> t.getAsistencia() == EstadoAsistencia.AUSENTE
-                        && !t.getFecha().isBefore(startOfThisMonth)
-                        && !t.getFecha().isAfter(endOfThisMonth))
+                        && !t.getFecha().isBefore(currentStart)
+                        && !t.getFecha().isAfter(currentEnd))
+                .count()
+                + (int) turnosCancelados.stream()
+                .filter(t -> !t.getFecha().isBefore(currentStart) && !t.getFecha().isAfter(currentEnd))
                 .count();
-
-        LocalDate startOfLastMonth = startOfThisMonth.minusMonths(1);
-        LocalDate endOfLastMonth = startOfThisMonth.minusDays(1);
-        int noShowsLastMonthVal = (int) turnos.stream()
+        int noShowsPrevious = (int) turnos.stream()
                 .filter(t -> t.getAsistencia() == EstadoAsistencia.AUSENTE
-                        && !t.getFecha().isBefore(startOfLastMonth)
-                        && !t.getFecha().isAfter(endOfLastMonth))
+                        && !t.getFecha().isBefore(previousStart)
+                        && !t.getFecha().isAfter(previousEnd))
+                .count()
+                + (int) turnosCancelados.stream()
+                .filter(t -> !t.getFecha().isBefore(previousStart) && !t.getFecha().isAfter(previousEnd))
                 .count();
 
         String noShowsChange;
-        int diffNoShows = noShowsThisMonthVal - noShowsLastMonthVal;
+        int diffNoShows = noShowsCurrent - noShowsPrevious;
         if (diffNoShows > 0) {
-            noShowsChange = "+" + diffNoShows + " vs mes anterior";
+            noShowsChange = "+" + diffNoShows + " " + changeSuffix;
         } else if (diffNoShows < 0) {
-            noShowsChange = diffNoShows + " vs mes anterior";
+            noShowsChange = diffNoShows + " " + changeSuffix;
         } else {
-            noShowsChange = "igual que mes anterior";
+            noShowsChange = flatMessage;
         }
 
         return DashboardStatsDto.builder()
-                .sessionsToday(sessionsToday)
-                .sessionsTodayChange(sessionsTodayChange)
-                .earningsThisWeek(earningsThisWeek)
-                .earningsThisWeekChange(earningsThisWeekChange)
+                .sessionsToday(sessionsCurrent)
+                .sessionsTodayChange(sessionsChange)
+                .earningsThisWeek(earningsCurrent)
+                .earningsThisWeekChange(earningsChange)
                 .activePatients(activePatients)
                 .activePatientsChange(activePatientsChange)
-                .noShowsThisMonth(noShowsThisMonthVal)
+                .noShowsThisMonth(noShowsCurrent)
                 .noShowsChange(noShowsChange)
                 .build();
     }

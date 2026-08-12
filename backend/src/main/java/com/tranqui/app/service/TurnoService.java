@@ -1,5 +1,6 @@
 package com.tranqui.app.service;
 
+import com.tranqui.app.model.EstadoPago;
 import com.tranqui.app.model.EstadoTurno;
 import com.tranqui.app.model.Modalidad;
 import com.tranqui.app.model.TipoTurno;
@@ -46,6 +47,9 @@ public class TurnoService {
     @Autowired
     private NotificacionService notificacionService;
 
+    @Autowired
+    private ReembolsoService reembolsoService;
+
     // Off by default. Only turn this on temporarily while the real Mercado Pago integration
     // is broken/unlinked and you need to exercise the rest of the booking flow (Google
     // Calendar sync, notifications, etc). Never leave it "true" once real patients are paying —
@@ -66,6 +70,7 @@ public class TurnoService {
 
         List<Turno> turnosExistentes = turnosRaw.stream()
                 .filter(t -> {
+                    if (!t.isOcupaAgenda()) return false;
                     if (t.getEstado() == EstadoTurno.EXPIRADO) return false;
                     if (t.getEstado() == EstadoTurno.PENDIENTE_PAGO) {
                         return t.getFechaCreacion() != null && t.getFechaCreacion().isAfter(limiteCincoMin);
@@ -178,6 +183,27 @@ public class TurnoService {
         return !turnoRepository.existsByPacienteEmailAndEstadoNot(email, EstadoTurno.CANCELADO);
     }
 
+    private String resolverTypeLabel(Turno t) {
+        if ("receta-fuera".equals(t.getServicioId())) return "Receta fuera de turno";
+        if ("certificado".equals(t.getServicioId())) return "Certificado";
+        if (t.getTipo() == TipoTurno.OBRA_SOCIAL || t.getTipo() == TipoTurno.OSDE) return "Obra Social";
+        if (!t.isOcupaAgenda()) return "Documento solicitado";
+        return "Consulta particular";
+    }
+
+    // A tarifa's precioOnline/precioPresencial only override precio when the médico explicitly
+    // set one for this modalidad — most services keep a single precio regardless of modalidad,
+    // so a null override just falls back to it.
+    private java.math.BigDecimal resolverPrecioPorModalidad(com.tranqui.app.model.TarifaMedico tarifa, Modalidad modalidad) {
+        if (modalidad == Modalidad.ONLINE && tarifa.getPrecioOnline() != null) {
+            return tarifa.getPrecioOnline();
+        }
+        if (modalidad == Modalidad.PRESENCIAL && tarifa.getPrecioPresencial() != null) {
+            return tarifa.getPrecioPresencial();
+        }
+        return tarifa.getPrecio();
+    }
+
     @Transactional
     public com.tranqui.app.model.dto.TurnoResponseDto reservarTurno(com.tranqui.app.model.dto.ReservaTurnoDto dto) {
         // Check if patient already has an active or pending appointment in the future
@@ -189,32 +215,100 @@ public class TurnoService {
         Usuario medico = usuarioRepository.findById(dto.getMedicoId())
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
-        // Resolve which agenda (presencial/online) this turno books against. Only ambiguous
-        // when the médico offers both and the caller didn't say — reject rather than guess,
-        // since guessing wrong would silently book against the wrong agenda's horarios.
-        boolean ofreceAmbasModalidades = medico.isOfrecePresencial() && medico.isOfreceOnline();
-        Modalidad modalidad = dto.getModalidad();
-        if (modalidad == null) {
-            if (ofreceAmbasModalidades) {
-                throw new IllegalArgumentException("Debés indicar si el turno es presencial u online.");
-            }
-            modalidad = medico.isOfrecePresencial() ? Modalidad.PRESENCIAL : Modalidad.ONLINE;
+        // Resolve which tarifa this booking is for up front — before touching modalidad/agenda
+        // below — because whether it reserves a slot at all (TarifaMedico.requiereAgenda) depends
+        // on which tarifa it is, and that decides which path the rest of this method takes.
+        String servicioId = "particular";
+        Set<String> servicioIdsConocidos = Set.of("particular", "sobreturno", "obra_social", "osde", "receta-fuera", "certificado");
+        boolean esServicioCustom = dto.getServicioId() != null && !dto.getServicioId().isBlank()
+                && !servicioIdsConocidos.contains(dto.getServicioId());
+
+        Optional<com.tranqui.app.model.TarifaMedico> tarifaCustomOpt = esServicioCustom
+                ? tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), dto.getServicioId())
+                : Optional.empty();
+        boolean usoTarifaCustom = tarifaCustomOpt.isPresent() && tarifaCustomOpt.get().isHabilitado();
+
+        if (usoTarifaCustom) {
+            servicioId = dto.getServicioId();
+        } else if (dto.getTipo() == TipoTurno.OBRA_SOCIAL || dto.getTipo() == TipoTurno.OSDE) {
+            servicioId = "obra_social";
+        } else if (dto.getTipo() == TipoTurno.RECETA) {
+            servicioId = "receta-fuera";
+        } else if (dto.getTipo() == TipoTurno.CERTIFICADO) {
+            servicioId = "certificado";
+        } else if (dto.getTipo() == TipoTurno.SOBRETUNO) {
+            servicioId = "sobreturno";
         }
 
-        // Check if slot is still available (only for standard/non-sobreturno appointments)
-        if (dto.getTipo() != TipoTurno.SOBRETUNO) {
-            List<java.time.LocalTime> disponibles = obtenerHorariosDisponibles(medico.getId(), dto.getFecha(), modalidad);
-            if (!disponibles.contains(dto.getHora())) {
-                throw new IllegalStateException("El horario seleccionado ya no está disponible");
-            }
+        Optional<com.tranqui.app.model.TarifaMedico> tarifaOpt = usoTarifaCustom
+                ? Optional.empty()
+                : tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), servicioId);
+        if (!usoTarifaCustom && !tarifaOpt.isPresent() && (dto.getTipo() == TipoTurno.OBRA_SOCIAL || dto.getTipo() == TipoTurno.OSDE)) {
+            tarifaOpt = tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), "osde");
+        }
+
+        // Whether this booking requires a número de afiliado — resolved from the actual tarifa
+        // (its specific obra social, see TarifaMedico.obraSocial) rather than trusting the
+        // frontend, so the requirement can't be bypassed by calling this endpoint directly.
+        boolean requiereAfiliado;
+        // Whether this service reserves a slot on the médico's agenda at all — false for pure
+        // document services (recetas, certificados, informes). Unknown/legacy tarifas default to
+        // true, matching the old behavior of always blocking a slot.
+        boolean requiereAgendaServicio;
+        if (usoTarifaCustom) {
+            requiereAfiliado = tarifaCustomOpt.get().isRequiereObraSocial();
+            requiereAgendaServicio = tarifaCustomOpt.get().isRequiereAgenda();
         } else {
-            // For SOBRETUNO, verify the doctor has no other active appointment at the requested hour
-            List<Turno> turnosExistentes = turnoRepository.findByMedicoIdAndFechaAndEstadoNot(medico.getId(), dto.getFecha(), EstadoTurno.CANCELADO);
-            boolean yaOcupado = turnosExistentes.stream()
-                    .anyMatch(t -> t.getHoraInicio().equals(dto.getHora()));
-            if (yaOcupado) {
-                throw new IllegalStateException("El horario del sobreturno seleccionado ya se encuentra ocupado por otro turno");
+            boolean esTipoObraSocial = dto.getTipo() == TipoTurno.OBRA_SOCIAL || dto.getTipo() == TipoTurno.OSDE;
+            requiereAfiliado = esTipoObraSocial || (tarifaOpt.isPresent() && tarifaOpt.get().isRequiereObraSocial());
+            requiereAgendaServicio = tarifaOpt.isPresent() ? tarifaOpt.get().isRequiereAgenda() : true;
+        }
+
+        Modalidad modalidad;
+        java.time.LocalDate fechaFinal;
+        java.time.LocalTime horaInicioFinal;
+        java.time.LocalTime horaFinFinal;
+
+        if (!requiereAgendaServicio) {
+            // Document-only service: no consultorio, no videollamada, so there's no real
+            // modalidad or scheduled time to resolve — the booking timestamp is only for record
+            // keeping and must never block obtenerHorariosDisponibles for anyone else (enforced
+            // there by filtering out turnos with ocupaAgenda == false).
+            modalidad = null;
+            fechaFinal = java.time.LocalDate.now();
+            horaInicioFinal = java.time.LocalTime.now();
+            horaFinFinal = horaInicioFinal;
+        } else {
+            // Resolve which agenda (presencial/online) this turno books against. Only ambiguous
+            // when the médico offers both and the caller didn't say — reject rather than guess,
+            // since guessing wrong would silently book against the wrong agenda's horarios.
+            boolean ofreceAmbasModalidades = medico.isOfrecePresencial() && medico.isOfreceOnline();
+            modalidad = dto.getModalidad();
+            if (modalidad == null) {
+                if (ofreceAmbasModalidades) {
+                    throw new IllegalArgumentException("Debés indicar si el turno es presencial u online.");
+                }
+                modalidad = medico.isOfrecePresencial() ? Modalidad.PRESENCIAL : Modalidad.ONLINE;
             }
+
+            // Check if slot is still available (only for standard/non-sobreturno appointments)
+            if (dto.getTipo() != TipoTurno.SOBRETUNO) {
+                List<java.time.LocalTime> disponibles = obtenerHorariosDisponibles(medico.getId(), dto.getFecha(), modalidad);
+                if (!disponibles.contains(dto.getHora())) {
+                    throw new IllegalStateException("El horario seleccionado ya no está disponible");
+                }
+            } else {
+                // For SOBRETUNO, verify the doctor has no other active appointment at the requested hour
+                List<Turno> turnosExistentes = turnoRepository.findByMedicoIdAndFechaAndEstadoNot(medico.getId(), dto.getFecha(), EstadoTurno.CANCELADO);
+                boolean yaOcupado = turnosExistentes.stream()
+                        .anyMatch(t -> t.isOcupaAgenda() && t.getHoraInicio().equals(dto.getHora()));
+                if (yaOcupado) {
+                    throw new IllegalStateException("El horario del sobreturno seleccionado ya se encuentra ocupado por otro turno");
+                }
+            }
+            fechaFinal = dto.getFecha();
+            horaInicioFinal = dto.getHora();
+            horaFinFinal = dto.getHora().plusMinutes(45);
         }
 
         String formattedTelefono = dto.getTelefonoPaciente();
@@ -244,76 +338,30 @@ public class TurnoService {
         }
         paciente = usuarioRepository.save(paciente);
 
-        // Determine price based on selected service
-        java.math.BigDecimal precio = java.math.BigDecimal.ZERO;
-        String servicioId = "particular";
-
-        // Custom services the médico created in "Honorarios y servicios" (beyond the fixed
-        // PARTICULAR/OBRA_SOCIAL/RECETA/CERTIFICADO/SOBRETUNO ones) are selected directly by
-        // servicioId rather than by the TipoTurno enum, since the enum only covers the defaults.
-        Set<String> servicioIdsConocidos = Set.of("particular", "sobreturno", "obra_social", "osde", "receta-fuera", "certificado");
-        boolean esServicioCustom = dto.getServicioId() != null && !dto.getServicioId().isBlank()
-                && !servicioIdsConocidos.contains(dto.getServicioId());
-
-        Optional<com.tranqui.app.model.TarifaMedico> tarifaCustomOpt = esServicioCustom
-                ? tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), dto.getServicioId())
-                : Optional.empty();
-
-        boolean usoTarifaCustom = tarifaCustomOpt.isPresent() && tarifaCustomOpt.get().isHabilitado();
-        // Whether this booking requires a número de afiliado — resolved from the actual tarifa
-        // (its specific obra social, see TarifaMedico.obraSocial) rather than trusting the
-        // frontend, so the requirement can't be bypassed by calling this endpoint directly.
-        boolean requiereAfiliado;
+        // Determine price based on the tarifa resolved earlier (servicioId/tarifaOpt/
+        // tarifaCustomOpt/usoTarifaCustom), now that modalidad is known.
+        java.math.BigDecimal precio;
         if (usoTarifaCustom) {
-            servicioId = dto.getServicioId();
-            precio = tarifaCustomOpt.get().getPrecio();
-            requiereAfiliado = tarifaCustomOpt.get().isRequiereObraSocial();
+            precio = resolverPrecioPorModalidad(tarifaCustomOpt.get(), modalidad);
+        } else if (tarifaOpt.isPresent() && tarifaOpt.get().isHabilitado()) {
+            precio = resolverPrecioPorModalidad(tarifaOpt.get(), modalidad);
         } else {
+            // Fallback to defaults
             if (dto.getTipo() == TipoTurno.OBRA_SOCIAL || dto.getTipo() == TipoTurno.OSDE) {
-                servicioId = "obra_social";
+                precio = new java.math.BigDecimal("10500");
             } else if (dto.getTipo() == TipoTurno.RECETA) {
-                servicioId = "receta-fuera";
+                precio = new java.math.BigDecimal("45000");
             } else if (dto.getTipo() == TipoTurno.CERTIFICADO) {
-                servicioId = "certificado";
+                precio = new java.math.BigDecimal("55000");
             } else if (dto.getTipo() == TipoTurno.SOBRETUNO) {
-                servicioId = "sobreturno";
-            }
-
-            Optional<com.tranqui.app.model.TarifaMedico> tarifaOpt = tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), servicioId);
-            if (!tarifaOpt.isPresent() && (dto.getTipo() == TipoTurno.OBRA_SOCIAL || dto.getTipo() == TipoTurno.OSDE)) {
-                tarifaOpt = tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), "osde");
-            }
-
-            boolean esTipoObraSocial = dto.getTipo() == TipoTurno.OBRA_SOCIAL || dto.getTipo() == TipoTurno.OSDE;
-            requiereAfiliado = esTipoObraSocial || (tarifaOpt.isPresent() && tarifaOpt.get().isRequiereObraSocial());
-
-            if (tarifaOpt.isPresent() && tarifaOpt.get().isHabilitado()) {
-                precio = tarifaOpt.get().getPrecio();
+                precio = new java.math.BigDecimal("90000");
             } else {
-                // Fallback to defaults
-                if (dto.getTipo() == TipoTurno.OBRA_SOCIAL || dto.getTipo() == TipoTurno.OSDE) {
-                    precio = new java.math.BigDecimal("10500");
-                } else if (dto.getTipo() == TipoTurno.RECETA) {
-                    precio = new java.math.BigDecimal("45000");
-                } else if (dto.getTipo() == TipoTurno.CERTIFICADO) {
-                    precio = new java.math.BigDecimal("55000");
-                } else if (dto.getTipo() == TipoTurno.SOBRETUNO) {
-                    precio = new java.math.BigDecimal("90000");
-                } else {
-                    precio = medico.getPrecio() != null ? medico.getPrecio() : new java.math.BigDecimal("60000");
-                }
+                precio = medico.getPrecio() != null ? medico.getPrecio() : new java.math.BigDecimal("60000");
             }
         }
 
         if (requiereAfiliado && (dto.getMetadataAfiliado() == null || dto.getMetadataAfiliado().isBlank())) {
             throw new IllegalStateException("Este servicio requiere número de afiliado.");
-        }
-
-        // If it is the first consultation, apply a 30% surcharge and round to nearest whole number
-        // (never for a custom tariff — that surcharge only makes sense for the default "particular" price)
-        if (!usoTarifaCustom && dto.getTipo() == TipoTurno.PARTICULAR && esPrimeraConsulta(dto.getEmailPaciente())) {
-            java.math.BigDecimal surcharge = precio.multiply(new java.math.BigDecimal("0.30"));
-            precio = precio.add(surcharge).setScale(0, java.math.RoundingMode.HALF_UP);
         }
 
         String metaAfiliado = dto.getMetadataAfiliado();
@@ -328,9 +376,9 @@ public class TurnoService {
         Turno turno = Turno.builder()
                 .medico(medico)
                 .paciente(paciente)
-                .fecha(dto.getFecha())
-                .horaInicio(dto.getHora())
-                .horaFin(dto.getHora().plusMinutes(45))
+                .fecha(fechaFinal)
+                .horaInicio(horaInicioFinal)
+                .horaFin(horaFinFinal)
                 .tipo(dto.getTipo())
                 .modalidad(modalidad)
                 .estado(EstadoTurno.PENDIENTE_PAGO)
@@ -338,6 +386,7 @@ public class TurnoService {
                 .metadataAfiliado(metaAfiliado)
                 .servicioId(servicioId)
                 .idFinanciador(dto.getIdFinanciador())
+                .ocupaAgenda(requiereAgendaServicio)
                 .build();
 
         turno = turnoRepository.save(turno);
@@ -385,10 +434,12 @@ public class TurnoService {
         
         // Muta a confirmado
         turno.setEstado(EstadoTurno.CONFIRMADO);
-        
-        // Sincronizar agenda en Google Calendar
-        String meetUrl = calendarService.crearEventoReunion(turno);
-        turno.setTelemedicinaUrl(meetUrl);
+
+        // Sincronizar agenda en Google Calendar solo para turnos online; los presenciales no llevan videollamada
+        if (turno.getModalidad() == Modalidad.ONLINE) {
+            String meetUrl = calendarService.crearEventoReunion(turno);
+            turno.setTelemedicinaUrl(meetUrl);
+        }
 
         return turnoRepository.save(turno);
     }
@@ -420,14 +471,16 @@ public class TurnoService {
                         status = "completed";
                     }
 
-                    String typeLabel = (t.getTipo() == TipoTurno.OBRA_SOCIAL || t.getTipo() == TipoTurno.OSDE) ? "Obra Social" : "Consulta particular";
+                    String typeLabel = resolverTypeLabel(t);
 
                     return com.tranqui.app.model.dto.TurnoMedicoDto.builder()
                             .id(t.getId())
                             .patientName(t.getPaciente().getNombre())
                             .hour(String.format("%02d", t.getHoraInicio().getHour()))
+                            .horaInicio(String.format("%02d:%02d", t.getHoraInicio().getHour(), t.getHoraInicio().getMinute()))
                             .ampm("hs")
                             .type(typeLabel)
+                            .modalidad(t.getModalidad() != null ? t.getModalidad().toString() : null)
                             .status(status)
                             .attendanceStatus(t.getAsistencia() != null ? t.getAsistencia().name() : "ESPERANDO")
                             .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
@@ -435,6 +488,7 @@ public class TurnoService {
                             .firstConsultation(!emailsNoPrimeraConsulta.contains(t.getPaciente().getEmail()))
                             .patientInfo(construirPacienteDto(t.getPaciente()))
                             .metadataAfiliado(t.getMetadataAfiliado())
+                            .ocupaAgenda(t.isOcupaAgenda())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -480,14 +534,16 @@ public class TurnoService {
                         status = "completed";
                     }
 
-                    String typeLabel = (t.getTipo() == TipoTurno.OBRA_SOCIAL || t.getTipo() == TipoTurno.OSDE) ? "Obra Social" : "Consulta particular";
+                    String typeLabel = resolverTypeLabel(t);
 
                     return com.tranqui.app.model.dto.TurnoMedicoDto.builder()
                             .id(t.getId())
                             .patientName(t.getPaciente().getNombre())
                             .hour(String.format("%02d", t.getHoraInicio().getHour()))
+                            .horaInicio(String.format("%02d:%02d", t.getHoraInicio().getHour(), t.getHoraInicio().getMinute()))
                             .ampm("hs")
                             .type(typeLabel)
+                            .modalidad(t.getModalidad() != null ? t.getModalidad().toString() : null)
                             .status(status)
                             .attendanceStatus(t.getAsistencia() != null ? t.getAsistencia().name() : "ESPERANDO")
                             .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
@@ -495,6 +551,7 @@ public class TurnoService {
                             .firstConsultation(!emailsNoPrimeraConsultaTodos.contains(t.getPaciente().getEmail()))
                             .patientInfo(construirPacienteDto(t.getPaciente()))
                             .metadataAfiliado(t.getMetadataAfiliado())
+                            .ocupaAgenda(t.isOcupaAgenda())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -521,7 +578,7 @@ public class TurnoService {
                         status = "completed";
                     }
 
-                    String typeLabel = (t.getTipo() == TipoTurno.OBRA_SOCIAL || t.getTipo() == TipoTurno.OSDE) ? "Obra Social" : "Consulta particular";
+                    String typeLabel = resolverTypeLabel(t);
 
                     // The checkout URL is generated once at booking time (reservarTurno) and
                     // persisted on the turno — re-generating it here on every list read used to
@@ -532,8 +589,10 @@ public class TurnoService {
                             .id(t.getId())
                             .patientName(t.getMedico().getNombre()) // Show doctor name to patient
                             .hour(String.format("%02d", t.getHoraInicio().getHour()))
+                            .horaInicio(String.format("%02d:%02d", t.getHoraInicio().getHour(), t.getHoraInicio().getMinute()))
                             .ampm("hs")
                             .type(typeLabel)
+                            .modalidad(t.getModalidad() != null ? t.getModalidad().toString() : null)
                             .status(status)
                             .attendanceStatus(t.getAsistencia() != null ? t.getAsistencia().name() : "ESPERANDO")
                             .meetLink(t.getTelemedicinaUrl() != null ? t.getTelemedicinaUrl() : "")
@@ -542,6 +601,11 @@ public class TurnoService {
                             .domicilioAtencion(t.getMedico().getDomicilioAtencion())
                             .domicilioLat(t.getMedico().getDomicilioLat())
                             .domicilioLng(t.getMedico().getDomicilioLng())
+                            .domicilioAtencionTorre(t.getMedico().getDomicilioAtencionTorre())
+                            .domicilioAtencionPiso(t.getMedico().getDomicilioAtencionPiso())
+                            .domicilioAtencionDepto(t.getMedico().getDomicilioAtencionDepto())
+                            .domicilioAtencionBarrio(t.getMedico().getDomicilioAtencionBarrio())
+                            .ocupaAgenda(t.isOcupaAgenda())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -566,13 +630,28 @@ public class TurnoService {
     public void cancelarTurno(Long turnoId) {
         Turno turno = turnoRepository.findById(turnoId)
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
+
+        boolean teniaPagoAprobado = turno.getPago() != null && turno.getPago().getEstado() == EstadoPago.APROBADO;
+
         turno.setEstado(EstadoTurno.CANCELADO);
-        
+
         try {
             calendarService.eliminarEventoReunion(turno);
         } catch (Exception e) {
             org.slf4j.LoggerFactory.getLogger(TurnoService.class)
                 .error("Error al eliminar evento en Google Calendar para turno ID: {}", turnoId, e);
+        }
+
+        // Reembolsar en Mercado Pago si el turno ya estaba pagado. Igual que con Google Calendar,
+        // un fallo acá no debe impedir que la cancelación se confirme: se loguea y el médico puede
+        // resolverlo manualmente desde Mercado Pago si hace falta.
+        if (teniaPagoAprobado) {
+            try {
+                reembolsoService.procesarReembolso(turno, turno.getMedico());
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(TurnoService.class)
+                    .error("Error al procesar el reembolso de Mercado Pago para turno ID: {}", turnoId, e);
+            }
         }
 
         turno = turnoRepository.save(turno);

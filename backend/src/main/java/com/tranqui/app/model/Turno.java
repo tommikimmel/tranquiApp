@@ -71,6 +71,19 @@ public class Turno {
     @Column(name = "servicio_id", length = 50)
     private String servicioId; // id de la tarifa elegida (Honorarios y Servicios), para servicios custom del médico
 
+    // Copied from TarifaMedico.requiereAgenda at booking time (see TurnoService.reservarTurno) —
+    // false for pure document services (recetas, certificados, informes): no consultorio, no
+    // videollamada, so fecha/horaInicio/horaFin are just the booking timestamp, not a real
+    // scheduled slot, and this turno must never block obtenerHorariosDisponibles for anyone else.
+    // Denormalized rather than re-joined against tarifa_medico on every availability lookup, and
+    // stays historically accurate even if the médico later flips the tarifa's flag.
+    // columnDefinition (not just nullable=false): same backfill reasoning as
+    // TarifaMedico.requiereAgenda — this table already has production rows, and a bare
+    // `nullable=false` ALTER TABLE with no DEFAULT fails against them on Postgres.
+    @Builder.Default
+    @Column(name = "ocupa_agenda", columnDefinition = "boolean not null default true")
+    private boolean ocupaAgenda = true;
+
     @Column(name = "id_financiador", length = 50)
     private String idFinanciador; // id del financiador QBI2 elegido, cuando el servicio requiere obra social
 

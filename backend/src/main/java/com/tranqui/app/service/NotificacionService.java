@@ -64,12 +64,14 @@ public class NotificacionService {
         return notif;
     }
 
-    @Transactional
+    // The DELETE this used to run inline on every GET (deleting expired notifications for ALL
+    // users, not just the caller) was redundant work on a hot read path — NotificationScheduler
+    // already runs limpiarNotificacionesAntiguas() hourly and covers the same cleanup.
+    @Transactional(readOnly = true)
     public List<Notificacion> obtenerNotificaciones(String email) {
         Usuario usuario = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
         LocalDateTime hace24Horas = LocalDateTime.now().minusHours(24);
-        notificacionRepository.deleteByFechaCreacionBefore(hace24Horas);
         return notificacionRepository.findByUsuarioIdAndFechaCreacionAfterOrderByFechaCreacionDesc(usuario.getId(), hace24Horas);
     }
 

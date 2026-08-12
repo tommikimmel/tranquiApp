@@ -8,6 +8,8 @@ import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import { openOfficialPrescriptionPdf } from '../utils/pdfGenerator'
 import DateInputDDMMYYYY from './DateInputDDMMYYYY'
+import ComplaintModal from './ComplaintModal'
+import { formatDetalleDomicilio } from '../utils/dashboardHelpers'
 
 const formatDateDDMMYYYY = (dateStr?: string) => {
   if (!dateStr) return '';
@@ -51,6 +53,40 @@ function IconCalendar({ size = 16 }: { size?: number }) {
   )
 }
 
+function IconLocationPin({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M12 21s-7-6.1-7-11a7 7 0 0 1 14 0c0 4.9-7 11-7 11z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  )
+}
+
+function IconVideoCam({ size = 15 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <rect x="2" y="6" width="14" height="12" rx="2" />
+      <path d="M16 10l6-3v10l-6-3" />
+    </svg>
+  )
+}
+
+function IconPhone({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  )
+}
+
+function IconMailSmall({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <rect x="2" y="4" width="20" height="16" rx="2" /><polyline points="2 6 12 13 22 6" />
+    </svg>
+  )
+}
+
 function IconClipboard({ size = 16 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
@@ -87,6 +123,9 @@ interface Tariff {
   enabled: boolean
   requiereObraSocial?: boolean
   obraSocial?: string
+  precioOnline?: number | null
+  precioPresencial?: number | null
+  requiereAgenda?: boolean
 }
 
 interface RedesSociales {
@@ -115,12 +154,19 @@ interface Professional {
   domicilioAtencion?: string
   domicilioLat?: number | null
   domicilioLng?: number | null
+  domicilioAtencionTorre?: string
+  domicilioAtencionPiso?: string
+  domicilioAtencionDepto?: string
+  domicilioAtencionBarrio?: string
   descripcionPerfil?: string
   pacientesAtiende?: string[]
   institucionFormacion?: string
   aniosExperiencia?: number | null
   experiencia?: string
   redesSociales?: RedesSociales
+  telefono?: string
+  emailContacto?: string
+  publicaciones?: string
 }
 
 // PROFESSIONALS mock array removed since values are loaded from API
@@ -244,6 +290,29 @@ function ProCard({ pro, onBook, onChat, currentUser, availabilityDateLabel, avai
               <span className="tag next">Próximo turno: {pro.nextSlotDay.toLowerCase()} {pro.nextSlot} hs</span>
             )}
           </div>
+
+          {(pro.telefono || pro.emailContacto) && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+              {pro.telefono && (
+                <a
+                  href={`tel:${pro.telefono.replace(/\s+/g, '')}`}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-secondary)', textDecoration: 'none' }}
+                >
+                  <IconPhone size={12} /> {pro.telefono}
+                </a>
+              )}
+              {pro.emailContacto && (
+                <a
+                  href={`mailto:${pro.emailContacto}`}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-text-secondary)', textDecoration: 'none' }}
+                >
+                  <IconMailSmall size={12} /> {pro.emailContacto}
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="doc-side">
@@ -299,6 +368,7 @@ function PublicHeader({
 }) {
   const isDoctor = currentUser?.rol === 'PSIQUIATRA' || currentUser?.rol === 'MEDICO'
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showComplaintModal, setShowComplaintModal] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -427,11 +497,17 @@ function PublicHeader({
                         borderBottom: '1px solid #f0f2f5',
                         cursor: 'pointer',
                         fontSize: '13px',
-                        color: 'var(--color-text-primary)'
+                        color: 'var(--color-text-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
                       }}
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 15, height: 15, flexShrink: 0, color: 'var(--color-text-secondary)' }}>
+                        <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
                       Mis Turnos
                     </button>
                     <button
@@ -447,11 +523,19 @@ function PublicHeader({
                         borderBottom: '1px solid #f0f2f5',
                         cursor: 'pointer',
                         fontSize: '13px',
-                        color: 'var(--color-text-primary)'
+                        color: 'var(--color-text-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
                       }}
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 15, height: 15, flexShrink: 0, color: 'var(--color-text-secondary)' }}>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <path d="M9 15l2 2 4-4" />
+                      </svg>
                       Mi Receta
                     </button>
                     <a
@@ -467,11 +551,16 @@ function PublicHeader({
                         fontSize: '13px',
                         color: 'var(--color-text-primary)',
                         textDecoration: 'none',
-                        display: 'block'
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 15, height: 15, flexShrink: 0, color: 'var(--color-text-secondary)' }}>
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                      </svg>
                       Mi Cuenta
                     </a>
                     <a
@@ -489,13 +578,44 @@ function PublicHeader({
                         fontSize: '13px',
                         color: 'var(--color-text-primary)',
                         textDecoration: 'none',
-                        display: 'block'
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
                       onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 15, height: 15, flexShrink: 0, color: 'var(--color-text-secondary)' }}>
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      </svg>
                       Privacidad y mis datos
                     </a>
+                    <button
+                      onClick={() => {
+                        setShowDropdown(false);
+                        setShowComplaintModal(true);
+                      }}
+                      style={{
+                        padding: 'var(--space-3) var(--space-4)',
+                        textAlign: 'left',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: '1px solid #f0f2f5',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        color: 'var(--color-text-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 15, height: 15, flexShrink: 0, color: 'var(--color-text-secondary)' }}>
+                        <rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 6l-10 7L2 6" />
+                      </svg>
+                      Quejas y Soporte
+                    </button>
                     <button
                       onClick={() => {
                         setShowDropdown(false);
@@ -508,11 +628,17 @@ function PublicHeader({
                         border: 'none',
                         cursor: 'pointer',
                         fontSize: '13px',
-                        color: 'var(--color-danger)'
+                        color: 'var(--color-danger)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
                       }}
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fdf2f2'}
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 15, height: 15, flexShrink: 0 }}>
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
+                      </svg>
                       Cerrar sesión
                     </button>
                   </div>
@@ -533,6 +659,7 @@ function PublicHeader({
           )}
         </div>
       </div>
+      <ComplaintModal isOpen={showComplaintModal} onClose={() => setShowComplaintModal(false)} />
     </header>
   )
 }
@@ -581,9 +708,16 @@ interface BookTarget {
   nextSlot: string
   nextSlotDay: string
   fotoUrl?: string
+  telefono?: string
+  emailContacto?: string
+  publicaciones?: string
   domicilioAtencion?: string
   domicilioLat?: number | null
   domicilioLng?: number | null
+  domicilioAtencionTorre?: string
+  domicilioAtencionPiso?: string
+  domicilioAtencionDepto?: string
+  domicilioAtencionBarrio?: string
   ofreceOnline?: boolean
   ofrecePresencial?: boolean
   descripcionPerfil?: string
@@ -627,6 +761,7 @@ export default function LandingPage({
   const [selectedPrescriptionDetail, setSelectedPrescriptionDetail] = useState<any | null>(null)
   const [showHelpModal, setShowHelpModal] = useState(false)
   const [cancelTurnoId, setCancelTurnoId] = useState<number | null>(null)
+  const [detailTurno, setDetailTurno] = useState<any | null>(null)
 
   useEffect(() => {
     if (showPrescriptionsModal) {
@@ -783,6 +918,9 @@ export default function LandingPage({
             enabled: t.enabled,
             requiereObraSocial: t.requiereObraSocial,
             obraSocial: t.obraSocial,
+            precioOnline: t.precioOnline,
+            precioPresencial: t.precioPresencial,
+            requiereAgenda: t.requiereAgenda,
           })),
         }))
         setProfessionals(mapped)
@@ -907,6 +1045,10 @@ export default function LandingPage({
         domicilioAtencion: pro.domicilioAtencion,
         domicilioLat: pro.domicilioLat,
         domicilioLng: pro.domicilioLng,
+        domicilioAtencionTorre: pro.domicilioAtencionTorre,
+        domicilioAtencionPiso: pro.domicilioAtencionPiso,
+        domicilioAtencionDepto: pro.domicilioAtencionDepto,
+        domicilioAtencionBarrio: pro.domicilioAtencionBarrio,
         ofreceOnline: pro.ofreceOnline,
         ofrecePresencial: pro.ofrecePresencial,
         descripcionPerfil: pro.descripcionPerfil,
@@ -916,6 +1058,9 @@ export default function LandingPage({
         tags: pro.tags,
         experiencia: pro.experiencia,
         redesSociales: pro.redesSociales,
+        telefono: pro.telefono,
+        emailContacto: pro.emailContacto,
+        publicaciones: pro.publicaciones,
         tariffs: pro.tariffs
       })
     }
@@ -1112,109 +1257,140 @@ export default function LandingPage({
         return (
           <div style={{ width: '100%', maxWidth: '1200px', margin: 'var(--space-4) auto', padding: '0 var(--space-6)' }}>
             <div className="card" style={{
-              padding: 'var(--space-5) var(--space-6)',
-              backgroundColor: '#ecfdf5',
-              border: '1px solid var(--color-primary)',
-              borderLeft: '5px solid var(--color-primary)',
+              backgroundColor: 'var(--neutral-100)',
+              border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-lg)',
+              padding: 'var(--space-5)',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 'var(--space-5)',
-              boxShadow: 'var(--shadow-md)',
-              flexWrap: 'wrap'
+              flexDirection: 'column',
+              gap: 'var(--space-4)',
+              fontFamily: 'var(--font-body)'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', flex: '1 1 300px' }}>
-                <span style={{ fontSize: '24px' }}>⏰</span>
-                <div style={{ textAlign: 'left' }}>
-                  <h4 style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'bold', color: 'var(--color-primary)', textTransform: 'uppercase' }}>
-                    Mis Próximos Turnos
-                  </h4>
-                  <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                    Tenés turnos programados en Tranqui App. Podés pagar consultas pendientes o unirte a la videollamada el día de la sesión.
-                  </p>
-                </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'bold', color: 'var(--green-600)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                  Mis Próximos Turnos
+                </h4>
+                <p style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                  Tenés turnos programados en Tranqui App. Podés pagar consultas pendientes o unirte a la videollamada el día de la sesión.
+                </p>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', minWidth: '320px', flex: '2 1 400px' }}>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                 {upcomingAppointments.map(appt => {
                   const isTodayAppt = isToday(appt.fecha);
                   const isConfirmed = appt.status === 'confirmed';
+                  const isOnline = appt.modalidad ? appt.modalidad === 'ONLINE' : !!appt.meetLink;
                   return (
-                    <div key={appt.id} style={{ 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      gap: '6px', 
-                      backgroundColor: '#ffffff', 
-                      padding: 'var(--space-3)', 
-                      borderRadius: 'var(--radius-md)', 
-                      border: isConfirmed ? '1px solid #a7f3d0' : '1px solid #fef3c7' 
+                    <div
+                      key={appt.id}
+                      onClick={() => setDetailTurno(appt)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setDetailTurno(appt) }}
+                      style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 'var(--space-4)',
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: 'var(--space-3) var(--space-4)',
+                      flexWrap: 'wrap',
+                      cursor: 'pointer'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                          {formatDateDDMMYYYY(appt.fecha)} · {appt.hour} hs
-                        </span>
-                        <span className={`badge ${isConfirmed ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '9px', padding: '2px 6px', textTransform: 'uppercase' }}>
-                          {isConfirmed ? 'Confirmado' : 'Pendiente Pago'}
-                        </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 220 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                          <span style={{ color: 'var(--color-text-secondary)' }}><IconCalendar size={16} /></span>
+                          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                            {formatDateDDMMYYYY(appt.fecha)} · {appt.hour} hs
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                          <span style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{appt.patientName}</span>
+                          {' · '}
+                          {isOnline ? 'Consulta virtual' : 'Consulta presencial'}
+                        </div>
+
+                        {!isOnline && appt.domicilioAtencion && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                            <span style={{ color: 'var(--color-text-secondary)' }}><IconLocationPin size={16} /></span>
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>{appt.domicilioAtencion}</span>
+                          </div>
+                        )}
                       </div>
-                      
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px', flexWrap: 'wrap', gap: '8px' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                          <strong>Profesional:</strong> {appt.patientName} <span style={{ margin: '0 4px', opacity: 0.5 }}>|</span> <strong>Modalidad:</strong> {appt.type}
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <span className={`badge ${isConfirmed ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '11px' }}>
+                          {isConfirmed ? 'Confirmado' : 'Pendiente'}
                         </span>
-                        
-                        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                          {appt.meetLink && isConfirmed && isTodayAppt && (
-                            <a 
-                              href={appt.meetLink} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              className="btn btn--primary btn--sm" 
-                              style={{ fontSize: '10px', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}
-                            >
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 10, height: 10 }}><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
-                              Unirse
-                            </a>
-                          )}
-                          {appt.checkoutUrl && !isConfirmed && (
-                            <a 
-                              href={appt.checkoutUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              className="btn btn--sm" 
-                              style={{ 
-                                fontSize: '10px', 
-                                padding: '4px 10px', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '3px', 
-                                backgroundColor: '#009fe3', 
-                                color: 'white', 
-                                borderColor: '#009fe3', 
-                                fontWeight: 'bold',
-                                textDecoration: 'none',
-                                borderRadius: 'var(--radius-md)',
-                                boxShadow: '0 2px 4px rgba(0, 158, 227, 0.15)'
-                              }}
-                            >
-                              {appt.type === 'Copago OSDE' || appt.type === 'Obra Social' ? 'Pagar Copago' : 'Pagar Consulta'}
-                            </a>
-                          )}
-                          <button 
-                            onClick={() => handleCancelAppointmentByPatient(appt.id)}
+
+                        {isOnline && appt.meetLink && isConfirmed && isTodayAppt && (
+                          <a
+                            href={appt.meetLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
                             style={{
-                              border: 'none',
-                              background: 'none',
-                              cursor: 'pointer',
-                              color: 'var(--color-danger)',
-                              fontSize: '11px',
-                              fontWeight: 'bold',
-                              padding: '2px 4px'
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              background: 'var(--green-500)',
+                              color: '#fff',
+                              fontSize: 'var(--text-xs)',
+                              fontWeight: 600,
+                              padding: '8px 14px',
+                              borderRadius: 'var(--radius-md)',
+                              textDecoration: 'none',
+                              whiteSpace: 'nowrap'
                             }}
                           >
-                            Cancelar
-                          </button>
-                        </div>
+                            <IconVideoCam size={15} /> Unirse
+                          </a>
+                        )}
+
+                        {appt.checkoutUrl && !isConfirmed && (
+                          <a
+                            href={appt.checkoutUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              fontSize: 'var(--text-xs)',
+                              fontWeight: 'bold',
+                              padding: '8px 14px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              backgroundColor: '#009fe3',
+                              color: 'white',
+                              textDecoration: 'none',
+                              borderRadius: 'var(--radius-md)',
+                              boxShadow: '0 2px 4px rgba(0, 158, 227, 0.15)',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {appt.type === 'Copago OSDE' || appt.type === 'Obra Social' ? 'Pagar Copago' : 'Pagar Consulta'}
+                          </a>
+                        )}
+
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCancelAppointmentByPatient(appt.id) }}
+                          style={{
+                            background: 'transparent',
+                            border: '1px solid var(--color-border)',
+                            color: 'var(--color-text-secondary)',
+                            fontSize: 'var(--text-xs)',
+                            fontWeight: 600,
+                            padding: '8px 14px',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Cancelar
+                        </button>
                       </div>
                     </div>
                   );
@@ -1394,7 +1570,7 @@ export default function LandingPage({
                         Profesional: {appt.patientName}
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                        Modalidad: {appt.type}
+                        Modalidad: {(appt.modalidad ? appt.modalidad === 'ONLINE' : !!appt.meetLink) ? 'Online' : 'Presencial'}
                       </div>
                       {appt.domicilioAtencion && (
                         <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -1441,12 +1617,12 @@ export default function LandingPage({
                           )}
                         </div>
                       )}
-                      {appt.meetLink && isConfirmed && (
-                        <a 
-                          href={appt.meetLink} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="btn btn--primary" 
+                      {(appt.modalidad ? appt.modalidad === 'ONLINE' : !!appt.meetLink) && appt.meetLink && isConfirmed && (
+                        <a
+                          href={appt.meetLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn--primary"
                           style={{ fontSize: '11px', padding: 'var(--space-2) var(--space-4)', width: 'fit-content', display: 'flex', gap: '4px', alignItems: 'center', marginTop: 'var(--space-1)' }}
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
@@ -1487,6 +1663,169 @@ export default function LandingPage({
           </div>
         </div>
       )}
+
+      {/* Detalle de un turno puntual, abierto al hacer click en una fila de "Mis Próximos Turnos" */}
+      {detailTurno && (() => {
+        const appt = detailTurno;
+        const isConfirmed = appt.status === 'confirmed';
+        const isOnline = appt.modalidad ? appt.modalidad === 'ONLINE' : !!appt.meetLink;
+        const detalleDomicilio = formatDetalleDomicilio(appt);
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 9999,
+              padding: 'var(--space-4)'
+            }}
+            onClick={(e) => e.target === e.currentTarget && setDetailTurno(null)}
+          >
+            <div className="card" style={{
+              maxWidth: '480px',
+              width: '100%',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              position: 'relative',
+              padding: 'var(--space-6)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-4)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
+                <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Detalle del turno</h3>
+                <button onClick={() => setDetailTurno(null)} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <span style={{ color: 'var(--color-text-secondary)' }}><IconCalendar size={18} /></span>
+                  <span style={{ fontSize: 'var(--text-md)', fontWeight: 'bold' }}>
+                    {formatDateDDMMYYYY(appt.fecha)} · {appt.hour} hs
+                  </span>
+                  <span className={`badge ${isConfirmed ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '11px', marginLeft: 'auto' }}>
+                    {isConfirmed ? 'Confirmado' : 'Pendiente'}
+                  </span>
+                </div>
+
+                <div style={{ fontSize: 'var(--text-sm)' }}>
+                  <div>Profesional: <strong>{appt.patientName}</strong></div>
+                  <div style={{ color: 'var(--color-text-secondary)', marginTop: '2px' }}>{appt.type}</div>
+                  <div style={{ color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                    Modalidad: {isOnline ? 'Online (videollamada)' : 'Presencial'}
+                  </div>
+                </div>
+
+                {!isOnline && appt.domicilioAtencion && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ fontSize: 'var(--text-sm)' }}>
+                      <div>Dirección de atención: <strong>{appt.domicilioAtencion}</strong></div>
+                      {detalleDomicilio && (
+                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{detalleDomicilio}</div>
+                      )}
+                    </div>
+                    <a
+                      href={appt.domicilioLat && appt.domicilioLng
+                        ? `https://www.google.com/maps/search/?api=1&query=${appt.domicilioLat},${appt.domicilioLng}`
+                        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(appt.domicilioAtencion)}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn--ghost btn--sm"
+                      style={{
+                        fontSize: '11px',
+                        padding: 'var(--space-1) var(--space-2)',
+                        width: 'fit-content',
+                        display: 'inline-flex',
+                        gap: '4px',
+                        alignItems: 'center',
+                        border: '1px solid var(--color-border)',
+                        backgroundColor: 'var(--color-surface)',
+                        color: 'var(--color-primary)',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      <IconLocationPin size={13} />
+                      Ver dirección en Google Maps
+                    </a>
+                    {appt.domicilioLat != null && appt.domicilioLng != null && (
+                      <iframe
+                        title={`Ubicación del consultorio - turno ${appt.id}`}
+                        width="100%"
+                        height="180"
+                        style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${appt.domicilioLng - 0.006}%2C${appt.domicilioLat - 0.004}%2C${appt.domicilioLng + 0.006}%2C${appt.domicilioLat + 0.004}&layer=mapnik&marker=${appt.domicilioLat}%2C${appt.domicilioLng}`}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {isOnline && appt.meetLink && isConfirmed && (
+                  <a
+                    href={appt.meetLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn--primary"
+                    style={{ fontSize: '13px', padding: 'var(--space-2) var(--space-4)', width: 'fit-content', display: 'flex', gap: '6px', alignItems: 'center' }}
+                  >
+                    <IconVideoCam size={15} /> Unirse a la videollamada
+                  </a>
+                )}
+
+                {appt.checkoutUrl && !isConfirmed && (
+                  <a
+                    href={appt.checkoutUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn"
+                    style={{
+                      fontSize: '13px',
+                      padding: 'var(--space-2) var(--space-5)',
+                      width: 'fit-content',
+                      display: 'flex',
+                      gap: '6px',
+                      alignItems: 'center',
+                      textDecoration: 'none',
+                      backgroundColor: '#009fe3',
+                      color: 'white',
+                      borderColor: '#009fe3',
+                      fontWeight: 'bold',
+                      borderRadius: 'var(--radius-md)'
+                    }}
+                  >
+                    {appt.type === 'Copago OSDE' || appt.type === 'Obra Social' ? 'Pagar Copago' : 'Pagar Consulta'}
+                  </a>
+                )}
+
+                {appt.status !== 'completed' && (
+                  <button
+                    onClick={() => { setDetailTurno(null); handleCancelAppointmentByPatient(appt.id) }}
+                    style={{
+                      background: 'transparent',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-danger)',
+                      fontSize: 'var(--text-xs)',
+                      fontWeight: 600,
+                      padding: '8px 14px',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                      width: 'fit-content'
+                    }}
+                  >
+                    Cancelar turno
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Mi Historia Clinica Modal */}
       {showPrescriptionsModal && (
@@ -1722,6 +2061,22 @@ export default function LandingPage({
       {cancelTurnoId !== null && (() => {
         const appt = myAppointments.find(a => a.id === cancelTurnoId)
         if (!appt) return null;
+
+        // Same 48hs rule enforced server-side in ReembolsoService — computed here purely to
+        // warn the patient *before* they confirm, so "no cambia nada en mi plata" doesn't come
+        // as a surprise after the fact. `status === 'confirmed'` is the reliable signal that the
+        // turno was actually paid (PagoWebhookHandler only sets CONFIRMADO after approval).
+        const wasPaid = appt.status === 'confirmed'
+        let hoursUntilAppt: number | null = null
+        if (appt.fecha && appt.hour) {
+          const [y, m, d] = appt.fecha.split('-').map(Number)
+          const timeStr = appt.horaInicio || `${appt.hour}:00`
+          const [hh, mm] = timeStr.split(':').map(Number)
+          const apptDate = new Date(y, (m || 1) - 1, d, hh || 0, mm || 0)
+          hoursUntilAppt = (apptDate.getTime() - Date.now()) / (1000 * 60 * 60)
+        }
+        const within48h = hoursUntilAppt !== null && hoursUntilAppt < 48
+
         return (
           <div style={{
             position: 'fixed',
@@ -1770,7 +2125,7 @@ export default function LandingPage({
                   ¿Cancelar este turno?
                 </h3>
                 <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
-                  Esta acción no se puede deshacer. Si el turno ya fue pagado, se gestionará el reembolso según las políticas vigentes.
+                  Esta acción no se puede deshacer.
                 </p>
               </div>
 
@@ -1790,6 +2145,23 @@ export default function LandingPage({
                 <div><strong>Horario:</strong> {appt.hour} hs</div>
                 <div><strong>Modalidad:</strong> {appt.type}</div>
               </div>
+
+              {wasPaid && (
+                <div style={{
+                  backgroundColor: within48h ? '#fef2f2' : '#f0fdf4',
+                  border: `1px solid ${within48h ? '#fecaca' : '#bbf7d0'}`,
+                  borderRadius: 'var(--radius-md)',
+                  padding: 'var(--space-3) var(--space-4)',
+                  textAlign: 'left',
+                  fontSize: 'var(--text-sm)',
+                  color: within48h ? '#991b1b' : '#166534',
+                  lineHeight: '1.4'
+                }}>
+                  {within48h
+                    ? <><strong>No corresponde reembolso:</strong> este turno es en menos de 48 horas, así que según la política de cancelación tu pago no se devuelve automáticamente.</>
+                    : <><strong>Se te reembolsará el pago:</strong> como faltan más de 48 horas para el turno, el dinero se devuelve automáticamente a tu medio de pago original al confirmar la cancelación.</>}
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
                 <button
@@ -1835,6 +2207,30 @@ export default function LandingPage({
               <circle cx="12" cy="11.5" r="1" fill="currentColor" stroke="none" />
               <circle cx="15.5" cy="11.5" r="1" fill="currentColor" stroke="none" />
             </svg>
+            {chatChannels.some((c: any) => (c.mensajesSinLeer || 0) > 0) && (
+              <span
+                aria-label="Tenés mensajes nuevos"
+                title="Tenés mensajes nuevos"
+                style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--color-danger, #D64545)',
+                  border: '2px solid var(--color-surface, #fff)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" style={{ width: 9, height: 9 }}>
+                  <line x1="12" y1="8" x2="12" y2="13" />
+                  <circle cx="12" cy="16.5" r="0.5" fill="white" stroke="white" />
+                </svg>
+              </span>
+            )}
           </button>
 
           {/* Chat Window */}
@@ -1956,6 +2352,7 @@ export default function LandingPage({
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       {chatChannels.map((chan) => {
                         const initials = chan.nombre.split(' ').map((n: string) => n[0]).join('').slice(0, 2);
+                        const tieneNuevos = (chan.mensajesSinLeer || 0) > 0;
                         return (
                           <div
                             key={chan.id}
@@ -1975,23 +2372,49 @@ export default function LandingPage({
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--green-50)'}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                           >
-                            <div style={{
-                              width: '40px',
-                              height: '40px',
-                              borderRadius: '50%',
-                              backgroundColor: 'var(--green-50)',
-                              color: 'var(--color-primary)',
-                              border: '1px solid var(--green-100)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 'bold',
-                              fontSize: '13px'
-                            }}>
-                              {initials}
+                            <div style={{ position: 'relative', flexShrink: 0 }}>
+                              <div style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '50%',
+                                backgroundColor: 'var(--green-50)',
+                                color: 'var(--color-primary)',
+                                border: '1px solid var(--green-100)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 'bold',
+                                fontSize: '13px'
+                              }}>
+                                {initials}
+                              </div>
+                              {tieneNuevos && (
+                                <span
+                                  aria-label="Mensaje nuevo"
+                                  title="Mensaje nuevo"
+                                  style={{
+                                    position: 'absolute',
+                                    top: -2,
+                                    right: -2,
+                                    width: '16px',
+                                    height: '16px',
+                                    borderRadius: '50%',
+                                    backgroundColor: 'var(--color-danger, #D64545)',
+                                    border: '2px solid var(--color-surface, #fff)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" style={{ width: 8, height: 8 }}>
+                                    <line x1="12" y1="8" x2="12" y2="13" />
+                                    <circle cx="12" cy="16.5" r="0.5" fill="white" stroke="white" />
+                                  </svg>
+                                </span>
+                              )}
                             </div>
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                              <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>{chan.nombre}</span>
+                              <span style={{ fontSize: '13px', fontWeight: tieneNuevos ? 'bold' : 'normal', color: 'var(--color-text-primary)' }}>{chan.nombre}</span>
                               <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>{chan.email}</span>
                             </div>
                             <span style={{ fontSize: '10px', color: 'var(--color-primary)', fontWeight: 'bold' }}>Chat →</span>

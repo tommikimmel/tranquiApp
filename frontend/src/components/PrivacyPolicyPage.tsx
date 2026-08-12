@@ -5,7 +5,7 @@ import '../styles/privacy.css'
 const CONTACT_EMAIL = 'soporte@tranquisalud.com'
 const RESPONSABLE_NOMBRE = 'Enso Tomás García Criscuolo'
 const RESPONSABLE_CUIT = '20-47473505-3'
-const LAST_UPDATED = '7 de agosto de 2026'
+const LAST_UPDATED = '10 de agosto de 2026'
 
 const SECTIONS: { id: string; title: string }[] = [
   { id: 'responsable', title: '1. Responsable del tratamiento' },
@@ -13,7 +13,7 @@ const SECTIONS: { id: string; title: string }[] = [
   { id: 'datos-recolectados', title: '3. Qué datos recolectamos' },
   { id: 'datos-sensibles', title: '4. Datos sensibles y de salud' },
   { id: 'finalidades', title: '5. Para qué usamos tus datos' },
-  { id: 'base-legal', title: '6. Base legal y consentimiento' },
+  { id: 'base-legal', title: '6. Base legal, consentimiento y roles de tratamiento' },
   { id: 'terceros', title: '7. Con quién compartimos tus datos' },
   { id: 'transferencia-internacional', title: '8. Transferencia internacional de datos' },
   { id: 'google', title: '9. Uso específico de datos de Google' },
@@ -61,7 +61,7 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
           <p className="privacy-doc__updated">Última actualización: {LAST_UPDATED}</p>
 
           <p>
-            En Tranqui App nos tomamos en serio la privacidad de tu información, especialmente porque
+            En Tranqui Salud nos tomamos en serio la privacidad de tu información, especialmente porque
             gran parte de lo que manejamos son datos de salud. Esta política explica, en lenguaje claro,
             qué datos recolectamos, para qué los usamos, con quién los compartimos y qué derechos tenés
             sobre ellos — incluyendo los datos que accedemos a través de tu cuenta de Google cuando la
@@ -87,21 +87,25 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
 
           <Section id="responsable" title="1. Responsable del tratamiento">
             <p>
-              El responsable del tratamiento de los datos personales recolectados a través de Tranqui App
-              (el "Sitio", la "Plataforma") es:
+              El responsable del tratamiento de los datos personales recolectados a través de Tranqui
+              Salud (el "Sitio", la "Plataforma") es:
             </p>
             <ul>
               <li><strong>Razón social:</strong> {RESPONSABLE_NOMBRE}</li>
               <li><strong>CUIT:</strong> {RESPONSABLE_CUIT}</li>
-              <li><strong>Nombre comercial:</strong> Tranqui App / Tranqui Neurociencias</li>
+              <li><strong>Nombre comercial:</strong> Tranqui Salud</li>
               <li><strong>Sitio web:</strong> tranquisalud.com</li>
               <li><strong>Contacto:</strong> <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></li>
             </ul>
+            <p>
+              Respecto de los datos de salud que un profesional carga sobre sus pacientes, aplica además
+              la distinción de roles descripta en la sección 6.
+            </p>
           </Section>
 
           <Section id="alcance" title="2. Alcance de esta política">
             <p>
-              Esta política aplica a toda persona que use Tranqui App: pacientes, profesionales de la
+              Esta política aplica a toda persona que use Tranqui Salud: pacientes, profesionales de la
               salud mental (psicólogos y psiquiatras) y visitantes del Sitio. Al crear una cuenta, reservar
               un turno, iniciar sesión con Google o usar cualquier otra función de la Plataforma, aceptás
               las prácticas descriptas acá.
@@ -110,7 +114,8 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
               Si no estás de acuerdo con esta política, te pedimos que no uses la Plataforma. Si sos
               profesional de la salud y cargás datos de pacientes en la Plataforma (por ejemplo, historia
               clínica o seguimiento diario), sos responsable de contar con la base legal correspondiente
-              (por ejemplo, el consentimiento del paciente) para hacerlo.
+              (por ejemplo, el consentimiento del paciente o de su representante legal, según corresponda)
+              para hacerlo.
             </p>
           </Section>
 
@@ -142,14 +147,16 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
                 firma electrónica de recetas), descripción de perfil, tarifas.
               </li>
               <li>
-                <strong>Datos de salud (ver sección 4):</strong> diagnósticos, medicación prescripta,
+                <strong>Datos de salud</strong> (ver sección 4): diagnósticos, medicación prescripta,
                 notas de seguimiento e historia clínica.
               </li>
               <li>
                 <strong>Datos de pago:</strong> no almacenamos números de tarjeta. Los pagos se procesan a
-                través de Mercado Pago; guardamos únicamente las credenciales de conexión (encriptadas)
-                que cada profesional vincula a su propia cuenta de Mercado Pago para cobrar sus turnos
-                directamente, sin intermediación de comisiones de nuestra parte.
+                través de Mercado Pago mediante Mercado Pago Split; guardamos únicamente las credenciales
+                de conexión (encriptadas) que cada profesional vincula a su propia cuenta de Mercado Pago
+                para cobrar sus turnos directamente. Sobre estos pagos puede aplicar la comisión de
+                procesamiento propia de Mercado Pago; Tranqui Salud no cobra ninguna comisión adicional
+                sobre las consultas.
               </li>
               <li>
                 <strong>Datos de Google:</strong> ver sección 9, dedicada específicamente a esto.
@@ -164,7 +171,7 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
           <Section id="datos-sensibles" title="4. Datos sensibles y de salud">
             <p>
               La Ley 25.326 considera "datos sensibles" a los datos que revelan, entre otras cosas,
-              información referente a la salud. Buena parte de lo que procesamos en Tranqui App entra en
+              información referente a la salud. Buena parte de lo que procesamos en Tranqui Salud entra en
               esta categoría: diagnósticos, medicación prescripta, notas de evolución y seguimiento del
               estado de ánimo, e historia clínica.
             </p>
@@ -175,9 +182,11 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
               electrónicas). Nunca usamos datos de salud con fines publicitarios ni los vendemos.
             </p>
             <p>
-              Al usar la Plataforma como paciente, o al cargar datos de un paciente como profesional,
-              prestás tu consentimiento expreso para el tratamiento de estos datos sensibles con la única
-              finalidad de brindar el servicio de salud mental contratado.
+              Al usar la Plataforma como paciente, al cargar datos de un paciente como profesional, o al
+              reservar un turno en representación de un hijo/a o persona bajo tu representación legal (ver
+              sección 13), prestás o declarás contar con el consentimiento expreso necesario para el
+              tratamiento de estos datos sensibles, con la única finalidad de brindar el servicio de salud
+              mental contratado.
             </p>
           </Section>
 
@@ -187,7 +196,7 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
               <li>Conectar pacientes con profesionales y gestionar la reserva, confirmación y recordatorio de turnos.</li>
               <li>Brindar la consulta en sí (por videollamada o presencial) y su seguimiento clínico.</li>
               <li>Emitir recetas electrónicas válidas legalmente, lo que requiere enviar tus datos a QBI2/Innovamed (ver sección 7).</li>
-              <li>Procesar pagos entre paciente y profesional.</li>
+              <li>Procesar los pagos entre paciente y profesional.</li>
               <li>Enviarte notificaciones operativas por WhatsApp o email (confirmaciones de turno, recordatorios, recetas emitidas, códigos de verificación).</li>
               <li>Sincronizar turnos con tu Google Calendar, si sos profesional y activás esa función.</li>
               <li>Prevenir fraude, abuso y uso indebido de la Plataforma, y cumplir obligaciones legales (por ejemplo, las que exige la normativa de historia clínica).</li>
@@ -196,13 +205,27 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
             <p>No usamos tus datos para publicidad dirigida ni los cedemos con fines comerciales a terceros ajenos a la prestación del servicio.</p>
           </Section>
 
-          <Section id="base-legal" title="6. Base legal y consentimiento">
+          <Section id="base-legal" title="6. Base legal, consentimiento y roles de tratamiento">
             <p>
               Tratamos tus datos personales en base a tu consentimiento (otorgado al crear tu cuenta y
               aceptar esta política), a la necesidad de ejecutar el servicio que solicitás (por ejemplo,
               coordinar un turno o emitir una receta), y al cumplimiento de obligaciones legales aplicables
               a la prestación de servicios de salud en Argentina (entre otras, la Ley 26.529 de Derechos
               del Paciente y su normativa sobre historia clínica).
+            </p>
+            <p>
+              <strong>Distinción de roles sobre los datos de salud:</strong> respecto de los datos clínicos
+              que un profesional carga sobre sus pacientes (diagnósticos, medicación, notas de evolución,
+              historia clínica), el profesional actúa como <strong>responsable del tratamiento</strong> de
+              esos datos, y es quien debe contar con la base legal correspondiente frente a su paciente
+              (por ejemplo, el consentimiento informado). Tranqui Salud actúa como{' '}
+              <strong>encargado del tratamiento</strong>, procesando esos datos únicamente conforme a las
+              instrucciones del profesional y con la finalidad de operar la Plataforma, aplicando las
+              medidas de seguridad descriptas en la sección 11.
+            </p>
+            <p>
+              Para el resto de los datos (cuenta, identidad, pago, uso de la Plataforma), Tranqui Salud
+              actúa como responsable del tratamiento en los términos generales de esta política.
             </p>
           </Section>
 
@@ -219,9 +242,9 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
                 legal.
               </li>
               <li>
-                <strong>Mercado Pago:</strong> procesa los pagos de los turnos. Cada profesional conecta su
-                propia cuenta de Mercado Pago; nosotros no accedemos a tus datos de tarjeta ni de cuenta
-                bancaria.
+                <strong>Mercado Pago:</strong> procesa los pagos de los turnos mediante Mercado Pago Split.
+                Cada profesional conecta su propia cuenta de Mercado Pago; nosotros no accedemos a tus
+                datos de tarjeta ni de cuenta bancaria.
               </li>
               <li>
                 <strong>Twilio (WhatsApp Business API):</strong> envía las notificaciones de WhatsApp
@@ -237,7 +260,7 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
             </ul>
             <p>
               También podemos divulgar datos si una ley, orden judicial o autoridad competente así lo
-              requiere, o para proteger los derechos, la seguridad o la propiedad de Tranqui App, sus
+              requiere, o para proteger los derechos, la seguridad o la propiedad de Tranqui Salud, sus
               usuarios o terceros.
             </p>
           </Section>
@@ -255,7 +278,7 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
 
           <Section id="google" title="9. Uso específico de datos de Google">
             <p>
-              Tranqui App usa distintos servicios de Google API. Esta sección detalla, para cada uno, qué
+              Tranqui Salud usa distintos servicios de Google API. Esta sección detalla, para cada uno, qué
               datos accedemos, cómo los usamos, cómo los almacenamos y cómo los compartimos (o no).
             </p>
 
@@ -264,7 +287,7 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
               Si elegís iniciar sesión con tu cuenta de Google, accedemos únicamente a tu <strong>nombre</strong>{' '}
               y tu <strong>dirección de email</strong>, provistos por Google Identity Services al momento de
               autenticarte. Usamos estos datos exclusivamente para crear o reconocer tu cuenta en Tranqui
-              App. No accedemos a tu contraseña de Google, tus contactos, ni ningún otro dato de tu cuenta
+              Salud. No accedemos a tu contraseña de Google, tus contactos, ni ningún otro dato de tu cuenta
               de Google a través de este método.
             </p>
 
@@ -277,7 +300,7 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
             <ul>
               <li>
                 <strong>Escribir:</strong> crear en tu calendario un evento por cada turno confirmado en
-                Tranqui App, con el nombre del paciente, el horario de la consulta y el enlace de
+                Tranqui Salud, con el nombre del paciente, el horario de la consulta y el enlace de
                 videollamada.
               </li>
               <li>
@@ -340,7 +363,12 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
             </ul>
             <p>
               Ningún sistema es 100% infalible. Si detectamos un incidente de seguridad que afecte tus
-              datos personales, te notificaremos conforme lo exige la normativa aplicable.
+              datos personales, te notificaremos conforme lo exige la normativa aplicable. Cuando el
+              incidente se origine en el uso que un profesional o paciente hace de su propia cuenta o
+              credenciales (por ejemplo, dejar una sesión abierta en un dispositivo compartido), la
+              responsabilidad primaria por ese acceso indebido corresponde a quien controlaba la cuenta al
+              momento del incidente, sin perjuicio de las medidas de mitigación que Tranqui Salud adopte de
+              todas formas para proteger a los afectados.
             </p>
           </Section>
 
@@ -361,12 +389,27 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
 
           <Section id="menores" title="13. Menores de edad">
             <p>
-              Tranqui App está pensada para personas mayores de 18 años. Si un/a profesional atiende a un
-              paciente menor de edad, el tratamiento de sus datos requiere el consentimiento de sus padres,
-              madres o representantes legales, conforme a la Ley 26.061 de Protección Integral de los
-              Derechos de Niñas, Niños y Adolescentes, y es responsabilidad del profesional tratante
-              contar con ese consentimiento antes de cargar datos del menor en la Plataforma.
+              Tranqui Salud está pensada para ser usada por personas mayores de 18 años como titulares de
+              cuenta. Sin perjuicio de esto, la Plataforma puede usarse para gestionar la atención de
+              pacientes menores de edad en los siguientes casos, cada uno con su propio consentimiento:
             </p>
+            <ul>
+              <li>
+                <strong>Atención clínica de un menor:</strong> si un/a profesional atiende a un paciente
+                menor de edad, el tratamiento de sus datos de salud requiere el consentimiento de sus
+                padres, madres o representantes legales, conforme a la Ley 26.061 de Protección Integral de
+                los Derechos de Niñas, Niños y Adolescentes, y es responsabilidad del profesional tratante
+                contar con ese consentimiento antes de cargar datos del menor en la Plataforma.
+              </li>
+              <li>
+                <strong>Reserva de turnos por un representante legal:</strong> si un padre, madre, tutor/a o
+                representante legal reserva un turno o carga datos de contacto de un hijo/a o persona bajo
+                su representación a través de su propia cuenta, declara contar con la capacidad legal para
+                hacerlo y para autorizar el tratamiento de esos datos con la finalidad de gestionar el
+                turno, conforme a lo descripto en nuestros Términos y Condiciones. Tranqui Salud no verifica
+                de forma independiente el vínculo de representación declarado.
+              </li>
+            </ul>
           </Section>
 
           <Section id="cookies" title="14. Cookies y tecnologías similares">

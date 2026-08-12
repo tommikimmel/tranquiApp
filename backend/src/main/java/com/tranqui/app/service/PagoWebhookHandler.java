@@ -70,10 +70,12 @@ public class PagoWebhookHandler {
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado con ID: " + turnoId));
 
         turno.setEstado(EstadoTurno.CONFIRMADO);
-        
-        // Crear evento de Google Meet
-        String meetUrl = calendarService.crearEventoReunion(turno);
-        turno.setTelemedicinaUrl(meetUrl);
+
+        // Crear evento de Google Meet solo para turnos online; los presenciales no llevan videollamada
+        if (turno.getModalidad() == com.tranqui.app.model.Modalidad.ONLINE) {
+            String meetUrl = calendarService.crearEventoReunion(turno);
+            turno.setTelemedicinaUrl(meetUrl);
+        }
         turnoRepository.save(turno);
 
         // Registrar el Pago
@@ -86,7 +88,7 @@ public class PagoWebhookHandler {
                 .build();
         pagoRepository.save(pago);
 
-        log.info("Pago aprobado para turno ID: {}. Generado evento de Google Meet.", turnoId);
+        log.info("Pago aprobado para turno ID: {}.", turnoId);
 
         // Crear notificación para el médico y el paciente
         try {

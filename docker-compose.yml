@@ -34,6 +34,7 @@ services:
       - "traefik.http.routers.tranqui-backend.tls.certresolver=letsencrypt"
       - "traefik.http.services.tranqui-backend.loadbalancer.server.port=8080"
     environment:
+      TZ: America/Argentina/Buenos_Aires
       SPRING_DATASOURCE_URL: jdbc:postgresql://tranqui-db:5432/${DB_NAME:-tranqui_app}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-tomaskimmel}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-securepassword}
@@ -57,6 +58,7 @@ services:
       QBI2_RECIPE_ENV: ${QBI2_RECIPE_ENV:-hml}
       QBI2_CLIENTE_APP_ID: ${QBI2_CLIENTE_APP_ID:-}
       QBI2_RECIPE_TOKEN: ${QBI2_RECIPE_TOKEN:-}
+      SITE_ACCESS_PASSWORD: ${SITE_ACCESS_PASSWORD:-}
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: DEBUG
     depends_on:
       tranqui-db:

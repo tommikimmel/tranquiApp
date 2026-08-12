@@ -18,7 +18,42 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
 
     List<Turno> findByEstadoAndFechaAndRecordatorioEnviado(EstadoTurno estado, LocalDate fecha, Boolean recordatorioEnviado);
 
-    List<Turno> findByMedicoIdAndEstadoNot(Long medicoId, EstadoTurno estado);
+    // JOIN FETCH t.paciente: every caller of this method (ClinicalService, MedicoService,
+    // TurnoService.obtenerTodosTurnos) reads t.getPaciente() while mapping the result, which
+    // without the fetch join fired one lazy-load SELECT per turno in the returned list.
+    @org.springframework.data.jpa.repository.Query("SELECT t FROM Turno t JOIN FETCH t.paciente WHERE t.medico.id = :medicoId AND t.estado != :estado")
+    List<Turno> findByMedicoIdAndEstadoNot(@org.springframework.data.repository.query.Param("medicoId") Long medicoId, @org.springframework.data.repository.query.Param("estado") EstadoTurno estado);
+
+    List<Turno> findByMedicoIdAndEstado(Long medicoId, EstadoTurno estado);
+
+    // Date-bounded counterparts used by MedicoService#obtenerStats — the dashboard only ever
+    // needs the current + previous comparison windows (a few weeks/months at most), not a
+    // médico's entire turno history, which used to be loaded in full on every dashboard refresh.
+    @org.springframework.data.jpa.repository.Query("SELECT t FROM Turno t JOIN FETCH t.paciente WHERE t.medico.id = :medicoId AND t.estado != :estado AND t.fecha BETWEEN :desde AND :hasta")
+    List<Turno> findByMedicoIdAndEstadoNotAndFechaBetween(
+            @org.springframework.data.repository.query.Param("medicoId") Long medicoId,
+            @org.springframework.data.repository.query.Param("estado") EstadoTurno estado,
+            @org.springframework.data.repository.query.Param("desde") LocalDate desde,
+            @org.springframework.data.repository.query.Param("hasta") LocalDate hasta);
+
+    @org.springframework.data.jpa.repository.Query("SELECT t FROM Turno t WHERE t.medico.id = :medicoId AND t.estado = :estado AND t.fecha BETWEEN :desde AND :hasta")
+    List<Turno> findByMedicoIdAndEstadoAndFechaBetween(
+            @org.springframework.data.repository.query.Param("medicoId") Long medicoId,
+            @org.springframework.data.repository.query.Param("estado") EstadoTurno estado,
+            @org.springframework.data.repository.query.Param("desde") LocalDate desde,
+            @org.springframework.data.repository.query.Param("hasta") LocalDate hasta);
+
+    // Lightweight aggregate (2 scalar columns, grouped) for "is this patient new in the selected
+    // period" — needs each patient's true first-ever appointment date across all history, so it
+    // can't be bounded by the same current/previous window as the queries above, but doesn't need
+    // to load full Turno entities to answer that either.
+    interface PrimeraFechaPorPaciente {
+        Long getPacienteId();
+        LocalDate getPrimeraFecha();
+    }
+
+    @org.springframework.data.jpa.repository.Query("SELECT t.paciente.id AS pacienteId, MIN(t.fecha) AS primeraFecha FROM Turno t WHERE t.medico.id = :medicoId AND t.estado != :estado GROUP BY t.paciente.id")
+    List<PrimeraFechaPorPaciente> findPrimeraFechaPorPaciente(@org.springframework.data.repository.query.Param("medicoId") Long medicoId, @org.springframework.data.repository.query.Param("estado") EstadoTurno estado);
 
     boolean existsByPacienteEmailAndEstadoNot(String email, EstadoTurno estado);
 
@@ -33,7 +68,10 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT t.paciente FROM Turno t WHERE t.medico.id = :medicoId AND t.estado IN ('CONFIRMADO', 'PENDIENTE_VALIDACION')")
     List<Usuario> findDistinctPacientesByMedicoId(@org.springframework.data.repository.query.Param("medicoId") Long medicoId);
 
-    List<Turno> findByPacienteIdAndEstadoNot(Long pacienteId, EstadoTurno estado);
+    // JOIN FETCH t.medico: TurnoService.obtenerTurnosPaciente ("Mis turnos", patient-facing)
+    // reads t.getMedico() fields for every row while mapping the DTO.
+    @org.springframework.data.jpa.repository.Query("SELECT t FROM Turno t JOIN FETCH t.medico WHERE t.paciente.id = :pacienteId AND t.estado != :estado")
+    List<Turno> findByPacienteIdAndEstadoNot(@org.springframework.data.repository.query.Param("pacienteId") Long pacienteId, @org.springframework.data.repository.query.Param("estado") EstadoTurno estado);
 
     boolean existsByMedicoIdAndGoogleEventId(Long medicoId, String googleEventId);
 }

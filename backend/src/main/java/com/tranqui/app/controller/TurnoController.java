@@ -47,11 +47,6 @@ public class TurnoController {
         return ResponseEntity.ok(turnoService.reservarTurno(dto));
     }
 
-    @GetMapping("/turnos/check-first-consultation")
-    public ResponseEntity<Boolean> isFirstConsultation(@RequestParam String email) {
-        return ResponseEntity.ok(turnoService.esPrimeraConsulta(email));
-    }
-
     @GetMapping("/medicos/turnos/hoy")
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<List<com.tranqui.app.model.dto.TurnoMedicoDto>> obtenerTurnosDeHoy(

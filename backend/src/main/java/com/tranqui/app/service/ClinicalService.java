@@ -84,20 +84,26 @@ public class ClinicalService {
         LocalDate hoy = LocalDate.now();
         LocalDate limite = hoy.plusDays(3);
 
+        // Both of these used to run once PER PATIENT inside the loop below (identical turnos
+        // query every time, one COUNT query per patient) — fetched once here and grouped in
+        // memory instead, same pattern already used by TurnoService.emailsConTurnoNoCancelado.
+        List<Turno> todosLosTurnosDelMedico = turnoRepository.findByMedicoIdAndEstadoNot(medico.getId(), EstadoTurno.CANCELADO);
+        java.util.Map<Long, List<Turno>> turnosPorPaciente = todosLosTurnosDelMedico.stream()
+                .collect(Collectors.groupingBy(t -> t.getPaciente().getId()));
+
+        java.util.Map<Long, Integer> mensajesSinLeerPorPaciente = mensajeRepository.countUnreadMessagesGroupedByRemitente(medico.getId()).stream()
+                .collect(Collectors.toMap(
+                        com.tranqui.app.repository.MensajeRepository.UnreadCountPorRemitente::getRemitenteId,
+                        com.tranqui.app.repository.MensajeRepository.UnreadCountPorRemitente::getCantidad));
+
         List<PacienteDto> dtos = new ArrayList<>();
         for (Usuario p : todosLosPacientes) {
-            // Find all confirmed appointments for this patient and doctor
-            List<Turno> turnos = turnoRepository.findByMedicoIdAndEstadoNot(medico.getId(), EstadoTurno.CANCELADO);
-            
-            // Filter turnos for this patient
-            List<Turno> patientTurnos = turnos.stream()
-                    .filter(t -> t.getPaciente().getId().equals(p.getId()))
-                    .collect(Collectors.toList());
+            List<Turno> patientTurnos = turnosPorPaciente.getOrDefault(p.getId(), java.util.Collections.emptyList());
 
             // Determine if clinical priority is high
             boolean highPriority = patientTurnos.stream()
-                    .anyMatch(t -> t.getEstado() == EstadoTurno.CONFIRMADO && 
-                                   !t.getFecha().isBefore(hoy) && 
+                    .anyMatch(t -> t.getEstado() == EstadoTurno.CONFIRMADO &&
+                                   !t.getFecha().isBefore(hoy) &&
                                    !t.getFecha().isAfter(limite));
 
             // Find last visit date
@@ -107,7 +113,7 @@ public class ClinicalService {
                     .max(String::compareTo)
                     .orElse("Ninguna");
 
-            int unreadMessagesCount = mensajeRepository.countUnreadMessages(p.getId(), medico.getId());
+            int unreadMessagesCount = mensajesSinLeerPorPaciente.getOrDefault(p.getId(), 0);
             boolean sinTurno = patientTurnos.isEmpty();
             dtos.add(construirPacienteDto(p, sinTurno ? "Sin turnos registrados" : ultimaVisita, sinTurno, highPriority, unreadMessagesCount));
         }
@@ -361,6 +367,12 @@ public class ClinicalService {
             }
             if (c.getPan() == null || c.getPan().trim().isEmpty()) {
                 errores.add("el número de afiliado es obligatorio cuando hay obra social");
+            } else if (!c.getPan().trim().matches("[A-Za-z0-9\\-/. ]{6,30}")) {
+                // QBI2 rechaza la receta con QBI124 "LA CANTIDAD DE CARACTERES NO CUMPLE EL RANGO
+                // MINIMO O MAXIMO PARA EL FINANCIADOR SELECCIONADO" recién al emitir — sin este
+                // chequeo, un número de afiliado de 1-2 caracteres pasaba esta validación y llegaba
+                // hasta QBI2 antes de ser rechazado.
+                errores.add("el número de afiliado debe tener entre 6 y 30 caracteres válidos (letras, números, guiones, barras o puntos)");
             }
         }
 

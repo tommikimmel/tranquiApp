@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
@@ -7,13 +7,108 @@ import '../styles/privacy.css'
 
 type MiCuentaTab = 'datos' | 'password' | 'notificaciones' | 'privacidad' | 'eliminar'
 
-const TABS: { id: MiCuentaTab; label: string }[] = [
-  { id: 'datos', label: 'Datos personales' },
-  { id: 'password', label: 'Contraseña' },
-  { id: 'notificaciones', label: 'Notificaciones' },
-  { id: 'privacidad', label: 'Acceso a mis datos' },
-  { id: 'eliminar', label: 'Eliminar cuenta' },
+// Small inline icon set, kept local to this view (same visual language as the rest of the
+// app: 24x24 viewBox, currentColor stroke, 1.75 weight, rounded caps) so Mi Cuenta doesn't
+// need to import from App.tsx's private Icon object.
+const MCIcon = {
+  User: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+    </svg>
+  ),
+  Lock: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  ),
+  Bell: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ width: size, height: size }}>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  ),
+  Shield: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  ),
+  Trash: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+    </svg>
+  ),
+  Phone: ({ size = 14 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  ),
+  CalendarIcon: ({ size = 14 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  ),
+  IdCard: ({ size = 14 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <rect x="2" y="5" width="20" height="14" rx="2" /><circle cx="8.5" cy="12" r="2" /><line x1="14" y1="10" x2="19" y2="10" /><line x1="14" y1="14" x2="19" y2="14" />
+    </svg>
+  ),
+  HeartPulse: ({ size = 14 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M20.42 4.58a5.4 5.4 0 0 0-7.65 0l-.77.78-.77-.78a5.4 5.4 0 0 0-7.65 0C1.46 6.7 1.33 10.28 4 13l8 8 8-8c2.67-2.72 2.54-6.3.42-8.42z" />
+      <polyline points="4 11 7 11 9 8 11 14 13 11 16 11" />
+    </svg>
+  ),
+  Mail: ({ size = 14 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <rect x="2" y="4" width="20" height="16" rx="2" /><polyline points="2 6 12 13 22 6" />
+    </svg>
+  ),
+  Save: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+      <polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
+    </svg>
+  ),
+  Key: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <circle cx="7.5" cy="15.5" r="5.5" /><path d="M21 2l-9.6 9.6M15.5 7.5L18 10M13 10l2.5 2.5" />
+    </svg>
+  ),
+  AlertTriangle: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ width: size, height: size }}>
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  ),
+  Download: ({ size = 14 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  ),
+  ExternalLink: ({ size = 14 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  ),
+}
+
+const TABS: { id: MiCuentaTab; label: string; Icon: (props?: { size?: number }) => React.JSX.Element }[] = [
+  { id: 'datos', label: 'Datos personales', Icon: MCIcon.User },
+  { id: 'password', label: 'Contraseña', Icon: MCIcon.Lock },
+  { id: 'notificaciones', label: 'Notificaciones', Icon: MCIcon.Bell },
+  { id: 'privacidad', label: 'Acceso a mis datos', Icon: MCIcon.Shield },
+  { id: 'eliminar', label: 'Eliminar cuenta', Icon: MCIcon.Trash },
 ]
+
+// Small helper so field labels can carry a leading icon without repeating this markup everywhere.
+function FieldLabel({ htmlFor, icon, children }: { htmlFor: string; icon: React.JSX.Element; children: ReactNode }) {
+  return (
+    <label className="form-label" htmlFor={htmlFor} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <span style={{ color: 'var(--color-text-secondary)', display: 'inline-flex' }}>{icon}</span>
+      {children}
+    </label>
+  )
+}
 
 export default function MiCuentaView({ onLogout, onUserUpdated }: {
   onLogout: () => void
@@ -35,6 +130,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
   const [fechaNacimiento, setFechaNacimiento] = useState('')
   const [tipoDocumento, setTipoDocumento] = useState('')
   const [numeroDocumento, setNumeroDocumento] = useState('')
+  const [tieneObraSocial, setTieneObraSocial] = useState(false)
   const [obraSocial, setObraSocial] = useState('')
   const [numAfiliado, setNumAfiliado] = useState('')
   const [savingDatos, setSavingDatos] = useState(false)
@@ -50,8 +146,13 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
   const [notifWhatsapp, setNotifWhatsapp] = useState(true)
   const [savingNotif, setSavingNotif] = useState(false)
 
+  // Privacidad state
+  const [solicitandoCopiaDatos, setSolicitandoCopiaDatos] = useState(false)
+  const [copiaDatosSolicitada, setCopiaDatosSolicitada] = useState(false)
+
   // Eliminar cuenta state
   const [deletePassword, setDeletePassword] = useState('')
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -66,6 +167,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
         setFechaNacimiento(data.fechaNacimiento || '')
         setTipoDocumento(data.tipoDocumento || '')
         setNumeroDocumento(data.numeroDocumento != null ? String(data.numeroDocumento) : '')
+        setTieneObraSocial(!!(data.obraSocial || data.numAfiliado))
         setObraSocial(data.obraSocial || '')
         setNumAfiliado(data.numAfiliado || '')
         setNotifEmail(data.notificacionesEmailHabilitadas !== false)
@@ -79,6 +181,16 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const handleToggleObraSocial = (value: boolean) => {
+    setTieneObraSocial(value)
+    if (!value) {
+      // El paciente indicó que no tiene obra social: limpiamos los campos para que
+      // no quede guardado un dato que ya no aplica.
+      setObraSocial('')
+      setNumAfiliado('')
+    }
+  }
+
   const handleSaveDatos = async () => {
     setSavingDatos(true)
     try {
@@ -88,7 +200,8 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
         fechaNacimiento: fechaNacimiento || null,
         tipoDocumento,
         numeroDocumento: numeroDocumento ? Number(numeroDocumento) : null,
-        obraSocial, numAfiliado,
+        obraSocial: tieneObraSocial ? obraSocial : null,
+        numAfiliado: tieneObraSocial ? numAfiliado : null,
       })
       setCuenta(updated)
       onUserUpdated?.((prev: any) => ({ ...prev, nombre: updated.nombre, telefono: updated.telefono }))
@@ -135,6 +248,19 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
     }
   }
 
+  const handleSolicitarCopiaDatos = async () => {
+    setSolicitandoCopiaDatos(true)
+    try {
+      await api.solicitarCopiaDatos()
+      setCopiaDatosSolicitada(true)
+      showAlert('Tu solicitud fue enviada. Te responderemos por email dentro de los próximos 10 días hábiles ✓', 'success')
+    } catch (err: any) {
+      showAlert(err.message || 'No pudimos enviar tu solicitud. Intentá de nuevo.', 'error')
+    } finally {
+      setSolicitandoCopiaDatos(false)
+    }
+  }
+
   const handleDeleteAccount = async () => {
     setDeleting(true)
     try {
@@ -178,7 +304,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
 
           <div className="settings-layout">
             <nav className="settings-submenu" aria-label="Secciones de mi cuenta">
-              {TABS.map(({ id, label }) => (
+              {TABS.map(({ id, label, Icon: TabIcon }) => (
                 <button
                   key={id}
                   type="button"
@@ -186,6 +312,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                   onClick={() => setActiveTab(id)}
                   aria-current={activeTab === id ? 'true' : undefined}
                 >
+                  <span className="settings-submenu-icon"><TabIcon /></span>
                   <span className="settings-submenu-text">
                     <span className="settings-submenu-label">{label}</span>
                   </span>
@@ -198,25 +325,35 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                 <div className="card">
                   <div className="card__header">
                     <div>
-                      <h2 className="card__title">Datos personales</h2>
-                      <p className="card__subtitle">Email: {cuenta?.email}</p>
+                      <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <MCIcon.User size={18} /> Datos personales
+                      </h2>
+                      <p className="card__subtitle" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <MCIcon.Mail /> {cuenta?.email}
+                      </p>
                     </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', marginTop: 'var(--space-5)' }}>
+                  <div>
+                  <div className="settings-section-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0 0 var(--space-3)' }}>
+                    <MCIcon.User size={13} /> Información personal
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="mc-nombre">Nombre</label>
+                      <FieldLabel htmlFor="mc-nombre" icon={<MCIcon.User size={13} />}>Nombre</FieldLabel>
                       <input id="mc-nombre" className="form-input" type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} />
                     </div>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="mc-apellido">Apellido</label>
+                      <FieldLabel htmlFor="mc-apellido" icon={<MCIcon.User size={13} />}>Apellido</FieldLabel>
                       <input id="mc-apellido" className="form-input" type="text" value={apellido} onChange={(e) => setApellido(e.target.value)} />
                     </div>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="mc-telefono">Teléfono</label>
+                      <FieldLabel htmlFor="mc-telefono" icon={<MCIcon.Phone />}>Teléfono</FieldLabel>
                       <input id="mc-telefono" className="form-input" type="tel" value={telefono} onChange={(e) => setTelefono(e.target.value.replace(/[^\d]/g, ''))} placeholder="Ej: 3515998822" />
                     </div>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="mc-sexo">Sexo</label>
+                      <FieldLabel htmlFor="mc-sexo" icon={<MCIcon.User size={13} />}>Sexo</FieldLabel>
                       <select id="mc-sexo" className="form-input" value={sexo} onChange={(e) => setSexo(e.target.value)}>
                         <option value="">Sin especificar</option>
                         <option value="M">Masculino (M)</option>
@@ -225,11 +362,19 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                       </select>
                     </div>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="mc-fecha-nac">Fecha de nacimiento</label>
+                      <FieldLabel htmlFor="mc-fecha-nac" icon={<MCIcon.CalendarIcon />}>Fecha de nacimiento</FieldLabel>
                       <input id="mc-fecha-nac" className="form-input" type="date" value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} />
                     </div>
+                  </div>
+                  </div>
+
+                  <div>
+                  <div className="settings-section-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0 0 var(--space-3)' }}>
+                    <MCIcon.IdCard size={13} /> Documento de identidad
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="mc-tipo-doc">Tipo de documento</label>
+                      <FieldLabel htmlFor="mc-tipo-doc" icon={<MCIcon.IdCard />}>Tipo de documento</FieldLabel>
                       <select id="mc-tipo-doc" className="form-input" value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
                         <option value="">Sin especificar</option>
                         <option value="DNI">DNI</option>
@@ -239,22 +384,65 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                       </select>
                     </div>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="mc-num-doc">Número de documento</label>
+                      <FieldLabel htmlFor="mc-num-doc" icon={<MCIcon.IdCard />}>Número de documento</FieldLabel>
                       <input id="mc-num-doc" className="form-input" type="text" value={numeroDocumento} onChange={(e) => setNumeroDocumento(e.target.value.replace(/[^\d]/g, ''))} />
                     </div>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="mc-obra-social">Obra Social</label>
-                      <input id="mc-obra-social" className="form-input" type="text" value={obraSocial} onChange={(e) => setObraSocial(e.target.value)} placeholder="Ej: OSDE" />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label" htmlFor="mc-num-afiliado">Número de afiliado</label>
-                      <input id="mc-num-afiliado" className="form-input" type="text" value={numAfiliado} onChange={(e) => setNumAfiliado(e.target.value)} />
-                    </div>
                   </div>
-                  <div style={{ marginTop: 'var(--space-5)' }}>
-                    <button className="btn btn--primary" onClick={handleSaveDatos} disabled={savingDatos}>
-                      {savingDatos ? 'Guardando...' : 'Guardar cambios'}
+                  </div>
+
+                  <div>
+                  <div className="settings-section-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0 0 var(--space-3)' }}>
+                    <MCIcon.HeartPulse size={13} /> Obra social
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)',
+                      background: 'var(--neutral-50)', border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-md)', padding: 'var(--space-4)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{
+                        width: '34px', height: '34px', borderRadius: 'var(--radius-sm)',
+                        background: tieneObraSocial ? 'var(--color-primary)' : 'var(--neutral-100)',
+                        color: tieneObraSocial ? 'white' : 'var(--color-primary-hover)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        transition: 'background var(--transition-fast), color var(--transition-fast)',
+                      }}>
+                        <MCIcon.HeartPulse size={18} />
+                      </span>
+                      <div>
+                        <strong style={{ fontSize: 'var(--text-sm)' }}>¿Tenés obra social o prepaga?</strong>
+                        <p style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                          Activá esta opción solo si contás con cobertura médica.
+                        </p>
+                      </div>
+                    </div>
+                    <label className="toggle">
+                      <input type="checkbox" checked={tieneObraSocial} onChange={(e) => handleToggleObraSocial(e.target.checked)} />
+                      <span className="toggle__track" />
+                    </label>
+                  </div>
+
+                  {tieneObraSocial && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)', marginTop: 'var(--space-4)' }}>
+                      <div className="form-group">
+                        <FieldLabel htmlFor="mc-obra-social" icon={<MCIcon.HeartPulse />}>Obra Social</FieldLabel>
+                        <input id="mc-obra-social" className="form-input" type="text" value={obraSocial} onChange={(e) => setObraSocial(e.target.value)} placeholder="Ej: OSDE" />
+                      </div>
+                      <div className="form-group">
+                        <FieldLabel htmlFor="mc-num-afiliado" icon={<MCIcon.IdCard />}>Número de afiliado</FieldLabel>
+                        <input id="mc-num-afiliado" className="form-input" type="text" value={numAfiliado} onChange={(e) => setNumAfiliado(e.target.value)} />
+                      </div>
+                    </div>
+                  )}
+                  </div>
+
+                  <div>
+                    <button className="btn btn--primary" onClick={handleSaveDatos} disabled={savingDatos} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                      <MCIcon.Save size={15} /> {savingDatos ? 'Guardando...' : 'Guardar cambios'}
                     </button>
+                  </div>
                   </div>
                 </div>
               )}
@@ -263,7 +451,9 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                 <div className="card">
                   <div className="card__header">
                     <div>
-                      <h2 className="card__title">Cambiar contraseña</h2>
+                      <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <MCIcon.Lock size={18} /> Cambiar contraseña
+                      </h2>
                       <p className="card__subtitle">
                         {cuenta?.tienePassword
                           ? 'Ingresá tu contraseña actual y la nueva.'
@@ -274,16 +464,16 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: '360px' }}>
                     {cuenta?.tienePassword && (
                       <div className="form-group">
-                        <label className="form-label" htmlFor="mc-current-password">Contraseña actual</label>
+                        <FieldLabel htmlFor="mc-current-password" icon={<MCIcon.Key />}>Contraseña actual</FieldLabel>
                         <input id="mc-current-password" className="form-input" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
                       </div>
                     )}
                     <div className="form-group">
-                      <label className="form-label" htmlFor="mc-new-password">Nueva contraseña</label>
+                      <FieldLabel htmlFor="mc-new-password" icon={<MCIcon.Lock />}>Nueva contraseña</FieldLabel>
                       <input id="mc-new-password" className="form-input" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
                     </div>
                     <div className="form-group">
-                      <label className="form-label" htmlFor="mc-confirm-password">Confirmar nueva contraseña</label>
+                      <FieldLabel htmlFor="mc-confirm-password" icon={<MCIcon.Lock />}>Confirmar nueva contraseña</FieldLabel>
                       <input id="mc-confirm-password" className="form-input" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
                     </div>
                     <div>
@@ -291,8 +481,9 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                         className="btn btn--primary"
                         onClick={handleChangePassword}
                         disabled={savingPassword || !newPassword || !confirmPassword || (cuenta?.tienePassword && !currentPassword)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
                       >
-                        {savingPassword ? 'Guardando...' : 'Actualizar contraseña'}
+                        <MCIcon.Save size={15} /> {savingPassword ? 'Guardando...' : 'Actualizar contraseña'}
                       </button>
                     </div>
                   </div>
@@ -302,15 +493,22 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
               {activeTab === 'notificaciones' && (
                 <div className="card">
                   <div className="card__header">
-                    <h2 className="card__title">Preferencias de notificaciones</h2>
+                    <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <MCIcon.Bell size={18} /> Preferencias de notificaciones
+                    </h2>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
-                      <div>
-                        <strong style={{ fontSize: 'var(--text-sm)' }}>Notificaciones por email</strong>
-                        <p style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-                          Confirmaciones y recordatorios relacionados a tus turnos.
-                        </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ width: '34px', height: '34px', borderRadius: 'var(--radius-sm)', background: 'var(--neutral-100)', color: 'var(--color-primary-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <MCIcon.Mail size={16} />
+                        </span>
+                        <div>
+                          <strong style={{ fontSize: 'var(--text-sm)' }}>Notificaciones por email</strong>
+                          <p style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                            Confirmaciones y recordatorios relacionados a tus turnos.
+                          </p>
+                        </div>
                       </div>
                       <label className="toggle">
                         <input type="checkbox" checked={notifEmail} disabled={savingNotif} onChange={(e) => handleToggleNotif('email', e.target.checked)} />
@@ -318,11 +516,16 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                       </label>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
-                      <div>
-                        <strong style={{ fontSize: 'var(--text-sm)' }}>Notificaciones por WhatsApp</strong>
-                        <p style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-                          Recordatorios de turno y avisos de cancelación/reprogramación.
-                        </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ width: '34px', height: '34px', borderRadius: 'var(--radius-sm)', background: 'var(--neutral-100)', color: 'var(--color-primary-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <MCIcon.Phone size={16} />
+                        </span>
+                        <div>
+                          <strong style={{ fontSize: 'var(--text-sm)' }}>Notificaciones por WhatsApp</strong>
+                          <p style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                            Recordatorios de turno y avisos de cancelación/reprogramación.
+                          </p>
+                        </div>
                       </div>
                       <label className="toggle">
                         <input type="checkbox" checked={notifWhatsapp} disabled={savingNotif} onChange={(e) => handleToggleNotif('whatsapp', e.target.checked)} />
@@ -336,21 +539,35 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
               {activeTab === 'privacidad' && (
                 <div className="card">
                   <div className="card__header">
-                    <h2 className="card__title">Acceso a mis datos</h2>
+                    <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <MCIcon.Shield size={18} /> Acceso a mis datos
+                    </h2>
                     <p className="card__subtitle">De acuerdo a la Ley N° 25.326, tenés derecho a acceder, rectificar y suprimir tus datos personales.</p>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                     <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: 0 }}>
                       Podés editar o corregir tus datos desde la pestaña "Datos personales", y eliminar tu
                       cuenta en cualquier momento desde "Eliminar cuenta". Para pedir una copia de tus
-                      datos, o cualquier otra consulta sobre privacidad, escribinos.
+                      datos, tocá el botón de abajo: le avisamos a nuestro equipo de soporte con tu
+                      email de contacto y te responden por ese medio.
                     </p>
                     <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
-                      <a className="btn btn--secondary btn--sm" href="mailto:soporte@tranquisalud.com?subject=Acceso%20a%20mis%20datos">
-                        Solicitar una copia de mis datos
-                      </a>
-                      <a className="btn btn--ghost btn--sm" href="/privacidad" target="_blank" rel="noreferrer">
-                        Ver Política de Privacidad completa
+                      <button
+                        type="button"
+                        className="btn btn--secondary btn--sm"
+                        onClick={handleSolicitarCopiaDatos}
+                        disabled={solicitandoCopiaDatos || copiaDatosSolicitada}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        <MCIcon.Download />
+                        {copiaDatosSolicitada
+                          ? 'Solicitud enviada ✓'
+                          : solicitandoCopiaDatos
+                            ? 'Enviando...'
+                            : 'Solicitar una copia de mis datos'}
+                      </button>
+                      <a className="btn btn--ghost btn--sm" href="/privacidad" target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <MCIcon.ExternalLink /> Ver Política de Privacidad completa
                       </a>
                     </div>
                   </div>
@@ -360,38 +577,90 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
               {activeTab === 'eliminar' && (
                 <div className="card">
                   <div className="card__header">
-                    <h2 className="card__title">Eliminar cuenta</h2>
-                    <p className="card__subtitle">
-                      Esta acción es irreversible. Tus datos personales se anonimizan; tus turnos e
-                      historia clínica se conservan según lo exige la ley, sin tus datos personales.
-                    </p>
+                    <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-danger, #dc2626)' }}>
+                      <MCIcon.AlertTriangle size={18} /> Eliminar cuenta
+                    </h2>
+                    <p className="card__subtitle">Esta acción es permanente y no se puede deshacer.</p>
                   </div>
-                  {!confirmingDelete ? (
-                    <button className="btn btn--danger" onClick={() => setConfirmingDelete(true)}>
-                      Eliminar mi cuenta
-                    </button>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: '360px' }}>
-                      {cuenta?.tienePassword && (
-                        <div className="form-group">
-                          <label className="form-label" htmlFor="mc-delete-password">Confirmá tu contraseña</label>
-                          <input id="mc-delete-password" className="form-input" type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
-                        </div>
-                      )}
-                      <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                        <button
-                          className="btn btn--danger"
-                          onClick={handleDeleteAccount}
-                          disabled={deleting || (cuenta?.tienePassword && !deletePassword)}
-                        >
-                          {deleting ? 'Eliminando...' : 'Confirmar eliminación'}
-                        </button>
-                        <button className="btn btn--secondary" onClick={() => { setConfirmingDelete(false); setDeletePassword('') }}>
-                          Cancelar
-                        </button>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+                    <div style={{
+                      backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)',
+                      padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)'
+                    }}>
+                      <div>
+                        <strong style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-sm)', color: '#991b1b' }}>
+                          <MCIcon.Trash size={14} /> Qué pasa al eliminar tu cuenta
+                        </strong>
+                        <ul style={{ margin: '8px 0 0', paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: 'var(--text-sm)', color: '#7f1d1d' }}>
+                          <li>Se anonimizan tus datos personales: nombre, email, teléfono y documento dejan de estar asociados a vos.</li>
+                          <li>Perdés el acceso a la cuenta de inmediato — no vas a poder volver a iniciar sesión con este email.</li>
+                          <li>Cualquier turno futuro que tengas agendado queda cancelado.</li>
+                        </ul>
+                      </div>
+                      <div style={{ borderTop: '1px solid #fecaca', paddingTop: 'var(--space-3)' }}>
+                        <strong style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-sm)', color: '#166534' }}>
+                          <MCIcon.Shield size={14} /> Qué se conserva (por ley)
+                        </strong>
+                        <p style={{ margin: '6px 0 0', fontSize: 'var(--text-sm)', color: '#166534', lineHeight: '1.4' }}>
+                          Tu historia clínica y el historial de turnos ya realizados se conservan de forma anonimizada, tal como lo exige la normativa vigente — sin ningún dato que te identifique.
+                        </p>
                       </div>
                     </div>
-                  )}
+
+                    {!confirmingDelete ? (
+                      <button
+                        className="btn btn--danger"
+                        onClick={() => setConfirmingDelete(true)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', alignSelf: 'flex-start' }}
+                      >
+                        <MCIcon.Trash size={15} /> Quiero eliminar mi cuenta
+                      </button>
+                    ) : (
+                      <div style={{
+                        display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: '400px',
+                        backgroundColor: 'var(--neutral-50)', border: '1px solid var(--color-border)',
+                        borderRadius: 'var(--radius-md)', padding: 'var(--space-4)'
+                      }}>
+                        <div className="form-group">
+                          <FieldLabel htmlFor="mc-delete-confirm-text" icon={<MCIcon.AlertTriangle size={13} />}>
+                            Escribí <strong>ELIMINAR</strong> para confirmar
+                          </FieldLabel>
+                          <input
+                            id="mc-delete-confirm-text"
+                            className="form-input"
+                            type="text"
+                            value={deleteConfirmText}
+                            onChange={(e) => setDeleteConfirmText(e.target.value)}
+                            placeholder="ELIMINAR"
+                            autoComplete="off"
+                          />
+                        </div>
+                        {cuenta?.tienePassword && (
+                          <div className="form-group">
+                            <FieldLabel htmlFor="mc-delete-password" icon={<MCIcon.Key />}>Confirmá tu contraseña</FieldLabel>
+                            <input id="mc-delete-password" className="form-input" type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                          <button
+                            className="btn btn--danger"
+                            onClick={handleDeleteAccount}
+                            disabled={deleting || deleteConfirmText.trim().toUpperCase() !== 'ELIMINAR' || (cuenta?.tienePassword && !deletePassword)}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                          >
+                            <MCIcon.Trash size={15} /> {deleting ? 'Eliminando...' : 'Eliminar definitivamente'}
+                          </button>
+                          <button
+                            className="btn btn--secondary"
+                            onClick={() => { setConfirmingDelete(false); setDeletePassword(''); setDeleteConfirmText('') }}
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

@@ -57,17 +57,6 @@ class TurnoControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "paciente@test.com", roles = "PACIENTE")
-    void testIsFirstConsultation() throws Exception {
-        when(turnoService.esPrimeraConsulta("pac@test.com")).thenReturn(true);
-
-        mockMvc.perform(get("/api/turnos/check-first-consultation")
-                        .param("email", "pac@test.com"))
-                .andExpect(status().isOk())
-                .andExpect(content().string("true"));
-    }
-
-    @Test
     @WithMockUser(username = "medico@test.com", roles = "PSIQUIATRA")
     void testObtenerTurnosDeHoy() throws Exception {
         when(turnoService.obtenerTurnosDeHoy("medico@test.com")).thenReturn(Collections.emptyList());

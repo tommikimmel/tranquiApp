@@ -5,7 +5,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "receta")
+@Table(name = "receta", indexes = {
+        @Index(name = "idx_receta_medico_id", columnList = "medico_id"),
+        @Index(name = "idx_receta_paciente_id", columnList = "paciente_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -27,6 +30,13 @@ public class Receta {
 
     @Column(name = "medicamentos", nullable = false, columnDefinition = "TEXT")
     private String medicamentos; // JSON or text list of medicines
+
+    // JSON array of the laboratorio names entered by hand for this receta's medications (one
+    // entry per medicamento that has one set; empty ones are skipped) — kept separate from the
+    // free-text medicamentos blob above so the "medicamentos por laboratorio" stat in the
+    // historial doesn't need to parse that display string.
+    @Column(name = "laboratorios", columnDefinition = "TEXT")
+    private String laboratorios;
 
     @Column(name = "diagnostico", length = 150)
     private String diagnostico; // CIE-10

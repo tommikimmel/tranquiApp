@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.UUID;
@@ -138,6 +139,10 @@ public class GoogleCalendarService {
         return generarMeetUrl();
     }
 
+    // Short TTL (see CacheConfig) rather than no cache at all — obtenerConteosDisponibilidad
+    // calls this once per médico per public-homepage load, so without a cache a page with 10
+    // médicos visible fires up to 10 blocking Google Calendar HTTP calls on every request.
+    @Cacheable(value = "eventosGoogleCalendarDia", key = "#medico.id + '-' + #fecha")
     public java.util.List<com.google.api.services.calendar.model.Event> obtenerEventosDelDia(Usuario medico, java.time.LocalDate fecha) {
         boolean medicoConectado = medico != null && medico.getGoogleCalendarConnected() != null && medico.getGoogleCalendarConnected();
         if (!isEnabled || !medicoConectado) {

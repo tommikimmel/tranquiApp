@@ -55,16 +55,6 @@ class TurnoControllerUnitTest {
     }
 
     @Test
-    void isFirstConsultation_shouldDelegateToService() {
-        when(turnoService.esPrimeraConsulta("ana@mail.com")).thenReturn(true);
-
-        ResponseEntity<Boolean> response = controller.isFirstConsultation("ana@mail.com");
-
-        assertEquals(200, response.getStatusCodeValue());
-        assertTrue(response.getBody());
-    }
-
-    @Test
     void obtenerTurnosDeHoy_shouldDelegateToService() {
         when(turnoService.obtenerTurnosDeHoy("dra@mail.com")).thenReturn(List.of());
 

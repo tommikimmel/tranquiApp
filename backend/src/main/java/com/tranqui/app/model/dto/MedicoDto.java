@@ -13,7 +13,9 @@ public class MedicoDto {
     private Long id;
     private String name; // combined "nombre + apellido" for display, NOT for editing — see nombre
     private String nombre; // raw first name only; the settings form reads/writes this
-    private String email;
+    private String email; // account/login email — read-only for the settings form
+    private String emailContacto; // public contact email shown on the médico's professional card
+    private String telefono;
     private String initials;
     private String degree; // maps to degree in frontend
     private String specialty; // maps to specialty in frontend
@@ -36,10 +38,15 @@ public class MedicoDto {
     private String domicilioAtencion;
     private Double domicilioLat;
     private Double domicilioLng;
+    private String domicilioAtencionTorre;
+    private String domicilioAtencionPiso;
+    private String domicilioAtencionDepto;
+    private String domicilioAtencionBarrio;
     private MatriculaInfoDto matriculaInfo;
     private boolean verificado;
     private Boolean verificadoAdmin;
     private String experiencia;
+    private String publicaciones; // JSON array of {titulo, descripcion, link} — press/media mentions
     private RedesSocialesDto redesSociales;
 
     @Getter
@@ -114,5 +121,14 @@ public class MedicoDto {
         private boolean enabled;
         private boolean requiereObraSocial; // if true, checkout must collect financiador + n° de afiliado
         private String obraSocial; // the specific obra social this service is for, if any
+
+        // Per-modalidad overrides — null means "same as price" for that modalidad. See
+        // TarifaMedico.precioOnline / precioPresencial for the full rationale.
+        private BigDecimal precioOnline;
+        private BigDecimal precioPresencial;
+
+        // False for pure document services (recetas, certificados, informes) — see
+        // TarifaMedico.requiereAgenda.
+        private boolean requiereAgenda;
     }
 }

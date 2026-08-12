@@ -70,6 +70,7 @@ public class MercadoPagoService {
 
         PreferenceItemRequest itemRequest = PreferenceItemRequest.builder()
                 .title("Consulta Psiquiátrica - " + medico.getNombre())
+                .categoryId("health")
                 .quantity(1)
                 .currencyId("ARS")
                 .unitPrice(turno.getPrecio())
@@ -119,6 +120,7 @@ public class MercadoPagoService {
 
         PreferenceItemRequest itemRequest = PreferenceItemRequest.builder()
                 .title(solicitud.getTipoConcepto().toString() + " - " + medico.getNombre())
+                .categoryId("health")
                 .quantity(1)
                 .currencyId("ARS")
                 .unitPrice(solicitud.getPrecio())

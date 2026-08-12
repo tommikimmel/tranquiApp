@@ -7,7 +7,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "seguimiento_diario")
+@Table(name = "seguimiento_diario", indexes = {
+        @Index(name = "idx_seguimiento_diario_paciente_id", columnList = "paciente_id"),
+        @Index(name = "idx_seguimiento_diario_medico_id", columnList = "medico_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor

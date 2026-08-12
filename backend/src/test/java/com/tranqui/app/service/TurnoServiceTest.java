@@ -556,8 +556,6 @@ class TurnoServiceTest {
                     .fecha(LocalDate.now().plusDays(2))
                     .hora(LocalTime.of(9, 0))
                     .tipo(TipoTurno.PARTICULAR)
-                    // Reuse the setUp patient, which already has a non-cancelled turno,
-                    // so no first-consultation surcharge is applied and the price assertion is exact.
                     .nombrePaciente(paciente.getNombre())
                     .emailPaciente(paciente.getEmail())
                     .build();

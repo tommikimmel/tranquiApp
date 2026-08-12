@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -16,6 +17,7 @@ public class RecetaResponseDto {
     private MedicoSimpleDto medico;
     private PacienteSimpleDto paciente;
     private String medicamentos;
+    private List<String> laboratorios; // raw, as entered by the médico — grouping/normalization happens client-side
     private String diagnostico;
     private String indicaciones;
     private String pdfUrl;

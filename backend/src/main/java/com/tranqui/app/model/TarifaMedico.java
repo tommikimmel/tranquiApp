@@ -5,7 +5,9 @@ import lombok.*;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "tarifa_medico")
+@Table(name = "tarifa_medico", indexes = {
+        @Index(name = "idx_tarifa_medico_medico_id", columnList = "medico_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -46,4 +48,22 @@ public class TarifaMedico {
     // ids) predate this column and keep requiereObraSocial as their only signal.
     @Column(name = "obra_social", length = 100)
     private String obraSocial;
+
+    // Per-modalidad price overrides — null means "use precio for this modalidad too" (the
+    // common case: most médicos charge the same regardless of modalidad). Only médicos who
+    // opt into differentiated pricing for this specific service set one or both of these.
+    @Column(name = "precio_online", precision = 12, scale = 2)
+    private java.math.BigDecimal precioOnline;
+
+    @Column(name = "precio_presencial", precision = 12, scale = 2)
+    private java.math.BigDecimal precioPresencial;
+
+    // Whether booking this service reserves a slot on the médico's agenda. True (default) for
+    // normal consultations. False for pure document services (recetas, certificados, informes) —
+    // no consultorio, no videollamada, so a booking shouldn't block anyone else's availability.
+    // columnDefinition (not just nullable=false): same backfill reasoning as requiereObraSocial
+    // above — this table already has production rows.
+    @Builder.Default
+    @Column(name = "requiere_agenda", columnDefinition = "boolean not null default true")
+    private boolean requiereAgenda = true;
 }

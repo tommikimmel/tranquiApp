@@ -16,6 +16,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 
 /**
  * Real HTTP implementation of {@link Qbi2RecipeClient}, active only when
@@ -46,7 +47,12 @@ public class Qbi2RecipeClientHttp implements Qbi2RecipeClient {
     @Value("${qbi2.recipe.token:}")
     private String token;
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    // Without a connect/request timeout, a hung QBI2 request holds the JDBC connection open for
+    // the whole @Transactional method it runs inside (see RecetaService#emitirReceta) — under
+    // load that can exhaust the pool and take the whole app down, not just recetas.
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
     // NON_NULL only affects serialization (outgoing requests), never deserialization — needed
     // because QBI2's schema has several non-nullable value-type fields (RecetaRequestDto.fechaEmision:
     // DateTime, PacienteRecetaDto.ocultarPaciente: bool, MedicamentoDto.tratamiento: int) that we never
@@ -65,6 +71,7 @@ public class Qbi2RecipeClientHttp implements Qbi2RecipeClient {
     private HttpRequest.Builder requestBuilder(String path) {
         return HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl() + path))
+                .timeout(Duration.ofSeconds(20))
                 .header("Authorization", "Bearer " + token)
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json");

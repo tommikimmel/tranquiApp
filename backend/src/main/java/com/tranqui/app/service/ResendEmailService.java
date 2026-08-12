@@ -62,7 +62,51 @@ public class ResendEmailService {
         enviarCorreo(toEmail, asunto, htmlContent);
     }
 
+    public void enviarQueja(String nombreUsuario, String emailUsuario, String rolUsuario, String asunto, String mensaje) {
+        String asuntoFinal = "[Queja/Soporte - " + rolUsuario + "] " + (asunto != null && !asunto.isBlank() ? asunto : "Sin asunto");
+        String htmlContent = String.format(
+                "<div style=\"font-family: Arial, sans-serif; padding: 20px; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 10px;\">" +
+                        "<h2 style=\"color: #009ee3;\">Nueva queja / mensaje de soporte</h2>" +
+                        "<p><strong>De:</strong> %s (%s)</p>" +
+                        "<p><strong>Rol:</strong> %s</p>" +
+                        "<p><strong>Asunto:</strong> %s</p>" +
+                        "<div style=\"background: #f1f5f9; padding: 15px; border-radius: 8px; white-space: pre-wrap; color: #1e293b;\">%s</div>" +
+                        "</div>",
+                nombreUsuario != null ? nombreUsuario : "Usuario",
+                emailUsuario,
+                rolUsuario,
+                asunto != null && !asunto.isBlank() ? asunto : "Sin asunto",
+                mensaje
+        );
+
+        // Replies from support should go straight back to the user who complained, not to our
+        // own "from" address — set replyTo so a normal "Reply" in the inbox reaches them.
+        enviarCorreo("soporte@tranquisalud.com", asuntoFinal, htmlContent, emailUsuario);
+    }
+
+    public void enviarSolicitudCopiaDatos(String nombreUsuario, String emailUsuario, String rolUsuario) {
+        String asuntoFinal = "[Ley 25.326 - Acceso a datos] Solicitud de " + rolUsuario;
+        String htmlContent = String.format(
+                "<div style=\"font-family: Arial, sans-serif; padding: 20px; max-width: 600px; border: 1px solid #e2e8f0; border-radius: 10px;\">" +
+                        "<h2 style=\"color: #009ee3;\">Solicitud de copia de datos personales (Ley 25.326)</h2>" +
+                        "<p><strong>De:</strong> %s (%s)</p>" +
+                        "<p><strong>Rol:</strong> %s</p>" +
+                        "<p>El usuario solicitó, desde \"Mi Cuenta\" &gt; \"Privacidad\", una copia de los datos " +
+                        "personales que Tranqui App tiene registrados a su nombre.</p>" +
+                        "</div>",
+                nombreUsuario != null ? nombreUsuario : "Usuario",
+                emailUsuario,
+                rolUsuario
+        );
+
+        enviarCorreo("soporte@tranquisalud.com", asuntoFinal, htmlContent, emailUsuario);
+    }
+
     private void enviarCorreo(String toEmail, String asunto, String htmlBody) {
+        enviarCorreo(toEmail, asunto, htmlBody, null);
+    }
+
+    private void enviarCorreo(String toEmail, String asunto, String htmlBody, String replyTo) {
         if (apiKey == null || apiKey.trim().isEmpty() || !apiKey.startsWith("re_")) {
             log.info("==================================================================");
             log.info("[RESEND MOCK/DEV MODE] No hay API Key de Resend configurada.");
@@ -79,11 +123,15 @@ public class ResendEmailService {
             payloadMap.put("to", List.of(toEmail));
             payloadMap.put("subject", asunto);
             payloadMap.put("html", htmlBody);
+            if (replyTo != null && !replyTo.isBlank()) {
+                payloadMap.put("reply_to", List.of(replyTo));
+            }
 
             String jsonPayload = objectMapper.writeValueAsString(payloadMap);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("https://api.resend.com/emails"))
+                    .timeout(Duration.ofSeconds(15))
                     .header("Authorization", "Bearer " + apiKey.trim())
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))

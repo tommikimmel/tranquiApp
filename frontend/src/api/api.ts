@@ -2,7 +2,7 @@ const API_BASE = window.location.protocol === 'https:'
   ? `https://${window.location.host}/api`
   : `http://${window.location.hostname}:8081/api`;
 
-function sanitizeErrorMessage(errorText: string, status: number): string {
+export function sanitizeErrorMessage(errorText: string, status: number): string {
   if (status === 401) {
     return 'Sesión expirada o credenciales no válidas.';
   }
@@ -78,6 +78,10 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
 }
 
 export const api = {
+  // Site-wide access gate (temporary — see SiteAccessFilter on the backend)
+  getSiteAccessStatus: () => apiFetch('/site-access/estado'),
+  verificarSiteAccess: (password: string) => apiFetch('/site-access/verificar', { method: 'POST', body: { password } as any }),
+
   // Public
   getMedicos: () => apiFetch('/medicos'),
   
@@ -105,12 +109,17 @@ export const api = {
     telefonoPaciente: string
   }) => apiFetch('/turnos/reservar', { method: 'POST', body: data as any }),
 
-  checkFirstConsultation: (email: string) =>
-    apiFetch(`/turnos/check-first-consultation?email=${encodeURIComponent(email)}`),
-
   // Public catalog of obras sociales/financiadores from QBI2 — used at checkout when the
   // médico marked a service as "Requiere Obra Social" (see Honorarios y Servicios).
   getFinanciadores: () => apiFetch('/recetas/financiadores'),
+
+  // Support/complaints area — sends an email to soporte@tranquisalud.com on behalf of the
+  // logged-in patient or professional.
+  enviarQueja: (data: { asunto: string; mensaje: string }) =>
+    apiFetch('/soporte/queja', { method: 'POST', body: data as any }),
+
+  // ARCO (Ley 25.326) — pide al equipo de soporte una copia de los datos personales del usuario.
+  solicitarCopiaDatos: () => apiFetch('/soporte/solicitud-datos', { method: 'POST' }),
 
   // Auth / Login with Google
   loginGoogle: (idToken: string) => 
@@ -173,7 +182,7 @@ export const api = {
   // Doctor Dashboard
   getPerfil: () => apiFetch('/medicos/perfil'),
   
-  getStats: () => apiFetch('/medicos/stats'),
+  getStats: (periodo: 'DIARIO' | 'SEMANAL' | 'MENSUAL' = 'MENSUAL') => apiFetch(`/medicos/stats?periodo=${periodo}`),
   
   actualizarPerfil: (data: any) => 
     apiFetch('/medicos/perfil', { method: 'PUT', body: data }),
@@ -227,6 +236,7 @@ export const api = {
       regNo?: string
       nombreDroga?: string
       noSustituible?: boolean
+      laboratorio?: string
     }>
     diagnosis: string
     notes: string

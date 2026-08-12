@@ -89,6 +89,11 @@ public class Usuario {
     @Column(name = "telefono", length = 30)
     private String telefono;
 
+    // Public-facing contact email shown on the médico's professional card — deliberately
+    // separate from `email` above, which is the account/login identity and stays private.
+    @Column(name = "email_contacto", length = 150)
+    private String emailContacto;
+
     @Column(name = "titulo", length = 50)
     private String titulo;
 
@@ -148,6 +153,18 @@ public class Usuario {
 
     @Column(name = "domicilio_lng")
     private Double domicilioLng;
+
+    @Column(name = "domicilio_atencion_torre", length = 50)
+    private String domicilioAtencionTorre;
+
+    @Column(name = "domicilio_atencion_piso", length = 20)
+    private String domicilioAtencionPiso;
+
+    @Column(name = "domicilio_atencion_depto", length = 20)
+    private String domicilioAtencionDepto;
+
+    @Column(name = "domicilio_atencion_barrio", length = 100)
+    private String domicilioAtencionBarrio;
 
     @Column(name = "matricula_tipo", length = 20)
     private String matriculaTipo;
@@ -263,6 +280,12 @@ public class Usuario {
 
     @Column(name = "experiencia", columnDefinition = "TEXT")
     private String experiencia;
+
+    // JSON array of press/media mentions (título, descripción, link) the médico opts to publish
+    // on their profile — same "stringly-typed JSON blob" storage as experiencia above, parsed
+    // client-side. Optional, unlike experiencia which getMissingRequirements enforces.
+    @Column(name = "publicaciones", columnDefinition = "TEXT")
+    private String publicaciones;
 
     @Column(name = "instagram_url", length = 255)
     private String instagramUrl;

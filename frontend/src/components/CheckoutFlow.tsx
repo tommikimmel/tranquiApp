@@ -4,6 +4,7 @@ import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { OBRAS_SOCIALES } from '../constants/obrasSociales'
+import { formatDetalleDomicilio } from '../utils/dashboardHelpers'
 
 let leafletLoadingPromise: Promise<void> | null = null
 function loadLeafletScript(): Promise<void> {
@@ -57,6 +58,30 @@ function IconCheck({ size = 12 }: { size?: number }) {
   )
 }
 
+function IconPhone({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  )
+}
+
+function IconMail({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <rect x="2" y="4" width="20" height="16" rx="2" /><polyline points="2 6 12 13 22 6" />
+    </svg>
+  )
+}
+
+function IconWhatsapp({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.33 4.96L2.05 22l5.25-1.38a9.87 9.87 0 0 0 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm5.8 14.09c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.11.11-1.79-.11-.41-.13-.94-.31-1.62-.6-2.85-1.23-4.71-4.1-4.85-4.29-.14-.19-1.16-1.54-1.16-2.94 0-1.4.73-2.09.99-2.37.26-.28.57-.35.76-.35.19 0 .38 0 .55.01.18.01.41-.07.64.49.24.57.81 1.98.88 2.12.07.14.12.31.02.5-.09.19-.14.31-.28.48-.14.17-.29.37-.42.5-.14.14-.28.29-.12.57.16.28.71 1.17 1.52 1.9 1.05.94 1.93 1.23 2.21 1.37.28.14.44.12.6-.07.16-.19.68-.79.87-1.06.19-.28.37-.23.62-.14.26.09 1.63.77 1.91.91.28.14.47.21.54.33.07.12.07.68-.17 1.36z" />
+    </svg>
+  )
+}
+
 // ── Types ──────────────────────────────────────────────────────
 interface RedesSociales {
   instagram?: string
@@ -74,11 +99,18 @@ interface Professional {
   nextSlot: string
   nextSlotDay: string
   fotoUrl?: string
+  telefono?: string
+  emailContacto?: string
+  publicaciones?: string
   ofreceOnline?: boolean
   ofrecePresencial?: boolean
   domicilioAtencion?: string
   domicilioLat?: number | null
   domicilioLng?: number | null
+  domicilioAtencionTorre?: string
+  domicilioAtencionPiso?: string
+  domicilioAtencionDepto?: string
+  domicilioAtencionBarrio?: string
   descripcionPerfil?: string
   pacientesAtiende?: string[]
   institucionFormacion?: string
@@ -86,7 +118,7 @@ interface Professional {
   tags?: string[]
   experiencia?: string
   redesSociales?: RedesSociales
-  tariffs?: { id: string; label: string; price: number; enabled: boolean; requiereObraSocial?: boolean; obraSocial?: string }[]
+  tariffs?: { id: string; label: string; price: number; enabled: boolean; requiereObraSocial?: boolean; obraSocial?: string; precioOnline?: number | null; precioPresencial?: number | null; requiereAgenda?: boolean }[]
 }
 
 interface Financiador {
@@ -125,6 +157,7 @@ interface PatientBookingData {
   idFinanciador?: string
   afiliado?: string
   customTime?: string
+  isDocumentOnly?: boolean
 }
 
 // ── Mock Data ──────────────────────────────────────────────────
@@ -230,9 +263,6 @@ function StepSelect({
   const [afiliado, setAfiliado] = useState(cachedUser?.numAfiliado || '')
   const [customTime, setCustomTime] = useState('09:00')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
-  const [isFirstTime, setIsFirstTime] = useState(false)
-  const [showFirstTimeAlert, setShowFirstTimeAlert] = useState(false)
-  const [hasShownAlert, setHasShownAlert] = useState(false)
 
   // Same detection the backend uses (Usuario.isOfrecePresencial/isOfreceOnline): ofrecePresencial
   // defaults to false, ofreceOnline defaults to true, when the profesional never set them
@@ -259,6 +289,18 @@ function StepSelect({
   // asking the patient to pick one — it's already fixed — and go straight to número de afiliado.
   const fixedObraSocial = selectedCustomTariff?.obraSocial || ''
   const isFixedObraSocialType = isCustomObraSocialType && !!fixedObraSocial
+
+  // Pure document services (recetas, certificados, informes — flagged requiereAgenda: false by
+  // the médico in Honorarios y Servicios) don't need a consultorio visit or videollamada, so they
+  // skip modalidad selection and the day/horario calendar entirely — see TurnoService.
+  // reservarTurno on the backend, which ignores fecha/hora/modalidad for these regardless of
+  // what's sent and stamps the booking timestamp itself.
+  const defaultServicioIdPorTipo: Record<string, string> = {
+    OBRA_SOCIAL: 'osde', OSDE: 'osde', RECETA: 'receta-fuera', CERTIFICADO: 'certificado', SOBRETUNO: 'sobreturno'
+  }
+  const selectedTariffForAgenda = selectedCustomTariff
+    || (professional.tariffs || []).find(t => t.id === (defaultServicioIdPorTipo[tipo] || 'particular'))
+  const isDocumentOnly = selectedTariffForAgenda?.requiereAgenda === false
 
   const [financiadores, setFinanciadores] = useState<Financiador[]>([])
   const [idFinanciadorSel, setIdFinanciadorSel] = useState('')
@@ -377,38 +419,11 @@ function StepSelect({
     return list
   }, [viewMonth])
 
-  const handleEmailBlur = async () => {
-    if (email.trim().includes('@')) {
-      try {
-        const isFirst = await api.checkFirstConsultation(email.trim())
-        if (isFirst) {
-          setIsFirstTime(true)
-          setHasShownAlert(false)
-        } else {
-          setIsFirstTime(false)
-        }
-      } catch (err) {
-        console.error("Error al verificar primera consulta:", err)
-      }
-    }
-  }
-
   useEffect(() => {
-    if (isFirstTime && tipo === 'PARTICULAR' && !hasShownAlert) {
-      setShowFirstTimeAlert(true)
-      setHasShownAlert(true)
-    } else if (tipo !== 'PARTICULAR') {
-      setShowFirstTimeAlert(false)
+    if (isDocumentOnly) {
+      setLoading(false)
+      return
     }
-  }, [tipo, isFirstTime, hasShownAlert])
-
-  useEffect(() => {
-    if (email) {
-      handleEmailBlur()
-    }
-  }, [])
-
-  useEffect(() => {
     const fetchAvailability = async () => {
       setLoading(true)
       const weekdays = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
@@ -509,14 +524,34 @@ function StepSelect({
     }
 
     fetchAvailability()
-  }, [professional.id, modalidad])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [professional.id, modalidad, isDocumentOnly])
+
+  // A tariff's precioOnline/precioPresencial only override the base price when the médico
+  // explicitly set one for the currently selected modalidad — mirrors the backend's
+  // resolverPrecioPorModalidad in TurnoService so the price shown here matches what gets charged.
+  const findTariff = (id: string) => (professional.tariffs || []).find(t => t.id === id)
+  const resolvePrecio = (base: number, tariff?: { precioOnline?: number | null; precioPresencial?: number | null; requiereAgenda?: boolean }) => {
+    if (!tariff) return base
+    // Document-only services never resolve a modalidad server-side (see TurnoService.
+    // reservarTurno), so precioOnline/precioPresencial never apply to them either — always base.
+    if (tariff.requiereAgenda === false) return base
+    if (modalidad === 'ONLINE' && tariff.precioOnline != null) return tariff.precioOnline
+    if (modalidad === 'PRESENCIAL' && tariff.precioPresencial != null) return tariff.precioPresencial
+    return base
+  }
+
+  const tariffOsde = findTariff('osde')
+  const tariffReceta = findTariff('receta-fuera')
+  const tariffCertificado = findTariff('certificado')
+  const tariffSobreturno = findTariff('sobreturno')
 
   const services = [
-    { id: 'PARTICULAR', label: 'Consulta Particular', price: professional.price, desc: 'Consulta estándar de 50 minutos' },
-    { id: 'OBRA_SOCIAL', label: 'Obra Social OSDE', price: 10500, desc: 'Requiere Obra Social y número de afiliado' },
-    { id: 'RECETA', label: 'Receta fuera de turno', price: 45000, desc: 'Solicitud de recetas o órdenes médicas' },
-    { id: 'CERTIFICADO', label: 'Certificado', price: 55000, desc: 'Emisión de certificados aptos y licencias' },
-    { id: 'SOBRETUNO', label: 'Sobre turno', price: 90000, desc: 'Horario personalizado fuera de agenda' }
+    { id: 'PARTICULAR', label: 'Consulta Particular', price: resolvePrecio(professional.price, findTariff('particular')), desc: 'Consulta estándar de 50 minutos' },
+    { id: 'OBRA_SOCIAL', label: 'Obra Social OSDE', price: resolvePrecio(tariffOsde?.enabled ? tariffOsde.price : 10500, tariffOsde), desc: 'Requiere Obra Social y número de afiliado' },
+    { id: 'RECETA', label: 'Receta fuera de turno', price: resolvePrecio(tariffReceta?.enabled ? tariffReceta.price : 45000, tariffReceta), desc: 'Solicitud de recetas o órdenes médicas' },
+    { id: 'CERTIFICADO', label: 'Certificado', price: resolvePrecio(tariffCertificado?.enabled ? tariffCertificado.price : 55000, tariffCertificado), desc: 'Emisión de certificados aptos y licencias' },
+    { id: 'SOBRETUNO', label: 'Sobre turno', price: resolvePrecio(tariffSobreturno?.enabled ? tariffSobreturno.price : 90000, tariffSobreturno), desc: 'Horario personalizado fuera de agenda' }
   ] as const;
 
   // Custom tariffs render as additional selectable pills alongside the 5 defaults above.
@@ -525,20 +560,16 @@ function StepSelect({
     ...customTariffs.map(t => ({
       id: t.id,
       label: t.label,
-      price: t.price,
+      price: resolvePrecio(t.price, t),
       desc: t.requiereObraSocial ? 'Requiere Obra Social y número de afiliado' : 'Servicio configurado por el profesional'
     }))
   ]
 
   const currentPrice = useMemo(() => {
     const s = allServices.find(x => x.id === tipo)
-    let basePrice = s ? s.price : professional.price
-    if (isFirstTime && tipo === 'PARTICULAR') {
-      basePrice = Math.round(basePrice * 1.30)
-    }
-    return basePrice
+    return s ? s.price : professional.price
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tipo, professional.price, isFirstTime, customTariffs])
+  }, [tipo, professional.price, professional.tariffs, customTariffs, modalidad])
 
   const isObraSocialType = tipo === 'OBRA_SOCIAL' || tipo === 'OSDE';
   const effectiveObraSocial = obraSocial === 'Otra' ? customObraSocial : obraSocial;
@@ -553,8 +584,7 @@ function StepSelect({
   const canPay = name.trim().length > 2 &&
                   email.includes('@') &&
                   phone.length >= 8 &&
-                  selectedDayIdx !== null &&
-                  (selectedSlot !== null || tipo === 'SOBRETUNO') &&
+                  (isDocumentOnly || (selectedDayIdx !== null && (selectedSlot !== null || tipo === 'SOBRETUNO'))) &&
                   (!isObraSocialType || ((isFixedGenericObraSocialType || effectiveObraSocial.trim().length > 0) && afiliado.trim().length > 4)) &&
                   (!isCustomObraSocialType || (isFixedObraSocialType ? afiliado.trim().length > 4 : (idFinanciadorSel.trim().length > 0 && afiliado.trim().length > 4))) &&
                   (tipo !== 'SOBRETUNO' || /^([01]\d|2[0-3]):[0-5]\d$/.test(customTime)) &&
@@ -581,7 +611,12 @@ function StepSelect({
       const financiadorElegido = isCustomObraSocialType && !isFixedObraSocialType
         ? financiadores.find(f => String(f.idfinanciador) === idFinanciadorSel)
         : undefined;
-      onSelect(currentDay!, selectedSlot || { time: customTime, available: true }, {
+      // Document-only services skip the day/horario picker entirely — the backend stamps its own
+      // booking timestamp for these and ignores whatever fecha/hora/modalidad travels here, so a
+      // placeholder day/slot is enough to satisfy onSelect's signature.
+      const day = isDocumentOnly ? { date: new Date().toISOString().slice(0, 10), label: 'Hoy', sublabel: '', slots: [] } : currentDay!
+      const slot = isDocumentOnly ? { time: '00:00', available: true } : (selectedSlot || { time: customTime, available: true })
+      onSelect(day, slot, {
         name,
         email,
         phone: formattedPhone,
@@ -596,7 +631,8 @@ function StepSelect({
           : (isFixedObraSocialType ? fixedObraSocial : (isCustomObraSocialType ? financiadorElegido?.nombreComercial : undefined)),
         idFinanciador: (isCustomObraSocialType && !isFixedObraSocialType) ? idFinanciadorSel : undefined,
         afiliado: (isObraSocialType || isCustomObraSocialType) ? afiliado.trim() : undefined,
-        customTime: tipo === 'SOBRETUNO' ? customTime : undefined
+        customTime: tipo === 'SOBRETUNO' ? customTime : undefined,
+        isDocumentOnly
       });
     }
   };
@@ -634,6 +670,19 @@ function StepSelect({
 
   const experienciasList = parseExperiencias(professional.experiencia)
 
+  const parsePublicaciones = (raw?: string) => {
+    if (!raw) return []
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed
+    } catch (e) {
+      // ignore malformed data
+    }
+    return []
+  }
+
+  const publicacionesList = parsePublicaciones(professional.publicaciones)
+
   return (
     <div className="checkout-body" style={{ maxWidth: '780px', margin: '0 auto' }}>
       
@@ -662,6 +711,38 @@ function StepSelect({
 
             <p className="doc-bio">{proBio}</p>
 
+            {(professional.telefono || professional.emailContacto) && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
+                {professional.telefono && (
+                  <a
+                    href={`tel:${professional.telefono.replace(/\s+/g, '')}`}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: 'var(--color-text-secondary)', textDecoration: 'none' }}
+                  >
+                    <IconPhone size={14} /> {professional.telefono}
+                  </a>
+                )}
+                {professional.emailContacto && (
+                  <a
+                    href={`mailto:${professional.emailContacto}`}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: 'var(--color-text-secondary)', textDecoration: 'none' }}
+                  >
+                    <IconMail size={14} /> {professional.emailContacto}
+                  </a>
+                )}
+                {professional.telefono && (
+                  <a
+                    href={`https://api.whatsapp.com/send?phone=${professional.telefono.replace(/\D/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn--primary btn--sm"
+                    style={{ gap: '6px' }}
+                  >
+                    <IconWhatsapp size={14} /> WhatsApp
+                  </a>
+                )}
+              </div>
+            )}
+
             {hasRedes && (
               <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
                 {redes?.instagram && (
@@ -688,7 +769,7 @@ function StepSelect({
       <div className="grid-2">
         {/* Izquierda: tipo + día + horario + pagar */}
         <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {ofreceAmbasModalidades && (
+          {!isDocumentOnly && ofreceAmbasModalidades && (
             <div>
               <div className="book-title sora"><span className="dot"></span>Modalidad de la consulta</div>
               <div className="types">
@@ -756,6 +837,16 @@ function StepSelect({
             </div>
           )}
 
+          {isDocumentOnly && (
+            <div className="checkout-alert" style={{ padding: '12px 14px', borderRadius: 'var(--radius-md)', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', fontSize: '13px', color: 'var(--color-text-secondary)', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '1px' }}>
+                <rect x="4" y="2" width="16" height="20" rx="2" /><path d="M8 7h8M8 11h8M8 15h5" />
+              </svg>
+              <span>Este servicio es la solicitud de un documento, no un turno con horario fijo — no hace falta elegir día ni hora. El profesional lo va a preparar y hacértelo llegar.</span>
+            </div>
+          )}
+
+          {!isDocumentOnly && (
           <div>
             <div className="book-title sora"><span className="dot"></span>Elegí día y horario</div>
             <div className="cal">
@@ -814,6 +905,7 @@ function StepSelect({
               </div>
             </div>
           </div>
+          )}
 
           {currentDay && tipo !== 'SOBRETUNO' && (
             <div>
@@ -866,6 +958,9 @@ function StepSelect({
                 {professional.domicilioAtencion && (
                   <div className="map-addr">
                     <div className="street">{professional.domicilioAtencion}</div>
+                    {formatDetalleDomicilio(professional) && (
+                      <div className="street" style={{ fontSize: '0.85em', opacity: 0.8 }}>{formatDetalleDomicilio(professional)}</div>
+                    )}
                     <a
                       href={
                         professional.domicilioLat && professional.domicilioLng
@@ -946,7 +1041,6 @@ function StepSelect({
                   className="checkout-form__input"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  onBlur={handleEmailBlur}
                   style={{ width: '100%', padding: '10px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', outline: 'none' }}
                 />
               </div>
@@ -1111,20 +1205,6 @@ function StepSelect({
                 </>
               )}
 
-              {/* Surcharge Alert */}
-              {showFirstTimeAlert && (
-                <div className="checkout-alert checkout-alert--warning" style={{ display: 'flex', gap: '8px', padding: '10px', borderRadius: 'var(--radius-md)', backgroundColor: '#fffbe6', border: '1px solid #ffe58f', fontSize: '12.5px', color: '#ad7c11' }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ width: 16, height: 16, flexShrink: 0, marginTop: '2px' }}>
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                  <div>
-                    <strong>Primer turno:</strong> Se cobra un recargo del 30% por única vez debido a la apertura de la historia clínica en tu primera consulta particular.
-                  </div>
-                </div>
-              )}
-
               <div className="checkout-form__group checkout-form__group--checkbox" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '4px' }}>
                 <input
                   id="acceptedTerms"
@@ -1278,6 +1358,35 @@ function StepSelect({
                 </div>
               </div>
             )}
+
+            {publicacionesList.length > 0 && (
+              <div style={{ marginTop: '16px' }}>
+                <div className="seo-title" style={{ fontSize: '14px', marginBottom: '8px' }}>Publicaciones</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {publicacionesList.map((pub: any, i: number) => (
+                    <a
+                      key={pub.id || i}
+                      href={pub.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: 'block', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '10px 12px', textDecoration: 'none' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                        </svg>
+                        <strong style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{pub.titulo}</strong>
+                      </div>
+                      {pub.descripcion && (
+                        <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: '4px 0 0', lineHeight: 1.4 }}>
+                          {pub.descripcion}
+                        </p>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1294,6 +1403,7 @@ function StepConfirmed({
   meetLink,
   createdTurn,
   modality,
+  isDocumentOnly,
 }: {
   professional: Professional
   selectedDay: DayOption
@@ -1302,9 +1412,11 @@ function StepConfirmed({
   meetLink?: string
   createdTurn?: any
   modality: 'online' | 'presencial'
+  isDocumentOnly?: boolean
 }) {
   const actualMeetLink = meetLink || `https://meet.google.com/${Math.random().toString(36).slice(2, 5)}-${Math.random().toString(36).slice(2, 6)}-${Math.random().toString(36).slice(2, 5)}`
-  const isPresencial = modality === 'presencial'
+  // No real modalidad applies to a document-only request — no consultorio, no videollamada.
+  const isPresencial = !isDocumentOnly && modality === 'presencial'
 
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const [leafletLoaded, setLeafletLoaded] = useState(!!(window as any).L)
@@ -1388,11 +1500,13 @@ function StepConfirmed({
             <polyline points="20 6 9 17 4 12" />
           </svg>
         </div>
-        <h1 className="checkout-confirmed__title">¡Turno confirmado!</h1>
+        <h1 className="checkout-confirmed__title">{isDocumentOnly ? '¡Solicitud confirmada!' : '¡Turno confirmado!'}</h1>
         <p className="checkout-confirmed__subtitle">
-          {isPresencial 
-            ? "Te enviamos un email con todos los detalles de la consulta."
-            : "Te enviamos un email con todos los detalles y el link de la videollamada."
+          {isDocumentOnly
+            ? "Te enviamos un email con la confirmación. El profesional va a preparar el documento y hacértelo llegar — no requiere que coordines un horario."
+            : (isPresencial
+              ? "Te enviamos un email con todos los detalles de la consulta."
+              : "Te enviamos un email con todos los detalles y el link de la videollamada.")
           }
         </p>
       </div>
@@ -1402,18 +1516,22 @@ function StepConfirmed({
           <span className="checkout-summary-card__label">Profesional</span>
           <span className="checkout-summary-card__value">{professional.name}</span>
         </div>
-        <div className="checkout-summary-card__row">
-          <span className="checkout-summary-card__label">Modalidad</span>
-          <span className="checkout-summary-card__value">{isPresencial ? 'Presencial (en consultorio)' : 'Online (videollamada)'}</span>
-        </div>
-        <div className="checkout-summary-card__row">
-          <span className="checkout-summary-card__label">Fecha y hora</span>
-          <span className="checkout-summary-card__value">{selectedDay.label} {selectedDay.sublabel} · {selectedSlot.time} hs</span>
-        </div>
-        <div className="checkout-summary-card__row">
-          <span className="checkout-summary-card__label">Duración</span>
-          <span className="checkout-summary-card__value">50 minutos</span>
-        </div>
+        {!isDocumentOnly && (
+          <>
+            <div className="checkout-summary-card__row">
+              <span className="checkout-summary-card__label">Modalidad</span>
+              <span className="checkout-summary-card__value">{isPresencial ? 'Presencial (en consultorio)' : 'Online (videollamada)'}</span>
+            </div>
+            <div className="checkout-summary-card__row">
+              <span className="checkout-summary-card__label">Fecha y hora</span>
+              <span className="checkout-summary-card__value">{selectedDay.label} {selectedDay.sublabel} · {selectedSlot.time} hs</span>
+            </div>
+            <div className="checkout-summary-card__row">
+              <span className="checkout-summary-card__label">Duración</span>
+              <span className="checkout-summary-card__value">50 minutos</span>
+            </div>
+          </>
+        )}
         <div className="checkout-summary-card__row">
           <span className="checkout-summary-card__label">Pagado</span>
           <span className="checkout-summary-card__value checkout-summary-card__value--paid">
@@ -1423,7 +1541,7 @@ function StepConfirmed({
       </div>
 
       {/* Online Meet Link */}
-      {!isPresencial && (
+      {!isPresencial && !isDocumentOnly && (
         <div className="checkout-meet-card">
           <div className="checkout-meet-card__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" style={{ width: 24, height: 24 }}>
@@ -1461,6 +1579,11 @@ function StepConfirmed({
               <div className="checkout-meet-card__sublabel" style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>
                 {professional.domicilioAtencion}
               </div>
+              {formatDetalleDomicilio(professional) && (
+                <div className="checkout-meet-card__sublabel" style={{ color: 'var(--color-text-secondary)' }}>
+                  {formatDetalleDomicilio(professional)}
+                </div>
+              )}
             </div>
             <a
               href={
@@ -1573,6 +1696,7 @@ export default function CheckoutFlow({
   const [modality, setModality] = useState<'online' | 'presencial'>(
     professional.ofrecePresencial && !professional.ofreceOnline ? 'presencial' : 'online'
   )
+  const [isDocumentOnlyBooking, setIsDocumentOnlyBooking] = useState(false)
 
   const handleSelectSlot = (
     day: DayOption,
@@ -1584,6 +1708,7 @@ export default function CheckoutFlow({
     // The patient already chose presencial/online explicitly in StepSelect (or it was
     // preselected when the profesional only offers one) — no need to re-infer it here.
     setModality(patientData.modalidad === 'PRESENCIAL' ? 'presencial' : 'online')
+    setIsDocumentOnlyBooking(!!patientData.isDocumentOnly)
 
     handlePay(day, slot, patientData)
   }
@@ -1664,6 +1789,7 @@ export default function CheckoutFlow({
           meetLink={createdTurn?.meetLink}
           createdTurn={createdTurn}
           modality={modality}
+          isDocumentOnly={isDocumentOnlyBooking}
         />
       )}
       {showMockPaymentGateway && createdTurn && (

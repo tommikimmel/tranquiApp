@@ -10,15 +10,6 @@ interface LoginPageProps {
   onBack: () => void
 }
 
-function IconBrandLogo({ size = 28 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, color: 'var(--color-primary)' }}>
-      <circle cx="12" cy="12" r="10" />
-      <path d="M8 12h8M12 8v8" />
-    </svg>
-  )
-}
-
 function IconMail({ size = 36 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, color: 'var(--color-primary)' }}>
@@ -536,7 +527,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
         <div style={{ textAlign: 'center' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
-            <IconBrandLogo size={28} />
+            <img src="/logoTranquiApp.webp" alt="Tranqui App" width={28} height={28} style={{ display: 'block' }} />
             <span style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-xl)', fontWeight: 'bold', color: 'var(--color-primary)' }}>
               Tranqui App
             </span>

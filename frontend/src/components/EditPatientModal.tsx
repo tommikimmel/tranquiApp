@@ -72,8 +72,12 @@ export default function EditPatientModal({
     ? 'Completá calle, número, localidad y provincia, o dejá todos los campos de domicilio vacíos.'
     : null
 
-  const numAfiliadoError = tieneObraSocial && numAfiliado.trim().length > 0 && !/^[A-Za-z0-9\-/. ]{1,30}$/.test(numAfiliado.trim())
-    ? 'El número de afiliado tiene caracteres inválidos.'
+  // QBI2 rechaza la receta recién al emitirla con QBI124 "LA CANTIDAD DE CARACTERES NO CUMPLE EL
+  // RANGO MINIMO O MAXIMO PARA EL FINANCIADOR SELECCIONADO" si el número de afiliado es demasiado
+  // corto — antes este chequeo solo validaba el juego de caracteres (1-30), así que un valor de
+  // 1-2 dígitos pasaba acá y recién fallaba en QBI2. Mirrors ClinicalService.validarDatosPaciente.
+  const numAfiliadoError = tieneObraSocial && numAfiliado.trim().length > 0 && !/^[A-Za-z0-9\-/. ]{6,30}$/.test(numAfiliado.trim())
+    ? 'El número de afiliado debe tener entre 6 y 30 caracteres.'
     : null
 
   const canSave = apellido.trim().length > 0 && !!sexo && docDigits.length > 0 && !docError && !!fechaNacimiento && !telefonoError && !domicilioError &&

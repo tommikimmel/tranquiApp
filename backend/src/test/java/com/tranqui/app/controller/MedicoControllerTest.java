@@ -86,7 +86,7 @@ class MedicoControllerTest {
     @WithMockUser(username = "medico@test.com", roles = "PSIQUIATRA")
     void testObtenerStats() throws Exception {
         DashboardStatsDto stats = DashboardStatsDto.builder().sessionsToday(5).build();
-        when(medicoService.obtenerStats("medico@test.com")).thenReturn(stats);
+        when(medicoService.obtenerStats("medico@test.com", "MENSUAL")).thenReturn(stats);
 
         mockMvc.perform(get("/api/medicos/stats"))
                 .andExpect(status().isOk())

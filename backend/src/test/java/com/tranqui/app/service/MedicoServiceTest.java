@@ -156,7 +156,7 @@ class MedicoServiceTest {
 
     @Test
     void testObtenerStats() {
-        DashboardStatsDto stats = medicoService.obtenerStats(medico.getEmail());
+        DashboardStatsDto stats = medicoService.obtenerStats(medico.getEmail(), "MENSUAL");
         assertNotNull(stats);
         assertEquals(1, stats.getSessionsToday());
         assertEquals(0, new BigDecimal("35000").compareTo(stats.getEarningsThisWeek()));
@@ -252,7 +252,7 @@ class MedicoServiceTest {
         Turno ayer1 = turnoRepository.save(turnoFor(m, p, LocalDate.now().minusDays(1)));
         Turno ayer2 = turnoRepository.save(turnoFor(m, p, LocalDate.now().minusDays(1)));
         try {
-            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail());
+            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail(), "DIARIO");
             assertEquals("-1 vs ayer", stats.getSessionsTodayChange());
         } finally {
             turnoRepository.delete(hoy); turnoRepository.delete(ayer1); turnoRepository.delete(ayer2);
@@ -267,7 +267,7 @@ class MedicoServiceTest {
         Turno hoy = turnoRepository.save(turnoFor(m, p, LocalDate.now()));
         Turno ayer = turnoRepository.save(turnoFor(m, p, LocalDate.now().minusDays(1)));
         try {
-            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail());
+            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail(), "DIARIO");
             assertEquals("igual que ayer", stats.getSessionsTodayChange());
         } finally {
             turnoRepository.delete(hoy); turnoRepository.delete(ayer);
@@ -286,7 +286,7 @@ class MedicoServiceTest {
                 .tipo(TipoTurno.PARTICULAR).estado(EstadoTurno.PENDIENTE_PAGO).precio(new BigDecimal("10000"))
                 .build());
         try {
-            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail());
+            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail(), "SEMANAL");
             assertEquals("0% vs sem. anterior", stats.getEarningsThisWeekChange());
         } finally {
             turnoRepository.delete(pendiente);
@@ -301,7 +301,7 @@ class MedicoServiceTest {
         Turno estaSemana = turnoRepository.save(confirmadoCon(m, p, LocalDate.now(), new BigDecimal("20000")));
         Turno semanaPasada = turnoRepository.save(confirmadoCon(m, p, LocalDate.now().minusWeeks(1), new BigDecimal("10000")));
         try {
-            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail());
+            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail(), "SEMANAL");
             assertTrue(stats.getEarningsThisWeekChange().startsWith("+"));
         } finally {
             turnoRepository.delete(estaSemana); turnoRepository.delete(semanaPasada);
@@ -316,7 +316,7 @@ class MedicoServiceTest {
         Turno estaSemana = turnoRepository.save(confirmadoCon(m, p, LocalDate.now(), new BigDecimal("5000")));
         Turno semanaPasada = turnoRepository.save(confirmadoCon(m, p, LocalDate.now().minusWeeks(1), new BigDecimal("20000")));
         try {
-            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail());
+            DashboardStatsDto stats = medicoService.obtenerStats(m.getEmail(), "SEMANAL");
             assertTrue(stats.getEarningsThisWeekChange().startsWith("-"));
         } finally {
             turnoRepository.delete(estaSemana); turnoRepository.delete(semanaPasada);

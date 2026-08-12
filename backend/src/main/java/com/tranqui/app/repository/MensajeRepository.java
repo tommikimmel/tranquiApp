@@ -27,6 +27,19 @@ public interface MensajeRepository extends JpaRepository<Mensaje, Long> {
     @Query("SELECT CAST(COUNT(m) AS int) FROM Mensaje m WHERE m.remitente.id = :remitenteId AND m.destinatario.id = :destinatarioId AND m.leido = false")
     int countUnreadMessages(@Param("remitenteId") Long remitenteId, @Param("destinatarioId") Long destinatarioId);
 
+    // Batched counterpart of countUnreadMessages for listing endpoints that need the unread
+    // count for every remitente at once (e.g. ClinicalService.obtenerPacientesAtendidos) instead
+    // of one COUNT query per patient in a loop.
+    interface UnreadCountPorRemitente {
+        Long getRemitenteId();
+        Integer getCantidad();
+    }
+
+    @Query("SELECT m.remitente.id AS remitenteId, CAST(COUNT(m) AS int) AS cantidad " +
+           "FROM Mensaje m WHERE m.destinatario.id = :destinatarioId AND m.leido = false " +
+           "GROUP BY m.remitente.id")
+    List<UnreadCountPorRemitente> countUnreadMessagesGroupedByRemitente(@Param("destinatarioId") Long destinatarioId);
+
     @Query("SELECT DISTINCT u FROM Usuario u WHERE u.rol = 'PACIENTE' AND EXISTS (" +
            "  SELECT 1 FROM Mensaje m WHERE " +
            "  (m.remitente.id = u.id AND m.destinatario.id = :medicoId) OR " +

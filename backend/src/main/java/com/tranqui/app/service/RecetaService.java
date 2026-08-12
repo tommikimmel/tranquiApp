@@ -1,5 +1,7 @@
 package com.tranqui.app.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tranqui.app.model.Receta;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.model.dto.RecetaDto;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,6 +25,8 @@ import java.util.stream.Collectors;
 public class RecetaService {
 
     private static final Logger log = LoggerFactory.getLogger(RecetaService.class);
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private RecetaRepository recetaRepository;
@@ -75,6 +80,15 @@ public class RecetaService {
                 || (medico.getDireccion() != null && !medico.getDireccion().isBlank())
                 || (medico.getDomicilioCalle() != null && !medico.getDomicilioCalle().isBlank());
         if (!medicoTieneDomicilio) datosFaltantes.add("tu dirección profesional (en Configuración > Perfil profesional — QBI2 la exige aunque atiendas 100% online)");
+        // ClinicalService.actualizarPaciente ya exige 6-30 caracteres para guardados nuevos del
+        // número de afiliado, pero pacientes cargados antes de esa validación pueden tener un
+        // valor viejo demasiado corto — sin este chequeo, la receta viaja hasta QBI2 y recién ahí
+        // la rechaza con QBI124 ("LA CANTIDAD DE CARACTERES NO CUMPLE EL RANGO MINIMO O MAXIMO
+        // PARA EL FINANCIADOR SELECCIONADO"), en vez de decirle al médico de entrada qué corregir.
+        if (paciente.getCredencialCodEntidad() != null
+                && (paciente.getCredencialPan() == null || !paciente.getCredencialPan().trim().matches("[A-Za-z0-9\\-/. ]{6,30}"))) {
+            datosFaltantes.add("el número de afiliado del paciente (tiene que tener entre 6 y 30 caracteres — corregilo desde \"Editar datos\" en la ficha del paciente)");
+        }
         if (!datosFaltantes.isEmpty()) {
             throw new RecetaElectronicaException(
                     "No se pudo emitir la receta electrónica: falta completar " + String.join(", ", datosFaltantes)
@@ -83,11 +97,32 @@ public class RecetaService {
 
         // Format medication list to single string representation
         String medsFormatted = dto.getMedications().stream()
-                .map(m -> String.format("- %s (%s, %s, %s)", m.getName(),
-                        m.getDosage() != null ? m.getDosage() : "",
-                        m.getFrequency() != null ? m.getFrequency() : "",
-                        m.getDuration() != null ? m.getDuration() : ""))
+                .map(m -> {
+                    String linea = String.format("- %s (%s, %s, %s)", m.getName(),
+                            m.getDosage() != null ? m.getDosage() : "",
+                            m.getFrequency() != null ? m.getFrequency() : "",
+                            m.getDuration() != null ? m.getDuration() : "");
+                    if (m.getLaboratorio() != null && !m.getLaboratorio().trim().isEmpty()) {
+                        linea += " — Laboratorio: " + m.getLaboratorio().trim();
+                    }
+                    return linea;
+                })
                 .collect(Collectors.joining("\n"));
+
+        // Laboratorios entrados a mano por el médico, uno por medicamento que lo tenga cargado —
+        // se guardan aparte del texto de arriba para poder calcular la métrica "medicamentos por
+        // laboratorio" del historial sin tener que parsear ese string de display.
+        List<String> laboratoriosIngresados = dto.getMedications().stream()
+                .map(RecetaDto.MedicamentoDto::getLaboratorio)
+                .filter(lab -> lab != null && !lab.trim().isEmpty())
+                .map(String::trim)
+                .collect(Collectors.toList());
+        String laboratoriosJson;
+        try {
+            laboratoriosJson = objectMapper.writeValueAsString(laboratoriosIngresados);
+        } catch (Exception e) {
+            laboratoriosJson = "[]";
+        }
 
         // Build QBI2 / Innovamed Request
         com.tranqui.app.model.dto.Qbi2RecetaDtos.CoberturaDto coberturaPaciente = null;
@@ -275,6 +310,7 @@ public class RecetaService {
                 .medico(medico)
                 .paciente(paciente)
                 .medicamentos(medsFormatted)
+                .laboratorios(laboratoriosJson)
                 .diagnostico(dto.getDiagnosis())
                 .indicaciones(dto.getNotes())
                 .pdfUrl(recetaResult.getS3Link())
@@ -344,6 +380,17 @@ public class RecetaService {
         return mapToDto(receta);
     }
 
+    private List<String> parseLaboratorios(String laboratoriosJson) {
+        if (laboratoriosJson == null || laboratoriosJson.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+        try {
+            return objectMapper.readValue(laboratoriosJson, new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
+    }
+
     public RecetaResponseDto mapToDto(Receta receta) {
         if (receta == null) return null;
 
@@ -378,6 +425,7 @@ public class RecetaService {
                 .medico(medicoDto)
                 .paciente(pacienteDto)
                 .medicamentos(receta.getMedicamentos())
+                .laboratorios(parseLaboratorios(receta.getLaboratorios()))
                 .diagnostico(receta.getDiagnostico())
                 .indicaciones(receta.getIndicaciones())
                 .pdfUrl(receta.getPdfUrl())
