@@ -108,30 +108,60 @@ public class PagoWebhookHandler {
 
         log.info("Pago aprobado para turno ID: {}.", turnoId);
 
-        // Crear notificación para el médico y el paciente
+        // Crear notificación para el médico y el paciente. Document-only turnos (ocupaAgenda ==
+        // false) get their own wording — "Nuevo Documento Pendiente" instead of "Nuevo Turno
+        // Reservado", since there's no fecha/hora real to reference — and skip the WhatsApp
+        // "recordatorio de turno" below entirely, since construirCuerpoMensaje requires a
+        // telemedicinaUrl these never have.
+        boolean esDocumento = !turno.isOcupaAgenda();
         try {
-            String tituloMed = "Nuevo Turno Reservado";
-            String mensajeMed = "El paciente " + turno.getPaciente().getNombre() + 
-                             " ha reservado un turno para el día " + turno.getFecha() + 
-                             " a las " + turno.getHoraInicio() + "hs.";
-            notificacionService.crearNotificacion(turno.getMedico(), tituloMed, mensajeMed, "TURNO_RESERVADO");
+            if (esDocumento) {
+                String tipoDocumento = resolverTipoDocumentoLabel(turno);
+                String tituloMed = "Nuevo Documento Pendiente";
+                String mensajeMed = "El paciente " + turno.getPaciente().getNombre() +
+                        " pagó " + tipoDocumento + ". Encontralo en \"Documentos solicitados\" en Inicio.";
+                notificacionService.crearNotificacion(turno.getMedico(), tituloMed, mensajeMed, "DOCUMENTO_PENDIENTE");
 
-            String tituloPac = "Turno Confirmado ✓";
-            String mensajePac = "Tu turno con el profesional " + turno.getMedico().getNombre() + 
-                                " para el día " + turno.getFecha() + " a las " + turno.getHoraInicio() + "hs ha sido confirmado.";
-            notificacionService.crearNotificacion(turno.getPaciente(), tituloPac, mensajePac, "TURNO_CONFIRMADO");
+                String tituloPac = "Pago confirmado ✓";
+                String mensajePac = "Tu pago por " + tipoDocumento + " con el profesional " + turno.getMedico().getNombre() +
+                        " fue confirmado. Te va a llegar en cuanto el profesional lo prepare.";
+                notificacionService.crearNotificacion(turno.getPaciente(), tituloPac, mensajePac, "TURNO_CONFIRMADO");
+            } else {
+                String tituloMed = "Nuevo Turno Reservado";
+                String mensajeMed = "El paciente " + turno.getPaciente().getNombre() +
+                        " ha reservado un turno para el día " + turno.getFecha() +
+                        " a las " + turno.getHoraInicio() + "hs.";
+                notificacionService.crearNotificacion(turno.getMedico(), tituloMed, mensajeMed, "TURNO_RESERVADO");
+
+                String tituloPac = "Turno Confirmado ✓";
+                String mensajePac = "Tu turno con el profesional " + turno.getMedico().getNombre() +
+                        " para el día " + turno.getFecha() + " a las " + turno.getHoraInicio() + "hs ha sido confirmado.";
+                notificacionService.crearNotificacion(turno.getPaciente(), tituloPac, mensajePac, "TURNO_CONFIRMADO");
+            }
         } catch (Exception e) {
             log.error("Error al crear notificaciones de confirmación para el turno ID: {}", turnoId, e);
         }
 
         // Intentar notificar por WhatsApp — salvo que el paciente haya desactivado estas
-        // notificaciones desde "Mi Cuenta".
-        try {
-            if (turno.getPaciente().isNotificacionesWhatsappHabilitadas()) {
-                whatsAppService.enviarMensajeRecordatorio(turno);
+        // notificaciones desde "Mi Cuenta". No aplica a documentos: no hay fecha/hora real ni
+        // link de videollamada que recordar.
+        if (!esDocumento) {
+            try {
+                if (turno.getPaciente().isNotificacionesWhatsappHabilitadas()) {
+                    whatsAppService.enviarMensajeRecordatorio(turno);
+                }
+            } catch (Exception e) {
+                log.error("Error al enviar recordatorio de WhatsApp para el turno ID: {}", turnoId, e);
             }
-        } catch (Exception e) {
-            log.error("Error al enviar recordatorio de WhatsApp para el turno ID: {}", turnoId, e);
         }
+    }
+
+    private String resolverTipoDocumentoLabel(Turno turno) {
+        String servicioId = turno.getServicioId();
+        if ("receta-fuera".equals(servicioId)) return "una receta";
+        if ("certificado".equals(servicioId)) return "un certificado";
+        if (turno.getTipo() == com.tranqui.app.model.TipoTurno.RECETA) return "una receta";
+        if (turno.getTipo() == com.tranqui.app.model.TipoTurno.CERTIFICADO) return "un certificado";
+        return "un documento";
     }
 }

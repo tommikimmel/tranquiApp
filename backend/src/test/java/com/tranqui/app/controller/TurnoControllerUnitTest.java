@@ -72,10 +72,10 @@ class TurnoControllerUnitTest {
 
     @Test
     void cancelarTurno_shouldDelegateToService() {
-        ResponseEntity<Void> response = controller.cancelarTurno(5L);
+        ResponseEntity<Void> response = controller.cancelarTurno(5L, medico);
 
         assertEquals(200, response.getStatusCodeValue());
-        verify(turnoService).cancelarTurno(5L);
+        verify(turnoService).cancelarTurno(5L, "dra@mail.com");
     }
 
     @Test

@@ -1,9 +1,9 @@
 import { Icon } from './Icon'
-import type { Appointment } from '../types/dashboard'
+import type { Appointment, NavSection } from '../types/dashboard'
 
 // `compact` renders the slimmer "upcoming turnos" row (side panel on Inicio); the default
 // (non-compact) rendering keeps the fuller boxed row used by the "Diario" calendar tab.
-export default function AppointmentCard({ appt, compact, dateLabel, onMarcarDocumentoEnviado }: { appt: Appointment; compact?: boolean; dateLabel?: string; onMarcarDocumentoEnviado?: (id: string) => void }) {
+export default function AppointmentCard({ appt, compact, dateLabel, onMarcarDocumentoEnviado, onNavigate, onCancel }: { appt: Appointment; compact?: boolean; dateLabel?: string; onMarcarDocumentoEnviado?: (id: string) => void; onNavigate?: (section: NavSection) => void; onCancel?: (id: string) => void }) {
   const statusMap = {
     confirmed: { label: 'Confirmado', cls: 'badge--success' },
     pending: { label: 'Pago pendiente', cls: 'badge--warning' },
@@ -16,6 +16,11 @@ export default function AppointmentCard({ appt, compact, dateLabel, onMarcarDocu
   // its "hour" is just a booking timestamp, not a real scheduled time. See Turno.ocupaAgenda.
   const isDocumentOnly = appt.ocupaAgenda === false
   const isDocumentoEnviado = !!appt.documentoEnviado
+  // "Receta fuera de turno" is the exact label resolverTypeLabel (backend) gives this specific
+  // document service — the only one that needs an actual receta generated (via Recetas
+  // Electrónicas / QBI2) before there's anything to send at all, unlike a certificado/informe
+  // the médico writes up on their own.
+  const isReceta = appt.type === 'Receta fuera de turno'
   // Once a document turno is paid, "Confirmado" doesn't tell the médico anything actionable —
   // whether they still owe the patient the actual file is what matters here.
   const st = (isDocumentOnly && appt.status === 'confirmed')
@@ -85,12 +90,32 @@ export default function AppointmentCard({ appt, compact, dateLabel, onMarcarDocu
               Esperando pago
             </span>
           )}
+          {appt.status !== 'completed' && onCancel && (
+            <button
+              type="button"
+              onClick={() => onCancel(appt.id)}
+              className="btn btn--ghost btn--sm"
+              style={{ color: 'var(--color-danger)' }}
+            >
+              Cancelar
+            </button>
+          )}
         </div>
       )}
       {/* Not gated by `!compact`: this is exactly what the (compact) "Documentos solicitados"
           card on Inicio needs to let the médico act on a paid document request. */}
       {isDocumentOnly && appt.status === 'confirmed' && (
         <div className="appointment-item__actions" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {isReceta && onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('prescriptions')}
+              className="btn btn--primary btn--sm"
+              title="Ir a Recetas Electrónicas para generarla"
+            >
+              Generar receta →
+            </button>
+          )}
           {emailHref && (
             <a href={emailHref} className="btn btn--ghost btn--sm" title="Enviar por email" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
               <Icon.Mail size={14} /> Email

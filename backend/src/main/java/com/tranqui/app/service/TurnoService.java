@@ -642,11 +642,17 @@ public class TurnoService {
     }
 
     @Transactional
-    public void cancelarTurno(Long turnoId) {
+    public void cancelarTurno(Long turnoId, String requesterEmail) {
         Turno turno = turnoRepository.findById(turnoId)
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
 
         boolean teniaPagoAprobado = turno.getPago() != null && turno.getPago().getEstado() == EstadoPago.APROBADO;
+        // Whoever is cancelling — used to decide whether the 48h refund-withholding policy
+        // applies (see ReembolsoService#procesarReembolso): it shouldn't when the médico
+        // themselves cancels, only when the patient bails last-minute.
+        boolean profesionalCancela = requesterEmail != null
+                && turno.getMedico().getEmail() != null
+                && turno.getMedico().getEmail().equalsIgnoreCase(requesterEmail);
 
         turno.setEstado(EstadoTurno.CANCELADO);
 
@@ -662,7 +668,7 @@ public class TurnoService {
         // resolverlo manualmente desde Mercado Pago si hace falta.
         if (teniaPagoAprobado) {
             try {
-                reembolsoService.procesarReembolso(turno, turno.getMedico());
+                reembolsoService.procesarReembolso(turno, turno.getMedico(), profesionalCancela);
             } catch (Exception e) {
                 org.slf4j.LoggerFactory.getLogger(TurnoService.class)
                     .error("Error al procesar el reembolso de Mercado Pago para turno ID: {}", turnoId, e);

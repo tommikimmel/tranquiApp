@@ -954,10 +954,26 @@ export default function LandingPage({
         .then(([turnos, recetas]) => {
           setMyAppointments(turnos || [])
           setMyPrescriptions(recetas || [])
+          reconciliarTurnosPendientes(turnos || [])
         })
         .catch((err) => console.error("Error loading patient data:", err))
         .finally(() => setLoadingPortal(false))
     }
+  }
+
+  // Self-heals turnos stuck showing "Pendiente" despite already being paid — Mercado Pago's
+  // webhook isn't 100% reliable (delayed/dropped deliveries, or the patient closing the tab
+  // before the return-from-checkout redirect ever fires, so the other reconciliation path below
+  // never runs either). Every time "Mis Turnos" loads, re-checks each still-pending turno with a
+  // real (non-mock) payment attempt directly against Mercado Pago — see WebhookController#
+  // verificarPago — and silently reloads the list again if anything got confirmed.
+  const reconciliarTurnosPendientes = (turnos: any[]) => {
+    const pendientes = turnos.filter(t => t.status === 'pending' && t.checkoutUrl && !t.checkoutUrl.includes('mock'))
+    if (pendientes.length === 0) return
+    Promise.allSettled(pendientes.map(t => api.verificarPagoTurno(t.id)))
+      .then(() => api.getMisTurnos())
+      .then((turnos2: any) => { if (turnos2) setMyAppointments(turnos2) })
+      .catch((err) => console.error('Error al reconciliar turnos pendientes:', err))
   }
 
   useEffect(() => {

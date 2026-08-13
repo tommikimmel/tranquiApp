@@ -25,12 +25,24 @@ public class ReembolsoService {
     @Value("${mercadopago.enabled:false}")
     private boolean isEnabled;
 
+    // Legacy 2-arg entry point: always enforces the 48h policy (saltarPolitica48h = false), same
+    // as this method's original/only behavior — kept so existing callers/tests that don't care
+    // about who's cancelling keep working unchanged.
     public boolean procesarReembolso(Turno turno, Usuario medico) throws Exception {
+        return procesarReembolso(turno, medico, false);
+    }
+
+    // saltarPolitica48h = true when the médico themselves is the one cancelling (see
+    // TurnoService#cancelarTurno) — the 48h window exists to protect the médico's booked time
+    // from a patient bailing last-minute, not to penalize the patient's refund when it's the
+    // médico who decided not to hold the appointment. A patient-initiated cancellation still
+    // goes through the false path below and keeps the existing policy.
+    public boolean procesarReembolso(Turno turno, Usuario medico, boolean saltarPolitica48h) throws Exception {
         LocalDateTime ahora = LocalDateTime.now();
         LocalDateTime fechaTurno = LocalDateTime.of(turno.getFecha(), turno.getHoraInicio());
 
         // Validate 48 hours cancellation policy
-        if (ahora.plusHours(48).isAfter(fechaTurno)) {
+        if (!saltarPolitica48h && ahora.plusHours(48).isAfter(fechaTurno)) {
             log.warn("Intento de cancelación tardía para turno ID: {}. Menos de 48 horas.", turno.getId());
             return false; // Block automatic refund
         }

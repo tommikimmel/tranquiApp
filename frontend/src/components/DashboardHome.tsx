@@ -583,7 +583,7 @@ export default function DashboardHome({
           ) : (
             <ul className="appointment-list" role="list" aria-label="Sesiones de hoy">
               {dayAppointments.map((appt) => (
-                <AppointmentCard key={appt.id} appt={appt} />
+                <AppointmentCard key={appt.id} appt={appt} onCancel={(id) => onCancelAppointment(Number(id))} onNavigate={onNavigate} onMarcarDocumentoEnviado={onMarcarDocumentoEnviado} />
               ))}
               {dayExternalEvents.map((event) => (
                 <ExternalEventCard key={event.id} event={event} />
@@ -920,7 +920,7 @@ export default function DashboardHome({
             </div>
             <ul className="appointment-list appointment-list--compact" role="list" aria-label="Documentos solicitados">
               {documentAppointments.map((appt) => (
-                <AppointmentCard key={`doc-${appt.id}`} appt={appt} compact onMarcarDocumentoEnviado={onMarcarDocumentoEnviado} />
+                <AppointmentCard key={`doc-${appt.id}`} appt={appt} compact onMarcarDocumentoEnviado={onMarcarDocumentoEnviado} onNavigate={onNavigate} />
               ))}
             </ul>
           </div>

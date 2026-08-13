@@ -432,7 +432,7 @@ class TurnoServiceTest {
 
     @Test
     void testCancelarTurno_updatesEstadoAndNotifies() {
-        turnoService.cancelarTurno(turno.getId());
+        turnoService.cancelarTurno(turno.getId(), medico.getEmail());
 
         Turno dbTurno = turnoRepository.findById(turno.getId()).orElseThrow();
         assertEquals(EstadoTurno.CANCELADO, dbTurno.getEstado());
@@ -441,7 +441,7 @@ class TurnoServiceTest {
     @Test
     void testCancelarTurno_turnoNoEncontrado() {
         assertThrows(jakarta.persistence.EntityNotFoundException.class,
-                () -> turnoService.cancelarTurno(-1L));
+                () -> turnoService.cancelarTurno(-1L, medico.getEmail()));
     }
 
     @Test

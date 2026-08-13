@@ -442,20 +442,13 @@ export default function App() {
   }
 
   const handleCancelAppointment = (turnoId: number) => {
-    // Same 48hs rule enforced server-side in ReembolsoService — surfaced here so the médico
-    // isn't surprised that cancelling a paid turno didn't trigger a Mercado Pago refund.
+    // When the médico is the one cancelling, ReembolsoService always refunds in full regardless
+    // of the 48hs window (that policy only withholds the automatic refund when the PATIENT cancels
+    // last-minute — it doesn't make sense to penalize the patient for the médico's own decision).
     const appt = allAppointments.find(a => a.id === turnoId)
-    let refundNote = ''
-    if (appt?.status === 'confirmed' && appt.fecha && appt.hour) {
-      const [y, m, d] = appt.fecha.split('-').map(Number)
-      const timeStr = appt.horaInicio || `${appt.hour}:00`
-      const [hh, mm] = timeStr.split(':').map(Number)
-      const apptDate = new Date(y, (m || 1) - 1, d, hh || 0, mm || 0)
-      const hoursUntil = (apptDate.getTime() - Date.now()) / (1000 * 60 * 60)
-      refundNote = hoursUntil < 48
-        ? '\n\nEste turno ya fue pagado y es en menos de 48 horas: el pago NO se reembolsa automáticamente.'
-        : '\n\nEste turno ya fue pagado: al cancelarlo se reembolsa automáticamente en Mercado Pago (faltan más de 48hs).'
-    }
+    const refundNote = appt?.status === 'confirmed'
+      ? '\n\nEste turno ya fue pagado: al cancelarlo se reembolsa automáticamente en Mercado Pago.'
+      : ''
     if (window.confirm("¿Estás seguro de que deseas cancelar este turno?" + refundNote)) {
       api.cancelarTurno(turnoId)
         .then(() => {

@@ -129,7 +129,7 @@ class TurnoServiceGoogleCalendarTest {
 
         doNothing().when(googleCalendarService).eliminarEventoReunion(any(Turno.class));
 
-        turnoService.cancelarTurno(turno.getId());
+        turnoService.cancelarTurno(turno.getId(), medico.getEmail());
 
         verify(googleCalendarService, times(1)).eliminarEventoReunion(any(Turno.class));
         Turno dbTurno = turnoRepository.findById(turno.getId()).orElse(null);

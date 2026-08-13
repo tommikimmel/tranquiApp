@@ -109,4 +109,15 @@ class ReembolsoServiceTest {
         assertEquals(EstadoTurno.CONFIRMADO, turnoTardio.getEstado());
         assertEquals(EstadoPago.APROBADO, turnoTardio.getPago().getEstado());
     }
+
+    @Test
+    void whenMedicoCancelsLessThan48Hours_thenRefundStillApproved() throws Exception {
+        when(encryptionUtil.decrypt("encrypted-token")).thenReturn("dummy-token");
+
+        boolean resultado = reembolsoService.procesarReembolso(turnoTardio, medico, true);
+
+        assertTrue(resultado);
+        assertEquals(EstadoTurno.CANCELADO, turnoTardio.getEstado());
+        assertEquals(EstadoPago.REEMBOLSADO, turnoTardio.getPago().getEstado());
+    }
 }

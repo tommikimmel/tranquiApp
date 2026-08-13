@@ -292,7 +292,9 @@ export const api = {
   marcarDocumentoEnviado: (turnoId: number | string) =>
     apiFetch(`/turnos/${turnoId}/documento-enviado`, { method: 'POST' }),
   // Fallback reconciliation for when Mercado Pago's webhook is delayed/dropped — see
-  // WebhookController#verificarPago. Called right after the patient returns from Checkout Pro.
-  verificarPagoTurno: (externalReference: string, paymentId: string) =>
-    apiFetch(`/payments/verificar?externalReference=${encodeURIComponent(externalReference)}&paymentId=${encodeURIComponent(paymentId)}`, { method: 'POST' })
+  // WebhookController#verificarPago. Called right after the patient returns from Checkout Pro
+  // (with paymentId) and also for any turno already sitting "pending" in Mis Turnos (without
+  // paymentId — the backend searches Mercado Pago by external_reference instead).
+  verificarPagoTurno: (externalReference: string | number, paymentId?: string) =>
+    apiFetch(`/payments/verificar?externalReference=${encodeURIComponent(externalReference)}${paymentId ? `&paymentId=${encodeURIComponent(paymentId)}` : ''}`, { method: 'POST' })
 };

@@ -63,8 +63,10 @@ public class TurnoController {
 
     @PostMapping("/turnos/{turnoId}/cancelar")
     @PreAuthorize("hasAnyRole('PACIENTE', 'PSIQUIATRA')")
-    public ResponseEntity<Void> cancelarTurno(@PathVariable Long turnoId) {
-        turnoService.cancelarTurno(turnoId);
+    public ResponseEntity<Void> cancelarTurno(
+            @PathVariable Long turnoId,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
+        turnoService.cancelarTurno(turnoId, userDetails != null ? userDetails.getUsername() : null);
         return ResponseEntity.ok().build();
     }
 

@@ -38,6 +38,8 @@ export function getNotificationVisual(tipo: string | undefined): { Icon: (props:
       return { Icon: Icon.Activity, color: '#3b82f6' }
     case 'INFORME':
       return { Icon: Icon.FileText, color: '#8b5cf6' }
+    case 'DOCUMENTO_PENDIENTE':
+      return { Icon: Icon.FileText, color: 'var(--color-warning)' }
     case 'NUEVO_MENSAJE':
       return { Icon: Icon.MessageCircle, color: 'var(--color-primary)' }
     default:
