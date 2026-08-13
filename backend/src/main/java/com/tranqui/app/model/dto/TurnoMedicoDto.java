@@ -35,4 +35,10 @@ public class TurnoMedicoDto {
     private boolean ocupaAgenda;
     // Only meaningful when ocupaAgenda is false — see Turno.documentoEnviado.
     private boolean documentoEnviado;
+    // Only meaningful when ocupaAgenda is false — true for the specific "Receta fuera de turno"
+    // document service (see TurnoService#esReceta). The frontend can't reliably tell a receta
+    // apart from a certificado/informe just from the human-readable `type` label alone (a médico
+    // may have renamed/customized it in Honorarios y Servicios), so this is computed here from
+    // the actual servicioId/tipo instead.
+    private boolean esReceta;
 }

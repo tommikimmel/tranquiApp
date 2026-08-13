@@ -196,6 +196,13 @@ public class TurnoService {
         return "Consulta particular";
     }
 
+    // Same detection PagoWebhookHandler#resolverTipoDocumentoLabel uses for the "Nuevo Documento
+    // Pendiente" notification — kept as its own explicit boolean (TurnoMedicoDto.esReceta)
+    // instead of making the frontend infer it from the `type` label, which a médico can rename.
+    private boolean esReceta(Turno t) {
+        return "receta-fuera".equals(t.getServicioId()) || t.getTipo() == TipoTurno.RECETA;
+    }
+
     // A tarifa's precioOnline/precioPresencial only override precio when the médico explicitly
     // set one for this modalidad — most services keep a single precio regardless of modalidad,
     // so a null override just falls back to it.
@@ -502,6 +509,7 @@ public class TurnoService {
                             .metadataAfiliado(t.getMetadataAfiliado())
                             .ocupaAgenda(t.isOcupaAgenda())
                             .documentoEnviado(t.isDocumentoEnviado())
+                            .esReceta(esReceta(t))
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -566,6 +574,7 @@ public class TurnoService {
                             .metadataAfiliado(t.getMetadataAfiliado())
                             .ocupaAgenda(t.isOcupaAgenda())
                             .documentoEnviado(t.isDocumentoEnviado())
+                            .esReceta(esReceta(t))
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -621,6 +630,7 @@ public class TurnoService {
                             .domicilioAtencionBarrio(t.getMedico().getDomicilioAtencionBarrio())
                             .ocupaAgenda(t.isOcupaAgenda())
                             .documentoEnviado(t.isDocumentoEnviado())
+                            .esReceta(esReceta(t))
                             .build();
                 })
                 .collect(Collectors.toList());

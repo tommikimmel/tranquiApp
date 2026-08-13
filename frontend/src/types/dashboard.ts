@@ -12,6 +12,8 @@ export interface Appointment {
   ocupaAgenda?: boolean
   // Only meaningful when ocupaAgenda is false — see Turno.documentoEnviado.
   documentoEnviado?: boolean
+  // Only meaningful when ocupaAgenda is false — see TurnoMedicoDto.esReceta (backend).
+  esReceta?: boolean
   patientInfo?: { email?: string; telefono?: string }
 }
 

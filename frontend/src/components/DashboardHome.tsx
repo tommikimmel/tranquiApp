@@ -1292,6 +1292,18 @@ export default function DashboardHome({
               <button className="btn btn--secondary" onClick={() => setSelectedAppt(null)}>
                 Cerrar
               </button>
+              {selectedAppt.status !== 'completed' && (
+                <button
+                  className="btn btn--ghost"
+                  style={{ color: 'var(--color-danger)' }}
+                  onClick={() => {
+                    onCancelAppointment(Number(selectedAppt.id));
+                    setSelectedAppt(null);
+                  }}
+                >
+                  Cancelar turno
+                </button>
+              )}
               {(selectedAppt.modalidad ? selectedAppt.modalidad === 'ONLINE' : !!selectedAppt.meetLink) && selectedAppt.meetLink && selectedAppt.status === 'confirmed' && (
                 <a 
                   href={selectedAppt.meetLink}

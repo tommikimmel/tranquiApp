@@ -16,11 +16,13 @@ export default function AppointmentCard({ appt, compact, dateLabel, onMarcarDocu
   // its "hour" is just a booking timestamp, not a real scheduled time. See Turno.ocupaAgenda.
   const isDocumentOnly = appt.ocupaAgenda === false
   const isDocumentoEnviado = !!appt.documentoEnviado
-  // "Receta fuera de turno" is the exact label resolverTypeLabel (backend) gives this specific
-  // document service — the only one that needs an actual receta generated (via Recetas
-  // Electrónicas / QBI2) before there's anything to send at all, unlike a certificado/informe
-  // the médico writes up on their own.
-  const isReceta = appt.type === 'Receta fuera de turno'
+  // Computed server-side (TurnoMedicoDto.esReceta) from the real servicioId/tipo, not from the
+  // human-readable `type` label — a médico can rename a tariff's label in Honorarios y
+  // Servicios, which would silently break a plain string match against "Receta fuera de turno".
+  // Only a receta needs an actual e-prescription generated (via Recetas Electrónicas / QBI2)
+  // before there's anything to send at all, unlike a certificado/informe the médico writes up
+  // on their own.
+  const isReceta = !!appt.esReceta
   // Once a document turno is paid, "Confirmado" doesn't tell the médico anything actionable —
   // whether they still owe the patient the actual file is what matters here.
   const st = (isDocumentOnly && appt.status === 'confirmed')
