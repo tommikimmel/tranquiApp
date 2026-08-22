@@ -40,10 +40,19 @@ public class RecetaService {
     @Autowired
     private Qbi2RecipeClient qbi2RecipeClient;
 
+    @Autowired
+    private TurnoService turnoService;
+
+    @Autowired
+    private SubscriptionService subscriptionService;
+
     @Transactional
     public RecetaResponseDto emitirReceta(String medicoEmail, RecetaDto dto) {
         Usuario medico = usuarioRepository.findByEmail(medicoEmail)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
+
+        // Doble Gate (§7): Gate 1 (Plan Entitlement) + Gate 2 (Capacidad Legal)
+        subscriptionService.validarAccesoRecetas(medico);
 
         Usuario paciente = usuarioRepository.findById(dto.getPacienteId())
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
@@ -174,13 +183,21 @@ public class RecetaService {
                     .tipo(medico.getMatriculaTipo() != null && !medico.getMatriculaTipo().isBlank() ? medico.getMatriculaTipo() : "MP")
                     .numero(medico.getMatriculaNumero() != null ? String.valueOf(medico.getMatriculaNumero()) : medico.getMatricula())
                     .provincia(medico.getMatriculaProvincia() != null && !medico.getMatriculaProvincia().isBlank() ? medico.getMatriculaProvincia() : "Córdoba")
-                    .especialidad(medico.getSpecialty() != null ? medico.getSpecialty() : "Psiquiatría")
+                    .especialidad(medico.getSpecialty() != null && !medico.getSpecialty().isBlank() ? medico.getSpecialty() : "Psiquiatría")
                     .build();
 
             com.tranqui.app.model.dto.Qbi2RecetaDtos.SelloDto selloDto = com.tranqui.app.model.dto.Qbi2RecetaDtos.SelloDto.builder()
                     .linea1(medico.getSelloLinea1() != null && !medico.getSelloLinea1().isBlank() ? medico.getSelloLinea1() : ("Dr. " + medico.getNombre() + " " + (medico.getApellido() != null ? medico.getApellido() : "")))
-                    .linea2(medico.getSelloLinea2() != null && !medico.getSelloLinea2().isBlank() ? medico.getSelloLinea2() : (medico.getSpecialty() != null ? medico.getSpecialty() : "Psiquiatría"))
-                    .linea3(medico.getSelloLinea3() != null && !medico.getSelloLinea3().isBlank() ? medico.getSelloLinea3() : ((medico.getMatriculaTipo() != null && !medico.getMatriculaTipo().isBlank() ? medico.getMatriculaTipo() : "MP") + " " + (medico.getMatricula() != null ? medico.getMatricula() : "12345")))
+                    .linea2(medico.getSelloLinea2() != null && !medico.getSelloLinea2().isBlank() ? medico.getSelloLinea2() : (medico.getSpecialty() != null && !medico.getSpecialty().isBlank() ? medico.getSpecialty() : "Psiquiatría"))
+                    // Bug real: este fallback usaba el literal "12345" cuando medico.getMatricula() (el campo
+                    // String) era null, aun si el médico SÍ tenía cargado matriculaNumero (el campo Integer) —
+                    // el gate "medicoTieneMatricula" de arriba acepta cualquiera de los dos campos, así que un
+                    // médico con solo matriculaNumero cargado terminaba con un número de matrícula FALSO
+                    // impreso en el sello de un documento legal. Se unifica con el mismo fallback que ya usa
+                    // matriculaDto.numero más abajo (matriculaNumero primero, matricula como respaldo) — para
+                    // cuando el gate pasó, alguno de los dos siempre tiene valor real, así que ya no hace
+                    // falta (ni corresponde) un placeholder inventado.
+                    .linea3(medico.getSelloLinea3() != null && !medico.getSelloLinea3().isBlank() ? medico.getSelloLinea3() : ((medico.getMatriculaTipo() != null && !medico.getMatriculaTipo().isBlank() ? medico.getMatriculaTipo() : "MP") + " " + (medico.getMatriculaNumero() != null ? String.valueOf(medico.getMatriculaNumero()) : medico.getMatricula())))
                     .build();
 
             com.tranqui.app.model.dto.Qbi2RecetaDtos.MedicoReceta medicoReceta = com.tranqui.app.model.dto.Qbi2RecetaDtos.MedicoReceta.builder()
@@ -192,7 +209,7 @@ public class RecetaService {
                     .fechaNacimiento(medico.getFechaNacimiento() != null ? medico.getFechaNacimiento().toString() : null)
                     .email(medico.getEmail())
                     .telefono(medico.getTelefono())
-                    .especialidad(medico.getSpecialty() != null ? medico.getSpecialty() : "Psiquiatría")
+                    .especialidad(medico.getSpecialty() != null && !medico.getSpecialty().isBlank() ? medico.getSpecialty() : "Psiquiatría")
                     // Mismo campo requerido-si-Pasaporte que en PacienteReceta, ver comentario ahí.
                     .pais("Argentina")
                     .matricula(matriculaDto)
@@ -323,6 +340,16 @@ public class RecetaService {
 
         receta = recetaRepository.save(receta);
         String pdfUrl = receta.getPdfUrl();
+
+        // Best-effort: this receta just got generated for real, so any of this médico's pending
+        // "receta fuera de turno" purchases for this exact paciente are assumed fulfilled — see
+        // TurnoService#marcarRecetasEnviadasParaPaciente for the matching rationale. Never let a
+        // failure here undo the receta that was already successfully emitted through QBI2.
+        try {
+            turnoService.marcarRecetasEnviadasParaPaciente(medico.getId(), paciente.getId());
+        } catch (Exception e) {
+            log.error("Error al auto-marcar turnos de receta como enviados para médico ID {} / paciente ID {}", medico.getId(), paciente.getId(), e);
+        }
 
         // Construct message for patient
         String text = String.format(

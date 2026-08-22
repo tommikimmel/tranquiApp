@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, Suspense, lazy } from 'react'
+import { useState, useEffect, Suspense, lazy } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import './styles/index.css'
 import './styles/dashboard.css'
@@ -18,6 +18,8 @@ import ExternalEventCard from './components/ExternalEventCard'
 const AgendaView = lazy(() => import('./components/AgendaView'))
 const PrescriptionView = lazy(() => import('./components/PrescriptionView'))
 const SettingsView = lazy(() => import('./components/SettingsView'))
+const FeesServicesView = lazy(() => import('./components/FeesServicesView'))
+const ChoosePlanView = lazy(() => import('./components/ChoosePlanView'))
 const DashboardHome = lazy(() => import('./components/DashboardHome'))
 const LoginPage = lazy(() => import('./components/LoginPage'))
 const PatientsView = lazy(() => import('./components/PatientsView'))
@@ -27,11 +29,12 @@ const AdminDashboard = lazy(() => import('./components/AdminDashboard'))
 const NotFoundView = lazy(() => import('./components/NotFoundView'))
 const CompleteProfileModal = lazy(() => import('./components/CompleteProfileModal'))
 const TermsAcceptanceModal = lazy(() => import('./components/TermsAcceptanceModal'))
+const SetNewPasswordModal = lazy(() => import('./components/SetNewPasswordModal'))
 const PrivacyPolicyPage = lazy(() => import('./components/PrivacyPolicyPage'))
 const TermsPage = lazy(() => import('./components/TermsPage'))
 const MiCuentaView = lazy(() => import('./components/MiCuentaView'))
-import ComplaintModal from './components/ComplaintModal'
-import { api } from './api/api'
+const MyTicketsView = lazy(() => import('./components/MyTicketsView'))
+import { api, getBackendOrigin } from './api/api'
 import { useAlert } from './context/AlertContext'
 import { useDocumentTitle } from './hooks/useDocumentTitle'
 import { Client } from '@stomp/stompjs'
@@ -41,6 +44,22 @@ import type { Appointment, ExternalEvent, NavSection } from './types/dashboard'
 import type { CheckoutTarget } from './types/checkout'
 import { getNotificationVisual, getDoctorSlug } from './utils/dashboardHelpers'
 import { getMissingRequirements } from './utils/medicoProfile'
+
+// Mirrors the backend's SubscriptionAccessFilter check (status ACTIVE + currentPeriodEnd still
+// in the future) — the single source of truth for whether the dashboard should render or the
+// paywall (ChoosePlanView) should. Exported as a plain function so it's testable without
+// mounting the whole App tree.
+export function isSubscriptionAllowed(sub: any): boolean {
+  return !!sub && sub.status === 'ACTIVE' && !!sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) > new Date()
+}
+
+// Non-blocking "renewal coming up" warning shown a few days before expiry — the real
+// enforcement is isSubscriptionAllowed()/SubscriptionAccessFilter above, this is just a heads-up.
+export function getDaysUntilSubscriptionExpiry(sub: any): number | null {
+  return sub?.currentPeriodEnd
+    ? Math.ceil((new Date(sub.currentPeriodEnd).getTime() - Date.now()) / 86400000)
+    : null
+}
 
 // ── Root App ───────────────────────────────────────────────────
 export default function App() {
@@ -60,7 +79,7 @@ export default function App() {
   // LandingPage/LoginPage/AdminDashboard/CheckoutFlow each set their own title — this covers
   // the remaining case, the professional dashboard shell rendered directly here in App().
   useDocumentTitle(view === 'dashboard' ? 'Panel Profesional — Tranqui App' : 'Tranqui App')
-  const [showComplaintModal, setShowComplaintModal] = useState(false)
+  const [showTicketsView, setShowTicketsView] = useState(false)
   const [mpConnected, setMpConnected] = useState(false)
   const [googleConnected, setGoogleConnected] = useState(false)
   const [mpEnabled, setMpEnabled] = useState(false)
@@ -74,6 +93,7 @@ export default function App() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [showNotifications, setShowNotifications] = useState(false)
   const [newPatientAlert, setNewPatientAlert] = useState<{ nombre: string; fecha: string; hora: string; tipo: 'RESERVADO' | 'CANCELADO' } | null>(null)
+  const [cancelConfirm, setCancelConfirm] = useState<{ turnoId: number; refundNote: string } | null>(null)
   const [availabilityPresencial, setAvailabilityPresencial] = useState<any[]>([])
   const [availabilityOnline, setAvailabilityOnline] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
@@ -84,6 +104,12 @@ export default function App() {
   const [showDashboardAlertList, setShowDashboardAlertList] = useState(false)
   const [hasUnreadChats, setHasUnreadChats] = useState(false)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+
+  // Paywall de suscripciones (Etapa 1) — 'checking' evita mostrar el dashboard (o la pantalla de
+  // planes) por un instante antes de saber el estado real. Espejo en el frontend del chequeo que
+  // hace SubscriptionAccessFilter en el backend: status ACTIVE + currentPeriodEnd futuro.
+  const [mySubscription, setMySubscription] = useState<any>(null)
+  const [subscriptionAccess, setSubscriptionAccess] = useState<'checking' | 'allowed' | 'blocked'>('checking')
 
   const refreshUnreadChatsStatus = () => {
     if (currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')) {
@@ -159,34 +185,46 @@ export default function App() {
         return
       }
       setLoadingDashboard(true)
-      Promise.all([
-        api.getPerfil(),
-        api.getTurnosHoy(),
-        api.getDisponibilidad('PRESENCIAL'),
-        api.getDisponibilidad('ONLINE'),
-        api.getStats(statsPeriod),
-        api.getTurnos(),
-        api.getNotificaciones(),
-        api.getMercadoPagoStatus().catch(() => ({ connected: false })),
-        api.getGoogleCalendarStatus().catch(() => ({ connected: false })),
-        api.getTieneNoLeidos().catch(() => false),
-        api.getEventosExternosGoogleCalendar().catch((err) => {
-          console.error("Error al obtener eventos externos de Google Calendar:", err)
-          return []
-        })
-      ])
-        .then(([perfil, turnos, dispPresencial, dispOnline, statsData, allTurnos, notifData, mpStatus, googleStatus, unreadStatus, eventosExternos]) => {
-          setMedicoInfo(perfil)
-          setTodayAppointments(turnos || [])
-          setAvailabilityPresencial(dispPresencial || [])
-          setAvailabilityOnline(dispOnline || [])
-          setStats(statsData)
-          setAllAppointments(allTurnos || [])
-          setNotifications(notifData || [])
-          setMpConnected(!!mpStatus?.connected)
-          setMpEnabled(!!(mpStatus as any)?.mercadopagoEnabled)
-          setGoogleConnected(!!googleStatus?.connected)
-          setExternalEvents((eventosExternos as ExternalEvent[]) || [])
+      // Chequeo de suscripción PRIMERO — /subscriptions/my-subscription es la única ruta que el
+      // SubscriptionAccessFilter del backend deja pasar siempre. El resto de estas llamadas
+      // (turnos, disponibilidad, stats, etc.) el backend las corta con 403 si la suscripción no
+      // está activa, así que ni las intentamos en ese caso (evita que el .catch() de abajo termine
+      // interpretando el bloqueo por falta de pago como una sesión inválida y mande a /login).
+      api.getMySubscription()
+        .then((sub: any) => {
+          setMySubscription(sub)
+          const allowed = isSubscriptionAllowed(sub)
+          setSubscriptionAccess(allowed ? 'allowed' : 'blocked')
+          if (!allowed) return null
+
+          return Promise.all([
+            api.getPerfil(),
+            api.getTurnosHoy(),
+            api.getDisponibilidad('PRESENCIAL'),
+            api.getDisponibilidad('ONLINE'),
+            api.getStats(statsPeriod),
+            api.getTurnos(),
+            api.getNotificaciones(),
+            api.getMercadoPagoStatus().catch(() => ({ connected: false })),
+            api.getGoogleCalendarStatus().catch(() => ({ connected: false })),
+            api.getTieneNoLeidos().catch(() => false),
+            api.getEventosExternosGoogleCalendar().catch((err) => {
+              console.error("Error al obtener eventos externos de Google Calendar:", err)
+              return []
+            })
+          ]).then(([perfil, turnos, dispPresencial, dispOnline, statsData, allTurnos, notifData, mpStatus, googleStatus, unreadStatus, eventosExternos]) => {
+            setMedicoInfo(perfil)
+            setTodayAppointments(turnos || [])
+            setAvailabilityPresencial(dispPresencial || [])
+            setAvailabilityOnline(dispOnline || [])
+            setStats(statsData)
+            setAllAppointments(allTurnos || [])
+            setNotifications(notifData || [])
+            setMpConnected(!!mpStatus?.connected)
+            setMpEnabled(!!(mpStatus as any)?.mercadopagoEnabled)
+            setGoogleConnected(!!googleStatus?.connected)
+            setExternalEvents((eventosExternos as ExternalEvent[]) || [])
+          })
         })
         .catch((err) => {
           console.error("Error al inicializar dashboard:", err)
@@ -198,6 +236,32 @@ export default function App() {
     }
   }, [view, currentUser, loadingSession])
 
+  // Re-chequeo periódico de la suscripción mientras el profesional está adentro del panel.
+  // Dos casos, con distinta urgencia:
+  // - 'allowed': una sesión larga que cruza la medianoche del vencimiento — no hay apuro,
+  //   re-chequea cada 5 min y lo manda a ChoosePlanView si venció (en vez de dejarlo con
+  //   pantallas rotas por 403s silenciosos de ahí en más).
+  // - 'blocked': el profesional está viendo ChoosePlanView y puede volver de haber pagado en
+  //   Mercado Pago (backUrl = /panel) antes de que llegue el webhook que activa la suscripción —
+  //   sin este polling se quedaría mirando la pantalla de bloqueo hasta recargar a mano.
+  useEffect(() => {
+    const isProUser = currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')
+    if (loadingSession || view !== 'dashboard' || !isProUser || subscriptionAccess === 'checking') return
+
+    const intervalMs = subscriptionAccess === 'blocked' ? 15 * 1000 : 5 * 60 * 1000
+    const interval = setInterval(() => {
+      api.getMySubscription()
+        .then((sub: any) => {
+          setMySubscription(sub)
+          const allowed = isSubscriptionAllowed(sub)
+          setSubscriptionAccess(allowed ? 'allowed' : 'blocked')
+        })
+        .catch(() => {})
+    }, intervalMs)
+
+    return () => clearInterval(interval)
+  }, [loadingSession, view, currentUser, subscriptionAccess])
+
   // WebSocket Live Notifications Handler
   useEffect(() => {
     if (loadingSession) return
@@ -206,7 +270,7 @@ export default function App() {
       let client: Client | null = null;
       api.getPerfil().then((perfil) => {
         if (perfil && perfil.id) {
-          const socketUrl = window.location.protocol === 'https:' ? `https://${window.location.host}/ws-tranqui` : `http://${window.location.hostname}:8081/ws-tranqui`;
+          const socketUrl = `${getBackendOrigin()}/ws-tranqui`;
           const socket = new SockJS(socketUrl, null, { withCredentials: true } as any)
           client = new Client({
             webSocketFactory: () => socket,
@@ -273,7 +337,11 @@ export default function App() {
         }
       }
     }
-  }, [currentUser, view, loadingSession])
+    // Keyed on the stable id/rol pair, not the whole `currentUser` object — a new object
+    // reference on an unrelated re-render would tear the socket down and recreate it mid-handshake
+    // ("WebSocket is closed before the connection is established"), same bug fixed in LandingPage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, currentUser?.rol, view, loadingSession])
 
   const handleStatsPeriodChange = async (periodo: 'DIARIO' | 'SEMANAL' | 'MENSUAL') => {
     setStatsPeriod(periodo)
@@ -289,6 +357,18 @@ export default function App() {
     const updated = await api.actualizarDisponibilidad(modalidad, data)
     if (modalidad === 'PRESENCIAL') setAvailabilityPresencial(updated || data)
     else setAvailabilityOnline(updated || data)
+  }
+
+  // Bugfix: AgendaView used to call api.actualizarConfigAgenda directly, so the backend saved
+  // duracionTurnoMinutos/intervaloEntreTurnosMinutos correctly but medicoInfo here in App state
+  // never picked up the new values. AgendaView reads its initial duración/intervalo from the
+  // medicoInfo prop, so navigating away from Agenda and back (which remounts it) showed the old
+  // values again — and worse, re-imported the saved availability slots against the stale
+  // duración, silently dropping slots that no longer "fit" the mismatched grid. Routing the save
+  // through here and updating medicoInfo keeps the two in sync.
+  const handleSaveAgendaConfig = async (config: { duracionTurnoMinutos: number; intervaloEntreTurnosMinutos: number }) => {
+    const updated = await api.actualizarConfigAgenda(config)
+    setMedicoInfo(updated)
   }
 
   const handleSaveSettings = async (data: any) => {
@@ -447,19 +527,24 @@ export default function App() {
     // last-minute — it doesn't make sense to penalize the patient for the médico's own decision).
     const appt = allAppointments.find(a => a.id === turnoId)
     const refundNote = appt?.status === 'confirmed'
-      ? '\n\nEste turno ya fue pagado: al cancelarlo se reembolsa automáticamente en Mercado Pago.'
+      ? 'Este turno ya fue pagado: al cancelarlo se reembolsa automáticamente en Mercado Pago.'
       : ''
-    if (window.confirm("¿Estás seguro de que deseas cancelar este turno?" + refundNote)) {
-      api.cancelarTurno(turnoId)
-        .then(() => {
-          showAlert("Turno cancelado con éxito.", "success");
-          refreshDashboardAppointments();
-        })
-        .catch(err => {
-          console.error(err);
-          showAlert("Error al cancelar el turno.", "error");
-        });
-    }
+    setCancelConfirm({ turnoId, refundNote })
+  }
+
+  const confirmCancelAppointment = () => {
+    if (!cancelConfirm) return
+    const { turnoId } = cancelConfirm
+    setCancelConfirm(null)
+    api.cancelarTurno(turnoId)
+      .then(() => {
+        showAlert("Turno cancelado con éxito.", "success");
+        refreshDashboardAppointments();
+      })
+      .catch(err => {
+        console.error(err);
+        showAlert("Error al cancelar el turno.", "error");
+      });
   }
 
   const handleUpdateAttendance = (turnoId: number, asistencia: string) => {
@@ -473,8 +558,8 @@ export default function App() {
       });
   }
 
-  const handleMarcarDocumentoEnviado = (turnoId: string) => {
-    api.marcarDocumentoEnviado(turnoId)
+  const handleMarcarDocumentoEnviado = (turnoId: string, archivo: { data: string; nombre: string }) => {
+    api.marcarDocumentoEnviado(turnoId, archivo)
       .then(() => {
         refreshDashboardAppointments();
       })
@@ -504,6 +589,7 @@ export default function App() {
     prescriptions: 'Recetas',
     visitors: 'Visitadores médicos',
     payments: 'Cobros y liquidaciones',
+    honorarios: 'Honorarios y servicios',
     settings: 'Configuración',
   }
 
@@ -540,7 +626,7 @@ export default function App() {
             onRescheduleAppointment={handleRescheduleAppointment}
             onMarcarDocumentoEnviado={handleMarcarDocumentoEnviado}
             medicoInfo={medicoInfo}
-            onNavigate={(section) => navigate('/panel/' + section)}
+            onNavigate={(section, state) => navigate('/panel/' + section, { state })}
           />
         )
       case 'agenda':
@@ -550,6 +636,7 @@ export default function App() {
             initialAvailabilityPresencial={availabilityPresencial}
             initialAvailabilityOnline={availabilityOnline}
             onSave={handleSaveAvailability}
+            onSaveConfig={handleSaveAgendaConfig}
           />
         )
       case 'patients':
@@ -566,6 +653,13 @@ export default function App() {
           <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>Próximamente — historial de pagos recibidos (Tranqui es 100% libre de comisiones).</p>
         </div>
       )
+      case 'honorarios':
+        return (
+          <FeesServicesView
+            medicoInfo={medicoInfo}
+            onSave={handleSaveSettings}
+          />
+        )
       case 'settings': 
         return (
           <SettingsView
@@ -586,6 +680,12 @@ export default function App() {
   const isPro = currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')
   const unreadCount = notifications.filter(n => !n.leido).length
   const showBanner = view === 'dashboard' && medicoInfo && !medicoInfo.verificado && showUnverifiedAlert;
+
+  // Aviso (no bloqueante) de vencimiento próximo — el bloqueo real ya lo maneja
+  // subscriptionAccess/SubscriptionAccessFilter; esto es solo para avisar con anticipación.
+  const daysUntilSubscriptionExpiry = getDaysUntilSubscriptionExpiry(mySubscription)
+  const showExpiryWarning = view === 'dashboard' && subscriptionAccess === 'allowed'
+    && daysUntilSubscriptionExpiry !== null && daysUntilSubscriptionExpiry <= 3 && daysUntilSubscriptionExpiry >= 0
 
   const landingElement = (
     <LandingPage
@@ -772,19 +872,16 @@ export default function App() {
           </button>
           <h1 className="dashboard-header__title">{pageTitle[activeNav]}</h1>
         </div>
-        <div className="dashboard-header__actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+
+        <div className="dashboard-header__actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           
           {/* Interactive Notifications Bell */}
           <div style={{ position: 'relative' }}>
             <button
-              className="btn btn--icon btn--ghost"
+              className="btn btn--ghost btn--sm dashboard-header__action-btn"
               onClick={() => {
                 const opening = !showNotifications
                 setShowNotifications(opening)
-                // Opening the panel is how a médico "reads" their notifications — clear the
-                // badge right away instead of requiring a separate "Marcar leídas" click, which
-                // otherwise left the bell showing unread indefinitely even after everything had
-                // been seen.
                 if (opening && unreadCount > 0) {
                   handleMarkNotificationsRead()
                 }
@@ -793,21 +890,16 @@ export default function App() {
               style={{ position: 'relative' }}
             >
               <Icon.Bell hasUnread={unreadCount > 0} />
+              <span>Notificaciones</span>
               {unreadCount > 0 && (
                 <span style={{
-                  position: 'absolute',
-                  top: -2,
-                  right: -2,
                   backgroundColor: 'var(--color-error)',
                   color: 'white',
-                  borderRadius: '50%',
-                  width: '16px',
-                  height: '16px',
-                  fontSize: '9px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 'bold'
+                  borderRadius: '999px',
+                  padding: '2px 6px',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  lineHeight: 1
                 }}>
                   {unreadCount}
                 </span>
@@ -877,26 +969,39 @@ export default function App() {
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <button
+            onClick={() => setShowTicketsView(true)}
+            className="btn btn--ghost btn--sm dashboard-header__action-btn"
+            title="Ver mis tickets de soporte"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            Soporte
+          </button>
+
+          <div className="dashboard-header__divider" />
+
+          <div className="dashboard-header__profile">
             {medicoInfo?.fotoUrl ? (
-              <img 
-                src={medicoInfo.fotoUrl} 
-                alt={medicoInfo.name} 
-                className="sidebar__avatar" 
-                style={{ cursor: 'pointer', objectFit: 'cover', border: '1.5px solid var(--color-border)', width: '36px', height: '36px', borderRadius: '50%' }} 
-                aria-label="Ir a Configuración" 
-                role="button" 
+              <img
+                src={medicoInfo.fotoUrl}
+                alt={medicoInfo.name}
+                className="sidebar__avatar"
+                style={{ cursor: 'pointer', objectFit: 'cover', border: '1.5px solid var(--color-border)', width: '34px', height: '34px', borderRadius: '50%' }}
+                aria-label="Ir a Configuración"
+                role="button"
                 tabIndex={0}
                 onClick={() => navigate('/panel/settings')}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/panel/settings'); } }}
               />
             ) : (
-              <div 
-                className="sidebar__avatar" 
-                aria-label="Ir a Configuración" 
-                role="button" 
-                tabIndex={0} 
-                style={{ cursor: 'pointer' }}
+              <div
+                className="sidebar__avatar"
+                aria-label="Ir a Configuración"
+                role="button"
+                tabIndex={0}
+                style={{ cursor: 'pointer', width: '34px', height: '34px' }}
                 onClick={() => navigate('/panel/settings')}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/panel/settings'); } }}
               >
@@ -904,24 +1009,24 @@ export default function App() {
               </div>
             )}
             <button
-              onClick={() => setShowComplaintModal(true)}
-              className="btn btn--ghost btn--sm"
-              style={{ fontSize: '11px', padding: 'var(--space-1) var(--space-3)' }}
-              title="Enviar una queja o consulta a soporte"
-            >
-              Soporte
-            </button>
-            <button
               onClick={handleLogout}
-              className="btn btn--ghost btn--sm"
-              style={{ fontSize: '11px', padding: 'var(--space-1) var(--space-3)' }}
+              className="btn btn--outline btn--sm dashboard-header__action-btn"
             >
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
               Cerrar sesión
             </button>
           </div>
         </div>
       </header>
-      <ComplaintModal isOpen={showComplaintModal} onClose={() => setShowComplaintModal(false)} />
+      {showTicketsView && (
+        <Suspense fallback={null}>
+          <MyTicketsView onClose={() => setShowTicketsView(false)} />
+        </Suspense>
+      )}
 
       <main 
         className="dashboard-main" 
@@ -936,6 +1041,30 @@ export default function App() {
           padding: 'var(--space-6)' 
         } : {}}
       >
+        {showExpiryWarning && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+            padding: 'var(--space-3) var(--space-4)', marginBottom: 'var(--space-4)',
+            backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--radius-md)',
+            color: '#78350f', fontSize: 'var(--text-sm)'
+          }}>
+            <div style={{
+              width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#fef3c7',
+              color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+            }}>
+              <Icon.AlertTriangle size={16} />
+            </div>
+            <div>
+              <strong>
+                {daysUntilSubscriptionExpiry === 0
+                  ? 'Tu suscripción vence hoy'
+                  : `Tu suscripción vence en ${daysUntilSubscriptionExpiry} día${daysUntilSubscriptionExpiry === 1 ? '' : 's'}`}
+              </strong>
+              {' — '}
+              {new Date(mySubscription.currentPeriodEnd).toLocaleDateString('es-AR')}. Renovala para no perder el acceso al panel.
+            </div>
+          </div>
+        )}
         {renderContent()}
       </main>
 
@@ -1014,6 +1143,84 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {cancelConfirm && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div className="card" style={{
+            maxWidth: '400px',
+            width: '90%',
+            padding: 'var(--space-6)',
+            textAlign: 'center',
+            boxShadow: 'var(--shadow-lg)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--color-surface)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 'var(--space-4)'
+          }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              backgroundColor: '#fee2e2',
+              color: 'var(--color-danger, #dc2626)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 24, height: 24 }}>
+                <circle cx="12" cy="12" r="9" /><path d="M15 9l-6 6M9 9l6 6" />
+              </svg>
+            </div>
+            <h3 style={{
+              fontFamily: 'var(--font-heading)',
+              fontSize: 'var(--text-lg)',
+              fontWeight: 'var(--font-weight-bold)',
+              color: 'var(--color-text-primary)',
+              margin: 0
+            }}>
+              ¿Cancelar este turno?
+            </h3>
+            <p style={{
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-text-secondary)',
+              lineHeight: 'var(--line-height-relaxed)',
+              margin: 0
+            }}>
+              Esta acción no se puede deshacer y se le va a avisar al paciente.
+              {cancelConfirm.refundNote && <><br /><br />{cancelConfirm.refundNote}</>}
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', width: '100%', marginTop: 'var(--space-2)' }}>
+              <button
+                className="btn btn--secondary"
+                onClick={() => setCancelConfirm(null)}
+                style={{ flex: 1 }}
+              >
+                Volver
+              </button>
+              <button
+                className="btn btn--primary"
+                onClick={confirmCancelAppointment}
+                style={{ flex: 1, backgroundColor: 'var(--color-danger, #dc2626)', borderColor: 'var(--color-danger, #dc2626)' }}
+              >
+                Cancelar turno
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 
@@ -1061,6 +1268,12 @@ export default function App() {
               <AdminDashboard currentUser={currentUser} onLogout={handleLogout} />
             ) : !isPro ? (
               <Navigate to="/" replace />
+            ) : subscriptionAccess === 'checking' ? (
+              null
+            ) : subscriptionAccess === 'blocked' ? (
+              <Suspense fallback={null}>
+                <ChoosePlanView variant="blocked" subscription={mySubscription} onLogout={handleLogout} />
+              </Suspense>
             ) : (
               proDashboardElement
             )
@@ -1068,7 +1281,12 @@ export default function App() {
         />
         <Route path="*" element={<NotFoundView currentUser={currentUser} />} />
       </Routes>
-      {currentUser && currentUser.requiereAceptarTerminos ? (
+      {currentUser && currentUser.mustChangePassword ? (
+        <SetNewPasswordModal
+          onComplete={(updatedUser) => setCurrentUser(updatedUser)}
+          onLogout={handleLogout}
+        />
+      ) : currentUser && currentUser.requiereAceptarTerminos ? (
         <TermsAcceptanceModal
           onComplete={(updatedUser) => setCurrentUser(updatedUser)}
           onLogout={handleLogout}

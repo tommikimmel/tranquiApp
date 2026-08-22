@@ -66,4 +66,14 @@ public class TarifaMedico {
     @Builder.Default
     @Column(name = "requiere_agenda", columnDefinition = "boolean not null default true")
     private boolean requiereAgenda = true;
+
+    // Only meaningful when requiereAgenda is false (a pure document service): whether it's
+    // specifically a receta — those route to "Generar receta →" (Recetas Electrónicas / QBI2)
+    // instead of the "Enviar por mail" flow every other document service uses (see
+    // TurnoService#marcarDocumentoEnviado / DocumentActions.tsx). A médico can have several
+    // custom document services (e.g. "Receta de control" vs "Certificado laboral"), so this
+    // can't be inferred from servicioId alone the way the built-in "receta-fuera" tarifa is.
+    @Builder.Default
+    @Column(name = "es_receta", columnDefinition = "boolean not null default false")
+    private boolean esReceta = false;
 }

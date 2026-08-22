@@ -5,7 +5,7 @@ import { useAlert } from '../context/AlertContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import '../styles/privacy.css'
 
-type MiCuentaTab = 'datos' | 'password' | 'notificaciones' | 'privacidad' | 'eliminar'
+type MiCuentaTab = 'datos' | 'suscripcion' | 'password' | 'notificaciones' | 'privacidad' | 'eliminar'
 
 // Small inline icon set, kept local to this view (same visual language as the rest of the
 // app: 24x24 viewBox, currentColor stroke, 1.75 weight, rounded caps) so Mi Cuenta doesn't
@@ -14,6 +14,11 @@ const MCIcon = {
   User: ({ size = 16 }: { size?: number } = {}) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+    </svg>
+  ),
+  CreditCard: ({ size = 16 }: { size?: number } = {}) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size }}>
+      <rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" />
     </svg>
   ),
   Lock: ({ size = 16 }: { size?: number } = {}) => (
@@ -94,6 +99,7 @@ const MCIcon = {
 
 const TABS: { id: MiCuentaTab; label: string; Icon: (props?: { size?: number }) => React.JSX.Element }[] = [
   { id: 'datos', label: 'Datos personales', Icon: MCIcon.User },
+  { id: 'suscripcion', label: 'Mi Suscripción y Facturas', Icon: MCIcon.CreditCard },
   { id: 'password', label: 'Contraseña', Icon: MCIcon.Lock },
   { id: 'notificaciones', label: 'Notificaciones', Icon: MCIcon.Bell },
   { id: 'privacidad', label: 'Acceso a mis datos', Icon: MCIcon.Shield },
@@ -156,6 +162,10 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // Suscripciones y Facturas ARCA state
+  const [mySub, setMySub] = useState<any>(null)
+  const [myInvoices, setMyInvoices] = useState<any[]>([])
+
   useEffect(() => {
     api.getMiCuenta()
       .then((data: any) => {
@@ -178,6 +188,10 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
         showAlert('No pudimos cargar los datos de tu cuenta. Intentá de nuevo.', 'error')
       })
       .finally(() => setLoading(false))
+
+    // Cargar suscripción y facturas ARCA
+    api.getMySubscription().then((s: any) => setMySub(s)).catch(() => {})
+    api.getMyInvoices().then((invs: any) => setMyInvoices(Array.isArray(invs) ? invs : [])).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -323,7 +337,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
             <div className="settings-content">
               {activeTab === 'datos' && (
                 <div className="card">
-                  <div className="card__header">
+                  <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
                     <div>
                       <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <MCIcon.User size={18} /> Datos personales
@@ -332,6 +346,9 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                         <MCIcon.Mail /> {cuenta?.email}
                       </p>
                     </div>
+                    <button className="btn btn--primary btn--sm" onClick={handleSaveDatos} disabled={savingDatos} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
+                      <MCIcon.Save size={14} /> {savingDatos ? 'Guardando...' : 'Guardar cambios'}
+                    </button>
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)', marginTop: 'var(--space-5)' }}>
@@ -444,6 +461,103 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                     </button>
                   </div>
                   </div>
+                </div>
+              )}
+
+              {activeTab === 'suscripcion' && (
+                <div className="card">
+                  <div className="card__header">
+                    <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <MCIcon.CreditCard size={18} /> Mi Suscripción y Facturas ARCA
+                    </h2>
+                    <p className="card__subtitle">
+                      Gestioná tu membresía profesional y descargá tus comprobantes oficiales con CAE y código QR emitidos por ARCA.
+                    </p>
+                  </div>
+
+                  {mySub ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+                      <div style={{
+                        padding: 'var(--space-4)',
+                        backgroundColor: 'var(--green-50)',
+                        border: '1px solid var(--green-200)',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 'var(--space-3)'
+                      }}>
+                        <div>
+                          <span style={{ fontSize: '11px', color: 'var(--color-primary-hover)', fontWeight: 'bold', display: 'block' }}>PLAN PROFESIONAL</span>
+                          <strong style={{ fontSize: '18px', color: 'var(--color-primary)' }}>{mySub.plan?.name || 'Plan Profesional'}</strong>
+                          <span style={{ display: 'block', fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                            {mySub.currentPeriodEnd ? `Período cubierto hasta el ${new Date(mySub.currentPeriodEnd).toLocaleDateString('es-AR')}` : 'Sin fecha de vencimiento'}
+                          </span>
+                        </div>
+                        <span className={`badge ${mySub.status === 'ACTIVE' ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>
+                          {mySub.status === 'ACTIVE' ? 'Suscripción Activa' : mySub.status}
+                        </span>
+                      </div>
+
+                      {mySub.activeFeatures && mySub.activeFeatures.length > 0 && (
+                        <div>
+                          <strong style={{ fontSize: '13px', display: 'block', marginBottom: '8px' }}>Funcionalidades habilitadas:</strong>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {mySub.activeFeatures.map((feat: string) => (
+                              <span key={feat} className="badge badge--neutral" style={{ fontSize: '12px' }}>
+                                ✓ {feat.replace(/_/g, ' ')}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div style={{ marginTop: 'var(--space-2)' }}>
+                        <strong style={{ fontSize: '14px', display: 'block', marginBottom: '8px' }}>Comprobantes y Facturas C:</strong>
+                        {myInvoices.length === 0 ? (
+                          <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>No hay facturas emitidas todavía.</p>
+                        ) : (
+                          <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                              <thead>
+                                <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+                                  <th style={{ padding: '8px' }}>Comprobante</th>
+                                  <th style={{ padding: '8px' }}>Fecha</th>
+                                  <th style={{ padding: '8px' }}>Monto</th>
+                                  <th style={{ padding: '8px' }}>CAE</th>
+                                  <th style={{ padding: '8px', textAlign: 'right' }}>Descarga</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {myInvoices.map((inv: any) => (
+                                  <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                                    <td style={{ padding: '8px' }}>
+                                      <strong>{inv.cbteTipoNombre}</strong> #{String(inv.puntoVenta).padStart(5, '0')}-{String(inv.cbteNumero).padStart(8, '0')}
+                                    </td>
+                                    <td style={{ padding: '8px' }}>{new Date(inv.fechaEmision).toLocaleDateString('es-AR')}</td>
+                                    <td style={{ padding: '8px', fontWeight: 'bold' }}>$ {inv.importeTotal?.toLocaleString('es-AR')}</td>
+                                    <td style={{ padding: '8px', fontFamily: 'monospace' }}>{inv.cae || '—'}</td>
+                                    <td style={{ padding: '8px', textAlign: 'right' }}>
+                                      {inv.pdfUrl && (
+                                        <a href={api.getInvoicePdfUrl(inv.id)} target="_blank" rel="noreferrer" className="btn btn--secondary btn--sm">
+                                          📥 Descargar Factura C
+                                        </a>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-text-secondary)' }}>
+                      No contás con una suscripción profesional activa.
+                    </div>
+                  )}
                 </div>
               )}
 

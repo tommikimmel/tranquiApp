@@ -33,21 +33,13 @@ class ResendEmailServiceTest {
     }
 
     @Test
-    void enviarQueja_conAsuntoYRolCompletos_noLanzaExcepcion() {
-        assertDoesNotThrow(() -> resendEmailService.enviarQueja(
-                "Marta Rossi", "marta.medico@test.com", "PSIQUIATRA",
-                "Problema con un pago", "El pago no se acreditó en mi cuenta de Mercado Pago."));
+    void enviarRespuestaTicket_noLanzaExcepcion() {
+        assertDoesNotThrow(() -> resendEmailService.enviarRespuestaTicket(
+                "pedro@test.com", "Pedro", "Problema con un pago", "Ya lo revisamos, quedó resuelto."));
     }
 
     @Test
-    void enviarQueja_sinAsunto_usaValorPorDefecto() {
-        assertDoesNotThrow(() -> resendEmailService.enviarQueja(
-                "Pedro Gómez", "pedro@test.com", "PACIENTE", "", "No puedo reservar un turno."));
-    }
-
-    @Test
-    void enviarQueja_conAsuntoNulo_noLanzaExcepcion() {
-        assertDoesNotThrow(() -> resendEmailService.enviarQueja(
-                "Pedro Gómez", "pedro@test.com", "PACIENTE", null, "No puedo reservar un turno."));
+    void enviarPasswordTemporal_noLanzaExcepcion() {
+        assertDoesNotThrow(() -> resendEmailService.enviarPasswordTemporal("pedro@test.com", "Pedro", "Ab3xY9kLmP"));
     }
 }

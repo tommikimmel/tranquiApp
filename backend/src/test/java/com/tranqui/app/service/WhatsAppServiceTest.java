@@ -1,6 +1,7 @@
 package com.tranqui.app.service;
 
 import com.tranqui.app.model.EstadoTurno;
+import com.tranqui.app.model.Modalidad;
 import com.tranqui.app.model.Turno;
 import com.tranqui.app.model.Usuario;
 import org.junit.jupiter.api.BeforeEach;
@@ -113,6 +114,47 @@ class WhatsAppServiceTest {
     void whenTelemedicinaUrlIsEmpty_thenThrowsException() {
         turno.setTelemedicinaUrl(null);
         assertThrows(IllegalArgumentException.class, () -> whatsAppService.construirCuerpoMensaje(turno));
+    }
+
+    // Regression test: construirCuerpoMensaje used to throw IllegalArgumentException whenever
+    // telemedicinaUrl was blank, with no exception for PRESENCIAL turnos (which never have one).
+    // NotificationScheduler.enviarRecordatoriosTurnosSiguienteDia catches exceptions per-turno,
+    // so this silently meant presencial patients never got their WhatsApp reminder at all. Fixed
+    // by branching on modalidad instead of unconditionally requiring the video-call link.
+    @Test
+    void whenModalidadIsPresencialAndTelemedicinaUrlIsMissing_thenBodyIsBuiltWithoutVideoLink() {
+        turno.setModalidad(Modalidad.PRESENCIAL);
+        turno.setTelemedicinaUrl(null);
+
+        String body = whatsAppService.construirCuerpoMensaje(turno);
+
+        assertNotNull(body);
+        assertTrue(body.contains("Juan Paciente"));
+        assertTrue(body.contains("Carlos Medico"));
+        assertTrue(body.contains("consultorio"));
+        assertFalse(body.contains("Enlace de la videollamada"));
+        assertFalse(body.contains("https://"));
+    }
+
+    // ONLINE (and legacy turnos with no modalidad set at all, the pre-existing default covered
+    // by whenTelemedicinaUrlIsEmpty_thenThrowsException above) must keep requiring the link —
+    // only PRESENCIAL is exempt.
+    @Test
+    void whenModalidadIsOnlineAndTelemedicinaUrlIsMissing_thenStillThrowsException() {
+        turno.setModalidad(Modalidad.ONLINE);
+        turno.setTelemedicinaUrl(null);
+
+        assertThrows(IllegalArgumentException.class, () -> whatsAppService.construirCuerpoMensaje(turno));
+    }
+
+    // accountSid == "ACmockaccount" is the offline/dev sentinel (set in setUp()) — it short
+    // circuits createTwilioMessage before it ever touches the Twilio SDK, which is what lets the
+    // whole test suite (and local/dev runs without real Twilio credentials) exercise
+    // enviarMensajeRecordatorio without a network call or throwing.
+    @Test
+    void whenAccountSidIsMockSentinel_thenCreateTwilioMessageDoesNotThrow() {
+        assertDoesNotThrow(() ->
+                whatsAppService.createTwilioMessage("whatsapp:+123", "whatsapp:+456", "hola"));
     }
 
     @Test

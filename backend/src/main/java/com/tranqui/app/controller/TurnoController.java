@@ -96,8 +96,13 @@ public class TurnoController {
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<Void> marcarDocumentoEnviado(
             @PathVariable Long turnoId,
+            @RequestBody(required = false) com.tranqui.app.model.dto.MarcarDocumentoEnviadoRequest body,
             @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
-        turnoService.marcarDocumentoEnviado(turnoId, userDetails.getUsername());
+        turnoService.marcarDocumentoEnviado(
+                turnoId,
+                userDetails.getUsername(),
+                body != null ? body.getArchivoData() : null,
+                body != null ? body.getArchivoNombre() : null);
         return ResponseEntity.ok().build();
     }
 

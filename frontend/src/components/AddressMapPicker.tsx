@@ -621,7 +621,16 @@ export default function AddressMapPicker({
 
       <div
         ref={mapContainerRef}
-        style={{ width: '100%', height: '220px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)', marginTop: '8px' }}
+        style={{
+          width: '100%',
+          height: '220px',
+          borderRadius: 'var(--radius-md)',
+          border: '1.5px solid var(--color-border)',
+          marginTop: '8px',
+          position: 'relative',
+          zIndex: 1,
+          isolation: 'isolate'
+        }}
       />
       
       {lat != null && lng != null ? (

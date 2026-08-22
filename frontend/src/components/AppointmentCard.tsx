@@ -1,9 +1,10 @@
 import { Icon } from './Icon'
 import type { Appointment, NavSection } from '../types/dashboard'
+import DocumentActions from './DocumentActions'
 
 // `compact` renders the slimmer "upcoming turnos" row (side panel on Inicio); the default
 // (non-compact) rendering keeps the fuller boxed row used by the "Diario" calendar tab.
-export default function AppointmentCard({ appt, compact, dateLabel, onMarcarDocumentoEnviado, onNavigate, onCancel }: { appt: Appointment; compact?: boolean; dateLabel?: string; onMarcarDocumentoEnviado?: (id: string) => void; onNavigate?: (section: NavSection) => void; onCancel?: (id: string) => void }) {
+export default function AppointmentCard({ appt, compact, dateLabel, onMarcarDocumentoEnviado, onNavigate, onCancel }: { appt: Appointment; compact?: boolean; dateLabel?: string; onMarcarDocumentoEnviado?: (id: string, archivo: { data: string; nombre: string }) => void; onNavigate?: (section: NavSection, state?: any) => void; onCancel?: (id: string) => void }) {
   const statusMap = {
     confirmed: { label: 'Confirmado', cls: 'badge--success' },
     pending: { label: 'Pago pendiente', cls: 'badge--warning' },
@@ -19,9 +20,6 @@ export default function AppointmentCard({ appt, compact, dateLabel, onMarcarDocu
   // Computed server-side (TurnoMedicoDto.esReceta) from the real servicioId/tipo, not from the
   // human-readable `type` label — a médico can rename a tariff's label in Honorarios y
   // Servicios, which would silently break a plain string match against "Receta fuera de turno".
-  // Only a receta needs an actual e-prescription generated (via Recetas Electrónicas / QBI2)
-  // before there's anything to send at all, unlike a certificado/informe the médico writes up
-  // on their own.
   const isReceta = !!appt.esReceta
   // Once a document turno is paid, "Confirmado" doesn't tell the médico anything actionable —
   // whether they still owe the patient the actual file is what matters here.
@@ -29,14 +27,48 @@ export default function AppointmentCard({ appt, compact, dateLabel, onMarcarDocu
     ? (isDocumentoEnviado ? { label: 'Documento enviado', cls: 'badge--success' } : { label: 'Documento pendiente', cls: 'badge--warning' })
     : (statusMap[appt.status] || { label: appt.status, cls: 'badge--neutral' })
 
-  const patientEmail = appt.patientInfo?.email
-  const patientPhoneDigits = (appt.patientInfo?.telefono || '').replace(/[^\d]/g, '')
-  const emailHref = patientEmail
-    ? `mailto:${patientEmail}?subject=${encodeURIComponent('Tu ' + appt.type)}&body=${encodeURIComponent(`Hola ${appt.patientName}, te enviamos adjunto tu ${appt.type.toLowerCase()}. Saludos.`)}`
-    : undefined
-  const whatsappHref = patientPhoneDigits
-    ? `https://wa.me/${patientPhoneDigits}?text=${encodeURIComponent(`Hola ${appt.patientName}, te enviamos tu ${appt.type.toLowerCase()} adjunto en este mensaje.`)}`
-    : undefined
+  // Document-only turnos get their own stacked card (header row + full-width actions row)
+  // instead of cramming icon/name/badge/buttons into a single flex row — that's what made the
+  // action buttons unreachable/effectively invisible in the narrow "Documentos solicitados"
+  // side card. The buttons themselves (and the send-by-mail modal) live in DocumentActions so
+  // the "Detalle del Turno" modal (DashboardHome) can render the exact same controls.
+  if (isDocumentOnly) {
+    return (
+      <li className={`appointment-item appointment-item--document ${compact ? 'appointment-item--compact' : ''}`}>
+        <div className="document-card__header">
+          <span className="document-card__icon"><Icon.FileText size={18} /></span>
+          <div className="document-card__info">
+            <div className="appointment-item__name">{appt.patientName}</div>
+            <span className={`document-card__type-chip ${isReceta ? 'document-card__type-chip--receta' : 'document-card__type-chip--otro'}`}>
+              {appt.type}
+            </span>
+          </div>
+          <span className={`badge ${st.cls}`} style={{ fontSize: '9px', flexShrink: 0 }}>{st.label}</span>
+        </div>
+        {(appt.status === 'confirmed' || appt.status === 'pending') && (
+          <div className="document-card__footer">
+            {appt.status === 'confirmed' ? (
+              <DocumentActions appt={appt} onMarcarDocumentoEnviado={onMarcarDocumentoEnviado} onNavigate={onNavigate} />
+            ) : (
+              <span style={{ fontSize: '11px', color: 'var(--color-warning)', fontWeight: 'bold' }}>
+                Esperando pago
+              </span>
+            )}
+            {!compact && onCancel && (
+              <button
+                type="button"
+                onClick={() => onCancel(appt.id)}
+                className="btn btn--ghost btn--sm"
+                style={{ color: 'var(--color-danger)', marginLeft: 'auto' }}
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
+        )}
+      </li>
+    )
+  }
 
   return (
     <li className={`appointment-item ${compact ? 'appointment-item--compact' : ''}`}>
@@ -44,14 +76,8 @@ export default function AppointmentCard({ appt, compact, dateLabel, onMarcarDocu
         {dateLabel && (
           <div style={{ fontSize: '9px', fontWeight: 'bold', color: 'var(--color-primary)', textTransform: 'uppercase' }}>{dateLabel}</div>
         )}
-        {isDocumentOnly ? (
-          <Icon.FileText size={18} />
-        ) : (
-          <>
-            <div className="appointment-item__hour">{appt.hour}</div>
-            <div className="appointment-item__ampm">{appt.ampm || 'hs'}</div>
-          </>
-        )}
+        <div className="appointment-item__hour">{appt.hour}</div>
+        <div className="appointment-item__ampm">{appt.ampm || 'hs'}</div>
       </div>
       <div className="appointment-item__divider" />
       <div className="appointment-item__info">
@@ -65,18 +91,12 @@ export default function AppointmentCard({ appt, compact, dateLabel, onMarcarDocu
           )}
         </div>
       </div>
-      {isDocumentOnly ? (
-        <span className="appointment-item__tag appointment-item__tag--presencial">
-          {appt.status === 'confirmed' ? st.label : 'Documento'}
-        </span>
-      ) : (
-        <span className={`appointment-item__tag appointment-item__tag--${isOnline ? 'online' : 'presencial'}`}>
-          {isOnline ? 'Online' : 'Presencial'}
-        </span>
-      )}
+      <span className={`appointment-item__tag appointment-item__tag--${isOnline ? 'online' : 'presencial'}`}>
+        {isOnline ? 'Online' : 'Presencial'}
+      </span>
       {!compact && (
         <div className="appointment-item__actions">
-          {!isDocumentOnly && isOnline && appt.meetLink && appt.status === 'confirmed' && (
+          {isOnline && appt.meetLink && appt.status === 'confirmed' && (
             <a
               href={appt.meetLink}
               target="_blank"
@@ -100,41 +120,6 @@ export default function AppointmentCard({ appt, compact, dateLabel, onMarcarDocu
               style={{ color: 'var(--color-danger)' }}
             >
               Cancelar
-            </button>
-          )}
-        </div>
-      )}
-      {/* Not gated by `!compact`: this is exactly what the (compact) "Documentos solicitados"
-          card on Inicio needs to let the médico act on a paid document request. */}
-      {isDocumentOnly && appt.status === 'confirmed' && (
-        <div className="appointment-item__actions" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {isReceta && onNavigate && (
-            <button
-              type="button"
-              onClick={() => onNavigate('prescriptions')}
-              className="btn btn--primary btn--sm"
-              title="Ir a Recetas Electrónicas para generarla"
-            >
-              Generar receta →
-            </button>
-          )}
-          {emailHref && (
-            <a href={emailHref} className="btn btn--ghost btn--sm" title="Enviar por email" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              <Icon.Mail size={14} /> Email
-            </a>
-          )}
-          {whatsappHref && (
-            <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="btn btn--ghost btn--sm" title="Enviar por WhatsApp" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              <Icon.MessageCircle size={14} /> WhatsApp
-            </a>
-          )}
-          {!isDocumentoEnviado && onMarcarDocumentoEnviado && (
-            <button
-              type="button"
-              onClick={() => onMarcarDocumentoEnviado(appt.id)}
-              className="btn btn--primary btn--sm"
-            >
-              Documento enviado
             </button>
           )}
         </div>

@@ -603,6 +603,11 @@ function StepSelect({
   if (isCustomObraSocialType && !isFixedObraSocialType && !idFinanciadorSel.trim()) missingRequirements.push('seleccionar tu Obra Social')
   if (isCustomObraSocialType && afiliado.trim().length <= 4) missingRequirements.push('tu número de afiliado')
   if (tipo === 'SOBRETUNO' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(customTime)) missingRequirements.push('un horario válido (HH:MM)')
+  // Mirrors the day/slot half of `canPay` above — without this, a médico whose tariff for this
+  // servicio hasn't been backfilled to requiereAgenda:false yet (see TarifaAgendaBackfillRunner
+  // on the backend) sees the pay button greyed out with *zero* explanation, since none of the
+  // checks above cover "no seleccionaste turno".
+  if (!isDocumentOnly && tipo !== 'SOBRETUNO' && (selectedDayIdx === null || selectedSlot === null)) missingRequirements.push('elegir día y horario del turno')
   if (!acceptedTerms) missingRequirements.push('aceptar los términos de servicio')
 
   const handlePayClick = () => {

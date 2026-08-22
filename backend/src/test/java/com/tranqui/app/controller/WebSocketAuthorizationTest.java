@@ -150,7 +150,106 @@ class WebSocketAuthorizationTest {
         Throwable exception = errorFuture.get(5, TimeUnit.SECONDS);
 
         assertNotNull(exception);
-        
+
+        try {
+            session.disconnect();
+        } catch (Exception e) {
+            // Ignore if connection was already closed by the server
+        }
+    }
+
+    @Test
+    void whenConnectWithoutToken_thenSubscribeIsRejected() throws Exception {
+        // WebSocketChannelInterceptor doesn't reject the CONNECT frame itself when there's no
+        // token — it just never sets accessor.getUser(), so the session connects anonymously.
+        // The actual rejection happens on SUBSCRIBE to a protected /topic/notificaciones/{id}
+        // channel, where principal == null throws "No se encuentra autenticado".
+        CompletableFuture<Throwable> errorFuture = new CompletableFuture<>();
+
+        StompSession session = stompClient.connectAsync(
+                "ws://localhost:" + port + "/ws-tranqui",
+                new WebSocketHttpHeaders(),
+                new StompHeaders(),
+                new StompSessionHandlerAdapter() {
+                    @Override
+                    public void handleException(StompSession session, StompCommand command, StompHeaders headers, byte[] payload, Throwable exception) {
+                        errorFuture.complete(exception);
+                    }
+                    @Override
+                    public void handleTransportError(StompSession session, Throwable exception) {
+                        errorFuture.complete(exception);
+                    }
+                }
+        ).get(5, TimeUnit.SECONDS);
+
+        assertNotNull(session);
+        assertTrue(session.isConnected());
+
+        session.subscribe(
+                "/topic/notificaciones/" + medico1.getId(),
+                new StompFrameHandler() {
+                    @Override
+                    public java.lang.reflect.Type getPayloadType(StompHeaders headers) {
+                        return Object.class;
+                    }
+                    @Override
+                    public void handleFrame(StompHeaders headers, Object payload) {}
+                }
+        );
+
+        Throwable exception = errorFuture.get(5, TimeUnit.SECONDS);
+        assertNotNull(exception);
+
+        try {
+            session.disconnect();
+        } catch (Exception e) {
+            // Ignore if connection was already closed by the server
+        }
+    }
+
+    @Test
+    void whenSubscribeToMalformedDestination_thenRejected() throws Exception {
+        StompHeaders connectHeaders = new StompHeaders();
+        connectHeaders.add("Authorization", "Bearer " + tokenMedico1);
+
+        CompletableFuture<Throwable> errorFuture = new CompletableFuture<>();
+
+        StompSession session = stompClient.connectAsync(
+                "ws://localhost:" + port + "/ws-tranqui",
+                new WebSocketHttpHeaders(),
+                connectHeaders,
+                new StompSessionHandlerAdapter() {
+                    @Override
+                    public void handleException(StompSession session, StompCommand command, StompHeaders headers, byte[] payload, Throwable exception) {
+                        errorFuture.complete(exception);
+                    }
+                    @Override
+                    public void handleTransportError(StompSession session, Throwable exception) {
+                        errorFuture.complete(exception);
+                    }
+                }
+        ).get(5, TimeUnit.SECONDS);
+
+        assertNotNull(session);
+
+        // A non-numeric médico id makes WebSocketChannelInterceptor's Long.parseLong throw,
+        // which it wraps as "Formato de ID de médico no válido" instead of letting the raw
+        // NumberFormatException propagate.
+        session.subscribe(
+                "/topic/notificaciones/no-es-un-id",
+                new StompFrameHandler() {
+                    @Override
+                    public java.lang.reflect.Type getPayloadType(StompHeaders headers) {
+                        return Object.class;
+                    }
+                    @Override
+                    public void handleFrame(StompHeaders headers, Object payload) {}
+                }
+        );
+
+        Throwable exception = errorFuture.get(5, TimeUnit.SECONDS);
+        assertNotNull(exception);
+
         try {
             session.disconnect();
         } catch (Exception e) {

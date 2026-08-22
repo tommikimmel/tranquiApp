@@ -5,7 +5,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class QuejaDto {
+public class CrearTicketDto {
     private String asunto;
     private String mensaje;
 }

@@ -66,7 +66,11 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
     // (LiberarTurnosScheduler) must not keep blocking this patient from booking anything else —
     // including a document-only purchase — indefinitely. EXPIRADO used to be left out of this
     // exclusion, which turned any turno a cleanup pass marked EXPIRADO into a permanent block.
-    @org.springframework.data.jpa.repository.Query("SELECT COUNT(t) > 0 FROM Turno t WHERE t.paciente.email = :email AND t.fecha >= :fecha AND t.estado NOT IN ('CANCELADO', 'EXPIRADO')")
+    // ocupaAgenda = true: a pending/confirmed document request (receta fuera de turno,
+    // certificado, informe) doesn't hold a real slot and has its own independent lifecycle
+    // (documentoEnviado), so it must never block booking a real turno — or another document —
+    // the way an actual scheduled appointment does.
+    @org.springframework.data.jpa.repository.Query("SELECT COUNT(t) > 0 FROM Turno t WHERE t.paciente.email = :email AND t.fecha >= :fecha AND t.estado NOT IN ('CANCELADO', 'EXPIRADO') AND t.ocupaAgenda = true")
     boolean existsActiveTurnoByPacienteEmail(@org.springframework.data.repository.query.Param("email") String email, @org.springframework.data.repository.query.Param("fecha") LocalDate fecha);
 
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT t.paciente FROM Turno t WHERE t.medico.id = :medicoId AND t.estado IN ('CONFIRMADO', 'PENDIENTE_VALIDACION')")
@@ -83,4 +87,16 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
     // event for them) — used to clean up the médico's real Google Calendar when they disconnect
     // the integration, since those events would otherwise be orphaned there forever.
     List<Turno> findByMedicoIdAndGoogleEventIdIsNotNull(Long medicoId);
+
+    // Used by TurnoService#marcarRecetasEnviadasParaPaciente to auto-clear a médico's pending
+    // "receta fuera de turno" purchases for a patient once an actual receta gets generated for
+    // them — see that method for why this matches by médico+paciente rather than a turnoId.
+    List<Turno> findByMedicoIdAndPacienteIdAndServicioIdAndEstadoAndDocumentoEnviado(
+            Long medicoId, Long pacienteId, String servicioId, EstadoTurno estado, boolean documentoEnviado);
+
+    // Used by RecetaFlagBackfillRunner — turnos booked (via the built-in "receta-fuera" servicio
+    // or the legacy TipoTurno.RECETA) before Turno.esReceta existed, so it's still sitting at its
+    // DB default (false).
+    @org.springframework.data.jpa.repository.Query("SELECT t FROM Turno t WHERE t.esReceta = false AND (t.servicioId = 'receta-fuera' OR t.tipo = 'RECETA')")
+    List<Turno> findLegacyRecetasSinFlag();
 }

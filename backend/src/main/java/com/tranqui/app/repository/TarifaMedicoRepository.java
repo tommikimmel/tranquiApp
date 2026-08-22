@@ -12,4 +12,5 @@ public interface TarifaMedicoRepository extends JpaRepository<TarifaMedico, Long
     List<TarifaMedico> findByMedicoIdIn(List<Long> medicoIds);
     Optional<TarifaMedico> findByMedicoIdAndServicioId(Long medicoId, String servicioId);
     List<TarifaMedico> findByServicioIdInAndRequiereAgenda(List<String> servicioIds, boolean requiereAgenda);
+    List<TarifaMedico> findByServicioIdAndEsReceta(String servicioId, boolean esReceta);
 }

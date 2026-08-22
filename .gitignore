@@ -11,3 +11,6 @@ dist/
 target/
 .claude/
 coverage/
+playwright-report/
+test-results/
+*.jtl

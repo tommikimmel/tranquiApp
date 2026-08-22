@@ -35,6 +35,12 @@ public class AuthController {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
+    private com.tranqui.app.repository.PlanRepository planRepository;
+
+    @Autowired
+    private com.tranqui.app.repository.SubscriptionRepository subscriptionRepository;
+
+    @Autowired
     private JwtService jwtService;
 
     @Autowired
@@ -158,7 +164,17 @@ public class AuthController {
                 .ofreceOnline(registerRequestDto.getOfreceOnline())
                 .ofrecePresencial(registerRequestDto.getOfrecePresencial())
                 .fotoUrl(registerRequestDto.getFotoUrl())
-                .verificadoAdmin(registerRequestDto.getRol() == Rol.PACIENTE ? true : null)
+                .profession(registerRequestDto.getProfession() != null ? registerRequestDto.getProfession() : (registerRequestDto.getRol() == Rol.PSIQUIATRA ? "psiquiatra" : null))
+                .licenseType(registerRequestDto.getLicenseType() != null ? registerRequestDto.getLicenseType() : registerRequestDto.getMatriculaTipo())
+                .licenseNumber(registerRequestDto.getLicenseNumber() != null ? registerRequestDto.getLicenseNumber() : (registerRequestDto.getMatricula() != null ? registerRequestDto.getMatricula() : (registerRequestDto.getMatriculaNumero() != null ? String.valueOf(registerRequestDto.getMatriculaNumero()) : null)))
+                .licenseJurisdiction(registerRequestDto.getLicenseJurisdiction() != null ? registerRequestDto.getLicenseJurisdiction() : registerRequestDto.getMatriculaProvincia())
+                .licenseDocumentUrl(registerRequestDto.getLicenseDocumentUrl())
+                .taxIdType(registerRequestDto.getTaxIdType() != null ? registerRequestDto.getTaxIdType() : "CUIT")
+                .taxId(registerRequestDto.getTaxId() != null ? registerRequestDto.getTaxId() : registerRequestDto.getCuit())
+                .legalName(registerRequestDto.getLegalName() != null ? registerRequestDto.getLegalName() : (registerRequestDto.getNombre() + " " + (registerRequestDto.getApellido() != null ? registerRequestDto.getApellido() : "")).trim())
+                .ivaConditionId(registerRequestDto.getIvaConditionId() != null ? registerRequestDto.getIvaConditionId() : 6)
+                .fiscalAddress(registerRequestDto.getFiscalAddress() != null ? registerRequestDto.getFiscalAddress() : domicilioAtencionTrim)
+                .verificadoAdmin(registerRequestDto.getRol() == Rol.PACIENTE && registerRequestDto.getProfession() == null ? true : null)
                 .emailVerificado(false)
                 .codigoVerificacion(codigoVerificacion)
                 .codigoVerificacionExpiresAt(expiresAt)
@@ -166,7 +182,26 @@ public class AuthController {
                 .build();
 
         try {
-            usuarioRepository.save(usuario);
+            usuario = usuarioRepository.save(usuario);
+
+            // Si es un profesional de la salud, inicializar registro de suscripción (§6)
+            if (usuario.getRol() == Rol.PSIQUIATRA || usuario.getProfession() != null) {
+                String planCode = "psiquiatra".equalsIgnoreCase(usuario.getProfession()) ? "clinico" : "consultorio";
+                com.tranqui.app.model.Plan plan = planRepository.findByCode(planCode).orElse(null);
+                if (plan != null) {
+                    com.tranqui.app.model.Subscription initialSub = com.tranqui.app.model.Subscription.builder()
+                            .professional(usuario)
+                            .plan(plan)
+                            .status(com.tranqui.app.model.SubscriptionStatus.PENDING_VERIFICATION)
+                            .seats(1)
+                            .billingSource(com.tranqui.app.model.BillingSource.MANUAL_TRANSFER)
+                            .amountArs(plan.getPriceArs())
+                            .createdAt(java.time.LocalDateTime.now())
+                            .updatedAt(java.time.LocalDateTime.now())
+                            .build();
+                    subscriptionRepository.save(initialSub);
+                }
+            }
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             // Defense in depth against the race where two concurrent /register requests for the
             // same email both pass the findByEmail check above before either commits: the DB's
@@ -285,6 +320,24 @@ public class AuthController {
         return ResponseEntity.ok("Tu contraseña ha sido restablecida con éxito. Ya podés iniciar sesión.");
     }
 
+    private UserResponseDto toUserResponseDto(Usuario u) {
+        UserResponseDto dto = new UserResponseDto(
+                u.getId(),
+                u.getNombre(),
+                u.getEmail(),
+                u.getRol(),
+                u.getTelefono(),
+                u.isPerfilCompleto(),
+                u.getTerminosAceptadosEn() == null,
+                u.isMustChangePassword()
+        );
+        dto.setProfession(u.getProfession());
+        dto.setCanPrescribe(u.isCanPrescribe());
+        dto.setVerificadoAdmin(u.getVerificadoAdmin());
+        dto.setLicenseVerifiedAt(u.getLicenseVerifiedAt());
+        return dto;
+    }
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody com.tranqui.app.model.dto.LoginRequestDto loginRequestDto, HttpServletResponse response) {
         String cleanEmail = loginRequestDto.getEmail() != null ? loginRequestDto.getEmail().trim().toLowerCase() : "";
@@ -322,7 +375,7 @@ public class AuthController {
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
-        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto(), usuario.getTerminosAceptadosEn() == null));
+        return ResponseEntity.ok(toUserResponseDto(usuario));
     }
 
     @PostMapping("/google")
@@ -357,7 +410,7 @@ public class AuthController {
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
-        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto(), usuario.getTerminosAceptadosEn() == null));
+        return ResponseEntity.ok(toUserResponseDto(usuario));
     }
 
     // Fills in the Paso 2 profile data (nombre, apellido, sexo, fechaNacimiento,
@@ -402,7 +455,7 @@ public class AuthController {
         usuario.setPerfilCompleto(true);
         usuarioRepository.save(usuario);
 
-        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto(), usuario.getTerminosAceptadosEn() == null));
+        return ResponseEntity.ok(toUserResponseDto(usuario));
     }
 
     @GetMapping("/me")
@@ -412,7 +465,7 @@ public class AuthController {
         }
         Usuario usuario = usuarioRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
-        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto(), usuario.getTerminosAceptadosEn() == null));
+        return ResponseEntity.ok(toUserResponseDto(usuario));
     }
 
     // Cuentas creadas por Google sign-in (getOrCreateUsuario) nunca piden aceptar los términos
@@ -428,7 +481,7 @@ public class AuthController {
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
         usuario.setTerminosAceptadosEn(java.time.LocalDateTime.now());
         usuarioRepository.save(usuario);
-        return ResponseEntity.ok(new UserResponseDto(usuario.getId(), usuario.getNombre(), usuario.getEmail(), usuario.getRol(), usuario.getTelefono(), usuario.isPerfilCompleto(), usuario.getTerminosAceptadosEn() == null));
+        return ResponseEntity.ok(toUserResponseDto(usuario));
     }
 
     // ── Mi Cuenta ────────────────────────────────────────────────────────────
@@ -474,6 +527,32 @@ public class AuthController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
+    }
+
+    // Forced first-login change after an admin reset the password (Usuario.mustChangePassword —
+    // see AdminController#resetPassword). Deliberately doesn't ask for the current/temporary
+    // password like /mi-cuenta/password does: the person already had to log in with it to reach
+    // this endpoint at all, and re-typing a password they just got emailed and pasted in adds
+    // friction without any real security benefit.
+    @PostMapping("/set-new-password")
+    public ResponseEntity<?> setNewPassword(
+            @RequestBody com.tranqui.app.model.dto.SetNewPasswordDto dto,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String rawPass = dto.getNewPassword();
+        if (rawPass == null || rawPass.length() < 8 || !rawPass.matches(".*[A-Z].*") || !rawPass.matches(".*[a-z].*") || !rawPass.matches(".*[0-9].*")) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La nueva contraseña debe tener al menos 8 caracteres, incluir una letra mayúscula, una minúscula y un número.");
+        }
+
+        Usuario usuario = usuarioRepository.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+        usuario.setPassword(passwordEncoder.encode(rawPass));
+        usuario.setMustChangePassword(false);
+        usuarioRepository.save(usuario);
+
+        return ResponseEntity.ok(toUserResponseDto(usuario));
     }
 
     @PostMapping("/mi-cuenta/eliminar")

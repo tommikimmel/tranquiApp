@@ -1,6 +1,7 @@
-﻿import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Icon } from './Icon'
 import AppointmentCard from './AppointmentCard'
+import DocumentActions from './DocumentActions'
 import ExternalEventCard from './ExternalEventCard'
 import StatsOverview from './StatsOverview'
 import MPConnectBanner from './MPConnectBanner'
@@ -47,9 +48,9 @@ export default function DashboardHome({
   onCancelAppointment: (id: number) => void;
   onUpdateAttendance: (id: number, status: string) => void;
   onRescheduleAppointment: (id: number, date: string, hour: string) => void;
-  onMarcarDocumentoEnviado?: (id: string) => void;
+  onMarcarDocumentoEnviado?: (id: string, archivo: { data: string; nombre: string }) => void;
   medicoInfo?: any;
-  onNavigate?: (section: NavSection) => void;
+  onNavigate?: (section: NavSection, state?: any) => void;
 }) {
   const fullDateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const capitalizedFullDate = fullDateStr.charAt(0).toUpperCase() + fullDateStr.slice(1);
@@ -1119,6 +1120,25 @@ export default function DashboardHome({
                   </div>
                 </div>
               </div>
+
+              {/* Same document actions as the "Documentos solicitados" card (DocumentActions) —
+                  the médico needs to be able to act from here too, not just from the list. */}
+              {selectedAppt.ocupaAgenda === false && selectedAppt.status === 'confirmed' && (
+                <div>
+                  <label style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>
+                    Documento
+                  </label>
+                  <div style={{
+                    marginTop: 'var(--space-2)',
+                    backgroundColor: 'var(--neutral-50)',
+                    padding: 'var(--space-4)',
+                    borderRadius: 'var(--radius-lg)',
+                    border: '1px solid var(--color-border)'
+                  }}>
+                    <DocumentActions appt={selectedAppt} onMarcarDocumentoEnviado={onMarcarDocumentoEnviado} onNavigate={onNavigate} />
+                  </div>
+                </div>
+              )}
 
               {/* Cobertura / Obra Social details */}
               <div>

@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import LaboratorioAutocomplete from './LaboratorioAutocomplete'
+import { LABORATORIOS_ARGENTINA } from '../utils/laboratorios'
 
-// LaboratorioAutocomplete is a controlled input (value comes from props) — this thin wrapper
-// mirrors how it's actually wired up in PrescriptionView (parent owns the state), since typing
-// into a purely-controlled input with a fixed prop value wouldn't visibly update otherwise.
+// LaboratorioAutocomplete is a controlled <select> (value comes from props) — this thin
+// wrapper mirrors how it's actually wired up in PrescriptionView (parent owns the state).
 function ControlledWrapper({ onChangeSpy }: { onChangeSpy?: (v: string) => void }) {
   const [value, setValue] = useState('')
   return (
@@ -21,45 +21,40 @@ function ControlledWrapper({ onChangeSpy }: { onChangeSpy?: (v: string) => void 
 }
 
 describe('LaboratorioAutocomplete', () => {
-  it('shows no dropdown before the user types anything', () => {
-    render(<ControlledWrapper />)
-    expect(screen.queryByText('Bagó')).not.toBeInTheDocument()
-  })
-
-  it('suggests the matching laboratorio while typing, even with a typo', async () => {
-    const user = userEvent.setup()
+  it('renders a placeholder option plus every laboratorio in the catalog', () => {
     render(<ControlledWrapper />)
 
-    await user.type(screen.getByPlaceholderText('Ej: Bagó'), 'Vago')
-
-    await waitFor(() => expect(screen.getByText('Bagó')).toBeInTheDocument())
+    const select = screen.getByRole('combobox') as HTMLSelectElement
+    expect(select.value).toBe('')
+    expect(screen.getByRole('option', { name: 'Seleccionar laboratorio...' })).toBeInTheDocument()
+    expect(select.options.length).toBe(LABORATORIOS_ARGENTINA.length + 1)
   })
 
-  it('fills the input and closes the dropdown when a suggestion is clicked', async () => {
+  it('selecting a laboratorio calls onChange and updates the controlled value', async () => {
     const user = userEvent.setup()
     const onChangeSpy = vi.fn()
     render(<ControlledWrapper onChangeSpy={onChangeSpy} />)
 
-    const input = screen.getByPlaceholderText('Ej: Bagó') as HTMLInputElement
-    await user.type(input, 'Gador')
-    await waitFor(() => expect(screen.getByText('Gador')).toBeInTheDocument())
+    const select = screen.getByRole('combobox') as HTMLSelectElement
+    await user.selectOptions(select, 'Gador')
 
-    await user.click(screen.getByText('Gador'))
-
-    expect(input.value).toBe('Gador')
+    expect(select.value).toBe('Gador')
     expect(onChangeSpy).toHaveBeenLastCalledWith('Gador')
-    expect(screen.queryByText('Gador', { selector: 'div' })).not.toBeInTheDocument()
   })
 
-  it('allows free text that does not match any known laboratorio', async () => {
-    const user = userEvent.setup()
-    const onChangeSpy = vi.fn()
-    render(<ControlledWrapper onChangeSpy={onChangeSpy} />)
+  it('falls back to the empty option when the controlled value is not in the catalog', () => {
+    render(
+      <LaboratorioAutocomplete value="Laboratorio Casero XYZ" onChange={() => {}} />
+    )
 
-    const input = screen.getByPlaceholderText('Ej: Bagó') as HTMLInputElement
-    await user.type(input, 'Laboratorio Casero XYZ')
+    const select = screen.getByRole('combobox') as HTMLSelectElement
+    expect(select.value).toBe('')
+  })
 
-    expect(input.value).toBe('Laboratorio Casero XYZ')
-    expect(onChangeSpy).toHaveBeenLastCalledWith('Laboratorio Casero XYZ')
+  it('reflects a value already present in the catalog as selected', () => {
+    render(<LaboratorioAutocomplete value="Bagó" onChange={() => {}} />)
+
+    const select = screen.getByRole('combobox') as HTMLSelectElement
+    expect(select.value).toBe('Bagó')
   })
 })

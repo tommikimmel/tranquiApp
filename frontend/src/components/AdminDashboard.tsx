@@ -3,6 +3,8 @@ import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getInitials } from '../hooks/usePatients'
+import AdminTicketsView from './AdminTicketsView'
+import AdminSubscriptionsView from './AdminSubscriptionsView'
 
 function IconVideoCall({ size = 13 }: { size?: number }) {
   return (
@@ -71,6 +73,7 @@ interface User {
   apellido?: string
   email: string
   rol: 'ADMIN' | 'PSIQUIATRA' | 'PACIENTE' | 'VISITADOR'
+  profession?: string
   verificadoAdmin?: boolean
   titulo?: string
   specialty?: string
@@ -80,6 +83,17 @@ interface User {
   domicilioAtencion?: string
   matriculaTipo?: string
   matriculaProvincia?: string
+  matriculaNumero?: number
+  licenseType?: string
+  licenseNumber?: string
+  licenseJurisdiction?: string
+  licenseDocumentUrl?: string
+  licenseVerifiedAt?: string
+  taxIdType?: string
+  taxId?: string
+  legalName?: string
+  ivaConditionId?: number
+  fiscalAddress?: string
   ofreceOnline?: boolean
   ofrecePresencial?: boolean
   telefono?: string
@@ -183,6 +197,51 @@ function StatCard({ icon, label, value, tone }: { icon: React.ReactNode; label: 
   )
 }
 
+function SidebarNavItem({ active, onClick, icon, label, count }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string; count?: number }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        width: '100%',
+        boxSizing: 'border-box',
+        minHeight: '52px',
+        textAlign: 'left',
+        padding: '8px 12px',
+        border: 'none',
+        borderRadius: 'var(--radius-md)',
+        backgroundColor: active ? 'var(--green-50)' : 'transparent',
+        color: active ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+        fontWeight: active ? 700 : 600,
+        fontSize: '13.5px',
+        lineHeight: 1.25,
+        cursor: 'pointer',
+        transition: 'background-color 0.15s ease-in-out, color 0.15s ease-in-out'
+      }}
+      onMouseEnter={(e) => { if (!active) e.currentTarget.style.backgroundColor = 'var(--neutral-100)' }}
+      onMouseLeave={(e) => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}
+    >
+      <span style={{ flexShrink: 0, display: 'flex' }}>{icon}</span>
+      <span style={{ flex: 1 }}>{label}</span>
+      {count !== undefined && (
+        <span style={{
+          flexShrink: 0,
+          fontSize: '11px',
+          fontWeight: 700,
+          padding: '1px 7px',
+          borderRadius: '999px',
+          backgroundColor: active ? 'var(--color-primary)' : 'var(--neutral-100)',
+          color: active ? 'white' : 'var(--color-text-secondary)'
+        }}>
+          {count}
+        </span>
+      )}
+    </button>
+  )
+}
+
 function RoleBadge({ rol }: { rol: User['rol'] }) {
   const cls = rol === 'ADMIN' ? 'badge--warning' : rol === 'PSIQUIATRA' ? 'badge--success' : rol === 'VISITADOR' ? 'badge--info' : 'badge--neutral'
   const label = rol === 'ADMIN' ? 'Administrador' : rol === 'PSIQUIATRA' ? 'Profesional' : rol === 'VISITADOR' ? 'Visitador' : 'Paciente'
@@ -221,18 +280,73 @@ function ProfessionalDetailPanel({ pro }: { pro: User }) {
   const tags = splitCsv(pro.tags)
   const pacientes = splitCsv(pro.pacientesAtiende)
 
+  const ivaMap: Record<number, string> = {
+    1: 'IVA Responsable Inscripto',
+    4: 'IVA Sujeto Exento',
+    5: 'Consumidor Final',
+    6: 'Responsable Monotributo',
+  }
+
+  const professionLabel =
+    pro.profession === 'psiquiatra'
+      ? 'Médico Psiquiatra (Habilitado para Recetas Oficiales QBI2)'
+      : pro.profession === 'psicologo'
+      ? 'Licenciado en Psicología'
+      : pro.profession || (pro.rol === 'PSIQUIATRA' ? 'Médico Psiquiatra' : 'Profesional')
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-      {pro.matricula && (
-        <div style={{
-          backgroundColor: 'var(--color-info-bg)', border: '1px solid #BFDBFE', padding: '10px 14px',
-          borderRadius: 'var(--radius-sm)', fontSize: '13px', display: 'flex', justifyContent: 'space-between',
-          alignItems: 'center', flexWrap: 'wrap', gap: '6px'
-        }}>
-          <span style={{ color: 'var(--color-info)', fontWeight: 700 }}>MATRÍCULA</span>
-          <span style={{ fontSize: '15px', color: 'var(--color-info)', fontWeight: 900, letterSpacing: '0.03em' }}>
-            {pro.matriculaTipo || '—'} {pro.matricula || '—'} ({pro.matriculaProvincia || 'sin provincia'})
+      {/* Profesión & Matrícula Badge */}
+      <div style={{
+        backgroundColor: 'var(--color-info-bg)', border: '1px solid #BFDBFE', padding: '10px 14px',
+        borderRadius: 'var(--radius-sm)', fontSize: '13px', display: 'flex', justifyContent: 'space-between',
+        alignItems: 'center', flexWrap: 'wrap', gap: '6px'
+      }}>
+        <div>
+          <span style={{ color: 'var(--color-info)', fontWeight: 700, display: 'block', fontSize: '11px' }}>PROFESIÓN</span>
+          <strong style={{ color: 'var(--color-info)', fontSize: '14px' }}>{professionLabel}</strong>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <span style={{ color: 'var(--color-info)', fontWeight: 700, display: 'block', fontSize: '11px' }}>MATRÍCULA</span>
+          <span style={{ fontSize: '14px', color: 'var(--color-info)', fontWeight: 900, letterSpacing: '0.03em' }}>
+            {pro.licenseType || pro.matriculaTipo || 'MN'} {pro.licenseNumber || pro.matricula || '—'} ({pro.licenseJurisdiction || pro.matriculaProvincia || 'Nacional'})
           </span>
+        </div>
+      </div>
+
+      {/* Datos Fiscales ARCA RG 5616 (§6) */}
+      <div style={{ padding: '10px 14px', backgroundColor: '#F9FAFB', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontSize: '12px' }}>
+        <strong style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', color: 'var(--color-text-primary)' }}>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M3 10h18M5 10v11M9 10v11M15 10v11M19 10v11M12 2 2 7h20z"/></svg>
+          Datos Fiscales ARCA (Facturación Electrónica RG 5616):
+        </strong>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
+          <div>
+            <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>CUIT / CUIL Fiscal:</span>
+            <strong>{pro.taxId || pro.cuit || pro.cuil || 'Sin CUIT'}</strong>
+          </div>
+          <div>
+            <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>Razón Social / Nombre Fiscal:</span>
+            <strong>{pro.legalName || `${pro.nombre} ${pro.apellido || ''}`}</strong>
+          </div>
+          <div>
+            <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>Condición frente al IVA:</span>
+            <strong>{pro.ivaConditionId ? (ivaMap[pro.ivaConditionId] || `Condición #${pro.ivaConditionId}`) : 'Responsable Monotributo'}</strong>
+          </div>
+          <div>
+            <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>Domicilio Fiscal:</span>
+            <strong>{pro.fiscalAddress || pro.domicilioAtencion || 'No informado'}</strong>
+          </div>
+        </div>
+      </div>
+
+      {pro.licenseDocumentUrl && (
+        <div style={{ fontSize: '12px', padding: '6px 10px', backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          <strong>Documento / Carnet de Matrícula:</strong>{' '}
+          <a href={pro.licenseDocumentUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>
+            Ver comprobante adjunto
+          </a>
         </div>
       )}
 
@@ -244,10 +358,6 @@ function ProfessionalDetailPanel({ pro }: { pro: User }) {
         <div>
           <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>Especialidad</span>
           <strong>{pro.specialty || '—'}</strong>
-        </div>
-        <div>
-          <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>CUIT / CUIL</span>
-          <strong>{pro.cuit || pro.cuil || '—'}</strong>
         </div>
         <div>
           <span style={{ color: 'var(--color-text-secondary)', display: 'block' }}>Documento</span>
@@ -333,8 +443,10 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<'TODOS' | User['rol']>('TODOS')
-  const [activeSection, setActiveSection] = useState<'pending' | 'users'>('pending')
+  const [activeSection, setActiveSection] = useState<'pending' | 'subscriptions' | 'users' | 'tickets'>('subscriptions')
   const [detailUser, setDetailUser] = useState<User | null>(null)
+  const [resettingPasswordFor, setResettingPasswordFor] = useState<number | null>(null)
+  const [generatedPassword, setGeneratedPassword] = useState<{ email: string; password: string } | null>(null)
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -382,6 +494,21 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
       fetchUsers()
     } catch (err: any) {
       showAlert('Error al actualizar el rol', 'error')
+    }
+  }
+
+  const handleResetPassword = async (user: User) => {
+    if (!window.confirm(`¿Resetear la contraseña de ${user.nombre} ${user.apellido || ''}? Se le va a mandar una contraseña temporal por mail y va a tener que cambiarla al ingresar.`)) {
+      return
+    }
+    setResettingPasswordFor(user.id)
+    try {
+      const res: any = await api.resetUserPassword(user.id)
+      setGeneratedPassword({ email: res.email, password: res.password })
+    } catch (err: any) {
+      showAlert(err.message || 'Error al resetear la contraseña', 'error')
+    } finally {
+      setResettingPasswordFor(null)
     }
   }
 
@@ -446,17 +573,73 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main style={{
-        flex: 1,
-        padding: 'var(--space-8)',
-        maxWidth: '1200px',
-        width: '100%',
-        margin: '0 auto',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--space-6)'
-      }}>
+      {/* Body: Sidebar + Main Content */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', width: '100%' }}>
+
+        {/* Sidebar Navigation */}
+        <aside style={{
+          width: '260px',
+          flexShrink: 0,
+          borderRight: '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-surface)',
+          padding: 'var(--space-5) var(--space-3)',
+          position: 'sticky',
+          top: '65px',
+          alignSelf: 'flex-start',
+          height: 'calc(100vh - 65px)',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px'
+        }}>
+          <SidebarNavItem
+            active={activeSection === 'subscriptions'}
+            onClick={() => setActiveSection('subscriptions')}
+            icon={
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 21h18M3 10h18M5 10v11M9 10v11M15 10v11M19 10v11M12 2 2 7h20z"/>
+              </svg>
+            }
+            label="Suscripción y Facturación ARCA"
+          />
+          <SidebarNavItem
+            active={activeSection === 'pending'}
+            onClick={() => setActiveSection('pending')}
+            icon={<IconClock size={17} />}
+            label="Pendientes de Verificación"
+            count={pendingProfessionals.length}
+          />
+          <SidebarNavItem
+            active={activeSection === 'users'}
+            onClick={() => setActiveSection('users')}
+            icon={<IconUsers size={17} />}
+            label="Todos los Usuarios"
+            count={users.length}
+          />
+          <SidebarNavItem
+            active={activeSection === 'tickets'}
+            onClick={() => setActiveSection('tickets')}
+            icon={
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+              </svg>
+            }
+            label="Tickets de Soporte"
+          />
+        </aside>
+
+        {/* Main Content Area */}
+        <main style={{
+          flex: 1,
+          minWidth: 0,
+          padding: 'var(--space-8)',
+          maxWidth: '1200px',
+          width: '100%',
+          margin: '0 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--space-6)'
+        }}>
 
         {/* Overview at a glance */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-3)' }}>
@@ -466,46 +649,10 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
           <StatCard icon={<IconHeart size={20} />} label="Pacientes" value={stats.pacientes} tone="primary" />
         </div>
 
-        {/* Section Tabs */}
-        <div style={{
-          display: 'flex',
-          gap: 'var(--space-4)',
-          borderBottom: '1px solid var(--color-border)',
-          paddingBottom: '2px'
-        }}>
-          <button
-            onClick={() => setActiveSection('pending')}
-            style={{
-              padding: '8px 16px',
-              border: 'none',
-              background: 'none',
-              borderBottom: activeSection === 'pending' ? '3px solid var(--color-primary)' : '3px solid transparent',
-              color: activeSection === 'pending' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              fontWeight: '700',
-              cursor: 'pointer',
-              fontSize: '14px',
-              transition: 'all 0.2s ease-in-out'
-            }}
-          >
-            Pendientes de Verificación ({pendingProfessionals.length})
-          </button>
-          <button
-            onClick={() => setActiveSection('users')}
-            style={{
-              padding: '8px 16px',
-              border: 'none',
-              background: 'none',
-              borderBottom: activeSection === 'users' ? '3px solid var(--color-primary)' : '3px solid transparent',
-              color: activeSection === 'users' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-              fontWeight: '700',
-              cursor: 'pointer',
-              fontSize: '14px',
-              transition: 'all 0.2s ease-in-out'
-            }}
-          >
-            Todos los Usuarios ({users.length})
-          </button>
-        </div>
+        {/* ── SECTION 0: SUBSCRIPTIONS & ARCA INVOICING ── */}
+        {activeSection === 'subscriptions' && (
+          <AdminSubscriptionsView users={users} />
+        )}
 
         {/* ── SECTION 1: PENDING VERIFICATION ── */}
         {activeSection === 'pending' && (
@@ -526,7 +673,11 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
               </div>
             ) : pendingProfessionals.length === 0 ? (
               <div className="card" style={{ padding: 'var(--space-8)', textAlign: 'center', border: '1px solid var(--color-border)' }}>
-                <span style={{ fontSize: '24px', display: 'block', marginBottom: '8px' }}>🎉</span>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: 'var(--green-50)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 8px' }}>
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                </div>
                 <p style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
                   No hay profesionales pendientes de verificación en este momento.
                 </p>
@@ -598,6 +749,9 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
           </div>
         )}
 
+        {/* ── SECTION: TICKETS DE SOPORTE ── */}
+        {activeSection === 'tickets' && <AdminTicketsView />}
+
         {/* ── SECTION 2: TODOS LOS USUARIOS ── */}
         {activeSection === 'users' && (
           <div className="card" style={{
@@ -620,13 +774,13 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {(['TODOS', 'PSIQUIATRA', 'PACIENTE', 'ADMIN', 'VISITADOR'] as const).map(r => (
+                {(['TODOS', 'PSIQUIATRA', 'PACIENTE', 'ADMIN'] as const).map(r => (
                   <button
                     key={r}
                     onClick={() => setRoleFilter(r)}
                     className={`btn btn--sm ${roleFilter === r ? 'btn--primary' : 'btn--ghost'}`}
                   >
-                    {r === 'TODOS' ? 'Todos' : r === 'PSIQUIATRA' ? 'Profesionales' : r === 'PACIENTE' ? 'Pacientes' : r === 'ADMIN' ? 'Admins' : 'Visitadores'}
+                    {r === 'TODOS' ? 'Todos' : r === 'PSIQUIATRA' ? 'Profesionales' : r === 'PACIENTE' ? 'Pacientes' : 'Admins'}
                   </button>
                 ))}
               </div>
@@ -699,6 +853,16 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
                                 Ver perfil
                               </button>
                             )}
+                            {user.rol !== 'ADMIN' && (
+                              <button
+                                className="btn btn--ghost btn--sm"
+                                disabled={resettingPasswordFor === user.id}
+                                onClick={() => handleResetPassword(user)}
+                                title="Generar una contraseña temporal y mandársela por mail"
+                              >
+                                {resettingPasswordFor === user.id ? 'Reseteando...' : 'Resetear contraseña'}
+                              </button>
+                            )}
                             {user.rol === 'ADMIN' ? (
                               <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>No modificable</span>
                             ) : (
@@ -736,7 +900,8 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
             )}
           </div>
         )}
-      </main>
+        </main>
+      </div>
 
       {/* Modal: full professional profile, opened from "Ver perfil" in the users table */}
       {detailUser && (
@@ -761,6 +926,36 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
               <button className="btn btn--ghost btn--sm" onClick={() => setDetailUser(null)}>✕</button>
             </div>
             <ProfessionalDetailPanel pro={detailUser} />
+          </div>
+        </div>
+      )}
+
+      {/* Resultado del reseteo de contraseña — la única vez que este texto plano existe fuera
+          del mail que ya se le mandó al usuario. */}
+      {generatedPassword && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, padding: 'var(--space-4)'
+          }}
+        >
+          <div className="card" style={{ maxWidth: '420px', width: '100%', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', textAlign: 'center' }}>
+            <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Contraseña reseteada</h3>
+            <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
+              Se le mandó un mail a <strong>{generatedPassword.email}</strong> con esta contraseña temporal. Es solo por si lo necesitás como respaldo:
+            </p>
+            <div style={{
+              backgroundColor: 'var(--neutral-50)', border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)', padding: 'var(--space-3)',
+              fontSize: '20px', fontWeight: 'bold', letterSpacing: '2px', fontFamily: 'monospace'
+            }}>
+              {generatedPassword.password}
+            </div>
+            <button className="btn btn--primary" onClick={() => setGeneratedPassword(null)}>
+              Listo
+            </button>
           </div>
         </div>
       )}

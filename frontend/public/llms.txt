@@ -1,0 +1,16 @@
+# Tranqui App
+
+> Plataforma argentina de reserva de turnos online con psicólogos y psiquiatras verificados. Atención presencial y por videollamada, sin comisiones para el paciente.
+
+Tranqui App conecta pacientes con profesionales de salud mental (psicólogos, psiquiatras) verificados en Argentina. Los pacientes buscan un profesional, reservan y pagan un turno online, y pueden solicitar recetas electrónicas. Los profesionales gestionan su agenda, historia clínica de pacientes y emiten recetas electrónicas oficiales (QBI2/Innovamed) desde su panel.
+
+## Páginas públicas
+
+- [Inicio](https://tranquisalud.com/): búsqueda de profesionales por especialidad y disponibilidad.
+- [Términos y Condiciones](https://tranquisalud.com/terminos)
+- [Política de Privacidad](https://tranquisalud.com/privacidad)
+
+## Notas para agentes e indexadores
+
+- El contenido de perfiles de profesionales y disponibilidad de turnos es dinámico y cambia frecuentemente.
+- Las áreas de paciente y profesional (`/panel`, `/mi-cuenta`, `/reserva/*`) requieren autenticación y no deben indexarse como contenido público genérico.

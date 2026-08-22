@@ -10,6 +10,8 @@ import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.service.DisponibilidadService;
 import com.tranqui.app.service.MedicoService;
 import com.tranqui.app.service.MercadoPagoOAuthService;
+import com.tranqui.app.service.SubscriptionService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -24,6 +26,7 @@ import java.util.Collections;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -48,6 +51,14 @@ class MedicoControllerTest {
 
     @MockBean
     private MercadoPagoOAuthService mercadoPagoOAuthService;
+
+    @MockBean
+    private SubscriptionService subscriptionService;
+
+    @BeforeEach
+    void setUpSubscriptionAccess() {
+        when(subscriptionService.isAccessAllowed(anyLong())).thenReturn(true);
+    }
 
     @Test
     @WithMockUser(username = "paciente@test.com", roles = "PACIENTE")

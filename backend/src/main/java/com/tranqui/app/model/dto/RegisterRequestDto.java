@@ -47,6 +47,18 @@ public class RegisterRequestDto {
     private Boolean ofrecePresencial;
     private String fotoUrl;
 
+    // Plan Suscripciones (§6): Profesión, Matrícula extendida y Datos Fiscales
+    private String profession; // psiquiatra | psicologo | otro
+    private String licenseType; // MN | MP | MP_psico
+    private String licenseNumber;
+    private String licenseJurisdiction;
+    private String licenseDocumentUrl;
+    private String taxIdType; // CUIT | CUIL | DNI
+    private String taxId;
+    private String legalName; // Razón social
+    private Integer ivaConditionId; // 1=RI, 4=Exento, 5=CF, 6=Monotributo
+    private String fiscalAddress;
+
     // Debe venir en true para poder registrarse — ver AuthController.register().
     private Boolean aceptaTerminos;
 }

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 import { Icon } from './Icon'
 
@@ -289,11 +288,12 @@ const AgendaModalidadGrid = React.forwardRef(function AgendaModalidadGrid(
   )
 })
 
-export default function AgendaView({ medicoInfo, initialAvailabilityPresencial, initialAvailabilityOnline, onSave }: {
+export default function AgendaView({ medicoInfo, initialAvailabilityPresencial, initialAvailabilityOnline, onSave, onSaveConfig }: {
   medicoInfo: any
   initialAvailabilityPresencial: any[]
   initialAvailabilityOnline: any[]
   onSave: (modalidad: 'PRESENCIAL' | 'ONLINE', data: any[]) => Promise<void>
+  onSaveConfig: (config: { duracionTurnoMinutos: number; intervaloEntreTurnosMinutos: number }) => Promise<void>
 }) {
   const { showAlert } = useAlert();
 
@@ -303,8 +303,10 @@ export default function AgendaView({ medicoInfo, initialAvailabilityPresencial, 
   const ofreceOnline = medicoInfo?.ofreceOnline !== false
   const ofreceAmbasModalidades = ofrecePresencial && ofreceOnline
 
+  // Sin intervalo por defecto: la mayoría de los médicos prefiere agenda corrida, y quien
+  // quiera un colchón entre turnos lo agrega explícitamente.
   const [duracionTurno, setDuracionTurno] = useState(medicoInfo?.duracionTurnoMinutos ?? 45)
-  const [intervaloTurno, setIntervaloTurno] = useState(medicoInfo?.intervaloEntreTurnosMinutos ?? 10)
+  const [intervaloTurno, setIntervaloTurno] = useState(medicoInfo?.intervaloEntreTurnosMinutos ?? 0)
   const [activeModalidad, setActiveModalidad] = useState<'PRESENCIAL' | 'ONLINE'>(ofrecePresencial ? 'PRESENCIAL' : 'ONLINE')
 
   const presencialGridRef = React.useRef<AgendaModalidadGridHandle>(null)
@@ -386,7 +388,7 @@ export default function AgendaView({ medicoInfo, initialAvailabilityPresencial, 
     setSaving(true)
     try {
       const saves: Promise<any>[] = [
-        api.actualizarConfigAgenda({ duracionTurnoMinutos: duracionTurno, intervaloEntreTurnosMinutos: intervaloTurno })
+        onSaveConfig({ duracionTurnoMinutos: duracionTurno, intervaloEntreTurnosMinutos: intervaloTurno })
       ]
       if (ofrecePresencial) saves.push(onSave('PRESENCIAL', presencialGridRef.current?.getDtos() || []))
       if (ofreceOnline) saves.push(onSave('ONLINE', onlineGridRef.current?.getDtos() || []))
@@ -419,6 +421,7 @@ export default function AgendaView({ medicoInfo, initialAvailabilityPresencial, 
             <label>Duración de turno</label>
             <div className="agenda-view-select-wrap">
               <select value={duracionTurno} onChange={(e) => setDuracionTurno(Number(e.target.value))}>
+                <option value={15}>15 min</option>
                 <option value={30}>30 min</option>
                 <option value={45}>45 min</option>
                 <option value={50}>50 min</option>

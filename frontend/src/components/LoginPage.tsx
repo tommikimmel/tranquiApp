@@ -5,6 +5,7 @@ import DateInputDDMMYYYY from './DateInputDDMMYYYY'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAlert } from '../context/AlertContext'
 import { OBRAS_SOCIALES } from '../constants/obrasSociales'
+import ChoosePlanView from './ChoosePlanView'
 
 interface LoginPageProps {
   onLoginSuccess: (user: any) => void
@@ -77,6 +78,23 @@ function IconBuilding({ size = 18 }: { size?: number }) {
   )
 }
 
+function IconAlertTriangle({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ width: size, height: size, flexShrink: 0 }}>
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  )
+}
+
+function IconSparkle({ size = 14 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, flexShrink: 0 }}>
+      <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.1 2.1M15.6 15.6l2.1 2.1M17.7 6.3l-2.1 2.1M8.4 15.6l-2.1 2.1" />
+    </svg>
+  )
+}
+
 const PROVINCIAS_ARGENTINA = [
   "Buenos Aires", "CABA", "Catamarca", "Chaco", "Chubut", "Córdoba", "Corrientes",
   "Entre Ríos", "Formosa", "Jujuy", "La Pampa", "La Rioja", "Mendoza", "Misiones",
@@ -94,7 +112,7 @@ const ESPECIALIDADES_GRUPOS = [
 export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   useDocumentTitle('Iniciar sesión — Tranqui App')
   const { showAlert } = useAlert()
-  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'verify' | 'forgot' | 'reset'>('login')
+  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'verify' | 'forgot' | 'reset' | 'choose-plan'>('login')
   const [role, setRole] = useState<'PACIENTE' | 'PSIQUIATRA'>('PACIENTE')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -142,6 +160,14 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   const [ofrecePresencial, setOfrecePresencial] = useState(false)
   const [fotoUrl, setFotoUrl] = useState('')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+
+  // Subscription & Fiscal state (§6)
+  const [profession, setProfession] = useState<'psiquiatra' | 'psicologo' | 'otro'>('psiquiatra')
+  const [taxId, setTaxId] = useState('')
+  const [legalName, setLegalName] = useState('')
+  const [ivaConditionId, setIvaConditionId] = useState<number>(6) // 6 = Monotributo
+  const [fiscalAddress, setFiscalAddress] = useState('')
+  const [licenseDocumentUrl, setLicenseDocumentUrl] = useState('')
 
   // Email Verification State
   const [pendingEmail, setPendingEmail] = useState('')
@@ -374,8 +400,8 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       payload.matricula = matricula
       payload.titulo = titulo
       payload.specialty = specialty
-      payload.cuit = cuil
-      payload.cuil = cuil ? Number(cuil) : null
+      payload.cuit = taxId.trim() || cuil.trim()
+      payload.cuil = (taxId.trim() || cuil.trim()) ? Number((taxId.trim() || cuil.trim()).replace(/[^\d]/g, '')) : null
       payload.domicilioAtencion = domicilioAtencion
       payload.domicilioLat = domicilioLat
       payload.domicilioLng = domicilioLng
@@ -388,14 +414,32 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       payload.matriculaNumero = Number(matricula)
       payload.ofreceOnline = ofreceOnline
       payload.ofrecePresencial = ofrecePresencial
+
+      // Plan Suscripciones (§6)
+      payload.profession = profession
+      payload.licenseType = matriculaTipo
+      payload.licenseNumber = matricula
+      payload.licenseJurisdiction = matriculaProvincia || 'Nacional'
+      payload.licenseDocumentUrl = licenseDocumentUrl || null
+      payload.taxIdType = 'CUIT'
+      payload.taxId = taxId.trim() || cuil.trim()
+      payload.legalName = legalName.trim() || `${nombre} ${apellido}`.trim()
+      payload.ivaConditionId = Number(ivaConditionId) || 6
+      payload.fiscalAddress = fiscalAddress.trim() || domicilioAtencion.trim()
     }
 
     setLoading(true)
     try {
       await api.register(payload)
       setPendingEmail(cleanEmail)
-      showAlert('¡Registro exitoso! Enviamos un código de 6 dígitos a tu correo para activar tu cuenta.', 'success')
-      setActiveTab('verify')
+      if (role === 'PSIQUIATRA') {
+        // Los profesionales ven el catálogo de planes antes que nada — recién al continuar pasan
+        // a verificar el email (ver ChoosePlanView, variant "post-register").
+        setActiveTab('choose-plan')
+      } else {
+        showAlert('¡Registro exitoso! Enviamos un código de 6 dígitos a tu correo para activar tu cuenta.', 'success')
+        setActiveTab('verify')
+      }
     } catch (err: any) {
       showAlert(err.message || 'Error al intentar registrarse.', 'error')
     } finally {
@@ -498,6 +542,18 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (activeTab === 'choose-plan') {
+    return (
+      <ChoosePlanView
+        variant="post-register"
+        onContinue={() => {
+          showAlert('¡Registro exitoso! Enviamos un código de 6 dígitos a tu correo para activar tu cuenta.', 'success')
+          setActiveTab('verify')
+        }}
+      />
+    )
   }
 
   return (
@@ -620,7 +676,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
             alignItems: 'flex-start',
             gap: '10px'
           }}>
-            <span style={{ fontSize: '16px', lineHeight: 1 }}>⚠️</span>
+            <IconAlertTriangle size={16} />
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div>{error}</div>
               {error.includes('verificar tu correo') && (
@@ -739,42 +795,22 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                 <div className="form-group">
                   <label className="form-label form-label--required">Tipo de Usuario</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
+                  <div className="role-select">
                     <button
                       type="button"
+                      className={`role-select__card ${role === 'PACIENTE' ? 'active' : ''}`}
                       onClick={() => setRole('PACIENTE')}
-                      style={{
-                        padding: 'var(--space-3)',
-                        border: role === 'PACIENTE' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-                        borderRadius: 'var(--radius-md)',
-                        backgroundColor: role === 'PACIENTE' ? '#f0f9ff' : 'var(--color-surface)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
                     >
-                      <IconPatient size={24} />
-                      <span style={{ fontSize: '13px', fontWeight: '600' }}>Paciente</span>
+                      <span className="role-select__icon"><IconPatient size={24} /></span>
+                      Paciente
                     </button>
                     <button
                       type="button"
+                      className={`role-select__card ${role === 'PSIQUIATRA' ? 'active' : ''}`}
                       onClick={() => setRole('PSIQUIATRA')}
-                      style={{
-                        padding: 'var(--space-3)',
-                        border: role === 'PSIQUIATRA' ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-                        borderRadius: 'var(--radius-md)',
-                        backgroundColor: role === 'PSIQUIATRA' ? '#f0f9ff' : 'var(--color-surface)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
                     >
-                      <IconStethoscope size={24} />
-                      <span style={{ fontSize: '13px', fontWeight: '600' }}>Profesional</span>
+                      <span className="role-select__icon"><IconStethoscope size={24} /></span>
+                      Profesional
                     </button>
                   </div>
                 </div>
@@ -895,32 +931,15 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
                 <div className="form-group">
                   <label className="form-label form-label--required">Teléfono Móvil (WhatsApp)</label>
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <span style={{
-                      padding: '10px 12px',
-                      backgroundColor: 'var(--color-bg-secondary, #f0f4f1)',
-                      border: '1px solid var(--color-border)',
-                      borderRight: 'none',
-                      borderRadius: 'var(--radius-md) 0 0 var(--radius-md)',
-                      fontWeight: 'bold',
-                      fontSize: '14px',
-                      color: 'var(--color-text-secondary, #555)',
-                      userSelect: 'none',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}>
-                      +54
-                    </span>
+                  <div className="phone-input">
+                    <span className="phone-input__prefix">+54</span>
                     <input
                       type="tel"
-                      className="form-input"
+                      className="form-input phone-input__field"
                       placeholder="1112345678"
                       maxLength={11}
                       value={telefono.replace(/^\+54\s*/, '')}
                       onChange={(e) => setTelefono(e.target.value.replace(/[^\d]/g, '').slice(0, 11))}
-                      style={{
-                        borderRadius: '0 var(--radius-md) var(--radius-md) 0'
-                      }}
                       required
                     />
                   </div>
@@ -928,7 +947,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
                 {role === 'PACIENTE' && (
                   <div className="form-group">
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                    <label className={`check-chip ${hasObraSocial ? 'active' : ''}`}>
                       <input
                         type="checkbox"
                         checked={hasObraSocial}
@@ -1026,13 +1045,54 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                   </>
                 ) : (
                   <>
+                    {/* 1. Profesión y Plan Asociado (§6) */}
+                    <div className="form-group">
+                      <label className="form-label form-label--required">Profesión Principal</label>
+                      <select
+                        className="form-select"
+                        value={profession}
+                        onChange={(e) => {
+                          const prof = e.target.value as any
+                          setProfession(prof)
+                          if (prof === 'psiquiatra') {
+                            setTitulo('Médico Psiquiatra')
+                            setSpecialty('Psiquiatría')
+                          } else if (prof === 'psicologo') {
+                            setTitulo('Licenciado en Psicología')
+                            setSpecialty('Psicología Clínica')
+                          }
+                        }}
+                        required
+                      >
+                        <option value="psiquiatra">Médico Psiquiatra (Emisión de Recetas Electrónicas Oficiales QBI2)</option>
+                        <option value="psicologo">Licenciado en Psicología (Consultorio y Turnos)</option>
+                        <option value="otro">Otro Profesional de la Salud Mental</option>
+                      </select>
+                    </div>
+
+                    {/* Banner informativo de Plan y Cupos */}
+                    <div style={{ padding: '10px 14px', backgroundColor: 'var(--green-50)', border: '1px solid var(--green-200)', borderRadius: 'var(--radius-sm)', fontSize: '12px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <span style={{ color: 'var(--color-primary)', marginTop: '2px' }}><IconSparkle size={14} /></span>
+                      <span><strong>Plan sugerido para tu profesión:</strong>{' '}
+                      {profession === 'psiquiatra' ? (
+                        <span>
+                          <strong>Plan Clínico ($225.000 ARS/mes)</strong> · Incluye módulo oficial de Recetas Electrónicas QBI2 con psicofármacos y firma digital.
+                        </span>
+                      ) : (
+                        <span>
+                          <strong>Plan Consultorio ($149.500 ARS/mes)</strong> · Incluye adquisición de pacientes por zona geográfica, agenda y turnero online.
+                        </span>
+                      )}
+                      </span>
+                    </div>
+
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                       <div className="form-group">
                         <label className="form-label form-label--required">Título Profesional</label>
                         <input
                           type="text"
                           className="form-input"
-                          placeholder="Médico Psiquiatra"
+                          placeholder={profession === 'psiquiatra' ? 'Médico Psiquiatra' : 'Lic. en Psicología'}
                           value={titulo}
                           onChange={(e) => setTitulo(e.target.value)}
                           required
@@ -1040,12 +1100,14 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                       </div>
                       <div className="form-group">
                         <label className="form-label form-label--required">Especialidad</label>
-                        <select className="form-select" value={specialty} onChange={(e) => setSpecialty(e.target.value)} required>
-                          <option value="">Seleccionar...</option>
-                          {ESPECIALIDADES_GRUPOS.map((esp) => (
-                            <option key={esp} value={esp}>{esp}</option>
-                          ))}
-                        </select>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="Psiquiatría Adultos / TCC / etc."
+                          value={specialty}
+                          onChange={(e) => setSpecialty(e.target.value)}
+                          required
+                        />
                       </div>
                     </div>
 
@@ -1055,26 +1117,22 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                         <select className="form-select" value={matriculaTipo} onChange={(e) => setMatriculaTipo(e.target.value)}>
                           <option value="MN">MN - Matrícula Nacional</option>
                           <option value="MP">MP - Matrícula Provincial</option>
-                          <option value="MN_MP">MN / MP - Nacional y Provincial</option>
+                          <option value="MP_psico">MP - Colegio de Psicólogos</option>
                         </select>
                       </div>
-                      {(matriculaTipo === 'MP' || matriculaTipo === 'MN_MP') && (
-                        <div className="form-group">
-                          <label className="form-label form-label--required">Provincia</label>
-                          <select className="form-select" value={matriculaProvincia} onChange={(e) => setMatriculaProvincia(e.target.value)}>
-                            <option value="">Provincia...</option>
-                            {PROVINCIAS_ARGENTINA.map((p) => (
-                              <option key={p} value={p}>{p}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                      <div className="form-group" style={{ gridColumn: (matriculaTipo === 'MP' || matriculaTipo === 'MN_MP') ? 'span 1' : 'span 2' }}>
+                      <div className="form-group">
+                        <label className="form-label form-label--required">Provincia / Jurisdicción</label>
+                        <select className="form-select" value={matriculaProvincia} onChange={(e) => setMatriculaProvincia(e.target.value)} required>
+                          <option value="">Provincia...</option>
+                          {PROVINCIAS_ARGENTINA.map((p) => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
                         <label className="form-label form-label--required">N° Matrícula</label>
                         <input
                           type="text"
-                          inputMode="numeric"
-                          maxLength={10}
                           className="form-input"
                           placeholder="123456"
                           value={matricula}
@@ -1084,28 +1142,83 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
-                      <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                        <label className="form-label">CUIT / CUIL</label>
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="20123456789"
-                          value={cuil}
-                          onChange={(e) => setCuil(e.target.value)}
-                        />
+                    {/* 2. Datos Fiscales Obligatorios ARCA RG 5616 (§6) */}
+                    <div style={{ padding: '12px', backgroundColor: '#F9FAFB', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                      <strong style={{ fontSize: '13px', color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M3 10h18M5 10v11M9 10v11M15 10v11M19 10v11M12 2 2 7h20z"/></svg>
+                        Datos Fiscales ARCA (Facturación Electrónica RG 5616)
+                      </strong>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                        <div className="form-group">
+                          <label className="form-label form-label--required">CUIT / CUIL Fiscal</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="20123456789"
+                            maxLength={11}
+                            value={taxId || cuil}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^\d]/g, '').slice(0, 11)
+                              setTaxId(val)
+                              setCuil(val)
+                            }}
+                            required
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label form-label--required">Razón Social / Nombre Fiscal</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Nombre como figura en AFIP/ARCA"
+                            value={legalName || (nombre ? `${nombre} ${apellido}` : '')}
+                            onChange={(e) => setLegalName(e.target.value)}
+                            required
+                          />
+                        </div>
                       </div>
 
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                        <div className="form-group">
+                          <label className="form-label form-label--required">Condición frente al IVA</label>
+                          <select
+                            className="form-select"
+                            value={ivaConditionId}
+                            onChange={(e) => setIvaConditionId(Number(e.target.value))}
+                          >
+                            <option value={6}>Responsable Monotributo</option>
+                            <option value={1}>IVA Responsable Inscripto</option>
+                            <option value={4}>IVA Sujeto Exento</option>
+                          </select>
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label form-label--required">Domicilio Fiscal</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Domicilio registrado en ARCA"
+                            value={fiscalAddress || domicilioAtencion}
+                            onChange={(e) => setFiscalAddress(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                       <div className="form-group" style={{ gridColumn: 'span 2' }}>
                         <label className="form-label form-label--required">Modalidades de Atención</label>
-                        <div style={{ display: 'flex', gap: 'var(--space-4)', marginTop: '4px' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                        <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: '4px' }}>
+                          <label className={`check-chip check-chip--auto ${ofreceOnline ? 'active' : ''}`}>
                             <input type="checkbox" checked={ofreceOnline} onChange={(e) => setOfreceOnline(e.target.checked)} />
-                            <IconVideoCall size={16} /> Online / Telemedicina
+                            <span className="check-chip__icon"><IconVideoCall size={16} /></span> Online / Telemedicina
                           </label>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                          <label className={`check-chip check-chip--auto ${ofrecePresencial ? 'active' : ''}`}>
                             <input type="checkbox" checked={ofrecePresencial} onChange={(e) => setOfrecePresencial(e.target.checked)} />
-                            <IconBuilding size={16} /> Presencial
+                            <span className="check-chip__icon"><IconBuilding size={16} /></span> Presencial
                           </label>
                         </div>
                       </div>

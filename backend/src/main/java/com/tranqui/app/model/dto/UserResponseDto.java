@@ -10,6 +10,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@lombok.Builder
 public class UserResponseDto {
     private Long id;
     private String nombre;
@@ -18,11 +19,27 @@ public class UserResponseDto {
     private String telefono;
     private Boolean perfilCompleto;
     private Boolean requiereAceptarTerminos; // true = terminosAceptadosEn == null, ver AuthController
+    private Boolean mustChangePassword; // true = un admin reseteó la contraseña, ver Usuario.mustChangePassword
+    private String profession;
+    private Boolean canPrescribe;
+    private Boolean verificadoAdmin;
+    private java.time.LocalDateTime licenseVerifiedAt;
 
     public UserResponseDto(Long id, String nombre, String email, Rol rol) {
         this.id = id;
         this.nombre = nombre;
         this.email = email;
         this.rol = rol;
+    }
+
+    public UserResponseDto(Long id, String nombre, String email, Rol rol, String telefono, Boolean perfilCompleto, Boolean requiereAceptarTerminos, Boolean mustChangePassword) {
+        this.id = id;
+        this.nombre = nombre;
+        this.email = email;
+        this.rol = rol;
+        this.telefono = telefono;
+        this.perfilCompleto = perfilCompleto;
+        this.requiereAceptarTerminos = requiereAceptarTerminos;
+        this.mustChangePassword = mustChangePassword;
     }
 }

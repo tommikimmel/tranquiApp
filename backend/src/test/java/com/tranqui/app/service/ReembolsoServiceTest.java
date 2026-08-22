@@ -1,5 +1,7 @@
 package com.tranqui.app.service;
 
+import com.mercadopago.client.payment.PaymentRefundClient;
+import com.mercadopago.core.MPRequestOptions;
 import com.tranqui.app.model.EstadoPago;
 import com.tranqui.app.model.EstadoTurno;
 import com.tranqui.app.model.Pago;
@@ -11,6 +13,7 @@ import com.tranqui.app.util.EncryptionUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,6 +24,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -119,5 +125,89 @@ class ReembolsoServiceTest {
         assertTrue(resultado);
         assertEquals(EstadoTurno.CANCELADO, turnoTardio.getEstado());
         assertEquals(EstadoPago.REEMBOLSADO, turnoTardio.getPago().getEstado());
+    }
+
+    // ── invocación real al cliente de refund de Mercado Pago ─────────────────────────
+
+    @Test
+    void whenEnabledAndRealToken_shouldCallPaymentRefundClientWithTransactionIdAndAccessToken() throws Exception {
+        when(encryptionUtil.decrypt("encrypted-token")).thenReturn("real-looking-token");
+
+        PaymentRefundClient fakeRefundClient = mock(PaymentRefundClient.class);
+        ReembolsoService spyService = new ReembolsoService() {
+            @Override
+            protected PaymentRefundClient buildPaymentRefundClient() {
+                return fakeRefundClient;
+            }
+        };
+        ReflectionTestUtils.setField(spyService, "encryptionUtil", encryptionUtil);
+        ReflectionTestUtils.setField(spyService, "isEnabled", true);
+
+        boolean resultado = spyService.procesarReembolso(turnoConTiempo, medico);
+
+        assertTrue(resultado);
+        assertEquals(EstadoTurno.CANCELADO, turnoConTiempo.getEstado());
+        assertEquals(EstadoPago.REEMBOLSADO, turnoConTiempo.getPago().getEstado());
+
+        ArgumentCaptor<Long> idCaptor = ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<MPRequestOptions> optionsCaptor = ArgumentCaptor.forClass(MPRequestOptions.class);
+        verify(fakeRefundClient).refund(idCaptor.capture(), optionsCaptor.capture());
+        assertEquals(123456789L, idCaptor.getValue());
+        assertEquals("real-looking-token", optionsCaptor.getValue().getAccessToken());
+    }
+
+    @Test
+    void whenDisabled_shouldSkipRealRefundCallEntirely() throws Exception {
+        ReflectionTestUtils.setField(reembolsoService, "isEnabled", false);
+        when(encryptionUtil.decrypt("encrypted-token")).thenReturn("dummy-token");
+
+        PaymentRefundClient fakeRefundClient = mock(PaymentRefundClient.class);
+        ReembolsoService spyService = new ReembolsoService() {
+            @Override
+            protected PaymentRefundClient buildPaymentRefundClient() {
+                return fakeRefundClient;
+            }
+        };
+        ReflectionTestUtils.setField(spyService, "encryptionUtil", encryptionUtil);
+        ReflectionTestUtils.setField(spyService, "isEnabled", false);
+
+        boolean resultado = spyService.procesarReembolso(turnoConTiempo, medico);
+
+        assertTrue(resultado);
+        assertEquals(EstadoTurno.CANCELADO, turnoConTiempo.getEstado());
+        assertEquals(EstadoPago.REEMBOLSADO, turnoConTiempo.getPago().getEstado());
+        verifyNoInteractions(fakeRefundClient);
+    }
+
+    // ── guard: turno.getPago() == null no debe tirar NPE ──────────────────────────────
+
+    @Test
+    void whenEnabledAndTurnoSinPagoAsociado_shouldNotThrowAndStillCancelaElTurno() throws Exception {
+        when(encryptionUtil.decrypt("encrypted-token")).thenReturn("real-looking-token");
+
+        Turno turnoSinPago = Turno.builder()
+                .id(3L)
+                .fecha(LocalDate.now().plusDays(3))
+                .horaInicio(LocalTime.of(10, 0)).horaFin(LocalTime.of(10, 45))
+                .tipo(TipoTurno.PARTICULAR).estado(EstadoTurno.CONFIRMADO)
+                .build();
+        // turnoSinPago.getPago() queda null a propósito: simula la inconsistencia de datos que
+        // este guard cubre (turno aprobado/confirmado sin una fila de Pago asociada).
+
+        PaymentRefundClient fakeRefundClient = mock(PaymentRefundClient.class);
+        ReembolsoService spyService = new ReembolsoService() {
+            @Override
+            protected PaymentRefundClient buildPaymentRefundClient() {
+                return fakeRefundClient;
+            }
+        };
+        ReflectionTestUtils.setField(spyService, "encryptionUtil", encryptionUtil);
+        ReflectionTestUtils.setField(spyService, "isEnabled", true);
+
+        boolean resultado = assertDoesNotThrow(() -> spyService.procesarReembolso(turnoSinPago, medico));
+
+        assertTrue(resultado);
+        assertEquals(EstadoTurno.CANCELADO, turnoSinPago.getEstado());
+        verifyNoInteractions(fakeRefundClient);
     }
 }

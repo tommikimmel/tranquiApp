@@ -392,8 +392,12 @@ class ClinicalServiceTest {
         when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PacienteDto.CredencialInfoDto cred = PacienteDto.CredencialInfoDto.builder()
-                .codEntidad(1).pan("PAN").plan("210").token("TOK").build();
-        PacienteDto dto = PacienteDto.builder().nombre("Ana").credencial(cred).build();
+                .codEntidad(1).pan("PAN123456").plan("210").token("TOK").build();
+        // actualizarPaciente no resuelve codEntidad -> nombre de obra social por sí solo: usa
+        // dto.getObraSocial() (lo que el frontend ya resolvió contra el catálogo de financiadores)
+        // como base y le concatena el plan de la credencial. Sin obraSocial en el DTO, cae al
+        // literal genérico "Obra Social" (cubierto por el fallback de ese caso más abajo).
+        PacienteDto dto = PacienteDto.builder().nombre("Ana").obraSocial("OSDE").credencial(cred).build();
 
         clinicalService.actualizarPaciente(5L, "dra@mail.com", dto);
 
@@ -408,7 +412,8 @@ class ClinicalServiceTest {
         when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
         when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        PacienteDto.CredencialInfoDto cred = PacienteDto.CredencialInfoDto.builder().codEntidad(1).plan("  ").build();
+        PacienteDto.CredencialInfoDto cred = PacienteDto.CredencialInfoDto.builder()
+                .codEntidad(1).pan("PAN123456").plan("  ").build();
         PacienteDto dto = PacienteDto.builder().nombre("Ana").obraSocial("Swiss Medical").credencial(cred).build();
 
         clinicalService.actualizarPaciente(5L, "dra@mail.com", dto);

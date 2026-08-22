@@ -1,4 +1,5 @@
-﻿import { useState, Fragment } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
+import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 import { Icon } from './Icon'
 import AddressMapPicker from './AddressMapPicker'
@@ -20,7 +21,13 @@ import {
 } from '../utils/medicoProfile'
 
 // ── Settings: Tariff & Profile ─────────────────────────────────
-// DEFAULT_TARIFFS mock removed since values are loaded from API
+const SaveIcon = ({ size = 14 }: { size?: number }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+    <polyline points="17 21 17 13 7 13 7 21" />
+    <polyline points="7 3 7 8 15 8" />
+  </svg>
+)
 
 export default function SettingsView({
   medicoInfo,
@@ -31,7 +38,8 @@ export default function SettingsView({
   onDisconnect,
   googleConnected,
   onConnectGoogle,
-  onDisconnectGoogle
+  onDisconnectGoogle,
+  initialTab = 'perfil-pro'
 }: {
   medicoInfo: any
   onSave: (updated: any) => Promise<void>
@@ -42,6 +50,7 @@ export default function SettingsView({
   googleConnected: boolean
   onConnectGoogle: () => void
   onDisconnectGoogle: () => void
+  initialTab?: SettingsTab
 }) {
   const { showAlert } = useAlert();
   const [showUnmetList, setShowUnmetList] = useState(false);
@@ -81,8 +90,65 @@ export default function SettingsView({
   }
 
   const [matricula, setMatricula] = useState(medicoInfo?.matricula || (medicoInfo?.matriculaInfo?.numero ? String(medicoInfo.matriculaInfo.numero) : ''))
-  const [tariffs, setTariffs] = useState<any[]>(medicoInfo?.tariffs || [])
   const [fotoUrl, setFotoUrl] = useState(medicoInfo?.fotoUrl || '')
+
+  // Foto de perfil por cámara — alternativa a "Subir foto" para médicos que no tienen una
+  // foto a mano en el dispositivo. Usa getUserMedia; el stream se corta al cerrar el modal
+  // (cancelar, capturar, o desmontar el componente) para no dejar la cámara del navegador
+  // encendida de fondo.
+  const [showCameraModal, setShowCameraModal] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const cameraStreamRef = useRef<MediaStream | null>(null)
+
+  const stopCameraStream = () => {
+    cameraStreamRef.current?.getTracks().forEach(track => track.stop())
+    cameraStreamRef.current = null
+  }
+
+  const handleOpenCamera = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      showAlert('Tu navegador no permite acceder a la cámara. Probá subir una foto desde tu dispositivo.', 'error')
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+      cameraStreamRef.current = stream
+      setShowCameraModal(true)
+    } catch (err) {
+      console.error(err)
+      showAlert('No pudimos acceder a la cámara. Revisá los permisos del navegador para este sitio.', 'error')
+    }
+  }
+
+  const handleCloseCamera = () => {
+    stopCameraStream()
+    setShowCameraModal(false)
+  }
+
+  const handleCapturePhoto = () => {
+    const video = videoRef.current
+    if (!video || !video.videoWidth) return
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    setFotoUrl(canvas.toDataURL('image/jpeg', 0.9))
+    handleCloseCamera()
+  }
+
+  // The video element only exists once the modal is open, so attach the already-granted
+  // stream after that render instead of inside handleOpenCamera.
+  useEffect(() => {
+    if (showCameraModal && videoRef.current && cameraStreamRef.current) {
+      videoRef.current.srcObject = cameraStreamRef.current
+    }
+  }, [showCameraModal])
+
+  // Safety net: if the médico navigates away from Configuración with the modal still open,
+  // don't leave the browser's camera indicator lit.
+  useEffect(() => () => stopCameraStream(), [])
   // Sello y código REFEPS para recetas electrónicas — QBI2 los usa para generar la receta
   // (incluida la firma electrónica, que ahora arma la API automáticamente a partir del REFEPS).
   // El sello se pre-completa con un texto sugerido a partir de los datos que ya cargó el
@@ -197,80 +263,24 @@ export default function SettingsView({
     setList(list.includes(value) ? list.filter(v => v !== value) : [...list, value])
   }
 
-  const updateTariff = (id: string, field: 'price' | 'enabled' | 'label' | 'requiereObraSocial' | 'obraSocial' | 'precioOnline' | 'precioPresencial' | 'requiereAgenda', value: number | boolean | string | null) => {
-    setTariffs(tariffs.map(t => t.id === id ? { ...t, [field]: value } : t))
-  }
-
-  // Per-modalidad pricing is opt-in per service (a médico rarely differentiates every service,
-  // and some don't offer both modalidades at all) — start expanded only for rows that already
-  // have an override saved, so existing data stays visible without forcing the toggle open for
-  // services that have never used it.
-  const [expandedPricingIds, setExpandedPricingIds] = useState<Set<string>>(
-    () => new Set(tariffs.filter((t: any) => t.precioOnline != null || t.precioPresencial != null).map((t: any) => t.id))
-  )
-  const togglePricingExpanded = (id: string) => {
-    setExpandedPricingIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-        // Collapsing clears the overrides so the base "Valor" applies to both modalidades again
-        // instead of leaving a stale, now-invisible override in place.
-        updateTariff(id, 'precioOnline', null)
-        updateTariff(id, 'precioPresencial', null)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
-  }
-
-  // New tariffs need a unique id (the backend's natural key for upsert/delete) — slugify the
-  // label and disambiguate against whatever ids already exist so two similarly-named services
-  // don't collide into the same row.
-  const slugifyTariffId = (label: string) => {
-    const base = label
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-+|-+$)/g, '') || 'servicio'
-    let id = base
-    let n = 2
-    while (tariffs.some(t => t.id === id)) { id = `${base}-${n}`; n++ }
-    return id
-  }
-
-  const addTariff = (label: string, price: number, obraSocial: string) => {
-    setTariffs([...tariffs, {
-      id: slugifyTariffId(label), label, price, enabled: true,
-      requiereObraSocial: !!obraSocial, obraSocial: obraSocial || undefined,
-      // Explicit, not left to default to `true` implicitly: a bare JSON payload missing this key
-      // would deserialize as Java's boolean default (false) server-side, silently marking a brand
-      // new, perfectly normal service as "no ocupa agenda" on its very first save.
-      requiereAgenda: true
-    }])
-  }
-
-  const deleteTariff = (id: string) => {
-    setTariffs(tariffs.filter(t => t.id !== id))
-  }
-
-  const [showAddTariff, setShowAddTariff] = useState(false)
-  const [newTariffName, setNewTariffName] = useState('')
-  const [newTariffPrice, setNewTariffPrice] = useState('')
-  const [newTariffObraSocial, setNewTariffObraSocial] = useState('')
-
-  const handleAddTariff = () => {
-    const name = newTariffName.trim()
-    const price = Number(newTariffPrice)
-    if (!name || newTariffPrice.trim() === '' || Number.isNaN(price)) return
-    addTariff(name, price, newTariffObraSocial)
-    setNewTariffName('')
-    setNewTariffPrice('')
-    setNewTariffObraSocial('')
-    setShowAddTariff(false)
-  }
-
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState<SettingsTab>('perfil-pro')
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab)
+    }
+  }, [initialTab])
+
+  // Suscripción y Facturas ARCA — mismos endpoints que ya usa Mi Cuenta (paciente), portados
+  // acá porque el profesional gestiona su perfil desde Configuración, no desde /mi-cuenta.
+  const [mySub, setMySub] = useState<any>(null)
+  const [myInvoices, setMyInvoices] = useState<any[]>([])
+
+  useEffect(() => {
+    api.getMySubscription().then((s: any) => setMySub(s)).catch(() => {})
+    api.getMyInvoices().then((invs: any) => setMyInvoices(Array.isArray(invs) ? invs : [])).catch(() => {})
+  }, [])
 
   const isValidUrl = (urlStr: string) => {
     try {
@@ -426,13 +436,6 @@ export default function SettingsView({
         selloLinea1,
         selloLinea2,
         selloLinea3,
-        // The legacy generic Obra Social/OSDE service always requires cobertura + n° de
-        // afiliado, and defaults its obra social to OSDE if the médico never edited it — but
-        // stays fully editable, so a médico who repointed it at a different obra social keeps
-        // that choice instead of it snapping back to OSDE on every save.
-        tariffs: tariffs.map(t => (t.id === 'obra_social' || t.id === 'osde')
-          ? { ...t, requiereObraSocial: true, obraSocial: t.obraSocial || 'OSDE' }
-          : t),
         fotoUrl,
         tags: selectedTags,
         ofreceOnline,
@@ -461,7 +464,6 @@ export default function SettingsView({
   const perfilProComplete = Boolean(name && apellido && sexo && fechaNacimiento && cuil && tipoDocumento && numeroDocumento && degree && matTipo && matProvincia && specialty && matricula)
   const perfilPublicoComplete = Boolean(descripcionPerfil && selectedTags.length > 0 && pacientesAtiende.length > 0 && institucionFormacion && aniosExperiencia !== '')
   const contactoComplete = Boolean(telefono.trim() && emailContacto.trim())
-  const honorariosComplete = tariffs.some((t: any) => t.enabled)
   const integracionesPendientes = (mpConnected ? 0 : 1) + (googleConnected ? 0 : 1)
 
   const presenciaComplete = experienciasLaborales.length > 0
@@ -470,11 +472,11 @@ export default function SettingsView({
     'perfil-publico': perfilPublicoComplete ? { label: 'Completo', tone: 'ok' } : { label: 'Incompleto', tone: 'warn' },
     'contacto': contactoComplete ? { label: 'Completo', tone: 'ok' } : { label: 'Incompleto', tone: 'warn' },
     'presencia': presenciaComplete ? { label: 'Completo', tone: 'ok' } : { label: 'Sin completar', tone: 'warn' },
-    'honorarios': honorariosComplete ? { label: 'Completo', tone: 'ok' } : { label: 'Sin configurar', tone: 'warn' },
     'notificaciones': { label: 'Activas', tone: 'ok' },
     'integraciones': integracionesPendientes === 0
       ? { label: 'Completo', tone: 'ok' }
       : { label: `${integracionesPendientes} pendiente${integracionesPendientes > 1 ? 's' : ''}`, tone: 'warn' },
+    'suscripcion': mySub?.status === 'ACTIVE' ? { label: 'Activa', tone: 'ok' } : { label: 'Sin activar', tone: 'warn' },
     'privacidad': { label: 'Ley 25.326', tone: 'ok' },
   }
 
@@ -482,7 +484,7 @@ export default function SettingsView({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-      <p className="settings-intro">Gestioná tu perfil profesional, honorarios e integraciones.</p>
+      <p className="settings-intro">Gestioná tu perfil profesional, contacto e integraciones.</p>
 
       {/* Verification status banner */}
       {medicoInfo?.verificado ? (
@@ -591,11 +593,14 @@ export default function SettingsView({
         <div className="settings-content">
       {activeTab === 'perfil-pro' && (
       <div className="card">
-        <div className="card__header">
+        <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)', position: 'relative', zIndex: 10 }}>
           <div>
             <h2 className="card__title">Perfil profesional</h2>
             <p className="card__subtitle">Tu foto es lo primero que ve un paciente al buscar turno — usá una imagen real y de buena calidad.</p>
           </div>
+          <button className="btn btn--primary btn--sm" onClick={handleSave} disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
+            <SaveIcon size={14} /> {saving ? 'Guardando...' : 'Guardar cambios'}
+          </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
           {/* Profile Photo Uploader */}
@@ -618,38 +623,57 @@ export default function SettingsView({
               )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              <label style={{
-                cursor: 'pointer',
-                backgroundColor: 'var(--color-primary)',
-                color: 'white',
-                padding: 'var(--space-2) var(--space-4)',
-                borderRadius: 'var(--radius-md)',
-                fontSize: 'var(--text-xs)',
-                fontWeight: 'bold',
-                textAlign: 'center'
-              }}>
-                Subir foto
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  style={{ display: 'none' }} 
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const MAX_FOTO_BYTES = 3 * 1024 * 1024
-                    if (file.size > MAX_FOTO_BYTES) {
-                      showAlert(`La foto pesa ${(file.size / (1024 * 1024)).toFixed(1)}MB — el máximo permitido es 3MB. Elegí una imagen más liviana.`, 'error')
-                      e.target.value = ''
-                      return
-                    }
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      setFotoUrl(reader.result as string);
-                    };
-                    reader.readAsDataURL(file);
+              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                <label style={{
+                  cursor: 'pointer',
+                  backgroundColor: 'var(--color-primary)',
+                  color: 'white',
+                  padding: 'var(--space-2) var(--space-4)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: 'var(--text-xs)',
+                  fontWeight: 'bold',
+                  textAlign: 'center'
+                }}>
+                  Subir foto
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const MAX_FOTO_BYTES = 3 * 1024 * 1024
+                      if (file.size > MAX_FOTO_BYTES) {
+                        showAlert(`La foto pesa ${(file.size / (1024 * 1024)).toFixed(1)}MB — el máximo permitido es 3MB. Elegí una imagen más liviana.`, 'error')
+                        e.target.value = ''
+                        return
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setFotoUrl(reader.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={handleOpenCamera}
+                  style={{
+                    cursor: 'pointer',
+                    backgroundColor: 'white',
+                    color: 'var(--color-primary)',
+                    border: '1.5px solid var(--color-primary)',
+                    padding: 'var(--space-2) var(--space-4)',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: 'var(--text-xs)',
+                    fontWeight: 'bold',
+                    textAlign: 'center'
                   }}
-                />
-              </label>
+                >
+                  Usar cámara
+                </button>
+              </div>
               {fotoUrl && (
                 <button 
                   onClick={() => setFotoUrl('')}
@@ -902,11 +926,14 @@ export default function SettingsView({
       {/* Public profile — shown to patients on the booking page, required to get verified */}
       {activeTab === 'perfil-publico' && (
       <div className="card">
-        <div className="card__header">
+        <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)', position: 'relative', zIndex: 10 }}>
           <div>
             <h2 className="card__title">Perfil público</h2>
             <p className="card__subtitle">Esta información se muestra a los pacientes en tu página de reserva. Es obligatoria para obtener la verificación de tu cuenta.</p>
           </div>
+          <button className="btn btn--primary btn--sm" onClick={handleSave} disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
+            <SaveIcon size={14} /> {saving ? 'Guardando...' : 'Guardar cambios'}
+          </button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
           <div className="form-group">
@@ -991,7 +1018,7 @@ export default function SettingsView({
       {/* Contacto — obligatorio para la verificación del profesional */}
       {activeTab === 'contacto' && (
       <div className="card">
-        <div className="card__header">
+        <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)', position: 'relative', zIndex: 10 }}>
           <div>
             <h2 className="card__title">Contacto</h2>
             <p className="card__subtitle">
@@ -1000,6 +1027,9 @@ export default function SettingsView({
               Son independientes del email con el que iniciás sesión.
             </p>
           </div>
+          <button className="btn btn--primary btn--sm" onClick={handleSave} disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
+            <SaveIcon size={14} /> {saving ? 'Guardando...' : 'Guardar cambios'}
+          </button>
         </div>
         <div className="form-grid">
           <div className="form-group">
@@ -1048,11 +1078,14 @@ export default function SettingsView({
       {/* Presencia y Experiencia (Redes Sociales y Experiencias Laborales) */}
       {activeTab === 'presencia' && (
       <div className="card">
-        <div className="card__header">
+        <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)', position: 'relative', zIndex: 10 }}>
           <div>
             <h2 className="card__title">Presencia y Experiencia Laboral</h2>
             <p className="card__subtitle">Sumá tus redes sociales y tus experiencias laborales previas para dar confianza a tus pacientes.</p>
           </div>
+          <button className="btn btn--primary btn--sm" onClick={handleSave} disabled={saving} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
+            <SaveIcon size={14} /> {saving ? 'Guardando...' : 'Guardar cambios'}
+          </button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -1297,211 +1330,6 @@ export default function SettingsView({
       </div>
       )}
 
-      {/* Tariffs */}
-      {activeTab === 'honorarios' && (
-      <div className="card">
-        <div className="card__header">
-          <div>
-            <h2 className="card__title">Honorarios y servicios</h2>
-            <p className="card__subtitle">Configurá los precios de cada tipo de consulta. Solo los servicios habilitados se muestran al paciente.</p>
-          </div>
-        </div>
-        <table className="settings-fees-table">
-          <thead>
-            <tr>
-              <th style={{ width: '44px' }}></th>
-              <th>Servicio</th>
-              <th>Valor (ARS)</th>
-              <th style={{ width: '170px' }}>Obra Social</th>
-              <th style={{ width: '40px' }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {tariffs.map((t: any) => {
-              // Legacy default service ("obra_social"/"osde" ids) — its obra social defaults
-              // to OSDE for display when never set explicitly, but stays fully editable like
-              // any other service; the médico can point it at a different obra social.
-              const isObraSocialTariff = t.id === 'obra_social' || t.id === 'osde'
-              // Per-modalidad pricing only makes sense when the médico actually offers both —
-              // otherwise there's nothing to differentiate, so don't even show the option.
-              const canDifferentiateByModalidad = ofreceOnline && ofrecePresencial
-              const isPricingExpanded = expandedPricingIds.has(t.id)
-              return (
-              <Fragment key={t.id}>
-              <tr style={{ opacity: t.enabled ? 1 : 0.5, transition: 'opacity 150ms' }}>
-                <td>
-                  <label className="toggle" style={{ transform: 'scale(0.8)' }}>
-                    <input
-                      type="checkbox"
-                      checked={t.enabled}
-                      onChange={(e) => updateTariff(t.id, 'enabled', e.target.checked)}
-                    />
-                    <span className="toggle__track" />
-                  </label>
-                </td>
-                <td>
-                  <input
-                    className="form-input settings-fee-name"
-                    type="text"
-                    value={t.label}
-                    onChange={(e) => updateTariff(t.id, 'label', e.target.value)}
-                    disabled={!t.enabled}
-                  />
-                  <label
-                    style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px', fontSize: '11px', color: 'var(--color-text-secondary)', cursor: t.enabled ? 'pointer' : 'default' }}
-                    title="Para servicios que son solo un documento (receta, certificado, informe) — no requieren consultorio ni videollamada, así que reservarlos no ocupa un horario de tu agenda."
-                  >
-                    <input
-                      type="checkbox"
-                      checked={t.requiereAgenda === false}
-                      onChange={(e) => updateTariff(t.id, 'requiereAgenda', !e.target.checked)}
-                      disabled={!t.enabled}
-                      style={{ margin: 0 }}
-                    />
-                    Es un documento (no ocupa turno)
-                  </label>
-                </td>
-                <td className="settings-fee-val">
-                  <input
-                    className="form-input"
-                    type="number"
-                    value={t.price}
-                    onChange={(e) => updateTariff(t.id, 'price', Number(e.target.value))}
-                    disabled={!t.enabled || isPricingExpanded}
-                  />
-                  {canDifferentiateByModalidad && (
-                    <button
-                      type="button"
-                      onClick={() => togglePricingExpanded(t.id)}
-                      disabled={!t.enabled}
-                      style={{ display: 'block', marginTop: '4px', background: 'none', border: 'none', padding: 0, fontSize: '11px', color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline' }}
-                    >
-                      {isPricingExpanded ? 'Usar el mismo precio' : 'Precio distinto por modalidad'}
-                    </button>
-                  )}
-                </td>
-                <td style={{ textAlign: 'center' }}>
-                  <select
-                    className="form-input"
-                    value={t.obraSocial || (isObraSocialTariff ? 'OSDE' : '')}
-                    onChange={(e) => updateTariff(t.id, 'obraSocial', e.target.value)}
-                    disabled={!t.enabled}
-                    title="Con qué obra social específica trabaja este servicio — al reservarlo, se le pedirá al paciente su número de afiliado"
-                  >
-                    <option value="">Ninguna (particular)</option>
-                    {OBRAS_SOCIALES.filter(os => os !== 'Otra').map((os) => (
-                      <option key={os} value={os}>{os}</option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    className="settings-fee-delete"
-                    onClick={() => deleteTariff(t.id)}
-                    aria-label={`Eliminar ${t.label}`}
-                    title="Eliminar servicio"
-                  >
-                    <Icon.Trash size={14} />
-                  </button>
-                </td>
-              </tr>
-              {canDifferentiateByModalidad && isPricingExpanded && (
-                <tr style={{ opacity: t.enabled ? 1 : 0.5 }}>
-                  <td></td>
-                  <td colSpan={4} style={{ paddingTop: 0 }}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', alignItems: 'center', padding: '8px 10px', borderLeft: '2px solid var(--color-border)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <label style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Presencial</label>
-                        <input
-                          className="form-input"
-                          type="number"
-                          placeholder={String(t.price)}
-                          value={t.precioPresencial ?? ''}
-                          onChange={(e) => updateTariff(t.id, 'precioPresencial', e.target.value === '' ? null : Number(e.target.value))}
-                          disabled={!t.enabled}
-                          style={{ width: '120px' }}
-                        />
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <label style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Online</label>
-                        <input
-                          className="form-input"
-                          type="number"
-                          placeholder={String(t.price)}
-                          value={t.precioOnline ?? ''}
-                          onChange={(e) => updateTariff(t.id, 'precioOnline', e.target.value === '' ? null : Number(e.target.value))}
-                          disabled={!t.enabled}
-                          style={{ width: '120px' }}
-                        />
-                      </div>
-                      <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Dejalo vacío para usar el precio por defecto en esa modalidad</span>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              </Fragment>
-              )
-            })}
-          </tbody>
-        </table>
-
-        {showAddTariff ? (
-          <div className="settings-fee-add-row">
-            <input
-              className="form-input"
-              type="text"
-              placeholder="Nombre del servicio (ej. Consulta domiciliaria)"
-              value={newTariffName}
-              onChange={(e) => setNewTariffName(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <input
-              className="form-input"
-              type="number"
-              placeholder="Valor ARS"
-              value={newTariffPrice}
-              onChange={(e) => setNewTariffPrice(e.target.value)}
-              style={{ width: '140px' }}
-            />
-            <select
-              className="form-input"
-              value={newTariffObraSocial}
-              onChange={(e) => setNewTariffObraSocial(e.target.value)}
-              style={{ width: '170px' }}
-              title="Con qué obra social específica trabaja este servicio (dejalo en 'Ninguna' para un servicio particular)"
-            >
-              <option value="">Ninguna (particular)</option>
-              {OBRAS_SOCIALES.filter(os => os !== 'Otra').map((os) => (
-                <option key={os} value={os}>{os}</option>
-              ))}
-            </select>
-            <button type="button" className="btn btn--primary btn--sm" onClick={handleAddTariff}>Agregar</button>
-            <button
-              type="button"
-              className="btn btn--secondary btn--sm"
-              onClick={() => { setShowAddTariff(false); setNewTariffName(''); setNewTariffPrice(''); setNewTariffObraSocial('') }}
-            >
-              Cancelar
-            </button>
-          </div>
-        ) : (
-          <button type="button" className="btn btn--secondary btn--sm" style={{ marginTop: 'var(--space-4)' }} onClick={() => setShowAddTariff(true)}>
-            <Icon.Plus /> Agregar servicio nuevo
-          </button>
-        )}
-
-        <div style={{ marginTop: 'var(--space-5)', display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-          <button className="btn btn--primary" onClick={handleSave} disabled={saving} id="btn-save-tariffs">
-            {saving ? 'Guardando...' : 'Guardar honorarios'}
-          </button>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-            Tranqui es 100% libre de comisiones, por lo que recibís la totalidad de tus honorarios.
-          </span>
-        </div>
-      </div>
-      )}
-
       {/* Notifications */}
       {activeTab === 'notificaciones' && (
       <div className="card">
@@ -1548,6 +1376,103 @@ export default function SettingsView({
         <GoogleCalendarConnectBanner connected={googleConnected} onConnect={onConnectGoogle} onDisconnect={onDisconnectGoogle} />
       </div>
       </>
+      )}
+
+      {activeTab === 'suscripcion' && (
+        <div className="card">
+          <div className="card__header">
+            <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icon.CreditCard /> Mi Suscripción y Facturas ARCA
+            </h2>
+            <p className="card__subtitle">
+              Gestioná tu membresía profesional y descargá tus comprobantes oficiales con CAE y código QR emitidos por ARCA.
+            </p>
+          </div>
+
+          {mySub ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+              <div style={{
+                padding: 'var(--space-4)',
+                backgroundColor: 'var(--green-50)',
+                border: '1px solid var(--green-200)',
+                borderRadius: 'var(--radius-md)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 'var(--space-3)'
+              }}>
+                <div>
+                  <span style={{ fontSize: '11px', color: 'var(--color-primary-hover)', fontWeight: 'bold', display: 'block' }}>PLAN PROFESIONAL</span>
+                  <strong style={{ fontSize: '18px', color: 'var(--color-primary)' }}>{mySub.plan?.name || 'Plan Profesional'}</strong>
+                  <span style={{ display: 'block', fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                    {mySub.currentPeriodEnd ? `Período cubierto hasta el ${new Date(mySub.currentPeriodEnd).toLocaleDateString('es-AR')}` : 'Sin fecha de vencimiento'}
+                  </span>
+                </div>
+                <span className={`badge ${mySub.status === 'ACTIVE' ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>
+                  {mySub.status === 'ACTIVE' ? 'Suscripción Activa' : mySub.status}
+                </span>
+              </div>
+
+              {mySub.activeFeatures && mySub.activeFeatures.length > 0 && (
+                <div>
+                  <strong style={{ fontSize: '13px', display: 'block', marginBottom: '8px' }}>Funcionalidades habilitadas:</strong>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {mySub.activeFeatures.map((feat: string) => (
+                      <span key={feat} className="badge badge--neutral" style={{ fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Icon.Check /> {feat.replace(/_/g, ' ')}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ marginTop: 'var(--space-2)' }}>
+                <strong style={{ fontSize: '14px', display: 'block', marginBottom: '8px' }}>Comprobantes y Facturas C:</strong>
+                {myInvoices.length === 0 ? (
+                  <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>No hay facturas emitidas todavía.</p>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+                          <th style={{ padding: '8px' }}>Comprobante</th>
+                          <th style={{ padding: '8px' }}>Fecha</th>
+                          <th style={{ padding: '8px' }}>Monto</th>
+                          <th style={{ padding: '8px' }}>CAE</th>
+                          <th style={{ padding: '8px', textAlign: 'right' }}>Descarga</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {myInvoices.map((inv: any) => (
+                          <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                            <td style={{ padding: '8px' }}>
+                              <strong>{inv.cbteTipoNombre}</strong> #{String(inv.puntoVenta).padStart(5, '0')}-{String(inv.cbteNumero).padStart(8, '0')}
+                            </td>
+                            <td style={{ padding: '8px' }}>{new Date(inv.fechaEmision).toLocaleDateString('es-AR')}</td>
+                            <td style={{ padding: '8px', fontWeight: 'bold' }}>$ {inv.importeTotal?.toLocaleString('es-AR')}</td>
+                            <td style={{ padding: '8px', fontFamily: 'monospace' }}>{inv.cae || '—'}</td>
+                            <td style={{ padding: '8px', textAlign: 'right' }}>
+                              {inv.pdfUrl && (
+                                <a href={api.getInvoicePdfUrl(inv.id)} target="_blank" rel="noreferrer" className="btn btn--secondary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  <Icon.Download size={14} /> Descargar Factura C
+                                </a>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-text-secondary)' }}>
+              No contás con una suscripción profesional activa.
+            </div>
+          )}
+        </div>
       )}
 
       {/* Privacidad y Datos personales — derechos ARCO (Ley 25.326) */}
@@ -1686,6 +1611,43 @@ export default function SettingsView({
         </div>
       )}
 
+      {showCameraModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: 'var(--space-4)'
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '480px', backgroundColor: 'white', padding: 'var(--space-6)', borderRadius: '12px' }}>
+            <h3 style={{ margin: '0 0 var(--space-4)', fontSize: 'var(--text-lg)' }}>Sacar foto de perfil</h3>
+            <div style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: '#000', aspectRatio: '4 / 3' }}>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transform: 'scaleX(-1)' }}
+              />
+            </div>
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', margin: 'var(--space-2) 0 0' }}>
+              Encuadrá tu rostro y hacé clic en "Capturar foto".
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-6)' }}>
+              <button type="button" className="btn btn--secondary" onClick={handleCloseCamera}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn--primary" onClick={handleCapturePhoto}>
+                Capturar foto
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showPubModal && pubForm && (
         <div style={{
           position: 'fixed',
@@ -1757,6 +1719,35 @@ export default function SettingsView({
         </div>
       )}
         </div>
+      </div>
+
+      {/* Floating Sticky Save Bar */}
+      <div style={{
+        position: 'sticky',
+        bottom: '16px',
+        alignSelf: 'flex-end',
+        zIndex: 100,
+        backgroundColor: 'rgba(255, 255, 255, 0.96)',
+        backdropFilter: 'blur(8px)',
+        border: '1.5px solid var(--color-primary)',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+        borderRadius: '999px',
+        padding: '6px 14px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px'
+      }}>
+        <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+          ¿Terminaste de editar?
+        </span>
+        <button
+          className="btn btn--primary btn--sm"
+          onClick={handleSave}
+          disabled={saving}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', borderRadius: '999px', padding: '6px 16px' }}
+        >
+          <SaveIcon size={14} /> {saving ? 'Guardando...' : 'Guardar cambios'}
+        </button>
       </div>
     </div>
   )

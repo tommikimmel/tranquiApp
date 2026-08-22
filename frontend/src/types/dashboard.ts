@@ -14,7 +14,7 @@ export interface Appointment {
   documentoEnviado?: boolean
   // Only meaningful when ocupaAgenda is false — see TurnoMedicoDto.esReceta (backend).
   esReceta?: boolean
-  patientInfo?: { email?: string; telefono?: string }
+  patientInfo?: any
 }
 
 // A médico's personal Google Calendar event (read-only, never a Turno) — see
@@ -28,4 +28,4 @@ export interface ExternalEvent {
   allDay: boolean
 }
 
-export type NavSection = 'dashboard' | 'agenda' | 'patients' | 'clinical-history' | 'prescriptions' | 'visitors' | 'payments' | 'settings'
+export type NavSection = 'dashboard' | 'agenda' | 'patients' | 'clinical-history' | 'prescriptions' | 'visitors' | 'payments' | 'honorarios' | 'settings'

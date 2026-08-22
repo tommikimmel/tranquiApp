@@ -26,6 +26,9 @@ public class SecurityConfig {
     @Autowired
     private SiteAccessFilter siteAccessFilter;
 
+    @Autowired
+    private SubscriptionAccessFilter subscriptionAccessFilter;
+
     @Bean
     public org.springframework.security.crypto.password.PasswordEncoder passwordEncoder() {
         return new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
@@ -38,11 +41,15 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable()) // Session is secured using HttpOnly and SameSite cookies
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/site-access/**", "/api/auth/google", "/api/auth/register", "/api/auth/login", "/api/auth/verify-email", "/api/auth/resend-code", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/health", "/api/payments/webhook", "/api/payments/verificar", "/ws-tranqui/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/medicos", "/api/medicos/*/turnos-disponibles", "/api/medicos/turnos-disponibles-conteo", "/api/medicos/mercadopago/callback", "/api/medicos/google-calendar/callback", "/api/medicos/google-calendar/webhook", "/api/turnos/reservar", "/api/turnos/*/abandonar-pago", "/api/recetas/financiadores", "/error").permitAll()
+                .requestMatchers("/api/site-access/**", "/api/auth/google", "/api/auth/register", "/api/auth/login", "/api/auth/verify-email", "/api/auth/resend-code", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/health", "/api/payments/webhook", "/api/payments/verificar", "/ws-tranqui/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/medicos", "/api/medicos/*/turnos-disponibles", "/api/medicos/turnos-disponibles-conteo", "/api/medicos/mercadopago/callback", "/api/medicos/google-calendar/callback", "/api/medicos/google-calendar/webhook", "/api/turnos/reservar", "/api/turnos/*/abandonar-pago", "/api/recetas/financiadores", "/api/subscriptions/plans", "/api/subscriptions/invoices/*/pdf", "/error").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(siteAccessFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+            // Necesita correr DESPUÉS de jwtAuthFilter (para tener el usuario autenticado
+            // disponible en el SecurityContext), así que se ancla a ese filtro en vez de a
+            // UsernamePasswordAuthenticationFilter como los otros dos.
+            .addFilterAfter(subscriptionAccessFilter, JwtAuthenticationFilter.class);
         return http.build();
     }
 

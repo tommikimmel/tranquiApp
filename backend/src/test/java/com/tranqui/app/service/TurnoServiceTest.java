@@ -13,10 +13,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest
 class TurnoServiceTest {
@@ -38,6 +41,12 @@ class TurnoServiceTest {
 
     @Autowired
     private com.tranqui.app.repository.NotificacionRepository notificacionRepository;
+
+    // Mocked so marcarDocumentoEnviado tests are deterministic and don't attempt a real HTTP
+    // call to Resend — default-stubbed to "sent successfully" in setUp(), overridden to false
+    // in the dedicated mail-failure test below.
+    @MockBean
+    private com.tranqui.app.service.ResendEmailService resendEmailService;
 
     private Usuario paciente;
     private Usuario medico;
@@ -76,6 +85,9 @@ class TurnoServiceTest {
                 .horaInicio(LocalTime.of(10, 0))
                 .horaFin(LocalTime.of(10, 45))
                 .tipo(TipoTurno.PARTICULAR)
+                // ONLINE so confirmarTurnoOsde actually exercises its Google Calendar sync path
+                // (it's a no-op for PRESENCIAL turnos — see TurnoService#confirmarTurnoOsde).
+                .modalidad(Modalidad.ONLINE)
                 .estado(EstadoTurno.PENDIENTE_PAGO)
                 // obtenerTurnosPaciente now reads the persisted checkoutUrl instead of calling
                 // Mercado Pago again on every read, so it must already be set here.
@@ -83,6 +95,10 @@ class TurnoServiceTest {
                 .build();
 
         turnoRepository.save(turno);
+
+        // Default: document email "sent" successfully unless a specific test overrides it.
+        when(resendEmailService.enviarDocumentoAdjunto(anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(true);
     }
 
     @AfterEach
@@ -196,7 +212,10 @@ class TurnoServiceTest {
         com.tranqui.app.model.dto.ReservaTurnoDto dto = com.tranqui.app.model.dto.ReservaTurnoDto.builder()
                 .medicoId(medico.getId())
                 .fecha(LocalDate.now().plusDays(2))
-                .hora(LocalTime.of(10, 0))
+                // Candidate start times step every duracionTurnoMinutos (45, this médico's
+                // default) with no gap (intervaloEntreTurnosMinutos default 0) — 9:00, 9:45,
+                // 10:30, 11:15. 10:00 is never a generated candidate, so it isn't a valid hora.
+                .hora(LocalTime.of(9, 45))
                 .tipo(TipoTurno.OBRA_SOCIAL)
                 .obraSocial("Swiss Medical")
                 .metadataAfiliado("99887766")
@@ -344,6 +363,19 @@ class TurnoServiceTest {
                 .build();
         turnoRepository.save(hoyTerminado);
 
+        // obtenerTodosTurnos only ever includes CONFIRMADO or PENDIENTE_VALIDACION turnos (see
+        // TurnoService#obtenerTodosTurnos) — a PENDIENTE_PAGO turno like the shared `turno`
+        // fixture never reaches the status-mapping code at all, so it can never produce
+        // "pending". Only PENDIENTE_VALIDACION (e.g. a transferencia awaiting manual review)
+        // does.
+        Turno pendienteValidacion = Turno.builder()
+                .paciente(paciente).medico(medico)
+                .fecha(LocalDate.now().plusDays(3))
+                .horaInicio(LocalTime.of(16, 0)).horaFin(LocalTime.of(16, 45))
+                .tipo(TipoTurno.PARTICULAR).estado(EstadoTurno.PENDIENTE_VALIDACION)
+                .build();
+        turnoRepository.save(pendienteValidacion);
+
         try {
             java.util.List<com.tranqui.app.model.dto.TurnoMedicoDto> result = turnoService.obtenerTodosTurnos(medico.getEmail());
 
@@ -357,6 +389,7 @@ class TurnoServiceTest {
         } finally {
             turnoRepository.delete(pasado);
             turnoRepository.delete(hoyTerminado);
+            turnoRepository.delete(pendienteValidacion);
         }
     }
 
@@ -492,6 +525,36 @@ class TurnoServiceTest {
                 () -> turnoService.reprogramarTurno(-1L, LocalDate.now().toString(), "10:00"));
     }
 
+    // Regression test: reprogramarTurno used to hardcode 45 minutes for horaFin regardless of
+    // the médico's configured duracionTurnoMinutos (a bug — reservarTurno and
+    // obtenerHorariosDisponibles both correctly use the médico's own duration). Verifies the fix
+    // with a duration that is neither the old hardcoded value nor its own default.
+    @Test
+    void testReprogramarTurno_usesMedicoConfiguredDuracionInsteadOfHardcoded45() {
+        medico.setDuracionTurnoMinutos(30);
+        usuarioRepository.save(medico);
+
+        LocalDate nuevaFecha = LocalDate.now().plusDays(4);
+        turnoService.reprogramarTurno(turno.getId(), nuevaFecha.toString(), "14:00");
+
+        Turno dbTurno = turnoRepository.findById(turno.getId()).orElseThrow();
+        assertEquals(LocalTime.of(14, 0), dbTurno.getHoraInicio());
+        assertEquals(LocalTime.of(14, 30), dbTurno.getHoraFin());
+    }
+
+    @Test
+    void testReprogramarTurno_usesMedicoConfiguredDuracionSesenta() {
+        medico.setDuracionTurnoMinutos(60);
+        usuarioRepository.save(medico);
+
+        LocalDate nuevaFecha = LocalDate.now().plusDays(4);
+        turnoService.reprogramarTurno(turno.getId(), nuevaFecha.toString(), "09:00");
+
+        Turno dbTurno = turnoRepository.findById(turno.getId()).orElseThrow();
+        assertEquals(LocalTime.of(9, 0), dbTurno.getHoraInicio());
+        assertEquals(LocalTime.of(10, 0), dbTurno.getHoraFin());
+    }
+
     @Test
     void testReservarTurnoReceta_usesFallbackPrice() {
         com.tranqui.app.model.dto.ReservaTurnoDto dto = com.tranqui.app.model.dto.ReservaTurnoDto.builder()
@@ -597,5 +660,229 @@ class TurnoServiceTest {
                 .build();
 
         assertThrows(IllegalStateException.class, () -> turnoService.reservarTurno(dto));
+    }
+
+    // --- Double-booking guard (existsActiveTurnoByPacienteEmail) ---------------------------
+
+    @Test
+    void testReservarTurno_blocksDoubleBookingForPatientWithActiveTurno() {
+        // `paciente` already has the shared `turno` fixture from setUp() — PENDIENTE_PAGO,
+        // ocupaAgenda true (default), fecha in the future — which is exactly what
+        // existsActiveTurnoByPacienteEmail looks for.
+        com.tranqui.app.model.dto.ReservaTurnoDto dto = com.tranqui.app.model.dto.ReservaTurnoDto.builder()
+                .medicoId(medico.getId())
+                .fecha(LocalDate.now().plusDays(2))
+                .hora(LocalTime.of(9, 0))
+                .tipo(TipoTurno.PARTICULAR)
+                .nombrePaciente(paciente.getNombre())
+                .emailPaciente(paciente.getEmail())
+                .build();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> turnoService.reservarTurno(dto));
+        assertTrue(ex.getMessage().contains("Ya tenés un turno activo"));
+    }
+
+    // --- Ambiguous modalidad when médico offers both -----------------------------------------
+
+    @Test
+    void testReservarTurno_ambasModalidadesSinEspecificar_throwsIllegalArgumentException() {
+        medico.setOfrecePresencial(true); // isOfreceOnline() already defaults to true
+        usuarioRepository.save(medico);
+
+        com.tranqui.app.model.dto.ReservaTurnoDto dto = com.tranqui.app.model.dto.ReservaTurnoDto.builder()
+                .medicoId(medico.getId())
+                .fecha(LocalDate.now().plusDays(2))
+                .hora(LocalTime.of(9, 0))
+                .tipo(TipoTurno.PARTICULAR)
+                .nombrePaciente("Ambas Modalidades")
+                .emailPaciente("ambas.modalidades@gmail.com")
+                // modalidad intentionally omitted
+                .build();
+
+        assertThrows(IllegalArgumentException.class, () -> turnoService.reservarTurno(dto));
+    }
+
+    // --- requiereAfiliado without metadataAfiliado --------------------------------------------
+
+    @Test
+    void testReservarTurno_obraSocialSinMetadataAfiliado_throwsIllegalStateException() {
+        com.tranqui.app.model.dto.ReservaTurnoDto dto = com.tranqui.app.model.dto.ReservaTurnoDto.builder()
+                .medicoId(medico.getId())
+                .fecha(LocalDate.now().plusDays(2))
+                .hora(LocalTime.of(9, 0))
+                .tipo(TipoTurno.OBRA_SOCIAL)
+                .obraSocial("Swiss Medical")
+                .nombrePaciente("Sin Afiliado")
+                .emailPaciente("sin.afiliado@gmail.com")
+                // metadataAfiliado intentionally omitted
+                .build();
+
+        // reservarTurno is @Transactional, so the Usuario row created for this new patient
+        // before the check fails is rolled back automatically — nothing to clean up.
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> turnoService.reservarTurno(dto));
+        assertTrue(ex.getMessage().contains("número de afiliado"));
+    }
+
+    // --- marcarDocumentoEnviado ----------------------------------------------------------------
+
+    private static final String ARCHIVO_DATA_VALIDO = "data:application/pdf;base64,aGVsbG8gbXVuZG8=";
+
+    private Turno crearTurnoDocumento(EstadoTurno estado, boolean esReceta, String servicioId) {
+        Turno doc = Turno.builder()
+                .paciente(paciente).medico(medico)
+                .fecha(LocalDate.now())
+                .horaInicio(LocalTime.of(12, 0)).horaFin(LocalTime.of(12, 0))
+                .tipo(esReceta ? TipoTurno.RECETA : TipoTurno.CERTIFICADO)
+                .estado(estado)
+                .ocupaAgenda(false)
+                .esReceta(esReceta)
+                .servicioId(servicioId)
+                .build();
+        turnoRepository.save(doc);
+        return doc;
+    }
+
+    @Test
+    void testMarcarDocumentoEnviado_success() {
+        Turno doc = crearTurnoDocumento(EstadoTurno.CONFIRMADO, false, "certificado");
+        try {
+            turnoService.marcarDocumentoEnviado(doc.getId(), medico.getEmail(), ARCHIVO_DATA_VALIDO, "certificado.pdf");
+
+            Turno db = turnoRepository.findById(doc.getId()).orElseThrow();
+            assertTrue(db.isDocumentoEnviado());
+        } finally {
+            turnoRepository.delete(doc);
+        }
+    }
+
+    @Test
+    void testMarcarDocumentoEnviado_wrongOwnership_throws() {
+        Turno doc = crearTurnoDocumento(EstadoTurno.CONFIRMADO, false, "certificado");
+        try {
+            assertThrows(IllegalStateException.class, () ->
+                    turnoService.marcarDocumentoEnviado(doc.getId(), "otro.medico@gmail.com", ARCHIVO_DATA_VALIDO, "x.pdf"));
+
+            Turno db = turnoRepository.findById(doc.getId()).orElseThrow();
+            assertFalse(db.isDocumentoEnviado());
+        } finally {
+            turnoRepository.delete(doc);
+        }
+    }
+
+    @Test
+    void testMarcarDocumentoEnviado_nonDocumentTurno_throws() {
+        // `turno` (from setUp) has ocupaAgenda == true (default) — a real scheduled appointment,
+        // not a document service.
+        assertThrows(IllegalStateException.class, () ->
+                turnoService.marcarDocumentoEnviado(turno.getId(), medico.getEmail(), ARCHIVO_DATA_VALIDO, "x.pdf"));
+    }
+
+    @Test
+    void testMarcarDocumentoEnviado_notYetPaid_throws() {
+        Turno doc = crearTurnoDocumento(EstadoTurno.PENDIENTE_PAGO, false, "certificado");
+        try {
+            assertThrows(IllegalStateException.class, () ->
+                    turnoService.marcarDocumentoEnviado(doc.getId(), medico.getEmail(), ARCHIVO_DATA_VALIDO, "x.pdf"));
+        } finally {
+            turnoRepository.delete(doc);
+        }
+    }
+
+    @Test
+    void testMarcarDocumentoEnviado_blocksRecetaPath() {
+        // Recetas are never sent through this path — they get auto-marked by
+        // marcarRecetasEnviadasParaPaciente when the médico actually generates the receta.
+        Turno receta = crearTurnoDocumento(EstadoTurno.CONFIRMADO, true, "receta-fuera");
+        try {
+            IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
+                    turnoService.marcarDocumentoEnviado(receta.getId(), medico.getEmail(), ARCHIVO_DATA_VALIDO, "x.pdf"));
+            assertTrue(ex.getMessage().toLowerCase().contains("receta"));
+        } finally {
+            turnoRepository.delete(receta);
+        }
+    }
+
+    @Test
+    void testMarcarDocumentoEnviado_oversizedAttachment_throws() {
+        Turno doc = crearTurnoDocumento(EstadoTurno.CONFIRMADO, false, "certificado");
+        // ~9MB decoded (12_000_000 base64 chars * 3/4), over the 8MB cap.
+        String archivoDataGrande = "data:application/pdf;base64," + "A".repeat(12_000_000);
+        try {
+            assertThrows(IllegalArgumentException.class, () ->
+                    turnoService.marcarDocumentoEnviado(doc.getId(), medico.getEmail(), archivoDataGrande, "grande.pdf"));
+        } finally {
+            turnoRepository.delete(doc);
+        }
+    }
+
+    @Test
+    void testMarcarDocumentoEnviado_mailSendFailure_throwsAndDoesNotMarkSent() {
+        when(resendEmailService.enviarDocumentoAdjunto(anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(false);
+
+        Turno doc = crearTurnoDocumento(EstadoTurno.CONFIRMADO, false, "certificado");
+        try {
+            // The failure is NOT swallowed — marcarDocumentoEnviado throws rather than silently
+            // flipping documentoEnviado when the patient never actually received the file.
+            assertThrows(IllegalStateException.class, () ->
+                    turnoService.marcarDocumentoEnviado(doc.getId(), medico.getEmail(), ARCHIVO_DATA_VALIDO, "x.pdf"));
+
+            Turno db = turnoRepository.findById(doc.getId()).orElseThrow();
+            assertFalse(db.isDocumentoEnviado());
+        } finally {
+            turnoRepository.delete(doc);
+        }
+    }
+
+    // --- abandonarReservaPendiente ---------------------------------------------------------
+
+    @Test
+    void testAbandonarReservaPendiente_cancelsWhenPendientePago() {
+        turnoService.abandonarReservaPendiente(turno.getId());
+
+        Turno db = turnoRepository.findById(turno.getId()).orElseThrow();
+        assertEquals(EstadoTurno.CANCELADO, db.getEstado());
+    }
+
+    @Test
+    void testAbandonarReservaPendiente_doesNothingWhenAlreadyConfirmed() {
+        turno.setEstado(EstadoTurno.CONFIRMADO);
+        turnoRepository.save(turno);
+
+        turnoService.abandonarReservaPendiente(turno.getId());
+
+        Turno db = turnoRepository.findById(turno.getId()).orElseThrow();
+        assertEquals(EstadoTurno.CONFIRMADO, db.getEstado());
+    }
+
+    @Test
+    void testAbandonarReservaPendiente_turnoNoEncontrado_throws() {
+        assertThrows(jakarta.persistence.EntityNotFoundException.class,
+                () -> turnoService.abandonarReservaPendiente(-1L));
+    }
+
+    // --- marcarRecetasEnviadasParaPaciente --------------------------------------------------
+
+    @Test
+    void testMarcarRecetasEnviadasParaPaciente_marksPendingRecetaFueraTurno() {
+        Turno recetaPendiente = crearTurnoDocumento(EstadoTurno.CONFIRMADO, true, "receta-fuera");
+        try {
+            turnoService.marcarRecetasEnviadasParaPaciente(medico.getId(), paciente.getId());
+
+            Turno db = turnoRepository.findById(recetaPendiente.getId()).orElseThrow();
+            assertTrue(db.isDocumentoEnviado());
+        } finally {
+            turnoRepository.delete(recetaPendiente);
+        }
+    }
+
+    @Test
+    void testMarcarRecetasEnviadasParaPaciente_noPendingRecetas_doesNothing() {
+        // `turno` (from setUp) isn't a "receta-fuera" servicio, so nothing should match — the
+        // method is best-effort and must never throw even when there's nothing to update.
+        assertDoesNotThrow(() -> turnoService.marcarRecetasEnviadasParaPaciente(medico.getId(), paciente.getId()));
+
+        Turno db = turnoRepository.findById(turno.getId()).orElseThrow();
+        assertFalse(db.isDocumentoEnviado());
     }
 }

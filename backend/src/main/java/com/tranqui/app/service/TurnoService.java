@@ -50,6 +50,9 @@ public class TurnoService {
     @Autowired
     private ReembolsoService reembolsoService;
 
+    @Autowired
+    private ResendEmailService resendEmailService;
+
     // Off by default. Only turn this on temporarily while the real Mercado Pago integration
     // is broken/unlinked and you need to exercise the rest of the booking flow (Google
     // Calendar sync, notifications, etc). Never leave it "true" once real patients are paying —
@@ -81,7 +84,7 @@ public class TurnoService {
 
         Usuario medico = usuarioRepository.findById(medicoId).orElse(null);
         int duracionTurnoMinutos = (medico != null && medico.getDuracionTurnoMinutos() != null) ? medico.getDuracionTurnoMinutos() : 45;
-        int intervaloEntreTurnosMinutos = (medico != null && medico.getIntervaloEntreTurnosMinutos() != null) ? medico.getIntervaloEntreTurnosMinutos() : 10;
+        int intervaloEntreTurnosMinutos = (medico != null && medico.getIntervaloEntreTurnosMinutos() != null) ? medico.getIntervaloEntreTurnosMinutos() : 0;
         List<java.time.LocalTime> locales = agendaService.calcularBloquesDisponibles(
                 disponibilidades, turnosExistentes, fecha, duracionTurnoMinutos, intervaloEntreTurnosMinutos);
 
@@ -199,8 +202,11 @@ public class TurnoService {
     // Same detection PagoWebhookHandler#resolverTipoDocumentoLabel uses for the "Nuevo Documento
     // Pendiente" notification — kept as its own explicit boolean (TurnoMedicoDto.esReceta)
     // instead of making the frontend infer it from the `type` label, which a médico can rename.
+    // t.isEsReceta() (denormalized from TarifaMedico.esReceta at booking time, see reservarTurno)
+    // is the source of truth for turnos booked after that field existed; the OR'd legacy checks
+    // are a safety net for older rows RecetaFlagBackfillRunner hasn't caught for some reason.
     private boolean esReceta(Turno t) {
-        return "receta-fuera".equals(t.getServicioId()) || t.getTipo() == TipoTurno.RECETA;
+        return t.isEsReceta() || "receta-fuera".equals(t.getServicioId()) || t.getTipo() == TipoTurno.RECETA;
     }
 
     // A tarifa's precioOnline/precioPresencial only override precio when the médico explicitly
@@ -274,13 +280,18 @@ public class TurnoService {
         // document services (recetas, certificados, informes). Unknown/legacy tarifas default to
         // true, matching the old behavior of always blocking a slot.
         boolean requiereAgendaServicio;
+        // Whether this specific document service is a receta — see TarifaMedico.esReceta.
+        // Meaningless (and left false) whenever requiereAgendaServicio is true.
+        boolean esRecetaServicio;
         if (usoTarifaCustom) {
             requiereAfiliado = tarifaCustomOpt.get().isRequiereObraSocial();
             requiereAgendaServicio = tarifaCustomOpt.get().isRequiereAgenda();
+            esRecetaServicio = tarifaCustomOpt.get().isEsReceta();
         } else {
             boolean esTipoObraSocial = dto.getTipo() == TipoTurno.OBRA_SOCIAL || dto.getTipo() == TipoTurno.OSDE;
             requiereAfiliado = esTipoObraSocial || (tarifaOpt.isPresent() && tarifaOpt.get().isRequiereObraSocial());
             requiereAgendaServicio = tarifaOpt.isPresent() ? tarifaOpt.get().isRequiereAgenda() : true;
+            esRecetaServicio = tarifaOpt.isPresent() && tarifaOpt.get().isEsReceta();
         }
 
         Modalidad modalidad;
@@ -406,6 +417,7 @@ public class TurnoService {
                 .servicioId(servicioId)
                 .idFinanciador(dto.getIdFinanciador())
                 .ocupaAgenda(requiereAgendaServicio)
+                .esReceta(esRecetaServicio)
                 .build();
 
         turno = turnoRepository.save(turno);
@@ -485,8 +497,12 @@ public class TurnoService {
                     if (t.getEstado() == EstadoTurno.CONFIRMADO) {
                         status = "confirmed";
                     }
-                    // If start time is past, could be completed
-                    if (t.getEstado() == EstadoTurno.CONFIRMADO && t.getHoraFin().isBefore(java.time.LocalTime.now())) {
+                    // If start time is past, could be completed. Document-only turnos (ocupaAgenda
+                    // false) stamp horaFin == horaInicio == the booking timestamp itself (see
+                    // reservarTurno), so this would otherwise flip to "completed" within the same
+                    // second they're paid — they have no real session to complete, only a
+                    // documentoEnviado flag, so they just stay "confirmed" until then.
+                    if (t.isOcupaAgenda() && t.getEstado() == EstadoTurno.CONFIRMADO && t.getHoraFin().isBefore(java.time.LocalTime.now())) {
                         status = "completed";
                     }
 
@@ -549,9 +565,15 @@ public class TurnoService {
                     if (t.getEstado() == EstadoTurno.CONFIRMADO) {
                         status = "confirmed";
                     }
-                    if (t.getEstado() == EstadoTurno.CONFIRMADO && t.getHoraFin().isBefore(java.time.LocalTime.now()) && t.getFecha().isEqual(java.time.LocalDate.now())) {
+                    // Document-only turnos (ocupaAgenda false) stamp horaFin == horaInicio == the
+                    // booking timestamp itself (see reservarTurno) and fecha == the day they were
+                    // bought — without this guard they'd flip to "completed" within the same
+                    // second they're paid, hiding the send/generar-receta actions entirely. They
+                    // have no real session to complete, only a documentoEnviado flag, so they just
+                    // stay "confirmed" indefinitely.
+                    if (t.isOcupaAgenda() && t.getEstado() == EstadoTurno.CONFIRMADO && t.getHoraFin().isBefore(java.time.LocalTime.now()) && t.getFecha().isEqual(java.time.LocalDate.now())) {
                         status = "completed";
-                    } else if (t.getEstado() == EstadoTurno.CONFIRMADO && t.getFecha().isBefore(java.time.LocalDate.now())) {
+                    } else if (t.isOcupaAgenda() && t.getEstado() == EstadoTurno.CONFIRMADO && t.getFecha().isBefore(java.time.LocalDate.now())) {
                         status = "completed";
                     }
 
@@ -595,9 +617,15 @@ public class TurnoService {
                     if (t.getEstado() == EstadoTurno.CONFIRMADO) {
                         status = "confirmed";
                     }
-                    if (t.getEstado() == EstadoTurno.CONFIRMADO && t.getHoraFin().isBefore(java.time.LocalTime.now()) && t.getFecha().isEqual(java.time.LocalDate.now())) {
+                    // Document-only turnos (ocupaAgenda false) stamp horaFin == horaInicio == the
+                    // booking timestamp itself (see reservarTurno) and fecha == the day they were
+                    // bought — without this guard they'd flip to "completed" within the same
+                    // second they're paid, hiding the send/generar-receta actions entirely. They
+                    // have no real session to complete, only a documentoEnviado flag, so they just
+                    // stay "confirmed" indefinitely.
+                    if (t.isOcupaAgenda() && t.getEstado() == EstadoTurno.CONFIRMADO && t.getHoraFin().isBefore(java.time.LocalTime.now()) && t.getFecha().isEqual(java.time.LocalDate.now())) {
                         status = "completed";
-                    } else if (t.getEstado() == EstadoTurno.CONFIRMADO && t.getFecha().isBefore(java.time.LocalDate.now())) {
+                    } else if (t.isOcupaAgenda() && t.getEstado() == EstadoTurno.CONFIRMADO && t.getFecha().isBefore(java.time.LocalDate.now())) {
                         status = "completed";
                     }
 
@@ -715,13 +743,19 @@ public class TurnoService {
         }
     }
 
-    // Only for document-only turnos (ocupaAgenda == false): the médico sends the actual
-    // receta/certificado/informe through their own email or WhatsApp client (see
-    // AppointmentCard's mailto:/wa.me links — there's no file storage/generation pipeline behind
-    // these purchases to send server-side), then clicks this to record that it went out, which is
-    // what flips the patient's "Mis Turnos" from "Documento pendiente" to "Documento enviado".
+    // 8MB cap on the decoded attachment — generous for a certificado/informe scan/PDF while
+    // keeping the request payload (and the outgoing email) reasonably sized.
+    private static final long MAX_DOCUMENTO_ADJUNTO_BYTES = 8L * 1024 * 1024;
+
+    // Only for document-only turnos (ocupaAgenda == false) that AREN'T recetas — a receta is
+    // never sent through this path, it's auto-marked when the médico actually generates it (see
+    // marcarRecetasEnviadasParaPaciente, called from RecetaService#emitirReceta). For
+    // certificados/informes there's no generation/storage pipeline in TranquiApp at all (the
+    // médico writes them up externally), so the uploaded file is required here and goes straight
+    // out as a real email attachment (ResendEmailService) — nothing about it is persisted, only
+    // the boolean documentoEnviado flips.
     @Transactional
-    public void marcarDocumentoEnviado(Long turnoId, String medicoEmail) {
+    public void marcarDocumentoEnviado(Long turnoId, String medicoEmail, String archivoData, String archivoNombre) {
         Turno turno = turnoRepository.findById(turnoId)
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
 
@@ -734,9 +768,69 @@ public class TurnoService {
         if (turno.getEstado() != EstadoTurno.CONFIRMADO) {
             throw new IllegalStateException("El documento todavía no fue pagado.");
         }
+        if (esReceta(turno)) {
+            throw new IllegalStateException("Las recetas se marcan como enviadas automáticamente al generarlas en Recetas Electrónicas.");
+        }
+        if (archivoData == null || archivoData.isBlank()) {
+            throw new IllegalArgumentException("Adjuntá el archivo del documento para poder enviarlo por mail.");
+        }
+        if (estimateBase64Bytes(archivoData) > MAX_DOCUMENTO_ADJUNTO_BYTES) {
+            throw new IllegalArgumentException("El archivo pesa demasiado — el máximo permitido es 8MB.");
+        }
+        String pacienteEmail = turno.getPaciente().getEmail();
+        if (pacienteEmail == null || pacienteEmail.isBlank()) {
+            throw new IllegalStateException("El paciente no tiene un email registrado — no se puede enviar el documento.");
+        }
+
+        boolean enviado = resendEmailService.enviarDocumentoAdjunto(
+                pacienteEmail,
+                turno.getPaciente().getNombre(),
+                turno.getMedico().getNombre(),
+                resolverTypeLabel(turno),
+                archivoData,
+                archivoNombre);
+        if (!enviado) {
+            throw new IllegalStateException("No se pudo enviar el mail con el documento. Intentá de nuevo en unos minutos.");
+        }
 
         turno.setDocumentoEnviado(true);
         turnoRepository.save(turno);
+
+        String titulo = "Documento enviado";
+        String mensaje = "Tu " + resolverTypeLabel(turno).toLowerCase() + " te llegó por mail.";
+        notificacionService.crearNotificacion(turno.getPaciente(), titulo, mensaje, "DOCUMENTO_ENVIADO");
+    }
+
+    // Called right after RecetaService#emitirReceta successfully generates a receta electrónica
+    // for (medico, paciente) — there's no explicit turnoId passed from the Recetas Electrónicas
+    // screen back to the originating "receta fuera de turno" purchase, so this matches by
+    // médico+paciente instead: any of that médico's still-pending receta-fuera turnos for this
+    // exact paciente are assumed fulfilled by the receta that was just generated. Best-effort
+    // (never throws) — a médico who writes a routine receta during any other flow for a patient
+    // who also happens to have an unrelated pending purchase would incidentally clear it too, but
+    // that's an acceptable trade-off against making the médico track it by hand.
+    @Transactional
+    public void marcarRecetasEnviadasParaPaciente(Long medicoId, Long pacienteId) {
+        List<Turno> pendientes = turnoRepository.findByMedicoIdAndPacienteIdAndServicioIdAndEstadoAndDocumentoEnviado(
+                medicoId, pacienteId, "receta-fuera", EstadoTurno.CONFIRMADO, false);
+        for (Turno turno : pendientes) {
+            turno.setDocumentoEnviado(true);
+            turnoRepository.save(turno);
+            notificacionService.crearNotificacion(turno.getPaciente(), "Documento enviado",
+                    "Tu receta fuera de turno ya fue generada.", "DOCUMENTO_ENVIADO");
+        }
+    }
+
+    // Decoded byte size of a base64 data: URI, without decoding it — same math as
+    // ImageUtils#decodedByteSize, duplicated here since that helper's regex is image-specific
+    // (data:image/...) and this accepts any mime type (PDFs included).
+    private long estimateBase64Bytes(String dataUri) {
+        int comma = dataUri.indexOf(',');
+        String b64 = comma >= 0 ? dataUri.substring(comma + 1) : dataUri;
+        int padding = 0;
+        if (b64.endsWith("==")) padding = 2;
+        else if (b64.endsWith("=")) padding = 1;
+        return (long) (b64.length() / 4.0 * 3) - padding;
     }
 
     @Transactional
@@ -746,7 +840,13 @@ public class TurnoService {
 
         java.time.LocalDate nuevaFecha = com.tranqui.app.config.DateConfig.parseLocalDate(fechaStr);
         java.time.LocalTime nuevaHoraInicio = java.time.LocalTime.parse(horaStr);
-        java.time.LocalTime nuevaHoraFin = nuevaHoraInicio.plusMinutes(45);
+        // Must use the médico's configured session length — same pattern as reservarTurno and
+        // obtenerHorariosDisponibles — instead of a hardcoded 45, which under/over-stated horaFin
+        // for any médico who configured a different duracionTurnoMinutos.
+        Usuario medicoDelTurno = turno.getMedico();
+        int duracionTurnoMinutos = (medicoDelTurno != null && medicoDelTurno.getDuracionTurnoMinutos() != null)
+                ? medicoDelTurno.getDuracionTurnoMinutos() : 45;
+        java.time.LocalTime nuevaHoraFin = nuevaHoraInicio.plusMinutes(duracionTurnoMinutos);
 
         turno.setFecha(nuevaFecha);
         turno.setHoraInicio(nuevaHoraInicio);

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
-import { api } from '../api/api'
+import { api, getBackendOrigin } from '../api/api'
 
 export interface Message {
   id?: number
@@ -74,7 +74,7 @@ export function useChat(activeContactId: number | null, onMessageReceived?: (msg
 
   // Connect to STOMP Broker
   useEffect(() => {
-    const socketUrl = window.location.protocol === 'https:' ? `https://${window.location.host}/ws-tranqui` : `http://${window.location.hostname}:8081/ws-tranqui`;
+    const socketUrl = `${getBackendOrigin()}/ws-tranqui`;
     const socket = new SockJS(socketUrl, null, { withCredentials: true } as any)
     const client = new Client({
       webSocketFactory: () => socket,

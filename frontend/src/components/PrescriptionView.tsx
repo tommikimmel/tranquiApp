@@ -1,12 +1,14 @@
-﻿import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 import { Icon } from './Icon'
 import LaboratorioAutocomplete from './LaboratorioAutocomplete'
+import EditPatientModal from './EditPatientModal'
 import { computeLaboratorioStats } from '../utils/laboratorios'
 import { openOfficialPrescriptionPdf } from '../utils/pdfGenerator'
 import { getPatientInitials, calcAge, formatDateDDMMYYYY } from '../utils/dashboardHelpers'
+import { getMissingPatientFields } from '../hooks/usePatients'
 
 // ── Prescription View ─────────────────────────────────────────
 // Quick-pick chips so completar Frecuencia/Duración sea de un click en vez de tipear a mano.
@@ -40,6 +42,7 @@ export default function PrescriptionView({ onSend, medicoInfo }: { onSend: (data
   const [patientSearch, setPatientSearch] = useState('');
   const [selectedPatientObj, setSelectedPatientObj] = useState<any | null>(null);
   const [showPatientDropdown, setShowPatientDropdown] = useState(false);
+  const [showEditPatientModal, setShowEditPatientModal] = useState(false);
 
   const [medications, setMedications] = useState<Array<{ name: string; dosage: string; frequency: string; duration: string; regNo?: string; nombreDroga?: string; noSustituible?: boolean; laboratorio?: string }>>([]);
   const [medSearchInput, setMedSearchInput] = useState('');
@@ -96,12 +99,51 @@ export default function PrescriptionView({ onSend, medicoInfo }: { onSend: (data
         setPatients(list);
 
         const statePatient = location.state?.patient || location.state?.patientObj;
+        const statePatientId = location.state?.patientId;
+        const statePatientName = location.state?.patientName;
+        const stateAppt = location.state?.appt;
+
+        let target: any = null;
+
         if (statePatient) {
-          const found = list.find((p: any) => p.id === statePatient.id) || statePatient;
-          setSelectedPatientObj(found);
-        } else if (location.state?.patientId) {
-          const found = list.find((p: any) => p.id === location.state.patientId);
-          if (found) setSelectedPatientObj(found);
+          const found = list.find((p: any) =>
+            (statePatient.id && p.id === statePatient.id) ||
+            (statePatient.email && p.email && p.email.toLowerCase() === statePatient.email.toLowerCase()) ||
+            (statePatient.dni && p.dni && String(p.dni) === String(statePatient.dni)) ||
+            (statePatient.name && p.name && p.name.toLowerCase() === statePatient.name.toLowerCase()) ||
+            (statePatient.nombre && p.nombre && `${p.nombre} ${p.apellido || ''}`.trim().toLowerCase() === `${statePatient.nombre} ${statePatient.apellido || ''}`.trim().toLowerCase())
+          );
+          target = found ? { ...found, ...statePatient } : statePatient;
+        } else if (statePatientId) {
+          target = list.find((p: any) => p.id === statePatientId);
+        } else if (statePatientName) {
+          target = list.find((p: any) =>
+            (p.name && p.name.toLowerCase() === statePatientName.toLowerCase()) ||
+            (`${p.nombre || ''} ${p.apellido || ''}`.trim().toLowerCase() === statePatientName.toLowerCase())
+          );
+        }
+
+        if (!target && stateAppt) {
+          target = {
+            id: stateAppt.pacienteId || stateAppt.usuarioId || stateAppt.patientInfo?.id,
+            name: stateAppt.patientName,
+            nombre: stateAppt.patientInfo?.nombre || stateAppt.patientName,
+            apellido: stateAppt.patientInfo?.apellido || '',
+            email: stateAppt.patientInfo?.email || stateAppt.patientInfo?.mail,
+            telefono: stateAppt.patientInfo?.telefono,
+            dni: stateAppt.patientInfo?.dni || stateAppt.patientInfo?.numeroDocumento,
+            tipoDocumento: stateAppt.patientInfo?.tipoDocumento || 'DNI',
+            fechaNacimiento: stateAppt.patientInfo?.fechaNacimiento,
+            obraSocial: stateAppt.patientInfo?.obraSocial,
+            numAfiliado: stateAppt.patientInfo?.numAfiliado,
+            credencial: stateAppt.patientInfo?.credencial,
+            domicilio: stateAppt.patientInfo?.domicilio,
+          };
+        }
+
+        if (target) {
+          setSelectedPatientObj(target);
+          setActiveTab('new');
         }
       })
       .catch(() => setPatients(MOCK_PATIENTS));
@@ -118,6 +160,9 @@ export default function PrescriptionView({ onSend, medicoInfo }: { onSend: (data
   const selectedPatientDni = selectedPatientObj?.dni || selectedPatientObj?.numeroDocumento || 'S/D';
   const selectedPatientTipoDoc = selectedPatientObj?.tipoDocumento || 'DNI';
   const selectedPatientAge = calcAge(selectedPatientObj?.fechaNacimiento);
+  // Same check RecetaService.emitirReceta runs server-side (see getMissingPatientFields) — run
+  // it here too so the médico sees it and can fix it before submitting, not after a failed send.
+  const missingPatientFields = selectedPatientObj ? getMissingPatientFields(selectedPatientObj) : [];
 
   const filteredPatients = patientSearch.trim().length >= 3
     ? patients.filter(p => {
@@ -188,7 +233,7 @@ export default function PrescriptionView({ onSend, medicoInfo }: { onSend: (data
     setMedications(prev => prev.filter((_, i) => i !== index));
   };
 
-  const canSend = selectedPatientObj && medications.length > 0 && medications.some(m => m.name.trim().length > 0);
+  const canSend = selectedPatientObj && missingPatientFields.length === 0 && medications.length > 0 && medications.some(m => m.name.trim().length > 0);
 
   const handleSend = () => {
     if (!selectedPatientObj) return;
@@ -533,6 +578,76 @@ export default function PrescriptionView({ onSend, medicoInfo }: { onSend: (data
                   </h2>
                   <p className="card__subtitle">Buscá y seleccioná a quién le vas a recetar.</p>
                 </div>
+
+                {location.state?.fromPendingDocument && selectedPatientObj && missingPatientFields.length === 0 && (
+                  <div style={{
+                    margin: 'var(--space-2) 0 var(--space-4) 0',
+                    padding: '10px 14px',
+                    backgroundColor: '#ECFDF5',
+                    border: '1.5px solid #10B981',
+                    borderRadius: 'var(--radius-md)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    fontSize: '13px',
+                    color: '#065F46'
+                  }}>
+                    <div style={{
+                      width: '28px', height: '28px', borderRadius: '50%',
+                      backgroundColor: '#D1FAE5', color: '#10B981',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                    }}>
+                      <Icon.FileText size={14} />
+                    </div>
+                    <div>
+                      <strong>Receta fuera de turno seleccionada automáticamente</strong>
+                      <div style={{ fontSize: '12px', color: '#047857', marginTop: '2px' }}>
+                        Se seleccionó a <strong>{selectedPatientName}</strong> desde la solicitud de documento pendiente.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedPatientObj && missingPatientFields.length > 0 && (
+                  <div style={{
+                    margin: 'var(--space-2) 0 var(--space-4) 0',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                    padding: '12px 14px',
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #fde68a',
+                    borderRadius: 'var(--radius-md)',
+                    color: '#92400e',
+                    fontSize: '13px',
+                    lineHeight: '1.5'
+                  }}>
+                    <div style={{
+                      width: '28px', height: '28px', borderRadius: '50%',
+                      backgroundColor: '#fef3c7', color: '#d97706',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                    }}>
+                      <Icon.AlertTriangle size={16} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: '200px' }}>
+                      <strong style={{ display: 'block', color: '#78350f', fontWeight: 600, marginBottom: '2px' }}>
+                        {selectedPatientName || 'Este paciente'} no tiene todos los datos necesarios
+                      </strong>
+                      <span>
+                        Faltan: <strong style={{ color: '#b45309' }}>{missingPatientFields.join(', ')}</strong>.
+                        {' '}No se puede emitir una receta electrónica válida sin estos datos.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn--sm btn--secondary"
+                      style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                      onClick={() => setShowEditPatientModal(true)}
+                    >
+                      Completar datos
+                    </button>
+                  </div>
+                )}
 
                 {selectedPatientObj ? (
                   <div className="rx-selected-patient">
@@ -953,10 +1068,27 @@ export default function PrescriptionView({ onSend, medicoInfo }: { onSend: (data
                     Limpiar todo
                   </button>
                 </div>
+                {!canSend && selectedPatientObj && missingPatientFields.length > 0 && (
+                  <p style={{ fontSize: 'var(--text-xs)', color: '#b45309', marginTop: 'var(--space-2)' }}>
+                    Completá los datos del paciente para poder emitir la receta.
+                  </p>
+                )}
               </div>
             </>
           )}
         </>
+      )}
+
+      {showEditPatientModal && selectedPatientObj && (
+        <EditPatientModal
+          patient={selectedPatientObj}
+          onClose={() => setShowEditPatientModal(false)}
+          onSaved={(updated) => {
+            setSelectedPatientObj((prev: any) => ({ ...prev, ...updated }));
+            setShowEditPatientModal(false);
+            showAlert('Datos del paciente actualizados.', 'success');
+          }}
+        />
       )}
     </div>
   );

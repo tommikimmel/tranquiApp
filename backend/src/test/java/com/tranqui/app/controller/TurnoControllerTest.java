@@ -17,7 +17,11 @@ import java.time.LocalDate;
 import java.util.Collections;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -63,5 +67,105 @@ class TurnoControllerTest {
 
         mockMvc.perform(get("/api/medicos/turnos/hoy"))
                 .andExpect(status().isOk());
+    }
+
+    // --- cancelar --------------------------------------------------------------------------
+
+    @Test
+    @WithMockUser(username = "paciente@test.com", roles = "PACIENTE")
+    void testCancelarTurno_success() throws Exception {
+        doNothing().when(turnoService).cancelarTurno(eq(1L), eq("paciente@test.com"));
+
+        mockMvc.perform(post("/api/turnos/1/cancelar"))
+                .andExpect(status().isOk());
+
+        verify(turnoService, times(1)).cancelarTurno(eq(1L), eq("paciente@test.com"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin@test.com", roles = "ADMIN")
+    void testCancelarTurno_wrongRole_forbidden() throws Exception {
+        mockMvc.perform(post("/api/turnos/1/cancelar"))
+                .andExpect(status().isForbidden());
+    }
+
+    // --- abandonar-pago (public, no role restriction) ---------------------------------------
+
+    @Test
+    void testAbandonarReservaPendiente_success() throws Exception {
+        doNothing().when(turnoService).abandonarReservaPendiente(1L);
+
+        mockMvc.perform(post("/api/turnos/1/abandonar-pago"))
+                .andExpect(status().isOk());
+
+        verify(turnoService, times(1)).abandonarReservaPendiente(1L);
+    }
+
+    // --- asistencia --------------------------------------------------------------------------
+
+    @Test
+    @WithMockUser(username = "medico@test.com", roles = "PSIQUIATRA")
+    void testActualizarAsistencia_success() throws Exception {
+        doNothing().when(turnoService).actualizarAsistencia(1L, "LLEGO");
+
+        mockMvc.perform(put("/api/turnos/1/asistencia").param("asistencia", "LLEGO"))
+                .andExpect(status().isOk());
+
+        verify(turnoService, times(1)).actualizarAsistencia(1L, "LLEGO");
+    }
+
+    @Test
+    @WithMockUser(username = "paciente@test.com", roles = "PACIENTE")
+    void testActualizarAsistencia_wrongRole_forbidden() throws Exception {
+        mockMvc.perform(put("/api/turnos/1/asistencia").param("asistencia", "LLEGO"))
+                .andExpect(status().isForbidden());
+    }
+
+    // --- documento-enviado -------------------------------------------------------------------
+
+    @Test
+    @WithMockUser(username = "medico@test.com", roles = "PSIQUIATRA")
+    void testMarcarDocumentoEnviado_success() throws Exception {
+        doNothing().when(turnoService).marcarDocumentoEnviado(eq(1L), eq("medico@test.com"), any(), any());
+
+        mockMvc.perform(post("/api/turnos/1/documento-enviado")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"archivoData\":\"data:application/pdf;base64,aGVsbG8=\",\"archivoNombre\":\"x.pdf\"}"))
+                .andExpect(status().isOk());
+
+        verify(turnoService, times(1)).marcarDocumentoEnviado(eq(1L), eq("medico@test.com"), anyString(), anyString());
+    }
+
+    @Test
+    @WithMockUser(username = "paciente@test.com", roles = "PACIENTE")
+    void testMarcarDocumentoEnviado_wrongRole_forbidden() throws Exception {
+        mockMvc.perform(post("/api/turnos/1/documento-enviado")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+    }
+
+    // --- reprogramar -------------------------------------------------------------------------
+
+    @Test
+    @WithMockUser(username = "medico@test.com", roles = "PSIQUIATRA")
+    void testReprogramarTurno_success() throws Exception {
+        doNothing().when(turnoService).reprogramarTurno(1L, "2026-09-01", "10:00");
+
+        mockMvc.perform(put("/api/turnos/1/reprogramar")
+                        .param("fecha", "2026-09-01")
+                        .param("hora", "10:00"))
+                .andExpect(status().isOk());
+
+        verify(turnoService, times(1)).reprogramarTurno(1L, "2026-09-01", "10:00");
+    }
+
+    @Test
+    @WithMockUser(username = "paciente@test.com", roles = "PACIENTE")
+    void testReprogramarTurno_wrongRole_forbidden() throws Exception {
+        mockMvc.perform(put("/api/turnos/1/reprogramar")
+                        .param("fecha", "2026-09-01")
+                        .param("hora", "10:00"))
+                .andExpect(status().isForbidden());
     }
 }

@@ -112,4 +112,90 @@ class LiberarTurnosSchedulerTest {
         assertNotNull(dbConfirmado);
         assertEquals(EstadoTurno.CONFIRMADO, dbConfirmado.getEstado());
     }
+
+    // The scheduler's query is scoped to EstadoTurno.PENDIENTE_PAGO only (see
+    // findByEstadoAndFechaCreacionBefore) — turnos in any other estado must never be touched,
+    // no matter how old fechaCreacion is.
+    @Test
+    void shouldNeverTouchTurnosThatAreNotPendienteDePago() {
+        Turno pendienteValidacionAntiguo = Turno.builder()
+                .paciente(paciente).medico(medico)
+                .fecha(LocalDate.now())
+                .horaInicio(LocalTime.of(15, 0)).horaFin(LocalTime.of(15, 45))
+                .tipo(TipoTurno.PARTICULAR)
+                .estado(EstadoTurno.PENDIENTE_VALIDACION)
+                .fechaCreacion(LocalDateTime.now().minusHours(2))
+                .build();
+
+        Turno expiradoAntiguo = Turno.builder()
+                .paciente(paciente).medico(medico)
+                .fecha(LocalDate.now())
+                .horaInicio(LocalTime.of(16, 0)).horaFin(LocalTime.of(16, 45))
+                .tipo(TipoTurno.PARTICULAR)
+                .estado(EstadoTurno.EXPIRADO)
+                .fechaCreacion(LocalDateTime.now().minusHours(2))
+                .build();
+
+        Turno canceladoAntiguo = Turno.builder()
+                .paciente(paciente).medico(medico)
+                .fecha(LocalDate.now())
+                .horaInicio(LocalTime.of(17, 0)).horaFin(LocalTime.of(17, 45))
+                .tipo(TipoTurno.PARTICULAR)
+                .estado(EstadoTurno.CANCELADO)
+                .fechaCreacion(LocalDateTime.now().minusHours(2))
+                .build();
+
+        turnoRepository.save(pendienteValidacionAntiguo);
+        turnoRepository.save(expiradoAntiguo);
+        turnoRepository.save(canceladoAntiguo);
+
+        scheduler.liberarTurnosExpirados();
+
+        assertEquals(EstadoTurno.PENDIENTE_VALIDACION,
+                turnoRepository.findById(pendienteValidacionAntiguo.getId()).orElseThrow().getEstado());
+        assertEquals(EstadoTurno.EXPIRADO,
+                turnoRepository.findById(expiradoAntiguo.getId()).orElseThrow().getEstado());
+        assertEquals(EstadoTurno.CANCELADO,
+                turnoRepository.findById(canceladoAntiguo.getId()).orElseThrow().getEstado());
+    }
+
+    // Boundary exactly around the 5-minute grace window (findByEstadoAndFechaCreacionBefore uses
+    // a strict "before", i.e. "<").
+    @Test
+    void shouldNotCancelTurnoStillJustInsideTheFiveMinuteGraceWindow() {
+        Turno casiExpirado = Turno.builder()
+                .paciente(paciente).medico(medico)
+                .fecha(LocalDate.now())
+                .horaInicio(LocalTime.of(13, 0)).horaFin(LocalTime.of(13, 45))
+                .tipo(TipoTurno.PARTICULAR)
+                .estado(EstadoTurno.PENDIENTE_PAGO)
+                // Created just under 5 minutes ago — still inside the grace window.
+                .fechaCreacion(LocalDateTime.now().minusMinutes(4).minusSeconds(50))
+                .build();
+        turnoRepository.save(casiExpirado);
+
+        scheduler.liberarTurnosExpirados();
+
+        assertEquals(EstadoTurno.PENDIENTE_PAGO,
+                turnoRepository.findById(casiExpirado.getId()).orElseThrow().getEstado());
+    }
+
+    @Test
+    void shouldCancelTurnoJustPastTheFiveMinuteGraceWindow() {
+        Turno recienExpirado = Turno.builder()
+                .paciente(paciente).medico(medico)
+                .fecha(LocalDate.now())
+                .horaInicio(LocalTime.of(14, 0)).horaFin(LocalTime.of(14, 45))
+                .tipo(TipoTurno.PARTICULAR)
+                .estado(EstadoTurno.PENDIENTE_PAGO)
+                // Created just over 5 minutes ago — past the grace window.
+                .fechaCreacion(LocalDateTime.now().minusMinutes(5).minusSeconds(10))
+                .build();
+        turnoRepository.save(recienExpirado);
+
+        scheduler.liberarTurnosExpirados();
+
+        assertEquals(EstadoTurno.CANCELADO,
+                turnoRepository.findById(recienExpirado.getId()).orElseThrow().getEstado());
+    }
 }

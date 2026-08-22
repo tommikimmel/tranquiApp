@@ -127,16 +127,16 @@ export interface Publicacion {
   link: string
 }
 
-export type SettingsTab = 'perfil-pro' | 'perfil-publico' | 'contacto' | 'presencia' | 'honorarios' | 'notificaciones' | 'integraciones' | 'privacidad'
+export type SettingsTab = 'perfil-pro' | 'perfil-publico' | 'contacto' | 'presencia' | 'notificaciones' | 'integraciones' | 'suscripcion' | 'privacidad'
 
 export const SETTINGS_TABS: { id: SettingsTab; label: string; Icon: (props: { size?: number }) => React.JSX.Element }[] = [
   { id: 'perfil-pro', label: 'Perfil profesional', Icon: Icon.User },
   { id: 'perfil-publico', label: 'Perfil público', Icon: Icon.Globe },
   { id: 'contacto', label: 'Contacto', Icon: Icon.Phone },
   { id: 'presencia', label: 'Presencia y Experiencia', Icon: Icon.Star },
-  { id: 'honorarios', label: 'Honorarios y servicios', Icon: Icon.DollarSign },
   { id: 'notificaciones', label: 'Notificaciones', Icon: Icon.BellSimple },
   { id: 'integraciones', label: 'Integraciones', Icon: Icon.MercadoPago },
+  { id: 'suscripcion', label: 'Suscripción y Facturas', Icon: Icon.CreditCard },
   { id: 'privacidad', label: 'Privacidad y Datos', Icon: Icon.Shield },
 ]
 

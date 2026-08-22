@@ -6,15 +6,19 @@ import com.tranqui.app.model.Usuario;
 import com.tranqui.app.model.dto.GoogleLoginDto;
 import com.tranqui.app.model.dto.LoginRequestDto;
 import com.tranqui.app.model.dto.RegisterRequestDto;
+import com.tranqui.app.repository.PlanRepository;
+import com.tranqui.app.repository.SubscriptionRepository;
 import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.service.GoogleAuthService;
 import com.tranqui.app.service.JwtService;
+import com.tranqui.app.service.ResendEmailService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -34,9 +38,12 @@ class AuthControllerUnitTest {
 
     @Mock private GoogleAuthService googleAuthService;
     @Mock private UsuarioRepository usuarioRepository;
+    @Mock private PlanRepository planRepository;
+    @Mock private SubscriptionRepository subscriptionRepository;
     @Mock private JwtService jwtService;
     @Mock private org.springframework.core.env.Environment env;
     @Mock private PasswordEncoder passwordEncoder;
+    @Mock private ResendEmailService resendEmailService;
 
     @InjectMocks
     private AuthController authController;
@@ -49,19 +56,44 @@ class AuthControllerUnitTest {
 
     @Test
     void register_shouldRejectWhenEmailAlreadyExists() {
+        // Needs a password that passes the complexity check first (>=8 chars, upper, lower,
+        // digit) — otherwise register() returns 400 at that earlier validation and never reaches
+        // the findByEmail(...) stub below, which is exactly what made this test fail with
+        // UnnecessaryStubbingException before this fix.
         when(usuarioRepository.findByEmail("ya@existe.com")).thenReturn(Optional.of(Usuario.builder().build()));
 
-        RegisterRequestDto dto = RegisterRequestDto.builder().email("ya@existe.com").build();
+        RegisterRequestDto dto = RegisterRequestDto.builder().email("ya@existe.com").password("Secret123").build();
         ResponseEntity<?> response = authController.register(dto);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         verify(usuarioRepository, never()).save(any());
     }
 
+    // Defense in depth against the race where two concurrent /register requests for the same
+    // email both pass the findByEmail check before either commits: findByEmail here returns
+    // empty (this request "won" the race check), but save() still throws because the DB's UNIQUE
+    // constraint caught the actual duplicate insert. register() must catch that and respond the
+    // same way as the normal duplicate-email path instead of letting a 500 leak through.
+    @Test
+    void register_shouldReturnBadRequestWhenSaveThrowsDataIntegrityViolationOnEmailRace() {
+        when(usuarioRepository.findByEmail("carrera@mail.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(any())).thenReturn("encoded");
+        when(usuarioRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+        RegisterRequestDto dto = RegisterRequestDto.builder()
+                .email("carrera@mail.com").password("Secret123").rol(Rol.PACIENTE).nombre("Ana")
+                .aceptaTerminos(true).build();
+
+        ResponseEntity<?> response = authController.register(dto);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("El email ya está registrado", response.getBody());
+    }
+
     @Test
     void register_shouldSaveWithVerificadoAdminTrueForPaciente() {
         when(usuarioRepository.findByEmail("nuevo@mail.com")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode("secret")).thenReturn("encoded-secret");
+        when(passwordEncoder.encode("Secret123")).thenReturn("encoded-secret");
         when(usuarioRepository.save(any())).thenAnswer(inv -> {
             Usuario u = inv.getArgument(0);
             u.setId(1L);
@@ -69,7 +101,8 @@ class AuthControllerUnitTest {
         });
 
         RegisterRequestDto dto = RegisterRequestDto.builder()
-                .email("nuevo@mail.com").password("secret").rol(Rol.PACIENTE).nombre("Ana").build();
+                .email("nuevo@mail.com").password("Secret123").rol(Rol.PACIENTE).nombre("Ana")
+                .aceptaTerminos(true).build();
 
         ResponseEntity<?> response = authController.register(dto);
 
@@ -85,9 +118,14 @@ class AuthControllerUnitTest {
         when(usuarioRepository.findByEmail("doc@mail.com")).thenReturn(Optional.empty());
         when(passwordEncoder.encode(any())).thenReturn("x");
         when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        // Subscription-init block for PSIQUIATRA calls planRepository.findByCode(...) — the
+        // Mockito default (Optional.empty()) already makes register() skip creating a
+        // Subscription, so no explicit stub is required here, but this documents that path.
+        when(planRepository.findByCode(any())).thenReturn(Optional.empty());
 
         RegisterRequestDto dto = RegisterRequestDto.builder()
-                .email("doc@mail.com").password("secret").rol(Rol.PSIQUIATRA).nombre("Dr X").build();
+                .email("doc@mail.com").password("Secret123").rol(Rol.PSIQUIATRA).nombre("Dr X")
+                .aceptaTerminos(true).build();
 
         authController.register(dto);
 
@@ -135,7 +173,9 @@ class AuthControllerUnitTest {
     void login_shouldSetSecureCookieInProdWithRealClientId() {
         ReflectionTestUtils.setField(authController, "clientId", "real-client-id");
         setDev(false);
-        Usuario usuario = Usuario.builder().id(1L).nombre("Ana").email("ana@mail.com").rol(Rol.PACIENTE).password("hashed").build();
+        // login() rejects unverified emails with 403 (Rol != ADMIN) — the user under test must
+        // be verified for the happy-path cookie assertions below to be reachable at all.
+        Usuario usuario = Usuario.builder().id(1L).nombre("Ana").email("ana@mail.com").rol(Rol.PACIENTE).password("hashed").emailVerificado(true).build();
         when(usuarioRepository.findByEmail("ana@mail.com")).thenReturn(Optional.of(usuario));
         when(passwordEncoder.matches("secret", "hashed")).thenReturn(true);
         when(jwtService.generateToken(usuario)).thenReturn("jwt-token");
@@ -156,7 +196,7 @@ class AuthControllerUnitTest {
     void login_shouldUseLaxCookieInDevMode() {
         ReflectionTestUtils.setField(authController, "clientId", "real-client-id");
         setDev(true);
-        Usuario usuario = Usuario.builder().id(1L).nombre("Ana").email("ana@mail.com").rol(Rol.PACIENTE).password("hashed").build();
+        Usuario usuario = Usuario.builder().id(1L).nombre("Ana").email("ana@mail.com").rol(Rol.PACIENTE).password("hashed").emailVerificado(true).build();
         when(usuarioRepository.findByEmail("ana@mail.com")).thenReturn(Optional.of(usuario));
         when(passwordEncoder.matches("secret", "hashed")).thenReturn(true);
         when(jwtService.generateToken(usuario)).thenReturn("jwt-token");

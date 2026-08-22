@@ -53,6 +53,9 @@ public class WebhookController {
     @Autowired
     private MercadoPagoOAuthService oauthService;
 
+    @Autowired
+    private com.tranqui.app.service.SubscriptionService subscriptionService;
+
     @PostMapping("/webhook")
     public ResponseEntity<?> receiveWebhook(
             @RequestHeader(value = "x-signature", required = false) String signature,
@@ -74,6 +77,28 @@ public class WebhookController {
             String externalReference = null;
             String transactionId = null;
             String status = null;
+
+            // Caso 0: Webhook de Suscripciones de Mercado Pago (§9)
+            String topic = node.has("type") ? node.get("type").asText() : (node.has("topic") ? node.get("topic").asText() : "");
+            String action = node.has("action") ? node.get("action").asText() : "";
+
+            if ("subscription_preapproval".equals(topic) || action.startsWith("subscription_preapproval")) {
+                String preapprovalId = node.has("data") && node.get("data").has("id") ? node.get("data").get("id").asText() : dataId;
+                String subStatus = node.has("status") ? node.get("status").asText() : "authorized";
+                log.info("Procesando webhook subscription_preapproval: id={}, status={}", preapprovalId, subStatus);
+                subscriptionService.processMercadoPagoPreapprovalWebhook(preapprovalId, subStatus);
+                return ResponseEntity.ok().build();
+            }
+
+            if ("subscription_authorized_payment".equals(topic) || action.startsWith("subscription_authorized_payment")) {
+                String subPaymentId = node.has("data") && node.get("data").has("id") ? node.get("data").get("id").asText() : dataId;
+                String preapprovalId = node.has("preapproval_id") ? node.get("preapproval_id").asText() : "";
+                java.math.BigDecimal amount = node.has("transaction_amount") ? new java.math.BigDecimal(node.get("transaction_amount").asText()) : null;
+                String payStatus = node.has("status") ? node.get("status").asText() : "approved";
+                log.info("Procesando webhook subscription_authorized_payment: id={}, preapprovalId={}, status={}", subPaymentId, preapprovalId, payStatus);
+                subscriptionService.processMercadoPagoPaymentWebhook(subPaymentId, preapprovalId, amount, payStatus);
+                return ResponseEntity.ok().build();
+            }
 
             // Caso 1: Es un webhook real de Mercado Pago (tipo = payment)
             if (node.has("type") && "payment".equals(node.get("type").asText()) 

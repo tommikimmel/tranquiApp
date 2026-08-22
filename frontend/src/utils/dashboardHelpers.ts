@@ -40,8 +40,13 @@ export function getNotificationVisual(tipo: string | undefined): { Icon: (props:
       return { Icon: Icon.FileText, color: '#8b5cf6' }
     case 'DOCUMENTO_PENDIENTE':
       return { Icon: Icon.FileText, color: 'var(--color-warning)' }
+    case 'DOCUMENTO_ENVIADO':
+      return { Icon: Icon.FileText, color: 'var(--color-success)' }
     case 'NUEVO_MENSAJE':
       return { Icon: Icon.MessageCircle, color: 'var(--color-primary)' }
+    case 'TICKET_NUEVO':
+    case 'TICKET_RESPUESTA':
+      return { Icon: Icon.MessageCircle, color: '#8b5cf6' }
     default:
       return { Icon: Icon.BellSimple, color: 'var(--color-primary)' }
   }

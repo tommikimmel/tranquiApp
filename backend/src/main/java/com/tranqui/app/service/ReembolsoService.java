@@ -25,6 +25,12 @@ public class ReembolsoService {
     @Value("${mercadopago.enabled:false}")
     private boolean isEnabled;
 
+    // Extracted so tests can substitute a mock client instead of hitting the real Mercado Pago
+    // API — same pattern as MercadoPagoService#buildPreferenceClient/buildPreapprovalClient.
+    protected PaymentRefundClient buildPaymentRefundClient() {
+        return new PaymentRefundClient();
+    }
+
     // Legacy 2-arg entry point: always enforces the 48h policy (saltarPolitica48h = false), same
     // as this method's original/only behavior — kept so existing callers/tests that don't care
     // about who's cancelling keep working unchanged.
@@ -61,9 +67,19 @@ public class ReembolsoService {
             // once, the last-refunded médico's token silently became the JVM-wide default —
             // exactly the kind of stale/cross-account state that made payments break for other
             // médicos (most visibly right after a médico disconnected/reconnected their account).
-            MPRequestOptions options = MPRequestOptions.builder().accessToken(rawToken).build();
-            PaymentRefundClient refundClient = new PaymentRefundClient();
-            refundClient.refund(Long.parseLong(turno.getPago().getTransactionId()), options);
+            // Bug real: esta llamada asumía turno.getPago() no-null sin chequearlo — un turno
+            // marcado APROBADO/CONFIRMADO debería siempre tener un Pago asociado (lo crea
+            // PagoWebhookHandler), pero de haber una inconsistencia de datos esto tiraba NPE acá
+            // y la cancelación completa fallaba (nunca llegaba a marcar el turno CANCELADO más
+            // abajo), en vez de degradar a "no había nada que reembolsar en Mercado Pago" y
+            // seguir procesando la cancelación igual.
+            if (turno.getPago() == null || turno.getPago().getTransactionId() == null) {
+                log.warn("No se pudo sincronizar el reembolso con Mercado Pago para el turno ID {}: no hay un Pago con transactionId asociado.", turno.getId());
+            } else {
+                MPRequestOptions options = MPRequestOptions.builder().accessToken(rawToken).build();
+                PaymentRefundClient refundClient = buildPaymentRefundClient();
+                refundClient.refund(Long.parseLong(turno.getPago().getTransactionId()), options);
+            }
         } else {
             log.info("Sincronización de reembolso con Mercado Pago omitida (simulación/offline).");
         }

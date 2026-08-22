@@ -232,6 +232,42 @@
   gap: var(--space-3);
 }
 
+/* Shared look for the utility buttons in the header (Notificaciones, Soporte, Cerrar sesión).
+   They're .btn--ghost (no color) so they don't compete with real primary/accent actions
+   elsewhere in the UI — but ghost has no border at rest, so on the header's white background
+   they'd have no visible edge until hovered. This adds a neutral outline so they still read as
+   distinct, clickable chips, matching the header's minimal hamburger-toggle look instead of the
+   colored .btn--secondary pills they used before. */
+.dashboard-header__action-btn {
+  gap: 6px;
+  font-weight: var(--font-weight-semi);
+}
+
+/* Extra class-selector weight (over plain .btn--ghost) so this wins regardless of the two
+   rules' order in the file. */
+.btn--ghost.dashboard-header__action-btn {
+  border-color: var(--color-border);
+}
+
+.btn--ghost.dashboard-header__action-btn:hover {
+  border-color: var(--neutral-300);
+}
+
+/* Separates the notification/support actions from the profile/logout group so the two clusters
+   read as distinct, instead of one undifferentiated row of buttons. */
+.dashboard-header__divider {
+  width: 1px;
+  align-self: stretch;
+  margin: var(--space-2) 0;
+  background: var(--color-border);
+}
+
+.dashboard-header__profile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
 /* ── Main Content ──────────────────────────────────────────── */
 .dashboard-main {
   padding: var(--space-8);
@@ -572,6 +608,20 @@
   border-color: #a93226;
 }
 
+/* Neutral outline — for actions that are common/expected (ex: cerrar sesión) and shouldn't
+   read as alarming. Keeping this separate from --danger reserves red for actual problems. */
+.btn--outline {
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+}
+
+.btn--outline:hover {
+  background: var(--neutral-100);
+  color: var(--color-text-primary);
+  border-color: var(--neutral-300);
+}
+
 .btn--sm {
   padding: var(--space-2) var(--space-4);
   font-size: var(--text-xs);
@@ -728,6 +778,85 @@
 .appointment-item__tag--presencial {
   background: var(--color-warning-bg);
   color: var(--color-warning);
+}
+
+/* Document-only turnos (receta fuera de turno / certificado / informe) — stacked layout instead
+   of the single flex row every other appointment-item uses, so the action buttons always get
+   their own full-width row instead of being squeezed out in narrow containers like the
+   "Documentos solicitados" side card. See AppointmentCard.tsx. */
+.appointment-item--document {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.document-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.document-card__icon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: var(--green-50);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.document-card__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.document-card__type-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: var(--font-weight-bold);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.document-card__type-chip--receta {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+
+.document-card__type-chip--otro {
+  background: #f3e8ff;
+  color: #7e22ce;
+}
+
+.document-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.document-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.document-actions__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Personal Google Calendar events merged into the same lists as turnos — a distinct blue
@@ -1353,61 +1482,44 @@
     grid-template-rows: var(--header-height) 1fr auto;
   }
 
-  .sidebar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    top: auto;
-    height: auto;
-    z-index: 100;
-    flex-direction: row;
-    border-right: none;
-    border-top: 1px solid var(--color-border);
-    grid-row: unset;
-    padding: var(--space-2);
-  }
-
-  .sidebar__logo,
-  .sidebar__footer,
-  .sidebar__nav-section-title {
-    display: none;
-  }
-
-  .sidebar__nav {
-    flex-direction: row;
-    padding: 0;
-    justify-content: space-around;
-    width: 100%;
-    gap: 0;
-  }
-
-  .sidebar__nav-item {
-    flex-direction: column;
-    gap: var(--space-1);
-    padding: var(--space-2);
-    font-size: 0.65rem;
-    flex: 1;
-    align-items: center;
-    border-radius: var(--radius-sm);
-  }
-
-  .sidebar__badge {
-    display: none;
-  }
+  /* .sidebar and its children are NOT restyled here on purpose — this was the original
+     (2026-07-01) fixed-bottom-tab-bar attempt, fully superseded by the "Fixed Bottom Sidebar
+     with Icons Only" !important block further down (2026-07-29, same commit as the ≤1024px
+     drawer). The !important rules already win regardless, so this was dead weight — removed as
+     cleanup, not because it was rendering incorrectly. */
 
   .dashboard-header {
     grid-column: 1;
+    /* .dashboard-header__actions wraps to 2 rows below ~360-400px, but the header's own
+       height stayed fixed at var(--header-height) with align-items:center — the wrapped second
+       row had nowhere to go and rendered on top of the page title/content underneath instead of
+       pushing it down. Letting the header grow (and padding it top/bottom instead of relying on
+       a fixed height) fixes that without touching the desktop layout above this breakpoint. */
+    height: auto;
+    min-height: var(--header-height);
+    padding-top: var(--space-3);
+    padding-bottom: var(--space-3);
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+  }
+
+  .dashboard-header__actions {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
   }
 
   .dashboard-main {
     padding: var(--space-4);
-    padding-bottom: calc(var(--space-16) + var(--space-4));
   }
 
   .mp-connect-banner {
     padding: var(--space-5);
     gap: var(--space-3);
+  }
+
+  .mp-connect-banner__top-row {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
   }
 
   .mp-connect-banner__logo {
@@ -1428,11 +1540,6 @@
 
   .stats-grid {
     grid-template-columns: 1fr 1fr;
-  }
-
-  .sidebar__nav-item {
-    font-size: 0.58rem;
-    padding: var(--space-1);
   }
 }
 
@@ -2139,75 +2246,639 @@
   margin: var(--space-2) 0 0;
 }
 
-/* Fees table (Honorarios y servicios) */
-.settings-fees-table {
-  width: 100%;
-  border-collapse: collapse;
+/* ==========================================================================
+   Honorarios y servicios (v2 - Principios de UI Tranqui)
+   ========================================================================== */
+
+.honorarios-cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
 }
 
-.settings-fees-table th {
-  font-size: 0.66rem;
-  font-weight: var(--font-weight-bold);
-  color: var(--neutral-400);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.honorarios-acciones {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.honorarios-bloqueo {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  background: #FDF4E3;
+  border: 1px solid #EBCE93;
+  border-radius: 12px;
+  padding: 13px 16px;
+  margin-top: 14px;
+  color: #9A6309;
+  font-size: 14px;
+}
+
+.honorarios-bloqueo button {
+  flex: none;
+  background: #fff;
+  border: 1px solid #EBCE93;
+  border-radius: var(--radius-md);
+  padding: 7px 13px;
+  color: #9A6309;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.honorarios-bloqueo button:hover {
+  border-color: #9A6309;
+  background: #FAF3E6;
+}
+
+.honorarios-bloqueo span {
+  flex: 1;
+}
+
+.honorarios-zona-listas {
+  margin-top: 24px;
+}
+
+.honorarios-ajuste {
+  background: #ECF7EE;
+  border: 1px solid #C7E6CE;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-top: 16px;
+}
+
+.honorarios-ajuste-lin {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: #227A3C;
+}
+
+.honorarios-ajuste-lin input,
+.honorarios-ajuste-lin select {
+  width: auto;
+  padding: 7px 10px;
+  font-size: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid #CFDBD2;
+  background: #fff;
+}
+
+.honorarios-ajuste-lin input {
+  width: 75px;
+  text-align: right;
+}
+
+.honorarios-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.honorarios-preset {
+  background: #fff;
+  border: 1px solid #C7E6CE;
+  border-radius: 99px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #227A3C;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.honorarios-preset:hover {
+  border-color: #2FA84F;
+  background: #FAFBFA;
+}
+
+.honorarios-preset.active {
+  background: #227A3C;
+  border-color: #227A3C;
+  color: #fff;
+}
+
+.honorarios-barra-lista {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.honorarios-buscador {
+  position: relative;
+  flex: 1;
+  max-width: 300px;
+}
+
+.honorarios-buscador input {
+  padding-left: 36px;
+  font-size: 14px;
+}
+
+.honorarios-buscador .buscador-icon {
+  position: absolute;
+  left: 11px;
+  top: 11px;
+  color: #617268;
+  pointer-events: none;
+}
+
+.honorarios-seccion {
+  margin-top: 24px;
+}
+
+.honorarios-seccion-tit {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+}
+
+.honorarios-seccion-tit h2 {
+  font-family: var(--font-heading), Sora, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #16311F;
+  margin: 0;
+}
+
+.honorarios-seccion-tit .tenue {
+  color: #617268;
+  font-size: 13px;
+}
+
+.honorarios-lista {
+  background: #fff;
+  border: 1px solid #E2E9E3;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.honorarios-fila {
+  border-top: 1px solid #E2E9E3;
+  transition: background 0.12s;
+}
+
+.honorarios-fila:first-child {
+  border-top: 0;
+}
+
+.honorarios-fila.marcada {
+  box-shadow: inset 3px 0 0 #9A6309;
+}
+
+.honorarios-resumen {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  width: 100%;
   text-align: left;
-  padding-bottom: var(--space-2);
-}
-
-.settings-fees-table th:nth-child(3) {
-  text-align: right;
-}
-
-.settings-fees-table td {
-  padding: var(--space-3) 0;
-  border-top: 1px solid var(--color-border);
-}
-
-.settings-fee-name {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
-  width: 100%;
-}
-
-.settings-fee-val {
-  text-align: right;
-}
-
-.settings-fee-val .form-input {
-  width: 130px;
-  margin-left: auto;
-  text-align: right;
-  font-weight: var(--font-weight-semi);
-  color: var(--color-primary-hover);
-}
-
-.settings-fee-delete {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  border: none;
   background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.honorarios-resumen:hover {
+  background: #FAFBFA;
+}
+
+.honorarios-fila.oculta .honorarios-resumen {
+  opacity: 0.6;
+}
+
+.honorarios-datos {
+  flex: 1;
+  min-width: 0;
+}
+
+.honorarios-nombre {
+  font-size: 15px;
+  font-weight: 600;
+  color: #16311F;
+}
+
+.honorarios-chips {
+  display: flex;
+  gap: 5px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.honorarios-chip {
+  font-size: 11.5px;
+  background: #F3F6F2;
+  color: #5D7166;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.honorarios-precio-celda {
+  text-align: right;
+  flex: none;
+}
+
+.honorarios-precio-mod {
+  font: 400 12px/1.4 Inter, system-ui, sans-serif;
+  color: #617268;
+  margin-top: 2px;
+}
+
+.honorarios-precio-celda.mal .honorarios-plata {
+  color: #9A6309;
+}
+
+.honorarios-antes {
+  font: 400 12px/1.4 Inter, system-ui, sans-serif;
+  color: #617268;
+  text-decoration: line-through;
+  margin-top: 2px;
+}
+
+.honorarios-futuro .honorarios-plata {
+  color: #227A3C;
+}
+
+.honorarios-plata {
+  font-family: var(--font-heading), Sora, sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #16311F;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.3px;
+}
+
+/* 44px tap target switch (Ley de Fitts) */
+.honorarios-sw-tap {
+  flex: none;
+  padding: 11px 3px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--neutral-400);
+  min-width: 44px;
+  min-height: 44px;
   cursor: pointer;
-  margin-left: auto;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  background: none;
+  border: none;
 }
 
-.settings-fee-delete:hover {
-  background: var(--color-error-bg);
-  color: var(--color-error);
+.honorarios-sw {
+  width: 38px;
+  height: 22px;
+  border-radius: 99px;
+  background: #CFDBD2;
+  position: relative;
+  transition: background 0.15s, box-shadow 0.15s;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
 }
 
-.settings-fee-add-row {
+.honorarios-sw::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s;
+}
+
+.honorarios-sw.checked {
+  background: #2FA84F;
+  box-shadow: inset 0 0 0 1px #227A3C;
+}
+
+.honorarios-sw.checked::after {
+  left: 19px;
+}
+
+.honorarios-editor {
+  padding: 6px 18px 20px;
+  border-top: 1px solid #E2E9E3;
+  background: #FAFBFA;
+}
+
+.honorarios-campos {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-top: 14px;
+}
+
+.honorarios-campo-ancho {
+  flex: 2 1 240px;
+}
+
+.honorarios-campo-angosto {
+  flex: 1 1 160px;
+}
+
+.honorarios-bloque {
+  margin-top: 18px;
+}
+
+.honorarios-bloque label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #5D7166;
+  margin-bottom: 6px;
+}
+
+.honorarios-pista {
+  font-size: 12px;
+  color: #617268;
+  margin-top: 5px;
+}
+
+.honorarios-aviso {
+  display: flex;
+  gap: 11px;
+  background: #FDF4E3;
+  border: 1px solid #EBCE93;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-top: 10px;
+  color: #9A6309;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.honorarios-aviso svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.honorarios-aviso .arreglo {
+  color: #9A6309;
+  font-weight: 600;
+  text-decoration: underline;
+  font-size: 13px;
+  margin-top: 5px;
+  display: inline-block;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* 3-card Service Type selector (Ley de Tesler) */
+.honorarios-tipos {
+  display: flex;
+  border: 1px solid #CFDBD2;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #fff;
+}
+
+.honorarios-tipo {
+  flex: 1;
+  padding: 12px 10px;
+  text-align: center;
+  border-left: 1px solid #E2E9E3;
+  background: #fff;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.honorarios-tipo:first-child {
+  border-left: 0;
+}
+
+.honorarios-tipo:hover {
+  background: #FAFBFA;
+}
+
+.honorarios-tipo b {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #16311F;
+}
+
+.honorarios-tipo span {
+  display: block;
+  font-size: 11.5px;
+  color: #617268;
+  margin-top: 3px;
+  line-height: 1.35;
+}
+
+.honorarios-tipo.active {
+  background: #ECF7EE;
+}
+
+.honorarios-tipo.active b,
+.honorarios-tipo.active span {
+  color: #227A3C;
+}
+
+.honorarios-cobs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.honorarios-cob {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  padding: 6px 12px;
+  border-radius: 99px;
+  border: 1px solid #CFDBD2;
+  background: #fff;
+  color: #5D7166;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.honorarios-cob:hover {
+  border-color: #617268;
+}
+
+.honorarios-cob.active {
+  background: #ECF7EE;
+  border-color: #C7E6CE;
+  color: #227A3C;
+  font-weight: 600;
+}
+
+.honorarios-orden {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
+  gap: 8px;
+}
+
+.honorarios-orden button {
+  border: 1px solid #CFDBD2;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.12s;
+}
+
+.honorarios-orden button:hover:not(:disabled) {
+  border-color: #617268;
+}
+
+.honorarios-orden button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.honorarios-pie-editor {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+  flex-wrap: wrap;
+  border-top: 1px solid #E2E9E3;
+  padding-top: 14px;
+}
+
+.honorarios-acc-riesgo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.honorarios-btn-riesgo {
+  color: #A8452F;
+  border: 1px solid transparent;
+  background: none;
+  padding: 6px 11px;
+  font-size: 13px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.12s;
+}
+
+.honorarios-btn-riesgo:hover {
+  background: #FBEDE9;
+  border-color: #F6D6CE;
+}
+
+.honorarios-detalle-tipo {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #5D7166;
+  margin-top: 8px;
+}
+
+.honorarios-arch-acc {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+.honorarios-sugeridos {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.honorarios-vacio {
+  padding: 34px 20px;
+  text-align: center;
+  color: #5D7166;
+}
+
+.honorarios-vacio b {
+  display: block;
+  font-family: var(--font-heading), Sora, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #16311F;
+  margin-bottom: 5px;
+}
+
+.honorarios-tostada {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  background: #16311F;
+  color: #fff;
+  border-radius: 99px;
+  padding: 12px 22px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 14px;
+  z-index: 10000;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  animation: slideUpFade 0.2s ease-out;
+}
+
+.honorarios-tostada button {
+  color: #9BD860;
+  font-weight: 700;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13.5px;
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (max-width: 640px) {
+  .honorarios-tipos {
+    flex-direction: column;
+  }
+  .honorarios-tipo {
+    border-left: 0;
+    border-top: 1px solid #E2E9E3;
+    text-align: left;
+  }
+  .honorarios-tipo:first-child {
+    border-top: 0;
+  }
+  .honorarios-cabecera {
+    flex-direction: column;
+  }
+  .honorarios-ajuste-lin {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 /* "Presencia y contenido" — extended profile placeholder tab */

@@ -3,6 +3,8 @@ package com.tranqui.app.service;
 import com.tranqui.app.model.*;
 import com.tranqui.app.model.dto.DashboardStatsDto;
 import com.tranqui.app.model.dto.MedicoDto;
+import com.tranqui.app.repository.PlanRepository;
+import com.tranqui.app.repository.SubscriptionRepository;
 import com.tranqui.app.repository.TarifaMedicoRepository;
 import com.tranqui.app.repository.TurnoRepository;
 import com.tranqui.app.repository.UsuarioRepository;
@@ -14,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
@@ -35,9 +38,16 @@ class MedicoServiceTest {
     @Autowired
     private TurnoRepository turnoRepository;
 
+    @Autowired
+    private SubscriptionRepository subscriptionRepository;
+
+    @Autowired
+    private PlanRepository planRepository;
+
     private Usuario medico;
     private Usuario paciente;
     private Turno turno;
+    private Subscription subscription;
 
     @BeforeEach
     void setUp() {
@@ -63,6 +73,10 @@ class MedicoServiceTest {
                 .institucionFormacion("UBA")
                 .aniosExperiencia(10)
                 .tags("Ansiedad,Depresión")
+                .titulo("Médica Psiquiatra")
+                .specialty("Psiquiatría")
+                .experiencia("Residencia en Hospital Italiano")
+                .ofreceOnline(true)
                 .verificadoAdmin(true)
                 .build();
         paciente = Usuario.builder()
@@ -73,6 +87,23 @@ class MedicoServiceTest {
 
         usuarioRepository.save(medico);
         usuarioRepository.save(paciente);
+
+        // obtenerMedicosActivos() now also requires an active subscription (paywall) — see
+        // SubscriptionService.isAccessAllowed — so the fixture needs a real ACTIVE Subscription
+        // row, otherwise the médico is filtered out of the public listing.
+        Plan planClinico = planRepository.findByCode("clinico")
+                .orElseThrow(() -> new IllegalStateException("Plan 'clinico' no encontrado (esperado seed de PlanService)"));
+        subscription = Subscription.builder()
+                .professional(medico)
+                .plan(planClinico)
+                .status(SubscriptionStatus.ACTIVE)
+                .seats(1)
+                .billingSource(BillingSource.MANUAL_TRANSFER)
+                .amountArs(planClinico.getPriceArs())
+                .currentPeriodStart(LocalDateTime.now())
+                .currentPeriodEnd(LocalDateTime.now().plusMonths(1))
+                .build();
+        subscriptionRepository.save(subscription);
 
         turno = Turno.builder()
                 .medico(medico)
@@ -90,6 +121,7 @@ class MedicoServiceTest {
     @AfterEach
     void tearDown() {
         turnoRepository.delete(turno);
+        subscriptionRepository.delete(subscription);
         List<TarifaMedico> tarifas = tarifaRepository.findByMedicoId(medico.getId());
         tarifaRepository.deleteAll(tarifas);
         usuarioRepository.delete(medico);

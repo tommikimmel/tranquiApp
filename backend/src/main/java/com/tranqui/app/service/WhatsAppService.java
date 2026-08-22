@@ -3,6 +3,7 @@ package com.tranqui.app.service;
 import com.twilio.Twilio;
 import com.twilio.rest.api.v2010.account.Message;
 import com.twilio.type.PhoneNumber;
+import com.tranqui.app.model.Modalidad;
 import com.tranqui.app.model.Turno;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -69,8 +70,25 @@ public class WhatsAppService {
         if (turno.getHoraInicio() == null) {
             throw new IllegalArgumentException("La hora de inicio del turno es requerida");
         }
-        if (turno.getTelemedicinaUrl() == null || turno.getTelemedicinaUrl().trim().isEmpty()) {
+        // Los turnos PRESENCIALES nunca tienen (ni necesitan) telemedicinaUrl — exigirla acá
+        // hacía que este método tirara IllegalArgumentException para CUALQUIER turno presencial,
+        // y como NotificationScheduler atrapa esa excepción por-turno, los pacientes presenciales
+        // nunca recibían su recordatorio de WhatsApp. Para turnos ONLINE (o turnos viejos sin
+        // modalidad cargada, de antes de que existiera este campo) se mantiene la validación
+        // original: siguen siendo por videollamada, así que el link es obligatorio.
+        boolean esPresencial = turno.getModalidad() == Modalidad.PRESENCIAL;
+        if (!esPresencial && (turno.getTelemedicinaUrl() == null || turno.getTelemedicinaUrl().trim().isEmpty())) {
             throw new IllegalArgumentException("La URL de telemedicina es requerida");
+        }
+
+        if (esPresencial) {
+            return String.format(
+                "Hola %s, recordatorio de tu turno con el Dr. %s mañana %s a las %s hs. Te esperamos en el consultorio.",
+                turno.getPaciente().getNombre(),
+                turno.getMedico().getNombre(),
+                turno.getFecha().toString(),
+                turno.getHoraInicio().toString()
+            );
         }
 
         return String.format(

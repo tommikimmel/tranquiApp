@@ -239,6 +239,14 @@ public class Usuario {
     @Column(name = "reset_password_expires_at")
     private LocalDateTime resetPasswordExpiresAt;
 
+    // Set to true when an admin resets this user's password (AdminController#resetPassword) —
+    // the generated password is temporary, and the frontend blocks the rest of the app behind a
+    // mandatory "set your new password" modal (same gating pattern as terminosAceptadosEn) until
+    // AuthController#setNewPassword clears it.
+    @Builder.Default
+    @Column(name = "must_change_password", columnDefinition = "boolean not null default false")
+    private boolean mustChangePassword = false;
+
     @Column(name = "verificado_admin")
     private Boolean verificadoAdmin;
 
@@ -382,6 +390,74 @@ public class Usuario {
 
     public boolean isNotificacionesWhatsappHabilitadas() {
         return notificacionesWhatsappHabilitadas == null || notificacionesWhatsappHabilitadas;
+    }
+
+    // ── Professional Profile, Matrícula & Datos Fiscales (Plan Suscripciones) ──
+    @Column(name = "profession", length = 30)
+    private String profession; // psiquiatra | psicologo | otro
+
+    @Column(name = "license_type", length = 20)
+    private String licenseType; // MN | MP | MP_psico
+
+    @Column(name = "license_number", length = 50)
+    private String licenseNumber;
+
+    @Column(name = "license_jurisdiction", length = 100)
+    private String licenseJurisdiction;
+
+    @Column(name = "license_document_url", columnDefinition = "TEXT")
+    private String licenseDocumentUrl;
+
+    @Column(name = "license_verified_at")
+    private LocalDateTime licenseVerifiedAt;
+
+    @Column(name = "license_verified_by", length = 100)
+    private String licenseVerifiedBy;
+
+    // tax_id_type: CUIT | CUIL | DNI
+    @Column(name = "tax_id_type", length = 20)
+    private String taxIdType;
+
+    @Column(name = "tax_id", length = 30)
+    private String taxId;
+
+    @Column(name = "legal_name", length = 200)
+    private String legalName; // Razón Social / Nombre fiscal
+
+    // ARCA CondicionIVAReceptorId: 1=RI, 4=Exento, 5=Consumidor Final, 6=Monotributo
+    @Column(name = "iva_condition_id")
+    private Integer ivaConditionId;
+
+    @Column(name = "fiscal_address", length = 255)
+    private String fiscalAddress;
+
+    @Column(name = "qbi2_client_id", length = 100)
+    private String qbi2ClientId;
+
+    public boolean isCanPrescribe() {
+        boolean isMedical = "psiquiatra".equalsIgnoreCase(profession) || "medico".equalsIgnoreCase(profession)
+                || rol == Rol.PSIQUIATRA;
+        return isMedical && (licenseVerifiedAt != null || Boolean.TRUE.equals(verificadoAdmin));
+    }
+
+    public String getEffectiveTaxId() {
+        if (taxId != null && !taxId.isBlank()) return taxId;
+        if (cuit != null && !cuit.isBlank()) return cuit;
+        if (cuil != null) return String.valueOf(cuil);
+        if (dni != null && !dni.isBlank()) return dni;
+        if (numeroDocumento != null) return String.valueOf(numeroDocumento);
+        return null;
+    }
+
+    public String getEffectiveLegalName() {
+        if (legalName != null && !legalName.isBlank()) return legalName;
+        String full = ((nombre != null ? nombre : "") + " " + (apellido != null ? apellido : "")).trim();
+        return full.isEmpty() ? email : full;
+    }
+
+    public Integer getEffectiveIvaConditionId() {
+        if (ivaConditionId != null) return ivaConditionId;
+        return 6; // Default to Monotributo (6) for Argentina health professionals
     }
 
     // Null means "not accepted yet" — set once, at register() time, and never cleared. Existing

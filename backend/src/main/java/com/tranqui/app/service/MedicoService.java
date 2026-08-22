@@ -38,6 +38,9 @@ public class MedicoService {
     @Autowired
     private TurnoRepository turnoRepository;
 
+    @Autowired
+    private SubscriptionService subscriptionService;
+
     // Same flag MedicoController/MercadoPagoService use to know whether MP is really wired up
     // (real deployments) vs. simulated (local/dev) — verification only requires a connected MP
     // account when the integration is actually live, so local dev/tests aren't blocked forever.
@@ -49,7 +52,7 @@ public class MedicoService {
     // Fallback values for médicos who haven't configured their agenda settings yet —
     // 45 matches the historical hardcoded turno duration, 10 matches the mockup's default.
     private static final int DEFAULT_DURACION_TURNO_MINUTOS = 45;
-    private static final int DEFAULT_INTERVALO_ENTRE_TURNOS_MINUTOS = 10;
+    private static final int DEFAULT_INTERVALO_ENTRE_TURNOS_MINUTOS = 0;
 
     // "osde" replaces the old generic "obra_social" default as the seed for NEW médicos with no
     // tariffs yet — a specific obra social ("OSDE") instead of a generic "any obra social"
@@ -57,22 +60,34 @@ public class MedicoService {
     // "obra_social" row persisted keep it untouched; TurnoService.reservarTurno still treats
     // "obra_social"/"osde" as synonyms so both keep working.
     private static final List<MedicoDto.TarifaDto> DEFAULT_TARIFFS = Arrays.asList(
-            new MedicoDto.TarifaDto("particular", "Consulta particular", new BigDecimal("60000"), true, false, null, null, null, true),
-            new MedicoDto.TarifaDto("sobreturno", "Sobreturno", new BigDecimal("90000"), true, false, null, null, null, true),
-            new MedicoDto.TarifaDto("osde", "Obra Social OSDE", new BigDecimal("10500"), true, true, "OSDE", null, null, true),
+            new MedicoDto.TarifaDto("particular", "Consulta particular", new BigDecimal("60000"), true, false, null, null, null, true, false),
+            new MedicoDto.TarifaDto("sobreturno", "Sobreturno", new BigDecimal("90000"), true, false, null, null, null, true, false),
+            new MedicoDto.TarifaDto("osde", "Obra Social OSDE", new BigDecimal("10500"), true, true, "OSDE", null, null, true, false),
             // These three are pure document services — no consultorio, no videollamada — so they
-            // don't reserve a slot on the médico's agenda. See TarifaMedico.requiereAgenda.
-            new MedicoDto.TarifaDto("receta-fuera", "Receta fuera de turno", new BigDecimal("45000"), true, false, null, null, null, false),
-            new MedicoDto.TarifaDto("certificado", "Certificado", new BigDecimal("55000"), true, false, null, null, null, false),
-            new MedicoDto.TarifaDto("informe-apto", "Informe / Apto médico", new BigDecimal("165000"), true, false, null, null, null, false)
+            // don't reserve a slot on the médico's agenda. See TarifaMedico.requiereAgenda. Only
+            // "receta-fuera" is also flagged esReceta — see TarifaMedico.esReceta.
+            new MedicoDto.TarifaDto("receta-fuera", "Receta fuera de turno", new BigDecimal("45000"), true, false, null, null, null, false, true),
+            new MedicoDto.TarifaDto("certificado", "Certificado", new BigDecimal("55000"), true, false, null, null, null, false, false),
+            new MedicoDto.TarifaDto("informe-apto", "Informe / Apto médico", new BigDecimal("165000"), true, false, null, null, null, false, false)
     );
 
-    @Transactional(readOnly = true)
+    // NOT readOnly: construirMedicoDto self-heals by persisting DEFAULT_TARIFFS the first time a
+    // médico has zero TarifaMedico rows (e.g. right after they clear isMedicoVerificado but before
+    // ever opening "Honorarios y servicios") — under readOnly=true that INSERT throws (Postgres
+    // rejects writes in a read-only transaction) and takes down the entire public listing with a
+    // 500, not just that one médico's card.
+    @Transactional
     public List<MedicoDto> obtenerMedicosActivos() {
         // Filter by role at the DB level (was findAll() + Java-side filtering, scanning every
         // usuario row — patients included — on every public homepage load).
+        // Perfil completo + verificado por admin (isMedicoVerificado) Y suscripción activa
+        // (isAccessAllowed) — un profesional sin pago al día deja de listarse públicamente aunque
+        // su perfil esté impecable. Chequeos separados a propósito: isMedicoVerificado también
+        // alimenta MedicoDto.verificado (el banner de "completá tu perfil" del propio profesional),
+        // que es un concepto distinto de si está al día con el pago.
         List<Usuario> medicos = usuarioRepository.findByRol(Rol.PSIQUIATRA).stream()
                 .filter(this::isMedicoVerificado)
+                .filter(m -> subscriptionService.isAccessAllowed(m.getId()))
                 .collect(Collectors.toList());
 
         if (medicos.isEmpty()) {
@@ -273,6 +288,9 @@ public class MedicoService {
                     tarifa.setPrecioOnline(tDto.getPrecioOnline());
                     tarifa.setPrecioPresencial(tDto.getPrecioPresencial());
                     tarifa.setRequiereAgenda(tDto.isRequiereAgenda());
+                    // Only meaningful when requiereAgenda is false — a servicio that requires
+                    // agenda is never a "receta fuera de turno" candidate to begin with.
+                    tarifa.setEsReceta(tDto.isRequiereAgenda() ? false : tDto.isEsReceta());
                 } else {
                     tarifa = TarifaMedico.builder()
                             .medico(medico)
@@ -285,6 +303,7 @@ public class MedicoService {
                             .precioOnline(tDto.getPrecioOnline())
                             .precioPresencial(tDto.getPrecioPresencial())
                             .requiereAgenda(tDto.isRequiereAgenda())
+                            .esReceta(tDto.isRequiereAgenda() ? false : tDto.isEsReceta())
                             .build();
                 }
                 tarifaRepository.save(tarifa);
@@ -322,6 +341,7 @@ public class MedicoService {
                         .requiereObraSocial(def.isRequiereObraSocial())
                         .obraSocial(def.getObraSocial())
                         .requiereAgenda(def.isRequiereAgenda())
+                        .esReceta(def.isEsReceta())
                         .build();
                 tarifasDb.add(tarifaRepository.save(t));
             }
@@ -339,6 +359,7 @@ public class MedicoService {
                         .precioOnline(t.getPrecioOnline())
                         .precioPresencial(t.getPrecioPresencial())
                         .requiereAgenda(t.isRequiereAgenda())
+                        .esReceta(t.isEsReceta())
                         .build())
                 .collect(Collectors.toList());
 

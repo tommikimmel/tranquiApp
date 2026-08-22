@@ -99,17 +99,23 @@ class TurnoServiceGoogleCalendarTest {
                 .thenReturn(Collections.singletonList(eventoOcupado));
 
         List<LocalTime> disponibles = turnoService.obtenerHorariosDisponibles(medico.getId(), fecha, Modalidad.ONLINE);
-        
-        // La disponibilidad local de 9:00 a 12:00 en bloques de 1 hora es:
-        // 9:00 (9:00 - 9:45)
-        // 10:00 (10:00 - 10:45) -> Excluido (solapa con evento ocupado de 9:45 a 10:30)
-        // 11:00 (11:00 - 11:45)
-        
+
+        // This médico doesn't configure duracionTurnoMinutos/intervaloEntreTurnosMinutos, so
+        // TurnoService falls back to duracion=45 and intervalo=0 (see TurnoService and
+        // MedicoService's DEFAULT_* constants) — candidates step every 45 minutes with no gap,
+        // not the old implicit hourly cadence. La disponibilidad local de 9:00 a 12:00 en
+        // bloques de 45 minutos consecutivos es:
+        // 9:00  (9:00 - 9:45)   -> libre
+        // 9:45  (9:45 - 10:30)  -> Excluido (coincide exactamente con el evento ocupado 9:45-10:30)
+        // 10:30 (10:30 - 11:15) -> libre (el evento termina justo cuando empieza este bloque)
+        // 11:15 (11:15 - 12:00) -> libre
+
         assertNotNull(disponibles);
-        assertEquals(2, disponibles.size());
+        assertEquals(3, disponibles.size());
         assertTrue(disponibles.contains(LocalTime.of(9, 0)));
-        assertFalse(disponibles.contains(LocalTime.of(10, 0))); // Excluido
-        assertTrue(disponibles.contains(LocalTime.of(11, 0)));
+        assertFalse(disponibles.contains(LocalTime.of(9, 45))); // Excluido
+        assertTrue(disponibles.contains(LocalTime.of(10, 30)));
+        assertTrue(disponibles.contains(LocalTime.of(11, 15)));
     }
 
     @Test

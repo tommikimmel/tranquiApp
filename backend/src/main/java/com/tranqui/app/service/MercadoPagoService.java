@@ -4,14 +4,20 @@ import com.mercadopago.client.preference.PreferenceClient;
 import com.mercadopago.client.preference.PreferenceItemRequest;
 import com.mercadopago.client.preference.PreferenceRequest;
 import com.mercadopago.client.preference.PreferenceBackUrlsRequest;
+import com.mercadopago.client.preapproval.PreapprovalClient;
+import com.mercadopago.client.preapproval.PreapprovalCreateRequest;
+import com.mercadopago.client.preapproval.PreApprovalAutoRecurringCreateRequest;
 import com.mercadopago.core.MPRequestOptions;
 import com.mercadopago.resources.preference.Preference;
+import com.mercadopago.resources.preapproval.Preapproval;
+import com.tranqui.app.model.Plan;
 import com.tranqui.app.model.Turno;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.util.EncryptionUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Service
@@ -35,6 +41,12 @@ public class MercadoPagoService {
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
 
+    // Cuenta del ADMINISTRADOR/plataforma (Etapa 2 del paywall) — distinta del access token
+    // por-profesional que usan crearPreferenciaPago/crearPreferenciaDocumento arriba. Con esto se
+    // crea el Preapproval (suscripción recurrente) que le cobra al PROFESIONAL a favor del admin.
+    @Value("${mercadopago.admin.access-token:}")
+    private String adminAccessToken;
+
     private String notificationUrl() {
         return appPublicUrl + "/api/payments/webhook";
     }
@@ -42,6 +54,50 @@ public class MercadoPagoService {
     // Extracted so tests can substitute a mock client instead of hitting the real Mercado Pago API.
     protected PreferenceClient buildPreferenceClient() {
         return new PreferenceClient();
+    }
+
+    protected PreapprovalClient buildPreapprovalClient() {
+        return new PreapprovalClient();
+    }
+
+    /**
+     * Crea un Preapproval (suscripción recurrente mensual) de Mercado Pago cobrado a la cuenta
+     * del administrador — el profesional autoriza el pago recurrente visitando la URL de checkout
+     * que devuelve este método (ver checkoutUrlFor). No usa notificationUrl explícita porque el SDK
+     * 2.1.0 no expone ese campo en PreapprovalCreateRequest: depende de que la aplicación de MP
+     * (mismo App ID que MERCADOPAGO_CLIENT_ID — confirmado por el prefijo del access token) tenga
+     * configurado en su panel de desarrollador un webhook de "Suscripciones" apuntando a
+     * appPublicUrl + /api/payments/webhook, con el mismo secreto que MERCADOPAGO_WEBHOOK_SECRET.
+     */
+    public Preapproval crearSuscripcionPreapproval(Usuario profesional, Plan plan, Long subscriptionId) throws Exception {
+        if (adminAccessToken == null || adminAccessToken.isBlank()) {
+            throw new IllegalStateException("El cobro de suscripciones todavía no está configurado (falta MP_ADMIN_ACCESS_TOKEN).");
+        }
+
+        PreApprovalAutoRecurringCreateRequest autoRecurring = PreApprovalAutoRecurringCreateRequest.builder()
+                .frequency(1)
+                .frequencyType("months")
+                .transactionAmount(plan.getPriceArs())
+                .currencyId("ARS")
+                .startDate(OffsetDateTime.now())
+                .build();
+
+        PreapprovalCreateRequest request = PreapprovalCreateRequest.builder()
+                .payerEmail(profesional.getEmail())
+                .backUrl(frontendUrl + "/panel")
+                .reason("Suscripción Tranqui App - " + plan.getName())
+                .externalReference("sub-" + subscriptionId)
+                .status("pending")
+                .autoRecurring(autoRecurring)
+                .build();
+
+        PreapprovalClient client = buildPreapprovalClient();
+        MPRequestOptions options = MPRequestOptions.builder().accessToken(adminAccessToken).build();
+        return client.create(request, options);
+    }
+
+    public String checkoutUrlFor(Preapproval preapproval) {
+        return isSandbox ? preapproval.getSandboxInitPoint() : preapproval.getInitPoint();
     }
 
     public String crearPreferenciaPago(Turno turno, Usuario medico) throws Exception {

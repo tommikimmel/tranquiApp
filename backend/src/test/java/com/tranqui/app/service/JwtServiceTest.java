@@ -52,6 +52,24 @@ class JwtServiceTest {
     }
 
     @Test
+    void whenTokenExpirationIsInThePast_thenValidateShouldReturnFalse() {
+        // Force generateToken to issue an already-expired token (negative TTL) instead of
+        // waiting out a real 1h token — validateToken must reject it even though the signature
+        // itself is genuine (it's a boundary on isTokenExpired, not on signature verification,
+        // which whenInvalidToken_thenValidateShouldReturnFalse above already covers).
+        ReflectionTestUtils.setField(jwtService, "jwtExpiration", -1000L);
+        Usuario usuario = Usuario.builder()
+                .nombre("Vencido Test")
+                .email("vencido@test.com")
+                .rol(Rol.PACIENTE)
+                .build();
+
+        String expiredToken = jwtService.generateToken(usuario);
+
+        assertFalse(jwtService.validateToken(expiredToken));
+    }
+
+    @Test
     void whenExtractFromCookies_thenShouldFindToken() {
         Cookie[] cookies = new Cookie[]{
                 new Cookie("OTHER-COOKIE", "value"),

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import '../styles/landing.css'
 import { api } from '../api/api'
@@ -6,10 +6,17 @@ import { useChat } from '../hooks/useChat'
 import { useAlert } from '../context/AlertContext'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
-import { openOfficialPrescriptionPdf } from '../utils/pdfGenerator'
 import DateInputDDMMYYYY from './DateInputDDMMYYYY'
-import ComplaintModal from './ComplaintModal'
-import { formatDetalleDomicilio } from '../utils/dashboardHelpers'
+import CancelTurnoConfirmModal from './CancelTurnoConfirmModal'
+
+// Modals that aren't needed for first paint (only shown after a click) are lazy-loaded so their
+// code doesn't ship in the initial landing-page bundle — LandingPage itself stays a static import
+// (see App.tsx) since almost every first-time visitor needs it immediately.
+const HelpFaqModal = lazy(() => import('./HelpFaqModal'))
+const MisTurnosModal = lazy(() => import('./MisTurnosModal'))
+const TurnoDetailModal = lazy(() => import('./TurnoDetailModal'))
+const PrescriptionsModal = lazy(() => import('./PrescriptionsModal'))
+const MyTicketsView = lazy(() => import('./MyTicketsView'))
 
 const formatDateDDMMYYYY = (dateStr?: string) => {
   if (!dateStr) return '';
@@ -108,6 +115,15 @@ function IconClipboard({ size = 16 }: { size?: number }) {
       <path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1Z" />
       <rect x="5" y="6" width="14" height="16" rx="2" />
       <line x1="8" y1="12" x2="16" y2="12" /><line x1="8" y1="16" x2="16" y2="16" />
+    </svg>
+  )
+}
+
+function IconTicket({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M21 12a2 2 0 0 0-2-2V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v3a2 2 0 0 1 0 4v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2z" />
+      <line x1="12" y1="6" x2="12" y2="18" strokeDasharray="1.5 2" />
     </svg>
   )
 }
@@ -383,7 +399,7 @@ function PublicHeader({
 }) {
   const isDoctor = currentUser?.rol === 'PSIQUIATRA' || currentUser?.rol === 'MEDICO'
   const [showDropdown, setShowDropdown] = useState(false);
-  const [showComplaintModal, setShowComplaintModal] = useState(false);
+  const [showTicketsView, setShowTicketsView] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -608,7 +624,7 @@ function PublicHeader({
                     <button
                       onClick={() => {
                         setShowDropdown(false);
-                        setShowComplaintModal(true);
+                        setShowTicketsView(true);
                       }}
                       style={{
                         padding: 'var(--space-3) var(--space-4)',
@@ -629,7 +645,7 @@ function PublicHeader({
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ width: 15, height: 15, flexShrink: 0, color: 'var(--color-text-secondary)' }}>
                         <rect x="2" y="4" width="20" height="16" rx="2" /><path d="M22 6l-10 7L2 6" />
                       </svg>
-                      Quejas y Soporte
+                      Soporte
                     </button>
                     <button
                       onClick={() => {
@@ -674,7 +690,11 @@ function PublicHeader({
           )}
         </div>
       </div>
-      <ComplaintModal isOpen={showComplaintModal} onClose={() => setShowComplaintModal(false)} />
+      {showTicketsView && (
+        <Suspense fallback={null}>
+          <MyTicketsView onClose={() => setShowTicketsView(false)} />
+        </Suspense>
+      )}
     </header>
   )
 }
@@ -773,7 +793,10 @@ export default function LandingPage({
   const [loadingPortal, setLoadingPortal] = useState(false)
   const [showAppointmentsModal, setShowAppointmentsModal] = useState(false)
   const [showPrescriptionsModal, setShowPrescriptionsModal] = useState(false)
-  const [selectedPrescriptionDetail, setSelectedPrescriptionDetail] = useState<any | null>(null)
+  const [showTicketsView, setShowTicketsView] = useState(false)
+  // null = auto (defaults to 'documentos' only when there are no upcoming turnos but there are
+  // pending documents); once the patient clicks a tab explicitly it sticks to that choice.
+  const [homeCardView, setHomeCardView] = useState<'turnos' | 'documentos' | null>(null)
   const [showHelpModal, setShowHelpModal] = useState(false)
   const [cancelTurnoId, setCancelTurnoId] = useState<number | null>(null)
   const [detailTurno, setDetailTurno] = useState<any | null>(null)
@@ -871,7 +894,7 @@ export default function LandingPage({
 
   // Patient WebSocket Live Notifications Handler
   useEffect(() => {
-    if (loading || !currentUser || currentUser.rol !== 'PACIENTE') return
+    if (!currentUser || currentUser.rol !== 'PACIENTE') return
 
     let client: Client | null = null;
     
@@ -912,7 +935,12 @@ export default function LandingPage({
     return () => {
       client?.deactivate()
     }
-  }, [currentUser, loading])
+    // Deliberately keyed on the stable id/rol pair, not the whole `currentUser` object (a new
+    // reference on every parent re-render) or the unrelated `loading` state (the médicos list
+    // fetch below, which used to toggle shortly after mount and tear the socket down mid-handshake
+    // — the exact "WebSocket is closed before the connection is established" error in prod).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, currentUser?.rol])
 
   useEffect(() => {
     setLoading(true)
@@ -1274,6 +1302,18 @@ export default function LandingPage({
                 </span>
                 <span className="quick-access-card__arrow"><IconChevronRight /></span>
               </button>
+              <button
+                type="button"
+                className="quick-access-card"
+                onClick={() => setShowTicketsView(true)}
+              >
+                <span className="quick-access-card__icon"><IconTicket size={22} /></span>
+                <span className="quick-access-card__body">
+                  <span className="quick-access-card__title">Soporte</span>
+                  <span className="quick-access-card__subtitle">Consultas y problemas — te respondemos por acá</span>
+                </span>
+                <span className="quick-access-card__arrow"><IconChevronRight /></span>
+              </button>
             </div>
           )}
         </div>
@@ -1296,9 +1336,17 @@ export default function LandingPage({
           const f2 = `${year}-${month}-${day}`;
           return cleanDateStr === f1 || cleanDateStr === f2 || cleanDateStr.includes(f1) || cleanDateStr.includes(f2);
         };
-        const upcomingAppointments = myAppointments.filter(appt => appt.status !== 'completed');
-        
-        if (upcomingAppointments.length === 0) return null;
+        // Documents (ocupaAgenda === false) are purchases, not scheduled sessions — they never
+        // belong in "Mis Próximos Turnos" (no modalidad, no real horario). Once documentoEnviado
+        // is true there's nothing left to track either, so they drop out entirely instead of
+        // lingering here forever (unlike a real turno, a document-only turno never flips to
+        // "completed" on its own — see TurnoService's status computation).
+        const upcomingTurnos = myAppointments.filter(appt => appt.ocupaAgenda !== false && appt.status !== 'completed');
+        const pendingDocuments = myAppointments.filter(appt => appt.ocupaAgenda === false && !appt.documentoEnviado);
+
+        if (upcomingTurnos.length === 0 && pendingDocuments.length === 0) return null;
+
+        const activeView = homeCardView ?? (upcomingTurnos.length === 0 && pendingDocuments.length > 0 ? 'documentos' : 'turnos');
 
         return (
           <div style={{ width: '100%', maxWidth: '1200px', margin: 'var(--space-4) auto', padding: '0 var(--space-6)' }}>
@@ -1312,17 +1360,39 @@ export default function LandingPage({
               gap: 'var(--space-4)',
               fontFamily: 'var(--font-body)'
             }}>
-              <div>
-                <h4 style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'bold', color: 'var(--green-600)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                  Mis Próximos Turnos
-                </h4>
-                <p style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-                  Tenés turnos programados en Tranqui App. Podés pagar consultas pendientes o unirte a la videollamada el día de la sesión.
-                </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'bold', color: 'var(--green-600)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                    {activeView === 'turnos' ? 'Mis Próximos Turnos' : 'Mis Documentos Pendientes'}
+                  </h4>
+                  <p style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                    {activeView === 'turnos'
+                      ? 'Tenés turnos programados en Tranqui App. Podés pagar consultas pendientes o unirte a la videollamada el día de la sesión.'
+                      : 'Recetas fuera de turno, certificados e informes que solicitaste y todavía no recibiste.'}
+                  </p>
+                </div>
+                {pendingDocuments.length > 0 && upcomingTurnos.length > 0 && (
+                  <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      onClick={() => setHomeCardView('turnos')}
+                      className={`btn btn--sm ${activeView === 'turnos' ? 'btn--primary' : 'btn--ghost'}`}
+                    >
+                      Turnos ({upcomingTurnos.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHomeCardView('documentos')}
+                      className={`btn btn--sm ${activeView === 'documentos' ? 'btn--primary' : 'btn--ghost'}`}
+                    >
+                      Documentos Pendientes ({pendingDocuments.length})
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                {upcomingAppointments.map(appt => {
+                {activeView === 'turnos' ? upcomingTurnos.map(appt => {
                   const isTodayAppt = isToday(appt.fecha);
                   const isConfirmed = appt.status === 'confirmed';
                   const isOnline = appt.modalidad ? appt.modalidad === 'ONLINE' : !!appt.meetLink;
@@ -1420,6 +1490,91 @@ export default function LandingPage({
                             }}
                           >
                             {appt.type === 'Copago OSDE' || appt.type === 'Obra Social' ? 'Pagar Copago' : 'Pagar Consulta'}
+                          </a>
+                        )}
+
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCancelAppointmentByPatient(appt.id) }}
+                          style={{
+                            background: 'transparent',
+                            border: '1px solid var(--color-border)',
+                            color: 'var(--color-text-secondary)',
+                            fontSize: 'var(--text-xs)',
+                            fontWeight: 600,
+                            padding: '8px 14px',
+                            borderRadius: 'var(--radius-md)',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }) : pendingDocuments.map(appt => {
+                  const isConfirmed = appt.status === 'confirmed';
+                  return (
+                    <div
+                      key={appt.id}
+                      onClick={() => setDetailTurno(appt)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setDetailTurno(appt) }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 'var(--space-4)',
+                        backgroundColor: 'var(--color-surface)',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: 'var(--radius-md)',
+                        padding: 'var(--space-3) var(--space-4)',
+                        flexWrap: 'wrap',
+                        cursor: 'pointer'
+                      }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 220 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                          <span style={{ color: 'var(--color-text-secondary)' }}><IconClipboard size={16} /></span>
+                          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                            {appt.type}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                          Profesional: <span style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{appt.patientName}</span>
+                          {' · '}Solicitado el {formatDateDDMMYYYY(appt.fecha)}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        {(() => { const b = getTurnoBadge(appt); return (
+                          <span className={`badge ${b.cls}`} style={{ fontSize: '11px' }}>
+                            {b.label}
+                          </span>
+                        ) })()}
+
+                        {appt.checkoutUrl && !isConfirmed && (
+                          <a
+                            href={appt.checkoutUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              fontSize: 'var(--text-xs)',
+                              fontWeight: 'bold',
+                              padding: '8px 14px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              backgroundColor: '#009fe3',
+                              color: 'white',
+                              textDecoration: 'none',
+                              borderRadius: 'var(--radius-md)',
+                              boxShadow: '0 2px 4px rgba(0, 158, 227, 0.15)',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            Pagar
                           </a>
                         )}
 
@@ -1544,697 +1699,58 @@ export default function LandingPage({
 
       {/* Mis Turnos Modal */}
       {showAppointmentsModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: 'var(--space-4)'
-        }}>
-          <div className="card" style={{
-            maxWidth: '600px',
-            width: '100%',
-            maxHeight: '85vh',
-            overflowY: 'auto',
-            position: 'relative',
-            padding: 'var(--space-6)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-4)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
-              <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Mis Turnos Reservados</h3>
-              <button onClick={() => setShowAppointmentsModal(false)} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
-            </div>
-            {loadingPortal ? (
-              <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}><div className="checkout-spinner" style={{ margin: 'auto' }} /></div>
-            ) : myAppointments.length === 0 ? (
-              <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--space-4)' }}>No tenés turnos programados.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                {myAppointments.map(appt => {
-                  const isConfirmed = appt.status === 'confirmed';
-                  return (
-                    <div key={appt.id} style={{
-                      padding: 'var(--space-3)',
-                      borderRadius: 'var(--radius-md)',
-                      backgroundColor: isConfirmed ? '#ecfdf5' : '#fffbeb',
-                      border: isConfirmed ? '1px solid #a7f3d0' : '1px solid #fef3c7',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 'var(--space-2)'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>
-                          {formatDateDDMMYYYY(appt.fecha)} · {appt.hour} hs
-                        </span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                          {(() => { const b = getTurnoBadge(appt); return (
-                            <span className={`badge ${b.cls}`} style={{ fontSize: '9px' }}>
-                              {b.label}
-                            </span>
-                          ) })()}
-                          {appt.status !== 'completed' && (
-                            <button 
-                              onClick={() => handleCancelAppointmentByPatient(appt.id)}
-                              style={{
-                                border: 'none',
-                                background: 'none',
-                                cursor: 'pointer',
-                                color: 'var(--color-danger)',
-                                fontSize: '12px',
-                                fontWeight: 'bold'
-                              }}
-                              title="Cancelar Turno"
-                            >
-                              Cancelar
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'bold' }}>
-                        Profesional: {appt.patientName}
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                        Modalidad: {(appt.modalidad ? appt.modalidad === 'ONLINE' : !!appt.meetLink) ? 'Online' : 'Presencial'}
-                      </div>
-                      {appt.domicilioAtencion && (
-                        <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div>Dirección de atención: <strong>{appt.domicilioAtencion}</strong></div>
-                          {true && (
-                            <a 
-                              href={appt.domicilioLat && appt.domicilioLng 
-                                ? `https://www.google.com/maps/search/?api=1&query=${appt.domicilioLat},${appt.domicilioLng}`
-                                : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(appt.domicilioAtencion)}`
-                              }
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              className="btn btn--ghost btn--sm" 
-                              style={{ 
-                                fontSize: '10px', 
-                                padding: 'var(--space-1) var(--space-2)', 
-                                width: 'fit-content', 
-                                display: 'inline-flex', 
-                                gap: '4px', 
-                                alignItems: 'center', 
-                                border: '1px solid var(--color-border)',
-                                backgroundColor: 'var(--color-surface)',
-                                color: 'var(--color-primary)',
-                                fontWeight: 'bold'
-                              }}
-                            >
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 12, height: 12 }}>
-                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                                <circle cx="12" cy="10" r="3" />
-                              </svg>
-                              Ver dirección en Google Maps
-                            </a>
-                          )}
-                          {appt.domicilioLat != null && appt.domicilioLng != null && (
-                            <iframe
-                              title={`Ubicación del consultorio - turno ${appt.id}`}
-                              width="100%"
-                              height="140"
-                              style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}
-                              loading="lazy"
-                              referrerPolicy="no-referrer-when-downgrade"
-                              src={`https://www.openstreetmap.org/export/embed.html?bbox=${appt.domicilioLng - 0.006}%2C${appt.domicilioLat - 0.004}%2C${appt.domicilioLng + 0.006}%2C${appt.domicilioLat + 0.004}&layer=mapnik&marker=${appt.domicilioLat}%2C${appt.domicilioLng}`}
-                            />
-                          )}
-                        </div>
-                      )}
-                      {(appt.modalidad ? appt.modalidad === 'ONLINE' : !!appt.meetLink) && appt.meetLink && isConfirmed && (
-                        <a
-                          href={appt.meetLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn--primary"
-                          style={{ fontSize: '11px', padding: 'var(--space-2) var(--space-4)', width: 'fit-content', display: 'flex', gap: '4px', alignItems: 'center', marginTop: 'var(--space-1)' }}
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
-                          Unirse a la videollamada
-                        </a>
-                      )}
-                      {!isConfirmed && appt.checkoutUrl && (
-                        <a 
-                          href={appt.checkoutUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="btn" 
-                          style={{ 
-                            fontSize: '11px', 
-                            padding: 'var(--space-2) var(--space-5)', 
-                            width: 'fit-content', 
-                            display: 'flex', 
-                            gap: '6px', 
-                            alignItems: 'center', 
-                            marginTop: 'var(--space-1)', 
-                            textDecoration: 'none', 
-                            backgroundColor: '#009fe3', 
-                            color: 'white', 
-                            borderColor: '#009fe3', 
-                            fontWeight: 'bold',
-                            borderRadius: 'var(--radius-md)',
-                            boxShadow: '0 2px 4px rgba(0,158,227,0.15)'
-                          }}
-                        >
-                          Pagar Turno
-                        </a>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+        <Suspense fallback={null}>
+          <MisTurnosModal
+            appointments={myAppointments}
+            loading={loadingPortal}
+            onClose={() => setShowAppointmentsModal(false)}
+            onCancel={handleCancelAppointmentByPatient}
+          />
+        </Suspense>
       )}
 
       {/* Detalle de un turno puntual, abierto al hacer click en una fila de "Mis Próximos Turnos" */}
-      {detailTurno && (() => {
-        const appt = detailTurno;
-        const isConfirmed = appt.status === 'confirmed';
-        const isOnline = appt.modalidad ? appt.modalidad === 'ONLINE' : !!appt.meetLink;
-        const detalleDomicilio = formatDetalleDomicilio(appt);
-        return (
-          <div
-            style={{
-              position: 'fixed',
-              top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              backdropFilter: 'blur(4px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 9999,
-              padding: 'var(--space-4)'
-            }}
-            onClick={(e) => e.target === e.currentTarget && setDetailTurno(null)}
-          >
-            <div className="card" style={{
-              maxWidth: '480px',
-              width: '100%',
-              maxHeight: '85vh',
-              overflowY: 'auto',
-              position: 'relative',
-              padding: 'var(--space-6)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--space-4)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
-                <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Detalle del turno</h3>
-                <button onClick={() => setDetailTurno(null)} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                  <span style={{ color: 'var(--color-text-secondary)' }}><IconCalendar size={18} /></span>
-                  <span style={{ fontSize: 'var(--text-md)', fontWeight: 'bold' }}>
-                    {formatDateDDMMYYYY(appt.fecha)} · {appt.hour} hs
-                  </span>
-                  {(() => { const b = getTurnoBadge(appt); return (
-                    <span className={`badge ${b.cls}`} style={{ fontSize: '11px', marginLeft: 'auto' }}>
-                      {b.label}
-                    </span>
-                  ) })()}
-                </div>
-
-                <div style={{ fontSize: 'var(--text-sm)' }}>
-                  <div>Profesional: <strong>{appt.patientName}</strong></div>
-                  <div style={{ color: 'var(--color-text-secondary)', marginTop: '2px' }}>{appt.type}</div>
-                  <div style={{ color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                    Modalidad: {isOnline ? 'Online (videollamada)' : 'Presencial'}
-                  </div>
-                </div>
-
-                {!isOnline && appt.domicilioAtencion && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div style={{ fontSize: 'var(--text-sm)' }}>
-                      <div>Dirección de atención: <strong>{appt.domicilioAtencion}</strong></div>
-                      {detalleDomicilio && (
-                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{detalleDomicilio}</div>
-                      )}
-                    </div>
-                    <a
-                      href={appt.domicilioLat && appt.domicilioLng
-                        ? `https://www.google.com/maps/search/?api=1&query=${appt.domicilioLat},${appt.domicilioLng}`
-                        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(appt.domicilioAtencion)}`
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn--ghost btn--sm"
-                      style={{
-                        fontSize: '11px',
-                        padding: 'var(--space-1) var(--space-2)',
-                        width: 'fit-content',
-                        display: 'inline-flex',
-                        gap: '4px',
-                        alignItems: 'center',
-                        border: '1px solid var(--color-border)',
-                        backgroundColor: 'var(--color-surface)',
-                        color: 'var(--color-primary)',
-                        fontWeight: 'bold'
-                      }}
-                    >
-                      <IconLocationPin size={13} />
-                      Ver dirección en Google Maps
-                    </a>
-                    {appt.domicilioLat != null && appt.domicilioLng != null && (
-                      <iframe
-                        title={`Ubicación del consultorio - turno ${appt.id}`}
-                        width="100%"
-                        height="180"
-                        style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${appt.domicilioLng - 0.006}%2C${appt.domicilioLat - 0.004}%2C${appt.domicilioLng + 0.006}%2C${appt.domicilioLat + 0.004}&layer=mapnik&marker=${appt.domicilioLat}%2C${appt.domicilioLng}`}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {isOnline && appt.meetLink && isConfirmed && (
-                  <a
-                    href={appt.meetLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn--primary"
-                    style={{ fontSize: '13px', padding: 'var(--space-2) var(--space-4)', width: 'fit-content', display: 'flex', gap: '6px', alignItems: 'center' }}
-                  >
-                    <IconVideoCam size={15} /> Unirse a la videollamada
-                  </a>
-                )}
-
-                {appt.checkoutUrl && !isConfirmed && (
-                  <a
-                    href={appt.checkoutUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn"
-                    style={{
-                      fontSize: '13px',
-                      padding: 'var(--space-2) var(--space-5)',
-                      width: 'fit-content',
-                      display: 'flex',
-                      gap: '6px',
-                      alignItems: 'center',
-                      textDecoration: 'none',
-                      backgroundColor: '#009fe3',
-                      color: 'white',
-                      borderColor: '#009fe3',
-                      fontWeight: 'bold',
-                      borderRadius: 'var(--radius-md)'
-                    }}
-                  >
-                    {appt.type === 'Copago OSDE' || appt.type === 'Obra Social' ? 'Pagar Copago' : 'Pagar Consulta'}
-                  </a>
-                )}
-
-                {appt.status !== 'completed' && (
-                  <button
-                    onClick={() => { setDetailTurno(null); handleCancelAppointmentByPatient(appt.id) }}
-                    style={{
-                      background: 'transparent',
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-danger)',
-                      fontSize: 'var(--text-xs)',
-                      fontWeight: 600,
-                      padding: '8px 14px',
-                      borderRadius: 'var(--radius-md)',
-                      cursor: 'pointer',
-                      width: 'fit-content'
-                    }}
-                  >
-                    Cancelar turno
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {detailTurno && (
+        <Suspense fallback={null}>
+          <TurnoDetailModal
+            appt={detailTurno}
+            onClose={() => setDetailTurno(null)}
+            onCancel={handleCancelAppointmentByPatient}
+          />
+        </Suspense>
+      )}
 
       {/* Mi Historia Clinica Modal */}
       {showPrescriptionsModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: 'var(--space-4)'
-        }}>
-          <div className="card" style={{
-            maxWidth: '650px',
-            width: '100%',
-            maxHeight: '85vh',
-            overflowY: 'auto',
-            position: 'relative',
-            padding: 'var(--space-6)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-4)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
-              <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Mis Recetas Médicas</h3>
-              <button onClick={() => { setShowPrescriptionsModal(false); setSelectedPrescriptionDetail(null); }} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
-            </div>
+        <Suspense fallback={null}>
+          <PrescriptionsModal prescriptions={myPrescriptions} onClose={() => setShowPrescriptionsModal(false)} />
+        </Suspense>
+      )}
 
-            {selectedPrescriptionDetail ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                <button
-                  className="btn btn--ghost btn--sm"
-                  style={{ alignSelf: 'flex-start' }}
-                  onClick={() => setSelectedPrescriptionDetail(null)}
-                >
-                  ← Volver al listado
-                </button>
-                <div style={{ padding: 'var(--space-4)', backgroundColor: 'var(--neutral-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>
-                    Emisión: {formatDateDDMMYYYY(selectedPrescriptionDetail.fechaEmision || selectedPrescriptionDetail.fecha)}
-                  </div>
-                  <h4 style={{ margin: '0 0 var(--space-1)', color: 'var(--color-primary)' }}>
-                    Médico Prescriptor: {selectedPrescriptionDetail.medico ? `${selectedPrescriptionDetail.medico.nombre} ${selectedPrescriptionDetail.medico.apellido || ''}` : 'Médico Tratante'}
-                  </h4>
-                  {selectedPrescriptionDetail.medico?.matricula && (
-                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-3)' }}>
-                      Matrícula: {selectedPrescriptionDetail.medico.matricula}
-                    </div>
-                  )}
-
-                  {selectedPrescriptionDetail.diagnostico && (
-                    <div style={{ marginBottom: 'var(--space-3)' }}>
-                      <strong>Diagnóstico (CIE-10):</strong>
-                      <div style={{ fontSize: 'var(--text-sm)' }}>{selectedPrescriptionDetail.diagnostico}</div>
-                    </div>
-                  )}
-
-                  <div style={{ marginBottom: 'var(--space-3)' }}>
-                    <strong>Medicación prescrita:</strong>
-                    <pre style={{
-                      fontFamily: 'inherit',
-                      whiteSpace: 'pre-wrap',
-                      backgroundColor: '#ffffff',
-                      padding: 'var(--space-3)',
-                      borderRadius: 'var(--radius-sm)',
-                      border: '1px solid var(--color-border)',
-                      marginTop: '4px',
-                      fontSize: 'var(--text-sm)'
-                    }}>
-                      {selectedPrescriptionDetail.medicamentos}
-                    </pre>
-                  </div>
-
-                  {selectedPrescriptionDetail.indicaciones && (
-                    <div style={{ marginBottom: 'var(--space-3)' }}>
-                      <strong>Indicaciones para el paciente:</strong>
-                      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                        {selectedPrescriptionDetail.indicaciones}
-                      </div>
-                    </div>
-                  )}
-
-                  <button
-                    className="btn btn--primary btn--sm"
-                    style={{ marginTop: 'var(--space-2)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                    onClick={() => openOfficialPrescriptionPdf(selectedPrescriptionDetail, () => showAlert('Esta receta todavía no tiene el documento oficial de QBI2/Innovamed disponible. Contactá a tu médico.', 'error'))}
-                  >
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <line x1="12" y1="18" x2="12" y2="12" />
-                      <polyline points="9 15 12 18 15 15" />
-                    </svg>
-                    Ver PDF oficial de Receta
-                  </button>
-                  {selectedPrescriptionDetail.pdfUrl && (
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: 'var(--space-2)', wordBreak: 'break-all' }}>
-                      <strong>Link del documento (QBI2/Innovamed):</strong>{' '}
-                      <a href={selectedPrescriptionDetail.pdfUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>
-                        {selectedPrescriptionDetail.pdfUrl}
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : myPrescriptions.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                {myPrescriptions.map((rx, idx) => (
-                  <div key={rx.id || idx} style={{
-                    padding: 'var(--space-4)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-md)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 'var(--space-2)'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <strong style={{ fontSize: 'var(--text-sm)', color: 'var(--color-primary)' }}>
-                        {rx.medico ? `${rx.medico.nombre} ${rx.medico.apellido || ''}` : 'Receta Médica'}
-                      </strong>
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-                        {formatDateDDMMYYYY(rx.fechaEmision || rx.fecha)}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                      {rx.medicamentos}
-                    </div>
-                    <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-                      <button
-                        className="btn btn--secondary btn--sm"
-                        onClick={() => setSelectedPrescriptionDetail(rx)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                        Ver detalle
-                      </button>
-                      <button
-                        className="btn btn--ghost btn--sm"
-                        onClick={() => openOfficialPrescriptionPdf(rx, () => showAlert('Esta receta todavía no tiene el documento oficial de QBI2/Innovamed disponible. Contactá a tu médico.', 'error'))}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                      >
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                          <polyline points="14 2 14 8 20 8" />
-                          <line x1="12" y1="18" x2="12" y2="12" />
-                          <polyline points="9 15 12 18 15 15" />
-                        </svg>
-                        Ver PDF oficial
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: 'var(--space-6)' }}>
-                No tenés recetas médicas registradas actualmente.
-              </p>
-            )}
-          </div>
-        </div>
+      {/* Soporte / Tickets */}
+      {showTicketsView && (
+        <Suspense fallback={null}>
+          <MyTicketsView onClose={() => setShowTicketsView(false)} />
+        </Suspense>
       )}
 
       {/* Ayuda / FAQ Modal */}
       {showHelpModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(4px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999,
-          padding: 'var(--space-4)'
-        }}>
-          <div className="card" style={{
-            maxWidth: '600px',
-            width: '100%',
-            maxHeight: '85vh',
-            overflowY: 'auto',
-            position: 'relative',
-            padding: 'var(--space-6)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-4)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
-              <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}><IconHelp size={20} /> Ayuda y Preguntas Frecuentes (FAQ)</h3>
-              <button onClick={() => setShowHelpModal(false)} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', textAlign: 'left', fontSize: 'var(--text-sm)', lineHeight: '1.5' }}>
-              <div>
-                <h4 style={{ fontWeight: 'bold', color: 'var(--color-primary)', margin: '0 0 var(--space-1)' }}>1. ¿Cómo me registro en la aplicación?</h4>
-                <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
-                  El registro es sumamente sencillo. Podés iniciar sesión directamente con tu cuenta de Google haciendo clic en el botón <strong>"Iniciar sesión"</strong> en la parte superior derecha. Tu cuenta de paciente se creará automáticamente.
-                </p>
-              </div>
-              <div>
-                <h4 style={{ fontWeight: 'bold', color: 'var(--color-primary)', margin: '0 0 var(--space-1)' }}>2. ¿Cómo solicitar un turno?</h4>
-                <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
-                  Una vez que hayas iniciado sesión, navegá en la lista de profesionales en la página de inicio. Hacé clic en la tarjeta del profesional con el que quieras atenderte, seleccioná el día y horario disponible, completá los datos del formulario y hacé clic en "Confirmar reserva".
-                </p>
-              </div>
-              <div>
-                <h4 style={{ fontWeight: 'bold', color: 'var(--color-primary)', margin: '0 0 var(--space-1)' }}>3. ¿Cómo realizar el pago del turno?</h4>
-                <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
-                  Al reservar el turno, el sistema te redirigirá a Mercado Pago para abonar de forma segura. Si cerrás la pestaña sin abonar, podés ir a <strong>"Mis Turnos"</strong> desde tu menú de perfil en el Header y hacer clic en el botón azul <strong>"Pagar Turno"</strong> en cualquier momento.
-                </p>
-              </div>
-              <div>
-                <h4 style={{ fontWeight: 'bold', color: 'var(--color-primary)', margin: '0 0 var(--space-1)' }}>4. ¿Cómo cancelar un turno?</h4>
-                <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
-                  Si necesitás cancelar una reserva, abrí tu menú de perfil (haciendo clic en tu nombre en la parte superior derecha), seleccioná <strong>"Mis Turnos"</strong>, ubicá el turno correspondiente y hacé clic en el botón <strong>"Cancelar"</strong>.
-                </p>
-              </div>
-              <div>
-                <h4 style={{ fontWeight: 'bold', color: 'var(--color-primary)', margin: '0 0 var(--space-1)' }}>5. ¿Cómo unirse a la videollamada?</h4>
-                <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
-                  Una vez que el turno esté pagado y confirmado, se generará un link de Google Meet. Podés unirte directamente haciendo clic en el botón <strong>"Unirse a la llamada"</strong> en tu listado de turnos de hoy en la página de inicio, o en el modal <strong>"Mis Turnos"</strong> de tu perfil.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Suspense fallback={null}>
+          <HelpFaqModal onClose={() => setShowHelpModal(false)} />
+        </Suspense>
       )}
 
       {/* Cancellation Confirmation Modal */}
       {cancelTurnoId !== null && (() => {
         const appt = myAppointments.find(a => a.id === cancelTurnoId)
         if (!appt) return null;
-
-        // Same 48hs rule enforced server-side in ReembolsoService — computed here purely to
-        // warn the patient *before* they confirm, so "no cambia nada en mi plata" doesn't come
-        // as a surprise after the fact. `status === 'confirmed'` is the reliable signal that the
-        // turno was actually paid (PagoWebhookHandler only sets CONFIRMADO after approval).
-        const wasPaid = appt.status === 'confirmed'
-        let hoursUntilAppt: number | null = null
-        if (appt.fecha && appt.hour) {
-          const [y, m, d] = appt.fecha.split('-').map(Number)
-          const timeStr = appt.horaInicio || `${appt.hour}:00`
-          const [hh, mm] = timeStr.split(':').map(Number)
-          const apptDate = new Date(y, (m || 1) - 1, d, hh || 0, mm || 0)
-          hoursUntilAppt = (apptDate.getTime() - Date.now()) / (1000 * 60 * 60)
-        }
-        const within48h = hoursUntilAppt !== null && hoursUntilAppt < 48
-
         return (
-          <div style={{
-            position: 'fixed',
-            top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10000,
-            padding: 'var(--space-4)'
-          }}>
-            <div className="card" style={{
-              maxWidth: '420px',
-              width: '100%',
-              padding: 'var(--space-6)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 'var(--space-4)',
-              boxShadow: 'var(--shadow-xl)',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--color-border)',
-              backgroundColor: '#ffffff',
-              textAlign: 'center'
-            }}>
-              <div style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                color: 'var(--color-danger)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto var(--space-2)'
-              }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 28, height: 28 }}>
-                  <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                  <line x1="12" y1="9" x2="12" y2="13" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-              </div>
-
-              <div>
-                <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                  ¿Cancelar este turno?
-                </h3>
-                <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
-                  Esta acción no se puede deshacer.
-                </p>
-              </div>
-
-              <div style={{
-                backgroundColor: 'var(--neutral-50)',
-                padding: 'var(--space-3) var(--space-4)',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--color-border)',
-                textAlign: 'left',
-                fontSize: 'var(--text-sm)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '4px'
-              }}>
-                <div><strong>Profesional:</strong> {appt.patientName}</div>
-                <div><strong>Fecha:</strong> {formatDateDDMMYYYY(appt.fecha)}</div>
-                <div><strong>Horario:</strong> {appt.hour} hs</div>
-                <div><strong>Modalidad:</strong> {appt.type}</div>
-              </div>
-
-              {wasPaid && (
-                <div style={{
-                  backgroundColor: within48h ? '#fef2f2' : '#f0fdf4',
-                  border: `1px solid ${within48h ? '#fecaca' : '#bbf7d0'}`,
-                  borderRadius: 'var(--radius-md)',
-                  padding: 'var(--space-3) var(--space-4)',
-                  textAlign: 'left',
-                  fontSize: 'var(--text-sm)',
-                  color: within48h ? '#991b1b' : '#166534',
-                  lineHeight: '1.4'
-                }}>
-                  {within48h
-                    ? <><strong>No corresponde reembolso:</strong> este turno es en menos de 48 horas, así que según la política de cancelación tu pago no se devuelve automáticamente.</>
-                    : <><strong>Se te reembolsará el pago:</strong> como faltan más de 48 horas para el turno, el dinero se devuelve automáticamente a tu medio de pago original al confirmar la cancelación.</>}
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
-                <button
-                  type="button"
-                  className="btn btn--secondary"
-                  onClick={() => setCancelTurnoId(null)}
-                  style={{ flex: 1, height: '42px', justifyContent: 'center' }}
-                >
-                  No, mantener
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--danger"
-                  onClick={() => confirmCancelAppointmentByPatient(cancelTurnoId)}
-                  style={{ flex: 1, height: '42px', justifyContent: 'center' }}
-                >
-                  Sí, cancelar
-                </button>
-              </div>
-            </div>
-          </div>
+          <CancelTurnoConfirmModal
+            appt={appt}
+            onClose={() => setCancelTurnoId(null)}
+            onConfirm={() => confirmCancelAppointmentByPatient(cancelTurnoId)}
+          />
         )
       })()}
       {/* WhatsApp Floating Chat Widget */}

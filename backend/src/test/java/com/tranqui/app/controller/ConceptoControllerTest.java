@@ -9,17 +9,21 @@ import com.tranqui.app.model.Usuario;
 import com.tranqui.app.model.dto.SolicitarConceptoDto;
 import com.tranqui.app.repository.SolicitudDocumentoRepository;
 import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.app.service.SubscriptionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -42,6 +46,9 @@ class ConceptoControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @MockBean
+    private SubscriptionService subscriptionService;
+
     private Usuario paciente;
     private Usuario medico;
 
@@ -60,6 +67,8 @@ class ConceptoControllerTest {
 
         usuarioRepository.save(paciente);
         usuarioRepository.save(medico);
+
+        when(subscriptionService.isAccessAllowed(anyLong())).thenReturn(true);
     }
 
 

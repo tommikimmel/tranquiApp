@@ -117,6 +117,14 @@ public class Turno {
     @Column(name = "documento_enviado", columnDefinition = "boolean not null default false")
     private boolean documentoEnviado = false;
 
+    // Copied from TarifaMedico.esReceta at booking time (see TurnoService.reservarTurno), same
+    // denormalization rationale as ocupaAgenda above. Only meaningful when ocupaAgenda is false —
+    // drives whether this document turno shows "Generar receta →" or the "Enviar por mail" flow
+    // (see TurnoService#esReceta, DocumentActions.tsx).
+    @Builder.Default
+    @Column(name = "es_receta", columnDefinition = "boolean not null default false")
+    private boolean esReceta = false;
+
     @Builder.Default
     @Column(name = "fecha_creacion", nullable = false)
     private LocalDateTime fechaCreacion = LocalDateTime.now();

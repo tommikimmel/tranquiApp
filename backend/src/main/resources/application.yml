@@ -42,6 +42,11 @@ mercadopago:
   client-secret: ${MERCADOPAGO_CLIENT_SECRET:}
   webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
   sandbox: ${MERCADOPAGO_SANDBOX:true}
+  # Cuenta del administrador/plataforma (Etapa 2 del paywall de suscripciones — todavía sin
+  # código que las use). Access Token y Public Key directos de esa cuenta, no OAuth por-profesional.
+  admin:
+    access-token: ${MP_ADMIN_ACCESS_TOKEN:}
+    public-key: ${MP_ADMIN_PUBLIC_KEY:}
 
 payment:
   simulation:

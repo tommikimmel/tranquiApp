@@ -130,5 +130,8 @@ public class MedicoDto {
         // False for pure document services (recetas, certificados, informes) — see
         // TarifaMedico.requiereAgenda.
         private boolean requiereAgenda;
+
+        // Only meaningful when requiereAgenda is false — see TarifaMedico.esReceta.
+        private boolean esReceta;
     }
 }

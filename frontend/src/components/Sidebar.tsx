@@ -22,6 +22,7 @@ export default function Sidebar({
     { id: 'patients' as NavSection, label: 'Pacientes', Icon: Icon.Users },
     { id: 'clinical-history' as NavSection, label: 'Historia Clínica', Icon: Icon.ClinicalRecord },
     { id: 'prescriptions' as NavSection, label: 'Recetas', Icon: Icon.Prescription },
+    { id: 'honorarios' as NavSection, label: 'Honorarios y servicios', Icon: Icon.DollarSign },
     { id: 'settings' as NavSection, label: 'Configuración', Icon: Icon.Settings },
   ]
 
@@ -72,6 +73,7 @@ export default function Sidebar({
               className={`sidebar__nav-item ${activeNav === id ? 'active' : ''}`}
               onClick={() => handleNavClick(id)}
               aria-current={activeNav === id ? 'page' : undefined}
+              aria-label={label}
             >
               <span className="nav-icon"><NavIcon /></span>
               <span className="sidebar__nav-label">{label}</span>

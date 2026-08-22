@@ -24,6 +24,8 @@ import static org.mockito.Mockito.*;
 class AdminControllerUnitTest {
 
     @Mock private UsuarioRepository usuarioRepository;
+    @Mock private com.tranqui.app.repository.SubscriptionRepository subscriptionRepository;
+    @Mock private com.tranqui.app.service.SubscriptionService subscriptionService;
 
     @InjectMocks
     private AdminController controller;

@@ -21,6 +21,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -87,6 +88,7 @@ class PagoWebhookHandlerTest {
                 .fecha(LocalDate.now().plusDays(1))
                 .horaInicio(LocalTime.of(10, 0)).horaFin(LocalTime.of(10, 45))
                 .tipo(TipoTurno.PARTICULAR).estado(EstadoTurno.PENDIENTE_PAGO)
+                .modalidad(Modalidad.ONLINE)
                 .precio(new BigDecimal("60000"))
                 .build();
         when(turnoRepository.findById(10L)).thenReturn(Optional.of(turno));
@@ -119,13 +121,16 @@ class PagoWebhookHandlerTest {
                 .precio(new BigDecimal("60000"))
                 .build();
         when(turnoRepository.findById(11L)).thenReturn(Optional.of(turno));
-        when(calendarService.crearEventoReunion(turno)).thenReturn("https://meet.google.com/xyz");
+        // No modalidad ONLINE en este turno -> el handler nunca llama a calendarService, así que
+        // no corresponde stubearlo acá (evita UnnecessaryStubbingException); este test se enfoca
+        // exclusivamente en que un error de notificación no impida el envío de WhatsApp.
         doThrow(new RuntimeException("boom")).when(notificacionService)
                 .crearNotificacion(any(), anyString(), anyString(), anyString());
 
         assertDoesNotThrow(() -> handler.procesarAprobacionTurno(11L, "tx-2"));
 
         verify(whatsAppService).enviarMensajeRecordatorio(turno);
+        verifyNoInteractions(calendarService);
     }
 
     @Test
@@ -138,12 +143,89 @@ class PagoWebhookHandlerTest {
                 .precio(new BigDecimal("60000"))
                 .build();
         when(turnoRepository.findById(12L)).thenReturn(Optional.of(turno));
-        when(calendarService.crearEventoReunion(turno)).thenReturn("https://meet.google.com/xyz");
+        // Idem: sin modalidad ONLINE no se llama a calendarService, así que stubearlo acá también
+        // sería un stub innecesario.
         doThrow(new RuntimeException("whatsapp down")).when(whatsAppService).enviarMensajeRecordatorio(turno);
 
         assertDoesNotThrow(() -> handler.procesarAprobacionTurno(12L, "tx-3"));
 
         assertEquals(EstadoTurno.CONFIRMADO, turno.getEstado());
         verify(pagoRepository).save(any());
+    }
+
+    // ── idempotencia ──────────────────────────────────────────────────
+
+    @Test
+    void procesarAprobacionTurno_shouldBeNoOpWhenTurnoYaConfirmado() {
+        // Este handler ahora tiene dos llamadores que pueden llegar a procesar el mismo pago
+        // aprobado (el webhook async real de Mercado Pago y el fallback síncrono de
+        // WebhookController#verificarPago) — reprocesar un turno ya CONFIRMADO no debe duplicar
+        // el Pago ni las notificaciones.
+        Turno turno = Turno.builder()
+                .id(20L).medico(medico()).paciente(paciente())
+                .fecha(LocalDate.now().plusDays(1))
+                .horaInicio(LocalTime.of(9, 0)).horaFin(LocalTime.of(9, 45))
+                .tipo(TipoTurno.PARTICULAR).estado(EstadoTurno.CONFIRMADO)
+                .modalidad(Modalidad.ONLINE)
+                .precio(new BigDecimal("60000"))
+                .build();
+        when(turnoRepository.findById(20L)).thenReturn(Optional.of(turno));
+
+        assertDoesNotThrow(() -> handler.procesarAprobacionTurno(20L, "tx-idempotente"));
+
+        verify(turnoRepository, never()).save(any());
+        verifyNoInteractions(pagoRepository, calendarService, whatsAppService, notificacionService);
+    }
+
+    // ── esDocumento (turnos que no ocupan agenda, p.ej. receta/certificado fuera de turno) ──
+
+    @Test
+    void procesarAprobacionTurno_shouldUseDocumentWordingAndSkipWhatsappWhenNoOcupaAgenda() {
+        Usuario medico = medico();
+        Usuario paciente = paciente();
+        Turno turno = Turno.builder()
+                .id(30L).medico(medico).paciente(paciente)
+                .fecha(LocalDate.now()).horaInicio(LocalTime.of(9, 0)).horaFin(LocalTime.of(9, 0))
+                .tipo(TipoTurno.RECETA).estado(EstadoTurno.PENDIENTE_PAGO)
+                .servicioId("receta-fuera")
+                .ocupaAgenda(false)
+                .precio(new BigDecimal("5000"))
+                .build();
+        when(turnoRepository.findById(30L)).thenReturn(Optional.of(turno));
+
+        handler.procesarAprobacionTurno(30L, "tx-doc-1");
+
+        assertEquals(EstadoTurno.CONFIRMADO, turno.getEstado());
+        verify(notificacionService).crearNotificacion(eq(medico), eq("Nuevo Documento Pendiente"),
+                contains("pagó una receta"), eq("DOCUMENTO_PENDIENTE"));
+        verify(notificacionService).crearNotificacion(eq(paciente), eq("Pago confirmado ✓"),
+                contains("una receta"), eq("TURNO_CONFIRMADO"));
+        // Documentos no llevan fecha/hora real ni link de videollamada que recordar por WhatsApp,
+        // y tampoco disparan la creación de evento de Google Meet.
+        verifyNoInteractions(whatsAppService);
+        verifyNoInteractions(calendarService);
+    }
+
+    // ── opt-out de WhatsApp ──────────────────────────────────────────
+
+    @Test
+    void procesarAprobacionTurno_shouldSkipWhatsappWhenPacienteOptedOut() {
+        Usuario pacienteOptOut = Usuario.builder()
+                .id(2L).nombre("Ana").email("ana@mail.com").rol(Rol.PACIENTE)
+                .notificacionesWhatsappHabilitadas(false)
+                .build();
+        Turno turno = Turno.builder()
+                .id(40L).medico(medico()).paciente(pacienteOptOut)
+                .fecha(LocalDate.now().plusDays(1))
+                .horaInicio(LocalTime.of(9, 0)).horaFin(LocalTime.of(9, 45))
+                .tipo(TipoTurno.PARTICULAR).estado(EstadoTurno.PENDIENTE_PAGO)
+                .precio(new BigDecimal("60000"))
+                .build();
+        when(turnoRepository.findById(40L)).thenReturn(Optional.of(turno));
+
+        handler.procesarAprobacionTurno(40L, "tx-optout");
+
+        assertEquals(EstadoTurno.CONFIRMADO, turno.getEstado());
+        verify(whatsAppService, never()).enviarMensajeRecordatorio(any());
     }
 }

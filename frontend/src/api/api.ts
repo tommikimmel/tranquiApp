@@ -1,6 +1,12 @@
-const API_BASE = window.location.protocol === 'https:'
-  ? `https://${window.location.host}/api`
-  : `http://${window.location.hostname}:8081/api`;
+// Same http(s)://host[:8081] derivation the WebSocket connections (App.tsx, useChat.ts) also
+// need — kept in one place instead of copy-pasted per call site so the two can't drift.
+export function getBackendOrigin(): string {
+  return window.location.protocol === 'https:'
+    ? `https://${window.location.host}`
+    : `http://${window.location.hostname}:8081`;
+}
+
+const API_BASE = `${getBackendOrigin()}/api`;
 
 export function sanitizeErrorMessage(errorText: string, status: number): string {
   if (status === 401) {
@@ -113,13 +119,17 @@ export const api = {
   // médico marked a service as "Requiere Obra Social" (see Honorarios y Servicios).
   getFinanciadores: () => apiFetch('/recetas/financiadores'),
 
-  // Support/complaints area — sends an email to soporte@tranquisalud.com on behalf of the
-  // logged-in patient or professional.
-  enviarQueja: (data: { asunto: string; mensaje: string }) =>
-    apiFetch('/soporte/queja', { method: 'POST', body: data as any }),
-
   // ARCO (Ley 25.326) — pide al equipo de soporte una copia de los datos personales del usuario.
   solicitarCopiaDatos: () => apiFetch('/soporte/solicitud-datos', { method: 'POST' }),
+
+  // Tickets de soporte — reemplaza el viejo "Quejas y Soporte" (mail fijo, sin historial). El
+  // detalle/respuesta los usan tanto el paciente/profesional dueño del ticket como el admin.
+  crearTicket: (data: { asunto: string; mensaje: string }) =>
+    apiFetch('/tickets', { method: 'POST', body: data as any }),
+  getMisTickets: () => apiFetch('/tickets/mios'),
+  getTicket: (id: number | string) => apiFetch(`/tickets/${id}`),
+  responderTicket: (id: number | string, contenido: string) =>
+    apiFetch(`/tickets/${id}/mensajes`, { method: 'POST', body: { contenido } as any }),
 
   // Auth / Login with Google
   loginGoogle: (idToken: string) => 
@@ -176,8 +186,18 @@ export const api = {
     apiFetch(`/admin/users/${id}/rol`, { method: 'PUT', body: { rol } as any }),
   verifyProfessional: (id: number | string) => 
     apiFetch(`/admin/users/${id}/verify`, { method: 'POST' }),
-  rejectProfessional: (id: number | string) => 
+  rejectProfessional: (id: number | string) =>
     apiFetch(`/admin/users/${id}/reject`, { method: 'POST' }),
+  resetUserPassword: (id: number | string) =>
+    apiFetch(`/admin/users/${id}/reset-password`, { method: 'POST' }),
+  getAdminTickets: () => apiFetch('/admin/tickets'),
+  cambiarEstadoTicket: (id: number | string, estado: 'PENDIENTE' | 'ACTIVO' | 'RESUELTO') =>
+    apiFetch(`/admin/tickets/${id}/estado`, { method: 'PUT', body: { estado } as any }),
+
+  // Forzado tras un reseteo de contraseña por admin (Usuario.mustChangePassword) — ver
+  // SetNewPasswordModal.
+  setNewPassword: (newPassword: string) =>
+    apiFetch('/auth/set-new-password', { method: 'POST', body: { newPassword } as any }),
 
   // Doctor Dashboard
   getPerfil: () => apiFetch('/medicos/perfil'),
@@ -289,12 +309,33 @@ export const api = {
     apiFetch(`/turnos/${turnoId}/asistencia?asistencia=${encodeURIComponent(asistencia)}`, { method: 'PUT' }),
   reprogramarTurno: (turnoId: number | string, fecha: string, hora: string) =>
     apiFetch(`/turnos/${turnoId}/reprogramar?fecha=${encodeURIComponent(fecha)}&hora=${encodeURIComponent(hora)}`, { method: 'PUT' }),
-  marcarDocumentoEnviado: (turnoId: number | string) =>
-    apiFetch(`/turnos/${turnoId}/documento-enviado`, { method: 'POST' }),
+  marcarDocumentoEnviado: (turnoId: number | string, archivo: { data: string; nombre: string }) =>
+    apiFetch(`/turnos/${turnoId}/documento-enviado`, {
+      method: 'POST',
+      body: { archivoData: archivo.data, archivoNombre: archivo.nombre } as any,
+    }),
   // Fallback reconciliation for when Mercado Pago's webhook is delayed/dropped — see
   // WebhookController#verificarPago. Called right after the patient returns from Checkout Pro
   // (with paymentId) and also for any turno already sitting "pending" in Mis Turnos (without
   // paymentId — the backend searches Mercado Pago by external_reference instead).
   verificarPagoTurno: (externalReference: string | number, paymentId?: string) =>
-    apiFetch(`/payments/verificar?externalReference=${encodeURIComponent(externalReference)}${paymentId ? `&paymentId=${encodeURIComponent(paymentId)}` : ''}`, { method: 'POST' })
+    apiFetch(`/payments/verificar?externalReference=${encodeURIComponent(externalReference)}${paymentId ? `&paymentId=${encodeURIComponent(paymentId)}` : ''}`, { method: 'POST' }),
+
+  // ── Suscripciones y Facturación ARCA (§5, §8, §10) ─────────────────────────
+  getSubscriptionPlans: () => apiFetch('/subscriptions/plans'),
+  getMySubscription: () => apiFetch('/subscriptions/my-subscription'),
+  getMyInvoices: () => apiFetch('/subscriptions/my-invoices'),
+  getInvoicePdfUrl: (invoiceId: number | string) => `${API_BASE}/subscriptions/invoices/${invoiceId}/pdf`,
+  iniciarCheckoutSuscripcion: (planId: number) => apiFetch('/subscriptions/checkout', { method: 'POST', body: { planId } as any }),
+
+  // Admin Suscripciones y Facturación
+  getAdminSubscriptionOverview: () => apiFetch('/admin/subscriptions/overview'),
+  getAdminSubscriptionsList: () => apiFetch('/admin/subscriptions/list'),
+  registerAdminManualPayment: (data: any) => apiFetch('/admin/subscriptions/manual-payment', { method: 'POST', body: data }),
+  getAdminInvoices: () => apiFetch('/admin/subscriptions/invoices'),
+  emitirNotaDeCredito: (invoiceId: number | string, reason: string) => apiFetch(`/admin/subscriptions/invoices/${invoiceId}/credit-note`, { method: 'POST', body: { reason } as any }),
+  ejecutarReconciliacionAdmin: () => apiFetch('/admin/subscriptions/reconciliation/run', { method: 'POST' }),
+  updateSubscriptionPlan: (planId: number | string, data: any) => apiFetch(`/admin/subscriptions/plans/${planId}`, { method: 'PUT', body: data }),
+  getSubscriptionEvents: (subId?: number | string) => apiFetch(subId ? `/admin/subscriptions/${subId}/events` : '/admin/subscriptions/events'),
+  updateSubscriptionStatus: (subId: number | string, status: string) => apiFetch(`/admin/subscriptions/${subId}/status`, { method: 'PATCH', body: { status } as any }),
 };
