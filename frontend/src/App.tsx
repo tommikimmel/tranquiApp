@@ -111,6 +111,12 @@ export default function App() {
   const [mySubscription, setMySubscription] = useState<any>(null)
   const [subscriptionAccess, setSubscriptionAccess] = useState<'checking' | 'allowed' | 'blocked'>('checking')
 
+  // Recetas Electrónicas: gate espejo del Gate 1 del backend (SubscriptionService.hasFeature).
+  // Psicólogos (plan Consultorio) no tienen 'recetas_electronicas' entre sus activeFeatures — la
+  // sección ni se les muestra. Psiquiatras (plan Clínico) sí la tienen, pero la integración
+  // oficial con QBI2 todavía no está en producción, así que aparece marcada "Próximamente".
+  const canUseRecetas = !!mySubscription?.activeFeatures?.includes('recetas_electronicas')
+
   const refreshUnreadChatsStatus = () => {
     if (currentUser && (currentUser.rol === 'PSIQUIATRA' || currentUser.rol === 'MEDICO')) {
       api.getTieneNoLeidos()
@@ -644,6 +650,18 @@ export default function App() {
       case 'clinical-history':
         return <ClinicalHistoryView />
       case 'prescriptions':
+        // Un psicólogo no debe poder llegar acá ni por URL directa — el nav item ya está oculto,
+        // pero esto cierra el gate también del lado del render (misma condición que Sidebar).
+        if (!canUseRecetas) {
+          return (
+            <div className="card">
+              <div className="card__header"><h2 className="card__title">Recetas Electrónicas</h2></div>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
+                Tu plan actual no incluye recetas electrónicas. Esta función es parte del plan Clínico, para psiquiatras y médicos.
+              </p>
+            </div>
+          )
+        }
         return <PrescriptionView onSend={handleSendPrescription} medicoInfo={medicoInfo} />
       case 'visitors': 
         return <VisitorsView />
@@ -658,6 +676,7 @@ export default function App() {
           <FeesServicesView
             medicoInfo={medicoInfo}
             onSave={handleSaveSettings}
+            canUseRecetas={canUseRecetas}
           />
         )
       case 'settings': 
@@ -855,6 +874,7 @@ export default function App() {
         hasUnreadChats={hasUnreadChats}
         mobileOpen={mobileSidebarOpen}
         onCloseMobile={() => setMobileSidebarOpen(false)}
+        canUseRecetas={canUseRecetas}
       />
 
       <header className="dashboard-header" role="banner">

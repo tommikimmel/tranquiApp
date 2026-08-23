@@ -280,6 +280,24 @@ export default function PrescriptionView({ onSend, medicoInfo }: { onSend: (data
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+      {/* Banner "Próximamente": la integración oficial con QBI2 todavía no está en producción
+          (corre en modo de prueba/homologación) — el plan Clínico ya da acceso a esta sección,
+          pero conviene dejar explícito que la validación legal real todavía no está activa. */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)',
+        backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)', color: '#92400E',
+      }}>
+        <span style={{
+          fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.03em',
+          background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '999px', padding: '3px 9px', flexShrink: 0,
+        }}>
+          Próximamente
+        </span>
+        <span style={{ fontSize: 'var(--text-xs)' }}>
+          Estamos terminando la integración oficial con QBI2/Innovamed. Podés probar el flujo completo, pero por ahora corre en modo de homologación — todavía no emite recetas con validez legal.
+        </span>
+      </div>
+
       {/* Header & Tabs */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
         <div>

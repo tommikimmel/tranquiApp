@@ -266,6 +266,12 @@ public class MedicoService {
                     .map(MedicoDto.TarifaDto::getId)
                     .collect(Collectors.toSet());
 
+            // Un psicólogo (plan sin recetas_electronicas) no puede tener turnos de tipo receta —
+            // se fuerza acá server-side, no solo en el selector del frontend, para que no se pueda
+            // saltear llamando a la API directo. Mismo gate que RecetaService/SubscriptionService
+            // usan para emitir una receta real.
+            boolean puedeRecetar = subscriptionService.hasFeature(medico.getId(), "recetas_electronicas");
+
             for (MedicoDto.TarifaDto tDto : dto.getTariffs()) {
                 // A service "requiere obra social" if it has a specific obra social assigned
                 // (the new per-servicio model), or is one of the legacy generic ids, or the
@@ -290,7 +296,7 @@ public class MedicoService {
                     tarifa.setRequiereAgenda(tDto.isRequiereAgenda());
                     // Only meaningful when requiereAgenda is false — a servicio that requires
                     // agenda is never a "receta fuera de turno" candidate to begin with.
-                    tarifa.setEsReceta(tDto.isRequiereAgenda() ? false : tDto.isEsReceta());
+                    tarifa.setEsReceta(tDto.isRequiereAgenda() ? false : (tDto.isEsReceta() && puedeRecetar));
                 } else {
                     tarifa = TarifaMedico.builder()
                             .medico(medico)
@@ -303,7 +309,7 @@ public class MedicoService {
                             .precioOnline(tDto.getPrecioOnline())
                             .precioPresencial(tDto.getPrecioPresencial())
                             .requiereAgenda(tDto.isRequiereAgenda())
-                            .esReceta(tDto.isRequiereAgenda() ? false : tDto.isEsReceta())
+                            .esReceta(tDto.isRequiereAgenda() ? false : (tDto.isEsReceta() && puedeRecetar))
                             .build();
                 }
                 tarifaRepository.save(tarifa);
@@ -331,17 +337,21 @@ public class MedicoService {
         // If doctor has no tariffs in DB, initialize them with defaults
         if (tarifasDb.isEmpty()) {
             tarifasDb = new ArrayList<>();
+            // Un psicólogo no debe arrancar con el default "Receta fuera de turno" habilitado —
+            // su plan no incluye recetas_electronicas. Mismo gate que actualizarPerfil.
+            boolean puedeRecetar = subscriptionService.hasFeature(m.getId(), "recetas_electronicas");
             for (MedicoDto.TarifaDto def : DEFAULT_TARIFFS) {
+                boolean esRecetaDefault = def.isEsReceta() && puedeRecetar;
                 TarifaMedico t = TarifaMedico.builder()
                         .medico(m)
                         .servicioId(def.getId())
                         .label(def.getLabel())
                         .precio(def.getPrice())
-                        .habilitado(def.isEnabled())
+                        .habilitado(def.isEsReceta() ? esRecetaDefault : def.isEnabled())
                         .requiereObraSocial(def.isRequiereObraSocial())
                         .obraSocial(def.getObraSocial())
                         .requiereAgenda(def.isRequiereAgenda())
-                        .esReceta(def.isEsReceta())
+                        .esReceta(esRecetaDefault)
                         .build();
                 tarifasDb.add(tarifaRepository.save(t));
             }
@@ -427,6 +437,7 @@ public class MedicoService {
                 .initials(initials)
                 .degree(m.getTitulo() != null ? m.getTitulo() : "Médico/a")
                 .specialty(m.getSpecialty() != null ? m.getSpecialty() : "General")
+                .profession(m.getProfession())
                 .matricula(m.getMatricula())
                 .cuit(m.getCuit())
                 .price(price)

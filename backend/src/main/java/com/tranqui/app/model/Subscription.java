@@ -47,6 +47,14 @@ public class Subscription {
     @Column(name = "amount_ars", nullable = false, precision = 12, scale = 2)
     private BigDecimal amountArs;
 
+    // "monthly" | "annual" — ciclo de facturación realmente contratado en el checkout vigente.
+    // Los webhooks de Mercado Pago (processMercadoPagoPreapprovalWebhook /
+    // processMercadoPagoPaymentWebhook) lo leen para saber si el próximo período dura 1 o 12
+    // meses; antes de que existiera este campo, ambos asumían siempre 1 mes.
+    @Builder.Default
+    @Column(name = "billing_cycle", length = 20)
+    private String billingCycle = "monthly";
+
     @Column(name = "next_billing_date")
     private LocalDateTime nextBillingDate;
 

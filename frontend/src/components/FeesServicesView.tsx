@@ -16,9 +16,13 @@ const SaveIcon = ({ size = 14 }: { size?: number }) => (
 export default function FeesServicesView({
   medicoInfo,
   onSave,
+  canUseRecetas,
 }: {
   medicoInfo: any
   onSave: (updated: any) => Promise<void>
+  // false para psicólogos (plan sin recetas_electronicas): no pueden tener servicios tipo
+  // "Receta" — el backend además lo fuerza server-side en MedicoService.actualizarPerfil.
+  canUseRecetas?: boolean
 }) {
   const { showAlert } = useAlert()
 

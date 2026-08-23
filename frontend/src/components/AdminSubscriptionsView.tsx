@@ -212,6 +212,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
   const [editPlanName, setEditPlanName] = useState('')
   const [editPlanPriceArs, setEditPlanPriceArs] = useState<number>(0)
   const [editPlanPriceUsdRef, setEditPlanPriceUsdRef] = useState<number>(0)
+  const [editPlanPriceArsAnual, setEditPlanPriceArsAnual] = useState<number>(0)
   const [editPlanDesc, setEditPlanDesc] = useState('')
   const [editPlanIsActive, setEditPlanIsActive] = useState(true)
   const [isSubmittingPlan, setIsSubmittingPlan] = useState(false)
@@ -233,7 +234,10 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
         api.getAdminSubscriptionOverview(),
         api.getAdminSubscriptionsList(),
         api.getAdminInvoices(),
-        api.getSubscriptionPlans(),
+        // Catálogo completo (activos + ocultos) — con getSubscriptionPlans() (solo activos, el
+        // mismo endpoint público que usa ChoosePlanView) un plan desactivado desaparecía de acá
+        // sin forma de volver a activarlo.
+        api.getAdminSubscriptionPlans(),
         api.getSubscriptionEvents().catch(() => []),
       ])
       setOverview(overviewData)
@@ -257,8 +261,8 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
     setManualIdempotencyKey(newIdemKey)
     setSelectedProf(null)
     setManualProfSearch('')
-    setSelectedPlanId(plans.length > 0 ? plans[0].id : '')
-    setManualAmount(plans.length > 0 ? plans[0].priceArs : 149500)
+    setSelectedPlanId(visiblePlans.length > 0 ? visiblePlans[0].id : '')
+    setManualAmount(visiblePlans.length > 0 ? visiblePlans[0].priceArs : 149500)
     setManualMethod('MANUAL_TRANSFER')
     setManualStartDate(new Date().toISOString().split('T')[0])
     setManualEndDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
@@ -270,7 +274,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
 
   const handlePlanChange = (planId: number) => {
     setSelectedPlanId(planId)
-    const p = plans.find((x) => x.id === planId)
+    const p = visiblePlans.find((x) => x.id === planId)
     if (p) {
       setManualAmount(p.priceArs)
     }
@@ -279,18 +283,19 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
   const handleSelectProf = (u: UserLite) => {
     setSelectedProf(u)
     setManualProfSearch(`${u.nombre} ${u.apellido || ''}`)
-    // Auto suggest plan based on profession
-    if (u.profession === 'psiquiatra' || u.rol === 'PSIQUIATRA') {
-      const clinico = plans.find((p) => p.code === 'clinico')
-      if (clinico) {
-        setSelectedPlanId(clinico.id)
-        setManualAmount(clinico.priceArs)
-      }
-    } else {
-      const consultorio = plans.find((p) => p.code === 'consultorio')
+    // Auto-sugiere el plan según profession — el rol "PSIQUIATRA" lo comparten psicólogos y
+    // psiquiatras en este sistema (no sirve para distinguirlos), así que no se lo usa acá.
+    if (u.profession === 'psicologo') {
+      const consultorio = visiblePlans.find((p) => p.code === 'consultorio')
       if (consultorio) {
         setSelectedPlanId(consultorio.id)
         setManualAmount(consultorio.priceArs)
+      }
+    } else {
+      const clinico = visiblePlans.find((p) => p.code === 'clinico')
+      if (clinico) {
+        setSelectedPlanId(clinico.id)
+        setManualAmount(clinico.priceArs)
       }
     }
   }
@@ -368,6 +373,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
     setEditPlanName(plan.name)
     setEditPlanPriceArs(plan.priceArs)
     setEditPlanPriceUsdRef(plan.priceUsdRef || 0)
+    setEditPlanPriceArsAnual(plan.priceArsAnual || plan.priceArs * 10)
     setEditPlanDesc(plan.description || '')
     setEditPlanIsActive(plan.isActive !== false)
   }
@@ -381,6 +387,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
         name: editPlanName,
         priceArs: editPlanPriceArs,
         priceUsdRef: editPlanPriceUsdRef,
+        priceArsAnual: editPlanPriceArsAnual,
         description: editPlanDesc,
         isActive: editPlanIsActive,
       })
@@ -424,6 +431,11 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
       setIsSubmittingStatus(false)
     }
   }
+
+  // El alta manual solo debe ofrecer planes que un profesional puede contratar hoy — no el plan
+  // "equipo" oculto (ver PlanService: no se ofrece por ahora), que sigue en `plans` para que la
+  // pestaña "Planes y Precios Base" pueda mostrarlo y reactivarlo.
+  const visiblePlans = useMemo(() => plans.filter((p) => p.isActive !== false), [plans])
 
   const eligibleProfessionals = useMemo(() => {
     const search = manualProfSearch.toLowerCase().trim()
@@ -741,7 +753,12 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '10px', fontWeight: 'bold' }}>{formatCurrency(sub.amountArs)}</td>
+                        <td style={{ padding: '10px', fontWeight: 'bold' }}>
+                          {formatCurrency(sub.amountArs)}
+                          {sub.billingCycle === 'annual' && (
+                            <span style={{ display: 'block', fontSize: '10px', fontWeight: 'normal', color: 'var(--color-text-secondary)' }}>ciclo anual</span>
+                          )}
+                        </td>
                         <td style={{ padding: '10px' }}>
                           <span className="badge badge--neutral">{billingSourceLabel}</span>
                         </td>
@@ -830,12 +847,13 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
                 className="card"
                 style={{
                   padding: 'var(--space-5)',
-                  border: '1.5px solid var(--color-border)',
+                  border: p.isActive === false ? '1.5px dashed var(--color-border)' : '1.5px solid var(--color-border)',
                   borderRadius: 'var(--radius-lg)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 'var(--space-4)',
-                  backgroundColor: 'white'
+                  backgroundColor: 'white',
+                  opacity: p.isActive === false ? 0.75 : 1,
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -847,8 +865,8 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
                       {p.name}
                     </h4>
                   </div>
-                  <span className={`badge ${p.isActive !== false ? 'badge--success' : 'badge--neutral'}`}>
-                    {p.isActive !== false ? 'Activo en Catálogo' : 'Inactivo'}
+                  <span className={`badge ${p.isActive !== false ? 'badge--success' : 'badge--warning'}`} title={p.isActive !== false ? undefined : 'Los profesionales no lo ven ni pueden elegirlo, pero podés reactivarlo cuando quieras desde "Modificar Precio Base / Plan".'}>
+                    {p.isActive !== false ? 'Visible para profesionales' : 'Oculto para profesionales'}
                   </span>
                 </div>
 
@@ -860,6 +878,11 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
                   {p.priceUsdRef && (
                     <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
                       Ref. Internacional: <strong>${p.priceUsdRef} USD</strong>
+                    </span>
+                  )}
+                  {p.priceArsAnual && (
+                    <span style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                      Ciclo anual: <strong>{formatCurrency(p.priceArsAnual)}</strong>
                     </span>
                   )}
                 </div>
@@ -1157,6 +1180,26 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
 
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>
+                  Precio Total del Ciclo Anual (ARS) *
+                </label>
+                <input
+                  type="number"
+                  value={editPlanPriceArsAnual}
+                  onChange={(e) => setEditPlanPriceArsAnual(Number(e.target.value))}
+                  className="form-input"
+                  style={{ width: '100%', fontWeight: 'bold' }}
+                  min="0"
+                  step="100"
+                  required
+                />
+                <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                  Es el monto único que se cobra al elegir el ciclo anual (Mercado Pago factura esto una sola vez, cada 12 meses).
+                  Sugerido "2 meses sin cargo": {formatCurrency(editPlanPriceArs * 10)}.
+                </span>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>
                   Descripción Comercial
                 </label>
                 <textarea
@@ -1422,7 +1465,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
                   className="form-select"
                   style={{ width: '100%' }}
                 >
-                  {plans.map((p) => (
+                  {visiblePlans.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} ({formatCurrency(p.priceArs)}/mes) — {p.requiresPrescriber ? 'Psiquiatras / Médicos' : 'Psicólogos'}
                     </option>

@@ -170,6 +170,7 @@ interface Professional {
   name: string
   initials: string
   specialty: string
+  profession?: string
   degree: string
   matricula: string
   tags: string[]
@@ -202,7 +203,20 @@ interface Professional {
 
 // PROFESSIONALS mock array removed since values are loaded from API
 
-const SPECIALTIES = ['Todos', 'Ansiedad', 'Depresión', 'Trauma', 'Pareja', 'Psiquiatría', 'Adolescentes']
+// Tipo de profesional: única segmentación fija del buscador (coincide con los dos planes de
+// suscripción: Psicólogos / Psiquiatras). Los tratamientos/motivos de consulta NO van acá — esos
+// se arman dinámicamente más abajo a partir de los tags que cada profesional cargó en su perfil,
+// para no mostrar chips de motivos que ningún profesional activo atiende (o esconder los que sí).
+const PROFESSION_TYPES: { id: 'Todos' | 'psicologo' | 'psiquiatra'; label: string }[] = [
+  { id: 'Todos', label: 'Todos' },
+  { id: 'psicologo', label: 'Psicólogos' },
+  { id: 'psiquiatra', label: 'Psiquiatras' },
+]
+
+function esPsiquiatra(pro: { profession?: string; specialty: string }): boolean {
+  if (pro.profession) return pro.profession.toLowerCase() === 'psiquiatra'
+  return pro.specialty.includes('Psiquiatra') || pro.specialty.includes('Psiquiatría')
+}
 
 // ── Crisis Modal ───────────────────────────────────────────────
 function CrisisModal({ onClose }: { onClose: () => void }) {
@@ -277,7 +291,7 @@ function SkeletonCard() {
 // ── Professional Card ──────────────────────────────────────────
 function ProCard({ pro, onBook, onChat, currentUser, availabilityDateLabel, availabilityCount }: { pro: Professional; onBook: (p: Professional) => void; onChat: (p: Professional) => void; currentUser: any; availabilityDateLabel?: string | null; availabilityCount?: number }) {
   const proBio = pro.descripcionPerfil?.trim() || pro.experiencia?.trim() || (
-    pro.specialty.includes('Psiquiatra') || pro.specialty.includes('Psiquiatría')
+    esPsiquiatra(pro)
       ? "Médico especialista con enfoque integral combinando psicoterapia y abordaje farmacológico de forma personalizada."
       : "Profesional con enfoque clínico integral y seguimiento cercano del paciente para tratamientos de ansiedad, depresión y regulación emocional."
   );
@@ -419,7 +433,7 @@ function PublicHeader({
       <div className="public-header__inner">
         <a href="/" className="public-header__logo" aria-label="Tranqui App - Inicio">
           <img src="/tranqui-icon.png" alt="" aria-hidden="true" className="public-header__logo-icon" />
-          tranqui
+          tranquiApp
         </a>
         <span className="public-header__tagline">por Tranqui Neurociencias</span>
         <div className="public-header__spacer" />
@@ -781,8 +795,18 @@ export default function LandingPage({
   useDocumentTitle('Tranqui App — Turnos con psicólogos y psiquiatras')
   const { showAlert } = useAlert()
   const [query, setQuery] = useState('')
+  const [activeProfession, setActiveProfession] = useState<'Todos' | 'psicologo' | 'psiquiatra'>('Todos')
   const [activeSpecialty, setActiveSpecialty] = useState('Todos')
   const [activeModality, setActiveModality] = useState<'Todos' | 'Online' | 'Presencial'>('Todos')
+
+  // Chips de motivo/tratamiento: se arman con los tags reales que los profesionales cargados
+  // eligieron en su perfil (ver TRATAMIENTOS_DISPONIBLES en medicoProfile.ts) — nunca hardcodeados,
+  // así que nunca muestran un motivo que nadie atiende ni esconden uno nuevo que se agregue.
+  const dynamicTags = useMemo(() => {
+    const set = new Set<string>()
+    professionals.forEach((p) => (p.tags || []).forEach((t) => t && set.add(t)))
+    return ['Todos', ...Array.from(set).sort((a, b) => a.localeCompare(b, 'es'))]
+  }, [professionals])
   const [professionals, setProfessionals] = useState<Professional[]>([])
   const [loading, setLoading] = useState(true)
   const [showCrisis, setShowCrisis] = useState(false)
@@ -1078,9 +1102,10 @@ export default function LandingPage({
         pro.tags.some((t) => t.toLowerCase().includes(query.toLowerCase())) ||
         pro.specialty.toLowerCase().includes(query.toLowerCase())
 
-      const matchesSpecialty = activeSpecialty === 'Todos' ||
-        pro.tags.some((t) => t.toLowerCase().includes(activeSpecialty.toLowerCase())) ||
-        pro.specialty.toLowerCase().includes(activeSpecialty.toLowerCase())
+      const matchesProfession = activeProfession === 'Todos' ||
+        (activeProfession === 'psiquiatra' ? esPsiquiatra(pro) : !esPsiquiatra(pro))
+
+      const matchesSpecialty = activeSpecialty === 'Todos' || pro.tags.includes(activeSpecialty)
 
       const matchesAvailability = !availabilityDate || checkingAvailability || (availabilityMap[pro.id] ?? 0) > 0
 
@@ -1088,9 +1113,9 @@ export default function LandingPage({
         (activeModality === 'Online' && pro.ofreceOnline) ||
         (activeModality === 'Presencial' && pro.ofrecePresencial)
 
-      return matchesQuery && matchesSpecialty && matchesAvailability && matchesModality
+      return matchesQuery && matchesProfession && matchesSpecialty && matchesAvailability && matchesModality
     })
-  }, [query, activeSpecialty, activeModality, availabilityDate, availabilityMap, checkingAvailability, professionals])
+  }, [query, activeProfession, activeSpecialty, activeModality, availabilityDate, availabilityMap, checkingAvailability, professionals])
 
   const availabilityDateLabel = useMemo(() => {
     if (!availabilityDate) return null
@@ -1189,9 +1214,9 @@ export default function LandingPage({
             Encontrá tu espacio<br />para estar <em>tranqui</em>
           </h1>
           <p className="hero__subtitle">
-            {currentUser 
-              ? `Hola, ${currentUser.nombre}. Buscá y agendá tu sesión online con profesionales certificados.`
-              : 'Sesiones online de 50 minutos con profesionales certificados. Iniciá sesión para agendar tu consulta.'
+            {currentUser
+              ? `Hola, ${currentUser.nombre}. Elegí un profesional y agendá tu próxima sesión.`
+              : 'Elegí un psicólogo o psiquiatra, mirá su disponibilidad real y reservá en minutos.'
             }
           </p>
 
@@ -1247,7 +1272,31 @@ export default function LandingPage({
               </button>
               {showDatePicker && (
                 <div className="availability-popover" role="dialog" aria-label="Elegir fecha de disponibilidad">
-                  <label className="availability-popover__label" htmlFor="availability-date-input">Ver disponibilidad para el (DD/MM/AAAA):</label>
+                  <div className="availability-popover__header">
+                    <IconCalendar size={15} />
+                    <span>Ver disponibilidad</span>
+                  </div>
+                  <div className="availability-popover__quick">
+                    {[
+                      { label: 'Hoy', offset: 0 },
+                      { label: 'Mañana', offset: 1 },
+                    ].map(({ label, offset }) => {
+                      const d = new Date()
+                      d.setDate(d.getDate() + offset)
+                      const iso = d.toISOString().split('T')[0]
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          className={`availability-popover__quick-btn ${availabilityDate === iso ? 'active' : ''}`}
+                          onClick={() => { setAvailabilityDate(iso); setShowDatePicker(false) }}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <label className="availability-popover__label" htmlFor="availability-date-input">O elegí otra fecha (DD/MM/AAAA):</label>
                   <DateInputDDMMYYYY
                     id="availability-date-input"
                     className="availability-popover__input"
@@ -1260,20 +1309,37 @@ export default function LandingPage({
             </div>
           </div>
 
-          {/* Specialty chips */}
-          <div className="specialty-chips" role="group" aria-label="Filtrar por especialidad" style={{ margin: 'var(--space-2) auto var(--space-6)' }}>
-            {SPECIALTIES.map((s) => (
+          {/* Profession type chips: Psicólogos / Psiquiatras — segmentación fija del buscador */}
+          <div className="profession-chips" role="group" aria-label="Filtrar por tipo de profesional" style={{ margin: 'var(--space-2) auto 0' }}>
+            {PROFESSION_TYPES.map(({ id, label }) => (
               <button
-                key={s}
-                className={`specialty-chip ${activeSpecialty === s ? 'active' : ''}`}
-                onClick={() => setActiveSpecialty(s)}
-                aria-pressed={activeSpecialty === s}
-                id={`chip-${s.toLowerCase().replace(/\s/g, '-')}`}
+                key={id}
+                className={`profession-chip ${activeProfession === id ? 'active' : ''}`}
+                onClick={() => setActiveProfession(id)}
+                aria-pressed={activeProfession === id}
+                id={`chip-profession-${id}`}
               >
-                {s}
+                {label}
               </button>
             ))}
           </div>
+
+          {/* Motivo/tratamiento chips — dinámicos, según lo que los profesionales cargados eligieron */}
+          {dynamicTags.length > 1 && (
+            <div className="specialty-chips" role="group" aria-label="Filtrar por motivo de consulta" style={{ margin: 'var(--space-3) auto var(--space-6)' }}>
+              {dynamicTags.map((s) => (
+                <button
+                  key={s}
+                  className={`specialty-chip ${activeSpecialty === s ? 'active' : ''}`}
+                  onClick={() => setActiveSpecialty(s)}
+                  aria-pressed={activeSpecialty === s}
+                  id={`chip-${s.toLowerCase().replace(/\s/g, '-')}`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Quick access to the patient's own appointments and clinical history */}
           {currentUser && currentUser.rol === 'PACIENTE' && (
@@ -1624,11 +1690,15 @@ export default function LandingPage({
             {(['Todos', 'Online', 'Presencial'] as const).map((mode) => {
               const isActive = activeModality === mode;
               const label = mode === 'Todos' ? 'Todas las modalidades' : mode === 'Online' ? 'Citas Online' : 'Citas Presenciales';
+              const icon = mode === 'Online' ? <IconVideoCam size={14} /> : mode === 'Presencial' ? <IconLocationPin size={14} /> : null;
               return (
                 <button
                   key={mode}
                   onClick={() => setActiveModality(mode)}
                   style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-2)',
                     padding: 'var(--space-3) var(--space-6)',
                     borderRadius: '24px',
                     border: '1px solid',
@@ -1642,6 +1712,7 @@ export default function LandingPage({
                     transition: 'all 0.2s ease'
                   }}
                 >
+                  {icon}
                   {label}
                 </button>
               );
@@ -1663,7 +1734,7 @@ export default function LandingPage({
                     </p>
                     <button
                       className="btn btn--secondary"
-                      onClick={() => { setQuery(''); setActiveSpecialty('Todos') }}
+                      onClick={() => { setQuery(''); setActiveProfession('Todos'); setActiveSpecialty('Todos'); setActiveModality('Todos') }}
                       id="btn-clear-filters"
                     >
                       Ver todos los profesionales

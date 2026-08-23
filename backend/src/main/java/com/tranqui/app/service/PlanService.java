@@ -68,6 +68,7 @@ public class PlanService {
                     .description("Ideal para psicólogos y profesionales que buscan adquisición de pacientes por zona y software de gestión integral.")
                     .priceArs(new BigDecimal("149500.00"))
                     .priceUsdRef(new BigDecimal("99.00"))
+                    .priceArsAnual(new BigDecimal("1495000.00")) // 10x mensual = 2 meses sin cargo
                     .billingPeriod("monthly")
                     .minSeats(1)
                     .requiresPrescriber(false)
@@ -85,6 +86,7 @@ public class PlanService {
                     .description("Diseñado para psiquiatras y médicos: incluye recetas electrónicas oficiales QBI2 con firma digital y psicofármacos.")
                     .priceArs(new BigDecimal("225000.00"))
                     .priceUsdRef(new BigDecimal("149.00"))
+                    .priceArsAnual(new BigDecimal("2250000.00")) // 10x mensual = 2 meses sin cargo
                     .billingPeriod("monthly")
                     .minSeats(1)
                     .requiresPrescriber(true)
@@ -94,7 +96,21 @@ public class PlanService {
             return planRepository.save(p);
         });
 
-        // 3. Equipo (3+ profesionales)
+        // Backfill: instalaciones existentes donde consultorio/clinico ya se habían creado antes
+        // de que existiera el ciclo anual (priceArsAnual nulo). 10x el precio mensual vigente.
+        if (consultorio.getPriceArsAnual() == null) {
+            consultorio.setPriceArsAnual(consultorio.getPriceArs().multiply(BigDecimal.TEN));
+            consultorio = planRepository.save(consultorio);
+        }
+        if (clinico.getPriceArsAnual() == null) {
+            clinico.setPriceArsAnual(clinico.getPriceArs().multiply(BigDecimal.TEN));
+            clinico = planRepository.save(clinico);
+        }
+
+        // 3. Equipo (3+ profesionales) — por decisión de negocio, no se ofrece todavía. Se deja
+        // creado (isActive=false) para no perder su configuración/histórico, y sigue visible para
+        // el admin en el catálogo completo (marcado como oculto), pero nunca aparece en el
+        // catálogo público de /api/subscriptions/plans.
         Plan equipo = planRepository.findByCode("equipo").orElseGet(() -> {
             Plan p = Plan.builder()
                     .code("equipo")
@@ -105,11 +121,22 @@ public class PlanService {
                     .billingPeriod("monthly")
                     .minSeats(3)
                     .requiresPrescriber(false)
-                    .isActive(true)
+                    .isActive(false)
                     .effectiveFrom(LocalDateTime.now())
                     .build();
             return planRepository.save(p);
         });
+
+        // Backfill para instalaciones ya existentes donde "equipo" se creó cuando todavía estaba
+        // activo por defecto: lo oculta del catálogo público. Si en el futuro se decide ofrecer
+        // el plan Equipo de nuevo, borrar este bloque y reactivarlo a mano desde el panel de admin
+        // (que ahora sí puede reactivar un plan oculto) — de lo contrario, cada reinicio lo va a
+        // volver a ocultar.
+        if (Boolean.TRUE.equals(equipo.getIsActive())) {
+            equipo.setIsActive(false);
+            equipo = planRepository.save(equipo);
+            log.info("Plan 'equipo' desactivado del catálogo público (no se ofrece por ahora).");
+        }
 
         // Attach features
         linkPlanFeature(consultorio, "historia_clinica");
@@ -170,7 +197,7 @@ public class PlanService {
     }
 
     @Transactional
-    public Plan updatePlan(Long id, BigDecimal priceArs, BigDecimal priceUsdRef, String name, String description, Boolean isActive) {
+    public Plan updatePlan(Long id, BigDecimal priceArs, BigDecimal priceUsdRef, BigDecimal priceArsAnual, String name, String description, Boolean isActive) {
         Plan plan = planRepository.findById(id)
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Plan con ID " + id + " no encontrado"));
 
@@ -179,6 +206,9 @@ public class PlanService {
         }
         if (priceUsdRef != null) {
             plan.setPriceUsdRef(priceUsdRef);
+        }
+        if (priceArsAnual != null) {
+            plan.setPriceArsAnual(priceArsAnual);
         }
         if (name != null && !name.trim().isEmpty()) {
             plan.setName(name.trim());

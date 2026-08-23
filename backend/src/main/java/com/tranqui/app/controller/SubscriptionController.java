@@ -55,10 +55,12 @@ public class SubscriptionController {
                 .description(p.getDescription())
                 .priceArs(p.getPriceArs())
                 .priceUsdRef(p.getPriceUsdRef())
+                .priceArsAnual(p.getPriceArsAnual())
                 .billingPeriod(p.getBillingPeriod())
                 .minSeats(p.getMinSeats())
                 .requiresPrescriber(p.getRequiresPrescriber())
                 .features(planService.getFeatureKeysForPlan(p.getId()))
+                .isActive(p.getIsActive())
                 .build()
         ).toList();
         return ResponseEntity.ok(dtos);
@@ -88,10 +90,12 @@ public class SubscriptionController {
                 .description(plan.getDescription())
                 .priceArs(plan.getPriceArs())
                 .priceUsdRef(plan.getPriceUsdRef())
+                .priceArsAnual(plan.getPriceArsAnual())
                 .billingPeriod(plan.getBillingPeriod())
                 .minSeats(plan.getMinSeats())
                 .requiresPrescriber(plan.getRequiresPrescriber())
                 .features(features)
+                .isActive(plan.getIsActive())
                 .build() : null;
 
         SubscriptionResponseDto response = SubscriptionResponseDto.builder()
@@ -103,6 +107,7 @@ public class SubscriptionController {
                 .status(sub.getStatus())
                 .seats(sub.getSeats())
                 .billingSource(sub.getBillingSource())
+                .billingCycle(sub.getBillingCycle())
                 .amountArs(sub.getAmountArs())
                 .currentPeriodStart(sub.getCurrentPeriodStart())
                 .currentPeriodEnd(sub.getCurrentPeriodEnd())
@@ -131,7 +136,7 @@ public class SubscriptionController {
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
 
         try {
-            String checkoutUrl = subscriptionService.iniciarCheckout(prof.getId(), body.getPlanId());
+            String checkoutUrl = subscriptionService.iniciarCheckout(prof.getId(), body.getPlanId(), body.getBillingCycle());
             return ResponseEntity.ok(Map.of("checkoutUrl", checkoutUrl));
         } catch (IllegalStateException e) {
             return ResponseEntity.unprocessableEntity().body(Map.of("error", e.getMessage()));

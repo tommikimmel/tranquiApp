@@ -21,6 +21,7 @@ public class SubscriptionResponseDto {
     private SubscriptionStatus status;
     private Integer seats;
     private BillingSource billingSource;
+    private String billingCycle;
     private BigDecimal amountArs;
     private LocalDateTime currentPeriodStart;
     private LocalDateTime currentPeriodEnd;

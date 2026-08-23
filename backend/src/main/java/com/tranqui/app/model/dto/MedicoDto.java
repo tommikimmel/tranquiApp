@@ -19,6 +19,8 @@ public class MedicoDto {
     private String initials;
     private String degree; // maps to degree in frontend
     private String specialty; // maps to specialty in frontend
+    private String profession; // psiquiatra | psicologo | otro — ver Usuario.profession. Público:
+    // el buscador lo usa para el filtro "Psicólogos / Psiquiatras", no expone nada sensible.
     private String matricula;
     private String cuit;
     private BigDecimal price; // maps to price in frontend

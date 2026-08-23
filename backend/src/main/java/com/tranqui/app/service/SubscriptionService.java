@@ -56,7 +56,7 @@ public class SubscriptionService {
      * webhook (processMercadoPagoPreapprovalWebhook), cuando el profesional autoriza el pago.
      */
     @Transactional
-    public String iniciarCheckout(Long professionalId, Long planId) {
+    public String iniciarCheckout(Long professionalId, Long planId, String billingCycleInput) {
         Usuario profesional = usuarioRepository.findById(professionalId)
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Profesional no encontrado"));
         Plan plan = planRepository.findById(planId)
@@ -64,18 +64,27 @@ public class SubscriptionService {
         Subscription sub = subscriptionRepository.findByProfessionalId(professionalId)
                 .orElseThrow(() -> new IllegalStateException("El profesional no tiene una suscripción registrada."));
 
+        // Cualquier valor que no sea exactamente "annual" se trata como "monthly" — nunca se cobra
+        // el ciclo anual por accidente ante un valor inesperado del frontend.
+        String billingCycle = "annual".equalsIgnoreCase(billingCycleInput) ? "annual" : "monthly";
+        if ("annual".equals(billingCycle) && plan.getPriceArsAnual() == null) {
+            throw new IllegalStateException("El plan " + plan.getName() + " todavía no tiene precio anual configurado.");
+        }
+        BigDecimal montoElegido = "annual".equals(billingCycle) ? plan.getPriceArsAnual() : plan.getPriceArs();
+
         try {
-            var preapproval = mercadoPagoService.crearSuscripcionPreapproval(profesional, plan, sub.getId());
+            var preapproval = mercadoPagoService.crearSuscripcionPreapproval(profesional, plan, sub.getId(), billingCycle);
 
             sub.setPlan(plan);
             sub.setMpPreapprovalId(preapproval.getId());
             sub.setBillingSource(BillingSource.MERCADOPAGO);
-            sub.setAmountArs(plan.getPriceArs());
+            sub.setBillingCycle(billingCycle);
+            sub.setAmountArs(montoElegido);
             sub.setUpdatedAt(LocalDateTime.now());
             subscriptionRepository.save(sub);
 
             logEvent(sub.getId(), "MP_CHECKOUT_CREATED", "professional", String.valueOf(professionalId),
-                    "Preapproval creado: " + preapproval.getId() + " para plan " + plan.getCode());
+                    "Preapproval creado: " + preapproval.getId() + " para plan " + plan.getCode() + " (" + billingCycle + ")");
 
             return mercadoPagoService.checkoutUrlFor(preapproval);
         } catch (IllegalStateException e) {
@@ -104,8 +113,10 @@ public class SubscriptionService {
         Optional<Subscription> subOpt = subscriptionRepository.findByProfessionalId(professionalId);
         if (subOpt.isEmpty()) {
             // Si el profesional no tiene suscripción aún (entorno de pruebas o profesionales existentes),
-            // permitimos el acceso si su rol es psiquiatra/médico para recetas
-            if (usuario.getRol() == Rol.PSIQUIATRA && "recetas_electronicas".equals(featureKey)) {
+            // permitimos el acceso a recetas solo si tiene capacidad legal real para prescribir. El rol
+            // "PSIQUIATRA" es el único rol de profesional en el sistema (lo comparten psicólogos y
+            // psiquiatras) — no sirve para distinguirlos. Usuario.profession sí distingue.
+            if ("recetas_electronicas".equals(featureKey) && esPsiquiatraOMedico(usuario)) {
                 return true;
             }
             return false;
@@ -120,6 +131,14 @@ public class SubscriptionService {
         if (plan == null) return false;
 
         return planFeatureRepository.existsByPlanIdAndFeatureKey(plan.getId(), featureKey);
+    }
+
+    // Un psicólogo nunca tiene capacidad legal para prescribir, sin importar el rol compartido.
+    // Cuentas legacy sin profession explícita se tratan como médico (comportamiento previo a esta
+    // distinción, para no bloquear de golpe a psiquiatras ya migrados sin ese campo cargado).
+    private boolean esPsiquiatraOMedico(Usuario usuario) {
+        String profession = usuario.getProfession();
+        return profession == null || profession.isBlank() || !"psicologo".equalsIgnoreCase(profession.trim());
     }
 
     /**
@@ -177,12 +196,15 @@ public class SubscriptionService {
                 if (sub != null && sub.getCurrentPeriodEnd() != null) continue; // ya tiene un período real (pago manual o migración previa)
 
                 if (sub == null) {
-                    // Rol=PSIQUIATRA implica médico en este sistema (no psicólogo) — "clinico" es
-                    // el plan que incluye recetas_electronicas, así que migrarlos ahí evita
-                    // sacarles una funcionalidad a la que ya tenían acceso libre antes del paywall.
-                    Plan planMigracion = planRepository.findByCode("clinico").orElse(null);
+                    // Rol=PSIQUIATRA es el único rol de profesional del sistema (lo comparten
+                    // psicólogos y psiquiatras) — no alcanza para elegir el plan de migración.
+                    // "clinico" incluye recetas_electronicas y no debe otorgársele a un psicólogo,
+                    // así que la elección real depende de Usuario.profession.
+                    String profession = u.getProfession();
+                    String codigoPlan = "psicologo".equalsIgnoreCase(profession) ? "consultorio" : "clinico";
+                    Plan planMigracion = planRepository.findByCode(codigoPlan).orElse(null);
                     if (planMigracion == null) {
-                        log.error("Paywall: no se encontró el plan 'clinico' para migrar al profesional {} — se omite.", u.getId());
+                        log.error("Paywall: no se encontró el plan '{}' para migrar al profesional {} — se omite.", codigoPlan, u.getId());
                         continue;
                     }
                     sub = Subscription.builder()
@@ -395,7 +417,7 @@ public class SubscriptionService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime nextEnd = now.plusMonths(1);
+        LocalDateTime nextEnd = now.plusMonths(mesesDelCiclo(sub));
 
         SubscriptionStatus estadoPrevioPagoMp = sub.getStatus();
         SubscriptionStatus estadoNuevoPagoMp = "approved".equalsIgnoreCase(status) ? SubscriptionStatus.ACTIVE : SubscriptionStatus.PAST_DUE;
@@ -468,7 +490,7 @@ public class SubscriptionService {
         if (newStatus == SubscriptionStatus.ACTIVE
                 && (sub.getCurrentPeriodEnd() == null || sub.getCurrentPeriodEnd().isBefore(LocalDateTime.now()))) {
             LocalDateTime now = LocalDateTime.now();
-            LocalDateTime periodEnd = now.plusMonths(1);
+            LocalDateTime periodEnd = now.plusMonths(mesesDelCiclo(sub));
             sub.setCurrentPeriodStart(now);
             sub.setCurrentPeriodEnd(periodEnd);
             sub.setNextBillingDate(periodEnd);
@@ -479,6 +501,12 @@ public class SubscriptionService {
         logEvent(sub.getId(), "MP_PREAPPROVAL_STATUS_CHANGED", oldStatus.name(), newStatus.name(),
                 "MP_WEBHOOK", mpPreapprovalId,
                 "Cambio de estado: " + oldStatus + " -> " + newStatus);
+    }
+
+    // 12 meses si el profesional contrató el ciclo anual, 1 mes en cualquier otro caso
+    // (incluidas filas viejas sin billingCycle seteado — el default de la entidad es "monthly").
+    private int mesesDelCiclo(Subscription sub) {
+        return "annual".equalsIgnoreCase(sub.getBillingCycle()) ? 12 : 1;
     }
 
     public void logEvent(Long subscriptionId, String eventType, String actorType, String actorId, String payloadJson) {

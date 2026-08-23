@@ -64,10 +64,12 @@ public class AdminSubscriptionController {
                     .description(plan.getDescription())
                     .priceArs(plan.getPriceArs())
                     .priceUsdRef(plan.getPriceUsdRef())
+                    .priceArsAnual(plan.getPriceArsAnual())
                     .billingPeriod(plan.getBillingPeriod())
                     .minSeats(plan.getMinSeats())
                     .requiresPrescriber(plan.getRequiresPrescriber())
                     .features(features)
+                    .isActive(plan.getIsActive())
                     .build() : null;
 
             return SubscriptionResponseDto.builder()
@@ -79,6 +81,7 @@ public class AdminSubscriptionController {
                     .status(sub.getStatus())
                     .seats(sub.getSeats())
                     .billingSource(sub.getBillingSource())
+                    .billingCycle(sub.getBillingCycle())
                     .amountArs(sub.getAmountArs())
                     .currentPeriodStart(sub.getCurrentPeriodStart())
                     .currentPeriodEnd(sub.getCurrentPeriodEnd())
@@ -183,6 +186,33 @@ public class AdminSubscriptionController {
     private com.tranqui.app.repository.SubscriptionRepository subscriptionRepository;
 
     /**
+     * Catálogo completo de planes para el panel de admin — a diferencia de
+     * /api/subscriptions/plans (público, solo activos), esto incluye los planes ocultos
+     * (isActive=false) para que el admin pueda verlos y reactivarlos. Sin este endpoint, un plan
+     * desactivado desaparecía de la pestaña "Planes y Precios Base" sin forma de volver atrás.
+     */
+    @GetMapping("/plans")
+    public ResponseEntity<List<PlanResponseDto>> getAllPlans() {
+        List<Plan> plans = planService.getAllPlans();
+        List<PlanResponseDto> dtos = plans.stream().map(p -> PlanResponseDto.builder()
+                .id(p.getId())
+                .code(p.getCode())
+                .name(p.getName())
+                .description(p.getDescription())
+                .priceArs(p.getPriceArs())
+                .priceUsdRef(p.getPriceUsdRef())
+                .priceArsAnual(p.getPriceArsAnual())
+                .billingPeriod(p.getBillingPeriod())
+                .minSeats(p.getMinSeats())
+                .requiresPrescriber(p.getRequiresPrescriber())
+                .features(planService.getFeatureKeysForPlan(p.getId()))
+                .isActive(p.getIsActive())
+                .build()
+        ).toList();
+        return ResponseEntity.ok(dtos);
+    }
+
+    /**
      * Actualiza el precio base, precio USD ref y detalles de un plan del catálogo
      */
     @PutMapping("/plans/{id}")
@@ -194,12 +224,14 @@ public class AdminSubscriptionController {
                 ? new java.math.BigDecimal(body.get("priceArs").toString()) : null;
         java.math.BigDecimal priceUsdRef = body.containsKey("priceUsdRef") && body.get("priceUsdRef") != null
                 ? new java.math.BigDecimal(body.get("priceUsdRef").toString()) : null;
+        java.math.BigDecimal priceArsAnual = body.containsKey("priceArsAnual") && body.get("priceArsAnual") != null
+                ? new java.math.BigDecimal(body.get("priceArsAnual").toString()) : null;
         String name = body.containsKey("name") && body.get("name") != null ? body.get("name").toString() : null;
         String description = body.containsKey("description") && body.get("description") != null ? body.get("description").toString() : null;
         Boolean isActive = body.containsKey("isActive") && body.get("isActive") != null
                 ? Boolean.valueOf(body.get("isActive").toString()) : null;
 
-        Plan updated = planService.updatePlan(id, priceArs, priceUsdRef, name, description, isActive);
+        Plan updated = planService.updatePlan(id, priceArs, priceUsdRef, priceArsAnual, name, description, isActive);
         return ResponseEntity.ok(updated);
     }
 

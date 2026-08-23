@@ -5,6 +5,7 @@ export interface PlanDto {
   description: string
   priceArs: number
   priceUsdRef: number
+  priceArsAnual?: number | null
   billingPeriod: string
   minSeats: number
   requiresPrescriber: boolean
@@ -34,6 +35,7 @@ export interface SubscriptionDto {
   status: SubscriptionStatus
   seats: number
   billingSource: BillingSource
+  billingCycle?: string
   amountArs: number
   currentPeriodStart?: string
   currentPeriodEnd?: string

@@ -35,6 +35,13 @@ public class Plan {
     @Column(name = "price_usd_ref", precision = 10, scale = 2)
     private BigDecimal priceUsdRef;
 
+    // Precio total del ciclo anual (con descuento tipo "2 meses sin cargo") — null mientras el
+    // plan solo se ofrezca mensual. Cuando está seteado, el checkout habilita el ciclo anual real:
+    // ver MercadoPagoService.crearSuscripcionPreapproval (frequency=12 meses) y
+    // Subscription.billingCycle (de dónde los webhooks toman cuántos meses sumar al período).
+    @Column(name = "price_ars_anual", precision = 12, scale = 2)
+    private BigDecimal priceArsAnual;
+
     @Builder.Default
     @Column(name = "billing_period", nullable = false, length = 20)
     private String billingPeriod = "monthly";

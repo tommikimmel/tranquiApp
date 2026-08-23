@@ -16,8 +16,10 @@ public class PlanResponseDto {
     private String description;
     private BigDecimal priceArs;
     private BigDecimal priceUsdRef;
+    private BigDecimal priceArsAnual;
     private String billingPeriod;
     private Integer minSeats;
     private Boolean requiresPrescriber;
     private List<String> features;
+    private Boolean isActive;
 }

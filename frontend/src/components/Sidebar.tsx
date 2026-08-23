@@ -7,7 +7,8 @@ export default function Sidebar({
   medicoInfo,
   hasUnreadChats,
   mobileOpen,
-  onCloseMobile
+  onCloseMobile,
+  canUseRecetas,
 }: {
   activeNav: NavSection;
   onNavChange: (s: NavSection) => void;
@@ -15,13 +16,18 @@ export default function Sidebar({
   hasUnreadChats: boolean;
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
+  // undefined = todavía no se sabe (suscripción cargando) → no mostrar ni ocultar de más.
+  // false = plan sin recetas_electronicas (psicólogos): la sección ni aparece.
+  // true = plan con recetas_electronicas (psiquiatras): aparece, con badge "Próximamente"
+  // porque la integración oficial con QBI2 todavía no está en producción.
+  canUseRecetas?: boolean;
 }) {
   const navItems = [
     { id: 'dashboard' as NavSection, label: 'Inicio', Icon: Icon.Dashboard },
     { id: 'agenda' as NavSection, label: 'Agenda', Icon: Icon.Calendar },
     { id: 'patients' as NavSection, label: 'Pacientes', Icon: Icon.Users },
     { id: 'clinical-history' as NavSection, label: 'Historia Clínica', Icon: Icon.ClinicalRecord },
-    { id: 'prescriptions' as NavSection, label: 'Recetas', Icon: Icon.Prescription },
+    ...(canUseRecetas ? [{ id: 'prescriptions' as NavSection, label: 'Recetas', Icon: Icon.Prescription, comingSoon: true }] : []),
     { id: 'honorarios' as NavSection, label: 'Honorarios y servicios', Icon: Icon.DollarSign },
     { id: 'settings' as NavSection, label: 'Configuración', Icon: Icon.Settings },
   ]
@@ -67,16 +73,28 @@ export default function Sidebar({
 
         <nav className="sidebar__nav" role="navigation" aria-label="Navegación principal">
           <span className="sidebar__nav-section-title">Menú Principal</span>
-          {navItems.map(({ id, label, Icon: NavIcon }) => (
+          {navItems.map(({ id, label, Icon: NavIcon, comingSoon }) => (
             <button
               key={id}
               className={`sidebar__nav-item ${activeNav === id ? 'active' : ''}`}
               onClick={() => handleNavClick(id)}
               aria-current={activeNav === id ? 'page' : undefined}
-              aria-label={label}
+              aria-label={comingSoon ? `${label} (Próximamente)` : label}
             >
               <span className="nav-icon"><NavIcon /></span>
               <span className="sidebar__nav-label">{label}</span>
+              {comingSoon && (
+                <span
+                  title="Todavía estamos terminando la integración oficial con QBI2"
+                  style={{
+                    fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.02em',
+                    color: 'var(--color-warning, #B45309)', background: 'var(--color-warning-bg, #FEF3C7)',
+                    border: '1px solid #FDE68A', borderRadius: '999px', padding: '2px 6px', marginLeft: 'auto',
+                  }}
+                >
+                  Próximamente
+                </span>
+              )}
               {id === 'patients' && hasUnreadChats && (
                 <span className="sidebar__badge-pulse" />
               )}

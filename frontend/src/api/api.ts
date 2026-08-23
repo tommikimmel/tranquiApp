@@ -326,11 +326,15 @@ export const api = {
   getMySubscription: () => apiFetch('/subscriptions/my-subscription'),
   getMyInvoices: () => apiFetch('/subscriptions/my-invoices'),
   getInvoicePdfUrl: (invoiceId: number | string) => `${API_BASE}/subscriptions/invoices/${invoiceId}/pdf`,
-  iniciarCheckoutSuscripcion: (planId: number) => apiFetch('/subscriptions/checkout', { method: 'POST', body: { planId } as any }),
+  iniciarCheckoutSuscripcion: (planId: number, billingCycle: 'monthly' | 'annual' = 'monthly') =>
+    apiFetch('/subscriptions/checkout', { method: 'POST', body: { planId, billingCycle } as any }),
 
   // Admin Suscripciones y Facturación
   getAdminSubscriptionOverview: () => apiFetch('/admin/subscriptions/overview'),
   getAdminSubscriptionsList: () => apiFetch('/admin/subscriptions/list'),
+  // Catálogo completo (activos + ocultos) para el panel de admin — a diferencia de
+  // getSubscriptionPlans(), que solo trae los planes activos del catálogo público.
+  getAdminSubscriptionPlans: () => apiFetch('/admin/subscriptions/plans'),
   registerAdminManualPayment: (data: any) => apiFetch('/admin/subscriptions/manual-payment', { method: 'POST', body: data }),
   getAdminInvoices: () => apiFetch('/admin/subscriptions/invoices'),
   emitirNotaDeCredito: (invoiceId: number | string, reason: string) => apiFetch(`/admin/subscriptions/invoices/${invoiceId}/credit-note`, { method: 'POST', body: { reason } as any }),

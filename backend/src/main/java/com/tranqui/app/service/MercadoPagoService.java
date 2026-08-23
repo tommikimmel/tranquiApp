@@ -70,14 +70,27 @@ public class MercadoPagoService {
      * appPublicUrl + /api/payments/webhook, con el mismo secreto que MERCADOPAGO_WEBHOOK_SECRET.
      */
     public Preapproval crearSuscripcionPreapproval(Usuario profesional, Plan plan, Long subscriptionId) throws Exception {
+        return crearSuscripcionPreapproval(profesional, plan, subscriptionId, "monthly");
+    }
+
+    /**
+     * @param billingCycle "annual" cobra plan.getPriceArsAnual() con frequency=12 meses; cualquier
+     *                      otro valor (incluido null) cobra plan.getPriceArs() mensual, como antes.
+     */
+    public Preapproval crearSuscripcionPreapproval(Usuario profesional, Plan plan, Long subscriptionId, String billingCycle) throws Exception {
         if (adminAccessToken == null || adminAccessToken.isBlank()) {
             throw new IllegalStateException("El cobro de suscripciones todavía no está configurado (falta MP_ADMIN_ACCESS_TOKEN).");
         }
 
+        boolean esAnual = "annual".equalsIgnoreCase(billingCycle);
+        if (esAnual && plan.getPriceArsAnual() == null) {
+            throw new IllegalStateException("El plan " + plan.getName() + " todavía no tiene precio anual configurado.");
+        }
+
         PreApprovalAutoRecurringCreateRequest autoRecurring = PreApprovalAutoRecurringCreateRequest.builder()
-                .frequency(1)
+                .frequency(esAnual ? 12 : 1)
                 .frequencyType("months")
-                .transactionAmount(plan.getPriceArs())
+                .transactionAmount(esAnual ? plan.getPriceArsAnual() : plan.getPriceArs())
                 .currencyId("ARS")
                 .startDate(OffsetDateTime.now())
                 .build();
@@ -85,7 +98,7 @@ public class MercadoPagoService {
         PreapprovalCreateRequest request = PreapprovalCreateRequest.builder()
                 .payerEmail(profesional.getEmail())
                 .backUrl(frontendUrl + "/panel")
-                .reason("Suscripción Tranqui App - " + plan.getName())
+                .reason("Suscripción Tranqui App - " + plan.getName() + (esAnual ? " (anual)" : ""))
                 .externalReference("sub-" + subscriptionId)
                 .status("pending")
                 .autoRecurring(autoRecurring)
