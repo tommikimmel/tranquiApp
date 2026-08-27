@@ -56,6 +56,9 @@ public class WebhookController {
     @Autowired
     private com.tranqui.app.service.SubscriptionService subscriptionService;
 
+    @Autowired
+    private com.tranqui.app.service.MercadoPagoService mercadoPagoService;
+
     @PostMapping("/webhook")
     public ResponseEntity<?> receiveWebhook(
             @RequestHeader(value = "x-signature", required = false) String signature,
@@ -109,6 +112,33 @@ public class WebhookController {
                 String mpUserId = node.has("user_id") ? node.get("user_id").asText() : null;
 
                 log.info("Procesando webhook real de Mercado Pago. Payment ID: {}, User ID (Seller): {}", paymentId, mpUserId);
+
+                // Suscripciones (Etapa 2): el cobro recurrente lo recibe la cuenta ADMIN, no el
+                // OAuth por-profesional de un médico — probamos primero si es un pago de
+                // suscripción (identificable por su external_reference "sub-{id}", que nosotros
+                // mismos seteamos al crear el Preapproval) antes de asumir que es un pago de
+                // turno/documento cobrado por un médico. Sin esto, este webhook "payment" genérico
+                // (que en la práctica llega más seguido que el "subscription_authorized_payment"
+                // dedicado, según qué tópicos tenga suscriptos la app de MP) rompía con
+                // IncorrectResultSizeDataAccessException al buscar un médico por mp_user_id que en
+                // realidad es el ID de la cuenta admin, y la suscripción nunca se activaba.
+                Payment pagoSuscripcion = null;
+                try {
+                    pagoSuscripcion = mercadoPagoService.obtenerPagoAdmin(paymentId);
+                } catch (Exception e) {
+                    log.debug("Payment {} no es legible con el token admin (probablemente no es de suscripción): {}", paymentId, e.getMessage());
+                }
+                if (pagoSuscripcion != null && pagoSuscripcion.getExternalReference() != null
+                        && pagoSuscripcion.getExternalReference().startsWith("sub-")) {
+                    log.info("Webhook 'payment' identificado como cobro de suscripción. Ref: {}, Status: {}",
+                            pagoSuscripcion.getExternalReference(), pagoSuscripcion.getStatus());
+                    subscriptionService.processMercadoPagoPaymentByExternalReference(
+                            pagoSuscripcion.getExternalReference(),
+                            String.valueOf(pagoSuscripcion.getId()),
+                            pagoSuscripcion.getTransactionAmount(),
+                            pagoSuscripcion.getStatus());
+                    return ResponseEntity.ok().build();
+                }
 
                 if (mpUserId != null) {
                     Usuario medico = usuarioRepository.findByMpUserId(mpUserId).orElse(null);

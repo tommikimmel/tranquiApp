@@ -356,7 +356,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                   <div className="settings-section-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0 0 var(--space-3)' }}>
                     <MCIcon.User size={13} /> Información personal
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
+                  <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
                     <div className="form-group">
                       <FieldLabel htmlFor="mc-nombre" icon={<MCIcon.User size={13} />}>Nombre</FieldLabel>
                       <input id="mc-nombre" className="form-input" type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} />
@@ -389,7 +389,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                   <div className="settings-section-label" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0 0 var(--space-3)' }}>
                     <MCIcon.IdCard size={13} /> Documento de identidad
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
+                  <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
                     <div className="form-group">
                       <FieldLabel htmlFor="mc-tipo-doc" icon={<MCIcon.IdCard />}>Tipo de documento</FieldLabel>
                       <select id="mc-tipo-doc" className="form-input" value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
@@ -442,7 +442,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                   </div>
 
                   {tieneObraSocial && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)', marginTop: 'var(--space-4)' }}>
+                    <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)', marginTop: 'var(--space-4)' }}>
                       <div className="form-group">
                         <FieldLabel htmlFor="mc-obra-social" icon={<MCIcon.HeartPulse />}>Obra Social</FieldLabel>
                         <input id="mc-obra-social" className="form-input" type="text" value={obraSocial} onChange={(e) => setObraSocial(e.target.value)} placeholder="Ej: OSDE" />

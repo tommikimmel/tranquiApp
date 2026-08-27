@@ -799,6 +799,8 @@ export default function LandingPage({
   const [activeSpecialty, setActiveSpecialty] = useState('Todos')
   const [activeModality, setActiveModality] = useState<'Todos' | 'Online' | 'Presencial'>('Todos')
 
+  const [professionals, setProfessionals] = useState<Professional[]>([])
+
   // Chips de motivo/tratamiento: se arman con los tags reales que los profesionales cargados
   // eligieron en su perfil (ver TRATAMIENTOS_DISPONIBLES en medicoProfile.ts) — nunca hardcodeados,
   // así que nunca muestran un motivo que nadie atiende ni esconden uno nuevo que se agregue.
@@ -807,7 +809,6 @@ export default function LandingPage({
     professionals.forEach((p) => (p.tags || []).forEach((t) => t && set.add(t)))
     return ['Todos', ...Array.from(set).sort((a, b) => a.localeCompare(b, 'es'))]
   }, [professionals])
-  const [professionals, setProfessionals] = useState<Professional[]>([])
   const [loading, setLoading] = useState(true)
   const [showCrisis, setShowCrisis] = useState(false)
 
@@ -1686,7 +1687,7 @@ export default function LandingPage({
           </div>
 
           {/* Modality Filter segmented buttons */}
-          <div style={{ display: 'flex', gap: 'var(--space-2)', margin: '0 0 var(--space-4)' }}>
+          <div className="modality-filter-row">
             {(['Todos', 'Online', 'Presencial'] as const).map((mode) => {
               const isActive = activeModality === mode;
               const label = mode === 'Todos' ? 'Todas las modalidades' : mode === 'Online' ? 'Citas Online' : 'Citas Presenciales';
@@ -1694,22 +1695,14 @@ export default function LandingPage({
               return (
                 <button
                   key={mode}
+                  className="modality-chip"
                   onClick={() => setActiveModality(mode)}
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-2)',
-                    padding: 'var(--space-3) var(--space-6)',
-                    borderRadius: '24px',
-                    border: '1px solid',
                     borderColor: isActive ? 'var(--color-primary)' : 'var(--color-border)',
                     backgroundColor: isActive ? 'var(--color-primary)' : 'white',
                     color: isActive ? 'white' : 'var(--color-text-primary)',
-                    fontSize: 'var(--text-sm)',
                     fontWeight: isActive ? 'bold' : 'normal',
-                    cursor: 'pointer',
                     boxShadow: isActive ? 'var(--shadow-sm)' : 'none',
-                    transition: 'all 0.2s ease'
                   }}
                 >
                   {icon}

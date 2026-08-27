@@ -119,9 +119,9 @@ export default function AdminTicketsView() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 'var(--space-4)', minHeight: '400px', flexWrap: 'wrap' }}>
+      <div className="ticket-columns" style={{ display: 'flex', gap: 'var(--space-4)', minHeight: '400px', flexWrap: 'wrap' }}>
         {/* Lista */}
-        <div style={{ flex: '1 1 280px', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: '520px', overflowY: 'auto' }}>
+        <div className="ticket-list-panel" style={{ flex: '1 1 280px', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: '520px', overflowY: 'auto' }}>
           {loading ? (
             <div style={{ textAlign: 'center', padding: 'var(--space-6)' }}><div className="checkout-spinner" style={{ margin: 'auto' }} /></div>
           ) : ticketsFiltrados.length === 0 ? (
@@ -174,7 +174,7 @@ export default function AdminTicketsView() {
         </div>
 
         {/* Detalle / chat */}
-        <div style={{ flex: '2 1 340px', display: 'flex', flexDirection: 'column', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', minHeight: '400px', maxHeight: '520px' }}>
+        <div className="ticket-detail-panel" style={{ flex: '2 1 340px', display: 'flex', flexDirection: 'column', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', minHeight: '400px', maxHeight: '520px' }}>
           {!selected ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
               Elegí un ticket para ver la conversación.
@@ -224,7 +224,7 @@ export default function AdminTicketsView() {
               </div>
               <div style={{ display: 'flex', gap: 'var(--space-2)', padding: 'var(--space-3)', borderTop: '1px solid var(--color-border)' }}>
                 <input
-                  className="form-input"
+                  className="form-input chat-reply-input"
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !sending) handleResponder() }}

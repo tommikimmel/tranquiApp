@@ -859,7 +859,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
             {regStep === 2 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                   <div className="form-group">
                     <label className="form-label form-label--required">Nombre</label>
                     <input
@@ -882,7 +882,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                   <div className="form-group">
                     <label className="form-label form-label--required">Sexo</label>
                     <select className="form-select" value={sexo} onChange={(e) => setSexo(e.target.value)}>
@@ -904,7 +904,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--space-3)' }}>
+                <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--space-3)' }}>
                   <div className="form-group">
                     <label className="form-label form-label--required">Documento</label>
                     <select className="form-select" value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
@@ -1086,7 +1086,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                       </span>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                    <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                       <div className="form-group">
                         <label className="form-label form-label--required">Título Profesional</label>
                         <input
@@ -1111,7 +1111,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-2)' }}>
+                    <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-2)' }}>
                       <div className="form-group">
                         <label className="form-label form-label--required">Tipo Matrícula</label>
                         <select className="form-select" value={matriculaTipo} onChange={(e) => setMatriculaTipo(e.target.value)}>
@@ -1149,7 +1149,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                         Datos Fiscales ARCA (Facturación Electrónica RG 5616)
                       </strong>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                      <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                         <div className="form-group">
                           <label className="form-label form-label--required">CUIT / CUIL Fiscal</label>
                           <input
@@ -1180,7 +1180,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                         </div>
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                      <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                         <div className="form-group">
                           <label className="form-label form-label--required">Condición frente al IVA</label>
                           <select
@@ -1208,7 +1208,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                    <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                       <div className="form-group" style={{ gridColumn: 'span 2' }}>
                         <label className="form-label form-label--required">Modalidades de Atención</label>
                         <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: '4px' }}>

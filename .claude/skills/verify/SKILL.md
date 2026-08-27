@@ -26,12 +26,14 @@ description: How to build/launch/drive TranquiApp locally to verify a change.
 
 ## Login (seed users — see `backend/.../config/DataInitializer.java`)
 
-All seed accounts use password `admin123`:
-- `medico.verificado@gmail.com` — fully verified professional, has seed availability/agenda data.
-- `medico.sinverificar@gmail.com` — unverified professional.
-- `paciente.completo@gmail.com` — patient with complete profile.
-- `paciente.sindatos@gmail.com` — patient with no data.
-- `admin@tranqui.com` — admin.
+As of 2026-08-24, `DataInitializer` only seeds `admin@tranqui.com` / `admin123` — the demo
+médico/paciente accounts it used to create (`medico.verificado@gmail.com`,
+`medico.sinverificar@gmail.com`, `paciente.completo@gmail.com`, `paciente.sindatos@gmail.com`)
+were removed on purpose (no default non-admin accounts, including in production). To exercise a
+médico or paciente flow locally, register a fresh account through the app instead of relying on a
+seeded one; note `frontend/e2e/patient-and-professional-flow.spec.ts`, `frontend/capture_all.js`,
+and `frontend/capture_all.cjs` still reference the old seed emails and need updating before they'll
+run against a freshly-cleaned DB.
 
 ## Gotchas
 

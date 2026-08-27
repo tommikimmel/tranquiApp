@@ -276,11 +276,26 @@ export default function SettingsView({
   // acá porque el profesional gestiona su perfil desde Configuración, no desde /mi-cuenta.
   const [mySub, setMySub] = useState<any>(null)
   const [myInvoices, setMyInvoices] = useState<any[]>([])
+  const [cancellingSub, setCancellingSub] = useState(false)
 
   useEffect(() => {
     api.getMySubscription().then((s: any) => setMySub(s)).catch(() => {})
     api.getMyInvoices().then((invs: any) => setMyInvoices(Array.isArray(invs) ? invs : [])).catch(() => {})
   }, [])
+
+  const handleCancelarSuscripcion = () => {
+    if (!window.confirm('¿Cancelar tu suscripción? Vas a seguir teniendo acceso hasta que termine el período que ya pagaste, pero no se te va a cobrar de nuevo.')) {
+      return
+    }
+    setCancellingSub(true)
+    api.cancelarSuscripcion()
+      .then(() => {
+        showAlert('Suscripción cancelada. Vas a mantener el acceso hasta que termine tu período actual.', 'success')
+        return api.getMySubscription().then((s: any) => setMySub(s))
+      })
+      .catch((err: any) => showAlert(err?.message || 'No se pudo cancelar la suscripción.', 'error'))
+      .finally(() => setCancellingSub(false))
+  }
 
   const isValidUrl = (urlStr: string) => {
     try {
@@ -602,7 +617,7 @@ export default function SettingsView({
             <SaveIcon size={14} /> {saving ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
+        <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)' }}>
           {/* Profile Photo Uploader */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', gridColumn: 'span 2', paddingBottom: 'var(--space-4)', borderBottom: '1px solid var(--color-border)' }}>
             <div style={{
@@ -981,7 +996,7 @@ export default function SettingsView({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+          <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
             <div className="form-group">
               <label className="form-label form-label--required" htmlFor="input-institucion">Institución de formación</label>
               <input
@@ -1410,8 +1425,26 @@ export default function SettingsView({
                   </span>
                 </div>
                 <span className={`badge ${mySub.status === 'ACTIVE' ? 'badge--success' : 'badge--warning'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>
-                  {mySub.status === 'ACTIVE' ? 'Suscripción Activa' : mySub.status}
+                  {mySub.cancelAtPeriodEnd ? 'Cancelada — activa hasta el vencimiento' : mySub.status === 'ACTIVE' ? 'Suscripción Activa' : mySub.status}
                 </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                {mySub.cancelAtPeriodEnd ? (
+                  <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                    Ya cancelaste tu suscripción. No se te va a volver a cobrar.
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={handleCancelarSuscripcion}
+                    disabled={cancellingSub}
+                    style={{ color: 'var(--color-danger, #b91c1c)' }}
+                  >
+                    {cancellingSub ? 'Cancelando...' : 'Cancelar suscripción'}
+                  </button>
+                )}
               </div>
 
               {mySub.activeFeatures && mySub.activeFeatures.length > 0 && (
@@ -1539,7 +1572,7 @@ export default function SettingsView({
           zIndex: 9999,
           padding: 'var(--space-4)'
         }}>
-          <div className="card" style={{ width: '100%', maxWidth: '500px', backgroundColor: 'white', padding: 'var(--space-6)', borderRadius: '12px' }}>
+          <div className="card mobile-modal-card" style={{ width: '100%', maxWidth: '500px', backgroundColor: 'white', padding: 'var(--space-6)', borderRadius: '12px' }}>
             <h3 style={{ margin: '0 0 var(--space-4)', fontSize: 'var(--text-lg)' }}>
               {expForm.id ? 'Editar experiencia laboral' : 'Nueva experiencia laboral'}
             </h3>
@@ -1554,7 +1587,7 @@ export default function SettingsView({
                   onChange={(e) => setExpForm({ ...expForm, nombreLugar: e.target.value })}
                 />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+              <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                 <div className="form-group">
                   <label className="form-label">Desde (Mes/Año)</label>
                   <input
@@ -1622,7 +1655,7 @@ export default function SettingsView({
           zIndex: 9999,
           padding: 'var(--space-4)'
         }}>
-          <div className="card" style={{ width: '100%', maxWidth: '480px', backgroundColor: 'white', padding: 'var(--space-6)', borderRadius: '12px' }}>
+          <div className="card mobile-modal-card" style={{ width: '100%', maxWidth: '480px', backgroundColor: 'white', padding: 'var(--space-6)', borderRadius: '12px' }}>
             <h3 style={{ margin: '0 0 var(--space-4)', fontSize: 'var(--text-lg)' }}>Sacar foto de perfil</h3>
             <div style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: '#000', aspectRatio: '4 / 3' }}>
               <video
@@ -1659,7 +1692,7 @@ export default function SettingsView({
           zIndex: 9999,
           padding: 'var(--space-4)'
         }}>
-          <div className="card" style={{ width: '100%', maxWidth: '500px', backgroundColor: 'white', padding: 'var(--space-6)', borderRadius: '12px' }}>
+          <div className="card mobile-modal-card" style={{ width: '100%', maxWidth: '500px', backgroundColor: 'white', padding: 'var(--space-6)', borderRadius: '12px' }}>
             <h3 style={{ margin: '0 0 var(--space-4)', fontSize: 'var(--text-lg)' }}>
               {pubForm.id ? 'Editar publicación' : 'Nueva publicación'}
             </h3>

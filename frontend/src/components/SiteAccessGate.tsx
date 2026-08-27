@@ -54,6 +54,7 @@ export default function SiteAccessGate({ children }: { children: ReactNode }) {
     }}>
       <form
         onSubmit={handleSubmit}
+        className="site-access-card"
         style={{
           width: '100%',
           maxWidth: '360px',

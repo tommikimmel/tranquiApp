@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
+import type { CSSProperties } from 'react'
 import { api } from '../api/api'
-import { useAlert } from '../context/AlertContext'
 import { Icon } from './Icon'
+import ReactivarCuentaView from './ReactivarCuentaView'
+import '../styles/checkout.css'
 
 // Etiquetas legibles para las feature keys que devuelve el backend (PlanService.initDefaultPlansAndFeatures) —
 // el DTO solo trae las keys crudas (snake_case), no un nombre para mostrar.
@@ -50,16 +52,16 @@ export default function ChoosePlanView({
   onContinue,
   onLogout,
   subscription,
+  profession,
 }: {
   variant: 'post-register' | 'blocked'
   onContinue?: () => void
   onLogout?: () => void
   subscription?: { status?: string; currentPeriodEnd?: string | null; plan?: { name?: string; code?: string } | null } | null
+  profession?: string | null
 }) {
-  const { showAlert } = useAlert()
   const [plans, setPlans] = useState<PlanLite[]>([])
   const [loading, setLoading] = useState(true)
-  const [payingPlanId, setPayingPlanId] = useState<number | null>(null)
   const [ciclo, setCiclo] = useState<'monthly' | 'annual'>('monthly')
   const [honorarioInput, setHonorarioInput] = useState('40.000')
 
@@ -70,7 +72,14 @@ export default function ChoosePlanView({
       .finally(() => setLoading(false))
   }, [])
 
-  const expired = subscription?.currentPeriodEnd && new Date(subscription.currentPeriodEnd) < new Date()
+  // Diseño dedicado (ver suscripcion-v11.html en la raíz del proyecto) para el caso de una cuenta
+  // bloqueada por falta de pago. El variant "post-register" (elegir plan recién registrado, antes
+  // de poder pagar) sigue con la pantalla genérica de más abajo — el copy de "reactivar" del nuevo
+  // diseño no aplica a alguien que nunca estuvo activo.
+  if (variant === 'blocked') {
+    return <ReactivarCuentaView plans={plans} loading={loading} subscription={subscription} profession={profession} onLogout={onLogout} />
+  }
+
   const hayCicloAnual = plans.some((p) => !!p.priceArsAnual)
   const honorario = parsePlata(honorarioInput)
 
@@ -79,23 +88,6 @@ export default function ChoosePlanView({
   // Equivalente mensual, para comparar "peras con peras" contra el plan mensual y contra el
   // honorario que el profesional tipeó.
   const precioMensualEquiv = (p: PlanLite) => (ciclo === 'annual' && p.priceArsAnual ? p.priceArsAnual / 12 : p.priceArs)
-
-  const handlePay = (planId: number) => {
-    setPayingPlanId(planId)
-    api.iniciarCheckoutSuscripcion(planId, ciclo)
-      .then((res: any) => {
-        if (res?.checkoutUrl) {
-          window.location.href = res.checkoutUrl
-        } else {
-          showAlert('No se pudo iniciar el pago. Intentá de nuevo.', 'error')
-          setPayingPlanId(null)
-        }
-      })
-      .catch((err: any) => {
-        showAlert(err?.message || 'No se pudo iniciar el pago con Mercado Pago.', 'error')
-        setPayingPlanId(null)
-      })
-  }
 
   return (
     <div style={{
@@ -116,42 +108,12 @@ export default function ChoosePlanView({
             </span>
           </div>
           <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-2xl)', margin: '0 0 8px', lineHeight: 1.25 }}>
-            {variant === 'post-register' ? 'Elegí tu plan profesional' : 'Volvé al buscador de Tranqui'}
+            Elegí tu plan profesional
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 'var(--text-sm)', maxWidth: '520px', margin: '0 auto' }}>
-            {variant === 'post-register'
-              ? 'Este es el catálogo de planes disponibles. Verificá tu email para activar tu cuenta — vas a poder pagar con Mercado Pago apenas inicies sesión por primera vez.'
-              : 'Mientras tu suscripción no esté activa, tu perfil no aparece en el buscador público de Tranqui: ningún paciente puede encontrarte ni reservar un turno. Reactivá para volver a estar visible.'}
+            Este es el catálogo de planes disponibles. Verificá tu email para activar tu cuenta — vas a poder pagar con Mercado Pago apenas inicies sesión por primera vez.
           </p>
         </div>
-
-        {variant === 'blocked' && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-            padding: 'var(--space-4)', backgroundColor: 'var(--color-warning-bg)', border: '1px solid #fde68a',
-            borderRadius: 'var(--radius-md)', color: '#78350f'
-          }}>
-            <div style={{
-              width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#fef3c7',
-              color: 'var(--color-warning)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-            }}>
-              <Icon.Lock size={18} />
-            </div>
-            <div style={{ fontSize: 'var(--text-sm)' }}>
-              {!subscription ? (
-                <span>Todavía no registramos ninguna suscripción para tu cuenta.</span>
-              ) : expired ? (
-                <span>
-                  Tu suscripción {subscription.plan?.name ? <strong>{subscription.plan.name}</strong> : ''} venció el{' '}
-                  <strong>{new Date(subscription.currentPeriodEnd as string).toLocaleDateString('es-AR')}</strong>.
-                </span>
-              ) : (
-                <span>Estado actual de tu suscripción: <strong>{subscription.status}</strong>.</span>
-              )}
-              {' '}Elegí un plan abajo para pagarlo con Mercado Pago y recuperar el acceso.
-            </div>
-          </div>
-        )}
 
         {/* ── Toggle de ciclo ── */}
         {hayCicloAnual && (
@@ -183,7 +145,10 @@ export default function ChoosePlanView({
         {loading ? (
           <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>Cargando planes...</p>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(plans.length || 1, 2)}, 1fr)`, gap: 'var(--space-5)' }}>
+          <div
+            className="plan-grid"
+            style={{ '--plan-cols': Math.min(plans.length || 1, 2), gap: 'var(--space-5)' } as CSSProperties}
+          >
             {plans.map((plan) => {
               const recomendado = subscription?.plan?.code === plan.code
               const precioMensual = precioMensualEquiv(plan)
@@ -284,37 +249,14 @@ export default function ChoosePlanView({
                     </div>
                   </div>
 
-                  {variant === 'blocked' ? (
-                    <button
-                      type="button"
-                      className="btn btn--primary"
-                      disabled={payingPlanId !== null}
-                      onClick={() => handlePay(plan.id)}
-                      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                    >
-                      {payingPlanId === plan.id ? 'Redirigiendo a Mercado Pago...' : (
-                        <>
-                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" />
-                          </svg>
-                          Reactivar por {money(precioCiclo(plan))}
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    // Todavía no hay sesión iniciada en este punto del registro (recién se loguea
-                    // después de verificar el email), y /subscriptions/checkout exige estar
-                    // autenticado — así que acá el plan es solo de referencia, no se puede pagar
-                    // hasta después de iniciar sesión por primera vez (variant "blocked").
-                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textAlign: 'center', margin: 0 }}>
-                      Vas a poder pagarlo apenas verifiques tu email e inicies sesión.
-                    </p>
-                  )}
-                  {variant === 'blocked' && (
-                    <p style={{ textAlign: 'center', fontSize: '11.5px', color: 'var(--color-text-secondary)', margin: 0 }}>
-                      Tu perfil vuelve al buscador apenas Mercado Pago confirma.
-                    </p>
-                  )}
+                  {/* Todavía no hay sesión iniciada en este punto del registro (recién se loguea
+                      después de verificar el email), y /subscriptions/checkout exige estar
+                      autenticado — así que acá el plan es solo de referencia, no se puede pagar
+                      hasta después de iniciar sesión por primera vez (variant "blocked", que ahora
+                      usa ReactivarCuentaView en vez de esta pantalla). */}
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', textAlign: 'center', margin: 0 }}>
+                    Vas a poder pagarlo apenas verifiques tu email e inicies sesión.
+                  </p>
                 </div>
               )
             })}
@@ -340,7 +282,7 @@ export default function ChoosePlanView({
                   setHonorarioInput(v ? v.toLocaleString('es-AR') : '')
                 }}
                 className="form-input"
-                style={{ width: '100px', fontWeight: 700, textAlign: 'right' }}
+                style={{ width: '100px', fontWeight: 700, textAlign: 'right', fontSize: '16px' }}
               />
             </span>
           </div>
@@ -366,14 +308,14 @@ export default function ChoosePlanView({
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-3)' }}>
-          {variant === 'post-register' && onContinue && (
-            <button type="button" className="btn btn--primary" onClick={onContinue} style={{ minWidth: '220px' }}>
+          {onContinue && (
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={onContinue}
+              style={{ minWidth: '220px', padding: 'var(--space-4) var(--space-6)' }}
+            >
               Continuar y verificar mi email
-            </button>
-          )}
-          {variant === 'blocked' && onLogout && (
-            <button type="button" className="btn btn--ghost" onClick={onLogout}>
-              Cerrar sesión
             </button>
           )}
         </div>

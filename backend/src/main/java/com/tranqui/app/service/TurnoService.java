@@ -61,6 +61,12 @@ public class TurnoService {
     @Value("${payment.simulation.enabled:false}")
     private boolean paymentSimulationEnabled;
 
+    // Used to build the unauthenticated confirmar-asistencia / no-asistira links sent in the
+    // "confirmá tu turno" email — those are backend endpoints (TurnoController), not frontend
+    // routes, so this needs the backend's own public URL, not app.frontend-url.
+    @Value("${app.public-url:http://localhost:8081}")
+    private String publicUrl;
+
     @Transactional(readOnly = true)
     public List<java.time.LocalTime> obtenerHorariosDisponibles(Long medicoId, java.time.LocalDate fecha, Modalidad modalidad) {
         List<com.tranqui.app.model.Disponibilidad> disponibilidades = disponibilidadRepository.findByMedicoIdAndModalidadOLegacy(medicoId, modalidad);
@@ -724,10 +730,26 @@ public class TurnoService {
 
         // Notify Patient
         String tituloPac = "Turno cancelado";
-        String mensajePac = "El turno del " + turno.getFecha() + " a las " + 
-                turno.getHoraInicio() + " hs con el profesional " + 
+        String mensajePac = "El turno del " + turno.getFecha() + " a las " +
+                turno.getHoraInicio() + " hs con el profesional " +
                 turno.getMedico().getNombre() + " ha sido cancelado.";
         notificacionService.crearNotificacion(turno.getPaciente(), tituloPac, mensajePac, "TURNO_CANCELADO");
+
+        // Same "no debe bloquear la cancelación" rationale as Google Calendar/Mercado Pago arriba:
+        // un fallo enviando el mail no debe impedir que la cancelación se confirme.
+        if (turno.isOcupaAgenda() && turno.getMedico().getEmail() != null) {
+            try {
+                resendEmailService.enviarTurnoCanceladoProfesional(
+                        turno.getMedico().getEmail(),
+                        turno.getMedico().getNombre(),
+                        turno.getPaciente().getNombre(),
+                        turno.getFecha(),
+                        turno.getHoraInicio());
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(TurnoService.class)
+                    .error("Error al enviar mail de turno cancelado al médico para turno ID: {}", turnoId, e);
+            }
+        }
     }
 
     @Transactional
@@ -851,6 +873,12 @@ public class TurnoService {
         turno.setFecha(nuevaFecha);
         turno.setHoraInicio(nuevaHoraInicio);
         turno.setHoraFin(nuevaHoraFin);
+        // La nueva fecha invalida cualquier recordatorio/confirmación de asistencia que ya se
+        // haya mandado para la fecha vieja — el link de confirmación viejo (si lo hubiera) queda
+        // sin efecto, y el scheduler vuelve a evaluar este turno para la nueva fecha.
+        turno.setConfirmacionAsistenciaEmailEnviado(false);
+        turno.setAsistenciaConfirmadaPaciente(false);
+        turno.setTokenConfirmacionAsistencia(null);
         turno = turnoRepository.save(turno);
 
         try {
@@ -858,6 +886,20 @@ public class TurnoService {
         } catch (Exception e) {
             org.slf4j.LoggerFactory.getLogger(TurnoService.class)
                 .error("Error al actualizar evento en Google Calendar para turno ID: {}", turnoId, e);
+        }
+
+        if (turno.getMedico() != null && turno.getMedico().getEmail() != null) {
+            try {
+                resendEmailService.enviarTurnoModificadoProfesional(
+                        turno.getMedico().getEmail(),
+                        turno.getMedico().getNombre(),
+                        turno.getPaciente().getNombre(),
+                        nuevaFecha,
+                        nuevaHoraInicio);
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(TurnoService.class)
+                    .error("Error al enviar mail de turno reprogramado al médico para turno ID: {}", turnoId, e);
+            }
         }
 
         try {
@@ -878,6 +920,89 @@ public class TurnoService {
         } catch (Exception e) {
             System.err.println("Fallo al enviar notificación de reprogramación: " + e.getMessage());
         }
+    }
+
+    // Llamado por NotificationScheduler una vez por día. Busca turnos reales (ocupaAgenda = true
+    // excluye recetas/certificados/informes, ver reservarTurno) que ocurren en exactamente 2 días
+    // y todavía no recibieron el mail de confirmación de asistencia, genera un token de un solo
+    // uso por turno y envía el mail con los enlaces "Confirmar asistencia" / "No podré asistir".
+    @Transactional
+    public void enviarRecordatoriosConfirmacionAsistencia() {
+        java.time.LocalDate fechaObjetivo = java.time.LocalDate.now().plusDays(2);
+        List<Turno> turnos = turnoRepository.findByEstadoAndFechaAndOcupaAgendaAndConfirmacionAsistenciaEmailEnviado(
+                EstadoTurno.CONFIRMADO, fechaObjetivo, true, false);
+
+        for (Turno turno : turnos) {
+            try {
+                String token = java.util.UUID.randomUUID().toString();
+                turno.setTokenConfirmacionAsistencia(token);
+                turno.setConfirmacionAsistenciaEmailEnviado(true);
+                turnoRepository.save(turno);
+
+                String confirmarUrl = publicUrl + "/api/turnos/" + turno.getId() + "/confirmar-asistencia?token=" + token;
+                String noAsistiraUrl = publicUrl + "/api/turnos/" + turno.getId() + "/no-asistira?token=" + token;
+                String modalidadLabel = turno.getModalidad() == Modalidad.ONLINE ? "Online (videollamada)"
+                        : turno.getModalidad() == Modalidad.PRESENCIAL ? "Presencial" : null;
+                String direccion = turno.getModalidad() == Modalidad.PRESENCIAL ? turno.getMedico().getDomicilioAtencion() : null;
+
+                resendEmailService.enviarConfirmacionAsistencia(
+                        turno.getPaciente().getEmail(),
+                        turno.getPaciente().getNombre(),
+                        turno.getMedico().getNombre(),
+                        turno.getFecha(),
+                        turno.getHoraInicio(),
+                        modalidadLabel,
+                        resolverTypeLabel(turno),
+                        direccion,
+                        confirmarUrl,
+                        noAsistiraUrl);
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(TurnoService.class)
+                    .error("Error al enviar mail de confirmación de asistencia para turno ID: {}", turno.getId(), e);
+            }
+        }
+    }
+
+    private void validarTokenConfirmacionAsistencia(Turno turno, String token) {
+        if (token == null || token.isBlank() || turno.getTokenConfirmacionAsistencia() == null
+                || !turno.getTokenConfirmacionAsistencia().equals(token)) {
+            throw new IllegalStateException("El enlace no es válido o ya venció.");
+        }
+    }
+
+    // Called from the public confirmar-asistencia link in the reminder email. Purely informational
+    // for the médico — does not change EstadoTurno, which is (and stays) driven by payment.
+    @Transactional
+    public void confirmarAsistenciaPaciente(Long turnoId, String token) {
+        Turno turno = turnoRepository.findById(turnoId)
+                .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
+        validarTokenConfirmacionAsistencia(turno, token);
+        if (turno.getEstado() != EstadoTurno.CONFIRMADO) {
+            throw new IllegalStateException("Este turno ya no está disponible para confirmar.");
+        }
+
+        turno.setAsistenciaConfirmadaPaciente(true);
+        turnoRepository.save(turno);
+
+        String titulo = "Paciente confirmó su asistencia";
+        String mensaje = turno.getPaciente().getNombre() + " confirmó que va a asistir al turno del " +
+                turno.getFecha() + " a las " + turno.getHoraInicio() + " hs.";
+        notificacionService.crearNotificacion(turno.getMedico(), titulo, mensaje, "TURNO_ASISTENCIA_CONFIRMADA");
+    }
+
+    // Called from the public no-asistira link in the reminder email — the patient is telling us
+    // ahead of time they can't make it, so this cancels the turno exactly like a patient-initiated
+    // cancellation would (same refund policy, same notifications), just triggered by token instead
+    // of a logged-in session.
+    @Transactional
+    public void marcarNoAsistiraPorToken(Long turnoId, String token) {
+        Turno turno = turnoRepository.findById(turnoId)
+                .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
+        validarTokenConfirmacionAsistencia(turno, token);
+        if (turno.getEstado() == EstadoTurno.CANCELADO) {
+            return; // idempotente — ya estaba cancelado
+        }
+        cancelarTurno(turnoId, turno.getPaciente().getEmail());
     }
 
     private com.tranqui.app.model.dto.PacienteDto construirPacienteDto(Usuario p) {

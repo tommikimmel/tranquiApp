@@ -55,6 +55,19 @@ public class SubscriptionAccessFilter extends OncePerRequestFilter {
             "/error"
     );
 
+    // Match exacto (no prefijo): GET /api/medicos es el buscador público de profesionales que
+    // usa la landing page — sin @PreAuthorize en el controller a propósito, porque lo consulta
+    // cualquier visitante anónimo. Si un psiquiatra bloqueado por el paywall navega esa misma
+    // página estando logueado (con su propio JWT), este filtro no debe cortarle un endpoint que
+    // es público igual — MedicoService.obtenerMedicosActivos() ya excluye ahí a los profesionales
+    // sin pago al día, así que dejar pasar la request no expone nada de más. No puede sumarse a
+    // BYPASS_PREFIXES tal cual porque matchea por prefijo: "/api/medicos" ahí adentro dejaría
+    // pasar también /api/medicos/perfil y el resto de rutas del panel, que sí deben seguir
+    // bloqueadas para un profesional sin suscripción activa.
+    private static final List<String> BYPASS_EXACT = List.of(
+            "/api/medicos"
+    );
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -90,6 +103,6 @@ public class SubscriptionAccessFilter extends OncePerRequestFilter {
     }
 
     private boolean isBypassed(String uri) {
-        return BYPASS_PREFIXES.stream().anyMatch(uri::startsWith);
+        return BYPASS_PREFIXES.stream().anyMatch(uri::startsWith) || BYPASS_EXACT.contains(uri);
     }
 }

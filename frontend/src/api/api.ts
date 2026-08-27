@@ -328,6 +328,7 @@ export const api = {
   getInvoicePdfUrl: (invoiceId: number | string) => `${API_BASE}/subscriptions/invoices/${invoiceId}/pdf`,
   iniciarCheckoutSuscripcion: (planId: number, billingCycle: 'monthly' | 'annual' = 'monthly') =>
     apiFetch('/subscriptions/checkout', { method: 'POST', body: { planId, billingCycle } as any }),
+  cancelarSuscripcion: () => apiFetch('/subscriptions/cancel', { method: 'POST' }),
 
   // Admin Suscripciones y Facturación
   getAdminSubscriptionOverview: () => apiFetch('/admin/subscriptions/overview'),

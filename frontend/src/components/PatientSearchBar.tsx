@@ -52,7 +52,10 @@ export default function PatientSearchBar({
   }
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: compact ? '360px' : '100%', maxWidth: compact ? '360px' : '480px' }}>
+    // `width: 100%` (rather than a hard-coded compact px width) with maxWidth keeps this from
+    // overflowing its container on narrow phones (~360px) where a fixed 360px box wouldn't fit
+    // beside its own padding/margins.
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', maxWidth: compact ? '360px' : '480px' }}>
       <div style={{ position: 'relative' }}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{
           width: 16, height: 16,
@@ -72,7 +75,7 @@ export default function PatientSearchBar({
           value={searchQuery}
           onChange={(e) => onSearchQueryChange(e.target.value)}
           onFocus={() => setIsFocused(true)}
-          className="form-input"
+          className="form-input patient-search-input"
           style={{
             width: '100%',
             paddingLeft: 'var(--space-8)',

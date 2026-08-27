@@ -49,6 +49,7 @@ export default function PatientDirectorySidebar({
         </div>
         <input
           type="text"
+          className="patient-directory-search-input"
           placeholder={searchPlaceholder}
           value={searchQuery}
           onChange={(e) => onSearchQueryChange(e.target.value)}

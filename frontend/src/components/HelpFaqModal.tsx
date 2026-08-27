@@ -32,7 +32,7 @@ export default function HelpFaqModal({ onClose }: { onClose: () => void }) {
       zIndex: 9999,
       padding: 'var(--space-4)'
     }}>
-      <div className="card" style={{
+      <div className="card mobile-modal-card" style={{
         maxWidth: '600px',
         width: '100%',
         maxHeight: '85vh',
@@ -45,7 +45,7 @@ export default function HelpFaqModal({ onClose }: { onClose: () => void }) {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
           <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}><IconHelp size={20} /> Ayuda y Preguntas Frecuentes (FAQ)</h3>
-          <button onClick={onClose} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
+          <button onClick={onClose} className="btn btn--ghost btn--sm mobile-modal-close" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', textAlign: 'left', fontSize: 'var(--text-sm)', lineHeight: '1.5' }}>
           <div>

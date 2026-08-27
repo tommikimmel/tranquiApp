@@ -101,6 +101,13 @@ public class SubscriptionReconciliationScheduler {
                     estadoPrevio != null ? estadoPrevio.name() : null, SubscriptionStatus.SUSPENDED.name(),
                     "SYSTEM", "CRON",
                     "Suscripción suspendida tras vencer la ventana de gracia.");
+            try {
+                resendEmailService.enviarSuscripcionVencida(
+                        sub.getProfessional().getEmail(), sub.getProfessional().getNombre(),
+                        sub.getPlan() != null ? sub.getPlan().getName() : null);
+            } catch (Exception e) {
+                log.error("Error al enviar mail de suscripción vencida para suscripción {}: {}", sub.getId(), e.getMessage(), e);
+            }
         }
     }
 
@@ -114,6 +121,22 @@ public class SubscriptionReconciliationScheduler {
         for (Subscription sub : expiring) {
             log.info("Aviso preventivo: Suscripción manual #{} (profesional {}) vence el {}",
                     sub.getId(), sub.getProfessional().getEmail(), sub.getCurrentPeriodEnd());
+
+            // Guarded by avisoVencimientoEnviado: esta query vuelve a matchear la misma suscripción
+            // todos los días de su ventana de 7 días (currentPeriodEnd no cambia hasta que se
+            // renueve), así que sin este chequeo se reenviaría el aviso una vez por día.
+            if (Boolean.TRUE.equals(sub.getAvisoVencimientoEnviado())) {
+                continue;
+            }
+            try {
+                resendEmailService.enviarSuscripcionProximaAVencer(
+                        sub.getProfessional().getEmail(), sub.getProfessional().getNombre(),
+                        sub.getPlan() != null ? sub.getPlan().getName() : null, sub.getCurrentPeriodEnd());
+                sub.setAvisoVencimientoEnviado(true);
+                subscriptionRepository.save(sub);
+            } catch (Exception e) {
+                log.error("Error al enviar mail de suscripción próxima a vencer para suscripción {}: {}", sub.getId(), e.getMessage(), e);
+            }
         }
     }
 

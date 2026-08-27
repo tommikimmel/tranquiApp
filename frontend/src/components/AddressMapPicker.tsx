@@ -544,7 +544,7 @@ export default function AddressMapPicker({
       <div className="form-group" style={{ gridColumn: 'span 2' }}>
         <label className="form-label form-label--required">Domicilio de Atención</label>
         <input
-          className="form-input"
+          className="form-input address-picker-input"
           type="text"
           placeholder="Calle y altura, ej: Av. Colón 123"
           maxLength={MAX_DIRECCION_LEN}
@@ -569,7 +569,7 @@ export default function AddressMapPicker({
         <div style={{ position: 'relative' }}>
           <input
             ref={inputRef}
-            className="form-input"
+            className="form-input address-picker-input"
             type="text"
             placeholder="Calle y altura, ej: Av. Colón 123"
             maxLength={MAX_DIRECCION_LEN}
@@ -634,7 +634,7 @@ export default function AddressMapPicker({
       />
       
       {lat != null && lng != null ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', gap: 'var(--space-2)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px', gap: 'var(--space-2)' }}>
           <span className="form-helper" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
             <IconMapPin />
             {manualAdjustmentEnabled 

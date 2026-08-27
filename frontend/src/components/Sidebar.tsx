@@ -26,8 +26,8 @@ export default function Sidebar({
     { id: 'dashboard' as NavSection, label: 'Inicio', Icon: Icon.Dashboard },
     { id: 'agenda' as NavSection, label: 'Agenda', Icon: Icon.Calendar },
     { id: 'patients' as NavSection, label: 'Pacientes', Icon: Icon.Users },
-    { id: 'clinical-history' as NavSection, label: 'Historia Clínica', Icon: Icon.ClinicalRecord },
-    ...(canUseRecetas ? [{ id: 'prescriptions' as NavSection, label: 'Recetas', Icon: Icon.Prescription, comingSoon: true }] : []),
+    { id: 'clinical-history' as NavSection, label: 'Historia Clínica', Icon: Icon.ClinicalRecord, comingSoon: true, comingSoonHint: 'Todavía estamos construyendo esta sección.' },
+    ...(canUseRecetas ? [{ id: 'prescriptions' as NavSection, label: 'Recetas', Icon: Icon.Prescription, comingSoon: true, comingSoonHint: 'Todavía estamos terminando la integración oficial con QBI2' }] : []),
     { id: 'honorarios' as NavSection, label: 'Honorarios y servicios', Icon: Icon.DollarSign },
     { id: 'settings' as NavSection, label: 'Configuración', Icon: Icon.Settings },
   ]
@@ -73,7 +73,7 @@ export default function Sidebar({
 
         <nav className="sidebar__nav" role="navigation" aria-label="Navegación principal">
           <span className="sidebar__nav-section-title">Menú Principal</span>
-          {navItems.map(({ id, label, Icon: NavIcon, comingSoon }) => (
+          {navItems.map(({ id, label, Icon: NavIcon, comingSoon, comingSoonHint }) => (
             <button
               key={id}
               className={`sidebar__nav-item ${activeNav === id ? 'active' : ''}`}
@@ -85,7 +85,8 @@ export default function Sidebar({
               <span className="sidebar__nav-label">{label}</span>
               {comingSoon && (
                 <span
-                  title="Todavía estamos terminando la integración oficial con QBI2"
+                  className="sidebar__coming-soon-badge"
+                  title={comingSoonHint}
                   style={{
                     fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.02em',
                     color: 'var(--color-warning, #B45309)', background: 'var(--color-warning-bg, #FEF3C7)',

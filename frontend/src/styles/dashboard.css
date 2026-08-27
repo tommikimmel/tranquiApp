@@ -1089,6 +1089,13 @@
   align-items: flex-start;
   gap: 12px;
   width: 100%;
+  /* flex-wrap + the __content min-width below let this row fold itself into a column
+     whenever the *actual* available width gets tight — not just below a viewport
+     breakpoint, but also when a narrower ancestor column (e.g. SettingsView's 260px
+     submenu, in-flow between its own 860px breakpoint and the global sidebar's 1024px
+     drawer breakpoint) squeezes this banner well before the viewport itself is "mobile".
+     Harmless at normal widths since neither the icon nor the content ever needs to wrap. */
+  flex-wrap: wrap;
 }
 
 .mp-connect-banner__icon {
@@ -1113,7 +1120,11 @@
 
 .mp-connect-banner__content {
   flex: 1;
-  min-width: 0;
+  /* A real min-width (not 0) is what makes the flex-wrap above actually fire: once the
+     row has less room than icon + gap + this, the content drops to its own full-width
+     line under the icon instead of being squeezed into a column so narrow that every
+     word breaks onto its own line. */
+  min-width: 190px;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -1192,6 +1203,33 @@
   background: linear-gradient(135deg, var(--green-600) 0%, var(--green-700) 100%) !important;
   box-shadow: 0 6px 18px rgba(47, 168, 79, 0.4) !important;
   transform: translateY(-1px) !important;
+}
+
+/* Known bug (see .claude/skills/verify/SKILL.md): between roughly 1000-1100px viewport width,
+   a narrower in-flow ancestor column — e.g. SettingsView's 260px submenu, which only collapses
+   to full-width at its own 860px breakpoint, well below where the global sidebar stops eating
+   260px in-flow (1024px) — can leave the .mp-connect-banner__body-wrapper row so tight that the
+   fixed-width icon crowds the text column down to a couple dozen px, wrapping it to one word per
+   line. The flex-wrap + min-width pair above already self-corrects once a container gets that
+   narrow, but forcing the column layout here too — reusing the existing 1100px breakpoint from
+   the two rules above (.stats-grid, .dashboard-home-maingrid) — makes the fix explicit and
+   guaranteed for this specific, previously-reported range instead of relying only on the
+   min-width threshold lining up exactly. */
+@media (max-width: 1100px) {
+  .mp-connect-banner__body-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mp-connect-banner__icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+  }
+
+  .mp-connect-banner__logo {
+    width: 22px;
+  }
 }
 
 /* ── Inputs ────────────────────────────────────────────────── */
@@ -3496,6 +3534,11 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    /* .btn--icon is 36x36 by default — fine as a mouse target, too small as the one control
+       that opens the whole drawer on a touch device. Bumped to the ~44px minimum recommended
+       touch target size, here only (not a global .btn--icon change). */
+    width: 44px;
+    height: 44px;
   }
 
   .dashboard-layout {
@@ -3533,11 +3576,15 @@
 
   .sidebar__mobile-close {
     display: inline-flex;
+    /* Same touch-target reasoning as .dashboard-mobile-nav-toggle above — 32px (the base,
+       mouse-oriented size) is under the ~44px minimum for a comfortable tap. */
+    width: 44px;
+    height: 44px;
   }
 
   .sidebar__nav-item {
     border-radius: 12px;
-    padding: 11px 14px;
+    padding: 13px 14px;
   }
 
   .sidebar__nav-item.active {
@@ -3751,6 +3798,16 @@
     right: calc(50% - 14px);
   }
 
+  /* The "Próximamente" pill (Historia Clínica / Recetas) is sized for the full-width drawer
+     row it normally sits at the end of via margin-left:auto — that only pushes right in a row
+     layout. Here .sidebar__nav-item is icon-only and column-flex (see above), so the pill has
+     nowhere to sit but squeezed under/over the icon in a ~44px-tall tab, wider than the tab
+     itself. Same treatment as the label right above: drop it, the icon alone is enough on the
+     compact bar, full "coming soon" context still lives in the drawer's expanded row. */
+  .sidebar__coming-soon-badge {
+    display: none !important;
+  }
+
   .dashboard-main {
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
   }
@@ -3850,6 +3907,427 @@
     justify-content: center !important;
     padding: 6px 12px !important;
     font-size: 0.8rem !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Mobile/tablet responsive pass — Agenda + Patients
+   Scope: AgendaView, AppointmentCard/ExternalEventCard, TurnoDetailModal,
+   CancelTurnoConfirmModal, MisTurnosModal, PatientsView,
+   PatientDirectorySidebar, PatientSearchBar, EditPatientModal,
+   CompleteProfileModal, AddressMapPicker.
+   Reuses the breakpoints already defined above (480/640/768/900) instead of
+   introducing new ones. Additive only — nothing here changes >1024px.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Fixed-overlay modals (TurnoDetailModal, CancelTurnoConfirmModal,
+   MisTurnosModal, EditPatientModal, CompleteProfileModal) — each renders its
+   own `position: fixed` overlay + centered `.card` with inline maxWidth /
+   height / font-size, so these need `!important` to win on mobile without
+   touching the components' desktop-identical inline styles. */
+@media (max-width: 640px) {
+  .app-modal-overlay {
+    padding: var(--space-3) !important;
+  }
+
+  .app-modal-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 90vh !important;
+    max-height: 90dvh !important;
+    overflow-y: auto !important;
+  }
+
+  .app-modal-card input,
+  .app-modal-card select {
+    font-size: 16px !important; /* iOS Safari zooms on focus below 16px */
+  }
+
+  .app-modal-actions {
+    flex-wrap: wrap !important;
+  }
+
+  .app-modal-btn {
+    min-height: 44px !important;
+  }
+
+  .app-modal-close {
+    min-width: 40px !important;
+    min-height: 40px !important;
+  }
+}
+
+/* Fixed N-column field grids (ficha de paciente, completar perfil) only get
+   cramped once the modal itself is down near phone width — keep 2 columns
+   through the phablet/tablet range and only stack below 480px. */
+@media (max-width: 480px) {
+  .modal-field-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Search inputs outside the shared .form-input flow (PatientSearchBar,
+   PatientDirectorySidebar, AddressMapPicker) set their own inline
+   font-size below 16px, which triggers the same iOS zoom-on-focus issue. */
+@media (max-width: 768px) {
+  .patient-search-input,
+  .patient-directory-search-input,
+  .address-picker-input {
+    font-size: 16px !important;
+  }
+}
+
+/* PatientsView chat header: avatar/name block + 3 action buttons ("Editar
+   datos", "Historia Clínica", "Emitir Receta") stop fitting on one line —
+   let both wrap instead of overflowing or clipping. */
+@media (max-width: 768px) {
+  .patients-chat-header__row {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+  }
+
+  .patients-chat-header__actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .patients-chat-header__actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+/* "Volver al listado" is the only way back to the roster once the mobile
+   master-detail view hides the sidebar, but its hit area was just the
+   18px icon + 4px padding — well under a comfortable touch target. */
+@media (max-width: 900px) {
+  .patients-master-detail__back {
+    min-width: 44px;
+    min-height: 44px;
+    padding: var(--space-2);
+  }
+}
+
+/* ── AgendaView: weekly availability editor ───────────────────
+   `.agenda-view-agenda-day-col` / `-daynames > div` are `flex: 1` inside a
+   row of 5 weekday columns — fine while the panel spans most of the
+   viewport, but each column drops below ~50px on a phone, too narrow for
+   the time labels and tap targets inside. Below 640px, stop shrinking the
+   columns and let `.agenda-view-agenda` scroll horizontally instead
+   (contained inside the card, not the page) — the header row and the slot
+   grid share the same fixed track widths so they scroll in lockstep. */
+@media (max-width: 640px) {
+  .agenda-view-agenda {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .agenda-view-agenda-headrow,
+  .agenda-view-agenda-body {
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .agenda-view-agenda-daynames,
+  .agenda-view-agenda-days {
+    flex: none;
+  }
+
+  .agenda-view-agenda-daynames > div,
+  .agenda-view-agenda-day-col {
+    flex: none;
+    width: 92px;
+  }
+
+  .agenda-view-settings-row {
+    flex-direction: column;
+  }
+
+  .agenda-view-panel {
+    padding: 16px;
+  }
+
+  .agenda-view-field input[type="text"],
+  .agenda-view-select-wrap select {
+    font-size: 16px; /* iOS zoom-on-focus guard */
+  }
+}
+
+/* ── AppointmentCard: the full (non-compact) row packs time + divider +
+   info + modalidad tag + action buttons into a single flex row — fine on
+   desktop, but on a narrow phone the action buttons (Unirse/Cancelar) get
+   squeezed to near-nothing. Let the row wrap and push actions onto their
+   own full-width line instead of shrinking everything else. */
+@media (max-width: 480px) {
+  .appointment-item {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+  }
+
+  .appointment-item__info {
+    min-width: 0;
+  }
+
+  .appointment-item__actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* ── Stat cards — extra breakpoint for narrow phones ──────────
+   The 768px block above drops .stats-grid to a 2x2 grid, which reads fine down to ~480px.
+   Below that (the ~360-430px phone range) a 2-up grid leaves each stat-card under ~170px wide —
+   too tight for a currency value like "$123.456" plus its change badge without an awkward
+   wrap. Placed after the 768px block (and !important, matching it) so it actually wins at
+   these narrower widths instead of being shadowed by the 2-column rule above. */
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Responsive: Admin / Tickets / Configuración / Mi Cuenta / Recetas / Login
+   (mobile ~360-430px & tablet ~768-1024px). Every selector below is scoped to
+   these views only — desktop (>1024px) keeps the exact layout it has today.
+   Reuses the breakpoints already in this file (1024 / 900 / 768 / 640 / 480px)
+   instead of introducing new ones.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Shared "blocking modal" treatment ────────────────────────
+   Used by PrescriptionsModal, MyTicketsView, SetNewPasswordModal,
+   TermsAcceptanceModal, HelpFaqModal, AdminDashboard's two modals,
+   AdminSubscriptionsView's modals, FeesServicesView's patient-preview modal,
+   SettingsView's modals and PrescriptionView's detail modal — all render a
+   fixed overlay + a `.card` with inline maxWidth/padding, so the mobile
+   overrides need !important to beat that inline style. Desktop is untouched:
+   these rules only exist inside the media queries below. */
+@media (max-width: 768px) {
+  .mobile-modal-card input,
+  .mobile-modal-card select,
+  .mobile-modal-card textarea {
+    font-size: 16px !important; /* avoid iOS Safari auto-zoom on focus */
+  }
+
+  .mobile-modal-card .btn--sm {
+    min-height: 44px !important;
+  }
+
+  .mobile-modal-close {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .mobile-modal-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: 92dvh !important;
+    overflow-y: auto !important;
+    border-radius: 16px !important;
+  }
+
+  /* `--flush` opts out of the outer padding override for modals whose inner
+     sections already manage their own padding (e.g. a header with its own
+     border-bottom that should span edge-to-edge). */
+  .mobile-modal-card:not(.mobile-modal-card--flush) {
+    padding: var(--space-4) !important;
+  }
+}
+
+/* ── Fixed 2-column inline-style forms → single column on phones ──
+   LoginPage (register steps), SettingsView, MiCuentaView and the
+   AdminSubscriptionsView modals all lay out field pairs with an inline
+   `gridTemplateColumns: '1fr 1fr'` (or '1fr 2fr'). !important is required to
+   beat that inline style; tablet (≥481px) keeps the 2-column layout. */
+@media (max-width: 480px) {
+  .stack-mobile-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── SettingsView / MiCuentaView (share `.settings-content`) ──
+   Bump form font-size on mobile/tablet-portrait to avoid iOS auto-zoom. */
+@media (max-width: 768px) {
+  .settings-content .form-input,
+  .settings-content .form-select,
+  .settings-content input,
+  .settings-content select,
+  .settings-content textarea {
+    font-size: 16px;
+  }
+}
+
+/* ── LoginPage — has no dedicated stylesheet of its own (only shared
+   classes + inline styles), so its mobile fixes live here. */
+@media (max-width: 480px) {
+  .login-container .form-input,
+  .login-container .form-select,
+  .login-container input,
+  .login-container select,
+  .login-container textarea {
+    font-size: 16px;
+  }
+
+  .role-select {
+    gap: var(--space-2);
+  }
+}
+
+/* ── AdminDashboard — its header/sidebar/main is a layout local to this
+   component (not the shared app Sidebar.tsx), so it needs its own
+   tablet/mobile collapse: the 260px fixed sidebar becomes a horizontal
+   scrollable nav bar instead of squeezing the content column. */
+@media (max-width: 1024px) {
+  /* Every property below has an inline-style counterpart on the element (see
+     AdminDashboard.tsx), so all of them need !important to actually win. */
+  .admin-dashboard__header {
+    padding: var(--space-3) var(--space-4) !important;
+    flex-wrap: wrap !important;
+    row-gap: var(--space-2) !important;
+  }
+
+  .admin-dashboard__body {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .admin-dashboard__sidebar {
+    position: static !important;
+    top: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    -webkit-overflow-scrolling: touch;
+    padding: var(--space-2) !important;
+    gap: 8px !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .admin-dashboard__sidebar > button {
+    width: auto !important;
+    min-height: 44px !important;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .admin-dashboard__main {
+    padding: var(--space-4) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-dashboard__search-input {
+    min-width: 0 !important;
+    width: 100%;
+    flex: 1 1 100%;
+  }
+}
+
+/* ── AdminTicketsView split list/detail panel — stack vertically on mobile
+   instead of squeezing a 280px list next to a 340px chat pane. */
+@media (max-width: 768px) {
+  .ticket-columns {
+    flex-direction: column;
+  }
+
+  .ticket-columns > * {
+    max-height: none !important;
+  }
+
+  .ticket-list-panel {
+    max-height: 260px !important;
+  }
+
+  .ticket-detail-panel {
+    min-height: 360px !important;
+  }
+}
+
+/* ── VisitorsView — fixed `320px 1fr` chat grid overflows any phone/tablet
+   narrower than ~700px, so it stacks into a top rep-list + chat below. */
+@media (max-width: 900px) {
+  .visitors-grid {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+  }
+
+  .visitors-grid__sidebar {
+    height: auto !important;
+    max-height: 260px;
+    border-right: none !important;
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+/* ── PrescriptionView — medication fields row (Dosis/Frecuencia/Duración/
+   Laboratorio) is a fixed 4-column grid; collapse progressively so no field
+   is ever squeezed under phone/tablet widths. */
+@media (max-width: 900px) {
+  .rx-med-fields-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .rx-med-fields-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .rx-med-fields-grid input,
+  .rx-med-fields-grid select {
+    font-size: 16px !important;
+  }
+
+  .rx-selected-patient {
+    flex-wrap: wrap;
+  }
+
+  .rx-lab-stat-label {
+    flex-basis: 96px !important;
+  }
+}
+
+/* ── SiteAccessGate — bump the password input to 16px on mobile too. */
+@media (max-width: 480px) {
+  .site-access-card input {
+    font-size: 16px !important;
+  }
+}
+
+/* ── Chat-style reply inputs (AdminTicketsView, MyTicketsView, VisitorsView) ── */
+@media (max-width: 480px) {
+  .chat-reply-input {
+    font-size: 16px !important;
+  }
+}
+
+/* ── AdminSubscriptionsView — plan cards use `minmax(320px, 1fr)`, whose
+   320px floor doesn't leave room on a ~360px phone once the shell's own
+   padding is subtracted. Force a single column below that width instead of
+   letting the grid overflow the viewport. */
+@media (max-width: 480px) {
+  .sub-plans-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── FeesServicesView (Honorarios) — search/quick-adjust/quick-add inputs ── */
+@media (max-width: 480px) {
+  .honorarios-buscador input,
+  .honorarios-ajuste-lin input,
+  .honorarios-ajuste-lin select,
+  .honorarios-sugeridos input,
+  .honorarios-sugeridos select {
+    font-size: 16px !important;
   }
 }
 

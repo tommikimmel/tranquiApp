@@ -784,7 +784,7 @@ function StepSelect({
                   onClick={() => handleSelectModalidad('PRESENCIAL')}
                 >
                   <span className="radio"></span>
-                  <span style={{ flex: 1 }}>
+                  <span style={{ flex: 1, minWidth: 0 }}>
                     <span className="t-name">Presencial</span>
                     <div className="t-desc">Consulta en el consultorio del profesional</div>
                   </span>
@@ -795,7 +795,7 @@ function StepSelect({
                   onClick={() => handleSelectModalidad('ONLINE')}
                 >
                   <span className="radio"></span>
-                  <span style={{ flex: 1 }}>
+                  <span style={{ flex: 1, minWidth: 0 }}>
                     <span className="t-name">Online</span>
                     <div className="t-desc">Videollamada por Google Meet</div>
                   </span>
@@ -815,7 +815,7 @@ function StepSelect({
                   onClick={() => setTipo(s.id)}
                 >
                   <span className="radio"></span>
-                  <span style={{ flex: 1 }}>
+                  <span style={{ flex: 1, minWidth: 0 }}>
                     <span className="t-name">{s.label}</span>
                     <div className="t-desc">{s.desc}</div>
                   </span>

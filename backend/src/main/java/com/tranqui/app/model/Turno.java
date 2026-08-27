@@ -129,6 +129,27 @@ public class Turno {
     @Column(name = "fecha_creacion", nullable = false)
     private LocalDateTime fechaCreacion = LocalDateTime.now();
 
+    // Whether TurnoService#enviarRecordatoriosConfirmacionAsistencia already sent the "confirmá
+    // tu turno" email (2 días antes) for this turno — prevents the daily scheduler from re-sending
+    // it every day it still matches the "fecha == hoy + 2" window. Reset to false by
+    // reprogramarTurno whenever the fecha changes, so a rescheduled turno gets its own reminder.
+    @Builder.Default
+    @Column(name = "confirmacion_asistencia_email_enviado", columnDefinition = "boolean not null default false")
+    private boolean confirmacionAsistenciaEmailEnviado = false;
+
+    // Set once the patient clicks "Confirmar asistencia" in that email. Purely informational for
+    // the médico (see TurnoService#confirmarAsistenciaPaciente) — it does NOT gate EstadoTurno,
+    // which is still driven by payment (see PagoWebhookHandler#procesarAprobacionTurno).
+    @Builder.Default
+    @Column(name = "asistencia_confirmada_paciente", columnDefinition = "boolean not null default false")
+    private boolean asistenciaConfirmadaPaciente = false;
+
+    // Random, unguessable token embedded in the confirmation email's links (confirmar-asistencia /
+    // no-asistira) — lets the patient act from the email without logging in, while still proving
+    // the click actually came from that email instead of someone guessing the turnoId.
+    @Column(name = "token_confirmacion_asistencia", length = 64)
+    private String tokenConfirmacionAsistencia;
+
     @PrePersist
     protected void onCreate() {
         if (fechaCreacion == null) {

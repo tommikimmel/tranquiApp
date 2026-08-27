@@ -40,7 +40,7 @@ export default function TermsAcceptanceModal({ onComplete, onLogout }: TermsAcce
       padding: 'var(--space-4)',
       overflowY: 'auto'
     }}>
-      <div className="card" style={{
+      <div className="card mobile-modal-card" style={{
         maxWidth: '440px',
         width: '100%',
         padding: 'var(--space-6)',

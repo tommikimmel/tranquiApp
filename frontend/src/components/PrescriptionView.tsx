@@ -284,7 +284,7 @@ export default function PrescriptionView({ onSend, medicoInfo }: { onSend: (data
           (corre en modo de prueba/homologación) — el plan Clínico ya da acceso a esta sección,
           pero conviene dejar explícito que la validación legal real todavía no está activa. */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)',
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)',
         backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)', color: '#92400E',
       }}>
         <span style={{
@@ -371,8 +371,8 @@ export default function PrescriptionView({ onSend, medicoInfo }: { onSend: (data
                   const maxCount = laboratorioStats[0].count;
                   const pct = maxCount > 0 ? Math.round((stat.count / maxCount) * 100) : 0;
                   return (
-                    <div key={stat.key} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                      <span style={{ flex: '0 0 160px', fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div key={stat.key} className="rx-lab-stat-row" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                      <span className="rx-lab-stat-label" style={{ flex: '0 0 160px', fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {stat.label}
                       </span>
                       <div style={{ flex: 1, height: '8px', backgroundColor: 'var(--neutral-200)', borderRadius: '999px', overflow: 'hidden' }}>
@@ -480,10 +480,10 @@ export default function PrescriptionView({ onSend, medicoInfo }: { onSend: (data
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               zIndex: 9999, padding: 'var(--space-4)'
             }}>
-              <div className="card" style={{ maxWidth: '600px', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div className="card mobile-modal-card" style={{ maxWidth: '600px', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
                   <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Detalle de Receta #{selectedDetailModal.id}</h3>
-                  <button className="btn btn--ghost btn--sm" onClick={() => setSelectedDetailModal(null)}>✕</button>
+                  <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setSelectedDetailModal(null)}>✕</button>
                 </div>
                 <div style={{ padding: 'var(--space-4)', backgroundColor: 'var(--neutral-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   <div>
@@ -901,7 +901,7 @@ export default function PrescriptionView({ onSend, medicoInfo }: { onSend: (data
                             <span style={{ display: 'block', fontSize: '11px' }}>La farmacia no podrá cambiarlo por otra marca (Decreto 987/03 Art.2°)</span>
                           </span>
                         </label>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 'var(--space-3)' }}>
+                        <div className="rx-med-fields-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 'var(--space-3)' }}>
                           <div className="form-group">
                             <label className="form-label">Dosis</label>
                             <input

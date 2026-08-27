@@ -30,7 +30,7 @@ export default function CancelTurnoConfirmModal({ appt, onClose, onConfirm }: {
   const within48h = hoursUntilAppt !== null && hoursUntilAppt < 48
 
   return (
-    <div style={{
+    <div className="app-modal-overlay" style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(0,0,0,0.5)',
@@ -41,7 +41,7 @@ export default function CancelTurnoConfirmModal({ appt, onClose, onConfirm }: {
       zIndex: 10000,
       padding: 'var(--space-4)'
     }}>
-      <div className="card" style={{
+      <div className="card app-modal-card" style={{
         maxWidth: '420px',
         width: '100%',
         padding: 'var(--space-6)',
@@ -115,10 +115,10 @@ export default function CancelTurnoConfirmModal({ appt, onClose, onConfirm }: {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+        <div className="app-modal-actions" style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
           <button
             type="button"
-            className="btn btn--secondary"
+            className="btn btn--secondary app-modal-btn"
             onClick={onClose}
             style={{ flex: 1, height: '42px', justifyContent: 'center' }}
           >
@@ -126,7 +126,7 @@ export default function CancelTurnoConfirmModal({ appt, onClose, onConfirm }: {
           </button>
           <button
             type="button"
-            className="btn btn--danger"
+            className="btn btn--danger app-modal-btn"
             onClick={onConfirm}
             style={{ flex: 1, height: '42px', justifyContent: 'center' }}
           >

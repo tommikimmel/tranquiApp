@@ -25,6 +25,9 @@ public class NotificationScheduler {
     @Autowired
     private NotificacionService notificacionService;
 
+    @Autowired
+    private TurnoService turnoService;
+
     // Cron se ejecuta cada 1 hora para eliminar notificaciones enviadas hace más de 24 horas
     @Scheduled(cron = "0 0 * * * ?")
     @Transactional
@@ -61,6 +64,18 @@ public class NotificationScheduler {
                 // Capturar excepción para que un fallo en un mensaje no bloquee el resto de los envíos
                 log.error("Fallo al enviar recordatorio de WhatsApp para el turno ID: " + turno.getId(), e);
             }
+        }
+    }
+
+    // Cron se ejecuta todos los días a las 09:00:00 (Zona Horaria Argentina) — mail de "confirmá
+    // tu turno" para los turnos que ocurren en exactamente 2 días, para que el paciente todavía
+    // tenga tiempo de avisar si no va a poder ir. Ver TurnoService#enviarRecordatoriosConfirmacionAsistencia.
+    @Scheduled(cron = "0 0 9 * * ?", zone = "America/Argentina/Cordoba")
+    public void enviarRecordatoriosConfirmacionAsistencia() {
+        try {
+            turnoService.enviarRecordatoriosConfirmacionAsistencia();
+        } catch (Exception e) {
+            log.error("Fallo al ejecutar el envío de recordatorios de confirmación de asistencia", e);
         }
     }
 }

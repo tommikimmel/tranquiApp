@@ -130,23 +130,23 @@ export default function EditPatientModal({
   }
 
   return (
-    <div style={{
+    <div className="app-modal-overlay" style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 9999, padding: 'var(--space-4)'
     }}>
-      <div className="card" style={{ maxWidth: '560px', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+      <div className="card app-modal-card" style={{ maxWidth: '560px', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
           <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Editar datos de {patient.nombre}</h3>
-          <button className="btn btn--ghost btn--sm" onClick={onClose}>✕</button>
+          <button className="btn btn--ghost btn--sm app-modal-close" onClick={onClose}>✕</button>
         </div>
 
         <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', margin: 0 }}>
           Estos datos son los que exige QBI2/Innovamed para validar una receta electrónica a nombre de este paciente.
         </p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-3)' }}>
+        <div className="modal-field-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-3)' }}>
           <div className="form-group">
             <label className="form-label form-label--required">Apellido</label>
             <input className="form-input" type="text" value={apellido} onChange={(e) => setApellido(e.target.value)} placeholder="Ej: Pérez" />
@@ -162,7 +162,7 @@ export default function EditPatientModal({
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--space-3)' }}>
+        <div className="modal-field-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--space-3)' }}>
           <div className="form-group">
             <label className="form-label form-label--required">Tipo Doc.</label>
             <select className="form-input" value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
@@ -191,7 +191,7 @@ export default function EditPatientModal({
         </div>
 
         <div className="settings-section-label">Domicilio</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-3)' }}>
+        <div className="modal-field-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-3)' }}>
           <div className="form-group">
             <label className="form-label">Calle</label>
             <input className="form-input" type="text" value={calle} onChange={(e) => setCalle(e.target.value)} placeholder="Ej: Av. Colón" />
@@ -201,7 +201,7 @@ export default function EditPatientModal({
             <input className="form-input" type="text" value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="Ej: 1234" />
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+        <div className="modal-field-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
           <div className="form-group">
             <label className="form-label">Localidad</label>
             <input className="form-input" type="text" value={localidad} onChange={(e) => setLocalidad(e.target.value)} placeholder="Ej: Córdoba" />
@@ -229,7 +229,7 @@ export default function EditPatientModal({
                 ))}
               </select>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+            <div className="modal-field-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
               <div className="form-group">
                 <label className="form-label">Plan</label>
                 <input className="form-input" type="text" value={plan} onChange={(e) => setPlan(e.target.value)} placeholder="Ej: 210" />
@@ -249,9 +249,9 @@ export default function EditPatientModal({
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', marginTop: 'var(--space-2)' }}>
-          <button className="btn btn--secondary" onClick={onClose} disabled={saving}>Cancelar</button>
-          <button className="btn btn--primary" onClick={handleSave} disabled={!canSave || saving}>
+        <div className="app-modal-actions" style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end', marginTop: 'var(--space-2)' }}>
+          <button className="btn btn--secondary app-modal-btn" onClick={onClose} disabled={saving}>Cancelar</button>
+          <button className="btn btn--primary app-modal-btn" onClick={handleSave} disabled={!canSave || saving}>
             {saving ? 'Guardando...' : 'Guardar'}
           </button>
         </div>

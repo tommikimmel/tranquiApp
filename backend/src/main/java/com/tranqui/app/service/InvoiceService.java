@@ -76,6 +76,17 @@ public class InvoiceService {
             return null;
         }
 
+        // La integración con ARCA (WSAA/WSFEv1) está codeada pero todavía no operativa — sin
+        // certificados ni alta real ante ARCA (arca.enabled=false por defecto, sin overrides en
+        // .env). Sin este guard, cada pago intentaba pedir CAE contra el servicio real igual,
+        // fallando siempre y — peor — quemando un número de comprobante correlativo real en cada
+        // intento fallido (la numeración se incrementa ANTES de llamar a ARCA), lo que rompe la
+        // integridad de la numeración para cuando la facturación real se habilite.
+        if (!arcaConfig.isEnabled()) {
+            log.info("Facturación ARCA todavía no está habilitada (arca.enabled=false) — se omite la emisión para el pago {}.", paymentId);
+            return null;
+        }
+
         Usuario prof = usuarioRepository.findById(payment.getProfessionalId())
                 .orElseThrow(() -> new IllegalArgumentException("Profesional no encontrado"));
 

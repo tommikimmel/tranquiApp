@@ -272,7 +272,10 @@ export default function App() {
   useEffect(() => {
     if (loadingSession) return
 
-    if (currentUser && currentUser.rol === 'PSIQUIATRA' && view === 'dashboard') {
+    // Igual que el resto de la carga del dashboard: si el paywall todavía está bloqueando al
+    // profesional (o no se terminó de chequear), /api/medicos/perfil devuelve 403 — evita
+    // disparar ese fetch (y el 403 ruidoso en consola) hasta que subscriptionAccess === 'allowed'.
+    if (currentUser && currentUser.rol === 'PSIQUIATRA' && view === 'dashboard' && subscriptionAccess === 'allowed') {
       let client: Client | null = null;
       api.getPerfil().then((perfil) => {
         if (perfil && perfil.id) {
@@ -347,7 +350,7 @@ export default function App() {
     // reference on an unrelated re-render would tear the socket down and recreate it mid-handshake
     // ("WebSocket is closed before the connection is established"), same bug fixed in LandingPage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.id, currentUser?.rol, view, loadingSession])
+  }, [currentUser?.id, currentUser?.rol, view, loadingSession, subscriptionAccess])
 
   const handleStatsPeriodChange = async (periodo: 'DIARIO' | 'SEMANAL' | 'MENSUAL') => {
     setStatsPeriod(periodo)
@@ -662,7 +665,28 @@ export default function App() {
             </div>
           )
         }
-        return <PrescriptionView onSend={handleSendPrescription} medicoInfo={medicoInfo} />
+        // Todavía no se habilita el flujo real de emisión (integración oficial con QBI2 en curso)
+        // — se muestra solo el cartel de aviso, sin exponer el formulario funcional, para que
+        // nadie pueda emitir una receta de prueba. Mismo tratamiento que Historia Clínica.
+        return (
+          <div className="card">
+            <div className="card__header"><h2 className="card__title">Recetas Electrónicas</h2></div>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)',
+              backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 'var(--radius-md)', color: '#92400E',
+            }}>
+              <span style={{
+                fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.03em',
+                background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '999px', padding: '3px 9px', flexShrink: 0,
+              }}>
+                Próximamente
+              </span>
+              <span style={{ fontSize: 'var(--text-xs)' }}>
+                Estamos terminando la integración oficial con QBI2/Innovamed para la emisión de recetas electrónicas con validez legal.
+              </span>
+            </div>
+          </div>
+        )
       case 'visitors': 
         return <VisitorsView />
       case 'payments': return (
@@ -1292,7 +1316,7 @@ export default function App() {
               null
             ) : subscriptionAccess === 'blocked' ? (
               <Suspense fallback={null}>
-                <ChoosePlanView variant="blocked" subscription={mySubscription} onLogout={handleLogout} />
+                <ChoosePlanView variant="blocked" subscription={mySubscription} onLogout={handleLogout} profession={currentUser?.profession} />
               </Suspense>
             ) : (
               proDashboardElement

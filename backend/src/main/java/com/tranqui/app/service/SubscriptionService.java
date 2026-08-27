@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -46,6 +48,9 @@ public class SubscriptionService {
     @Autowired
     private MercadoPagoService mercadoPagoService;
 
+    @Autowired
+    private com.tranqui.app.service.arca.ArcaConfig arcaConfig;
+
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
 
@@ -61,8 +66,21 @@ public class SubscriptionService {
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Profesional no encontrado"));
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Plan no encontrado"));
+        // Self-heal: cuentas creadas antes de que /register empezara a crear la fila de
+        // suscripción (o dadas de alta por otra vía, p.ej. Google signup) llegan acá sin ninguna
+        // fila — antes esto tiraba 422 y dejaba al profesional sin forma de salir del bloqueo del
+        // paywall (no podía pagar porque no tenía suscripción, y no tenía suscripción porque nunca
+        // había pagado). Crear la fila en el momento del checkout es la misma inicialización que
+        // hace AuthController.register, solo que tardía.
         Subscription sub = subscriptionRepository.findByProfessionalId(professionalId)
-                .orElseThrow(() -> new IllegalStateException("El profesional no tiene una suscripción registrada."));
+                .orElseGet(() -> subscriptionRepository.save(Subscription.builder()
+                        .professional(profesional)
+                        .plan(plan)
+                        .status(SubscriptionStatus.PENDING_VERIFICATION)
+                        .seats(1)
+                        .billingSource(BillingSource.MANUAL_TRANSFER)
+                        .amountArs(plan.getPriceArs())
+                        .build()));
 
         // Cualquier valor que no sea exactamente "annual" se trata como "monthly" — nunca se cobra
         // el ciclo anual por accidente ante un valor inesperado del frontend.
@@ -89,6 +107,22 @@ public class SubscriptionService {
             return mercadoPagoService.checkoutUrlFor(preapproval);
         } catch (IllegalStateException e) {
             throw e;
+        } catch (com.mercadopago.exceptions.MPApiException e) {
+            // e.getMessage() de MPApiException es siempre el genérico "Api error. Check response
+            // for details" — el motivo real (payer == collector, moneda inválida, cuenta de
+            // prueba vs. producción, etc.) viene en el body de la respuesta HTTP, no en el mensaje
+            // de la excepción. Sin loguear esto acá, un 422 de Mercado Pago es indiagnosticable.
+            Integer status = e.getApiResponse() != null ? e.getApiResponse().getStatusCode() : null;
+            String detalle = e.getApiResponse() != null ? e.getApiResponse().getContent() : e.getMessage();
+            log.error("Error de la API de Mercado Pago creando checkout para profesional {} (status {}): {}",
+                    professionalId, status, detalle);
+            // 429 = "local_rate_limited": Mercado Pago le puso un límite temporal a la cuenta admin
+            // por demasiados intentos seguidos de crear Preapproval — no es un error del profesional
+            // ni de nuestro lado, así que vale la pena distinguirlo del mensaje genérico.
+            String mensaje = (status != null && status == 429)
+                    ? "Mercado Pago está limitando temporalmente los intentos de pago. Esperá unos minutos y volvé a intentar."
+                    : "No se pudo iniciar el pago con Mercado Pago. Intentá de nuevo en unos minutos.";
+            throw new IllegalStateException(mensaje, e);
         } catch (Exception e) {
             log.error("Error creando checkout de Mercado Pago para profesional {}: {}", professionalId, e.getMessage(), e);
             throw new IllegalStateException("No se pudo iniciar el pago con Mercado Pago. Intentá de nuevo en unos minutos.", e);
@@ -123,7 +157,8 @@ public class SubscriptionService {
         }
 
         Subscription sub = subOpt.get();
-        if (sub.getStatus() != SubscriptionStatus.ACTIVE && sub.getStatus() != SubscriptionStatus.PAST_DUE) {
+        if (sub.getStatus() != SubscriptionStatus.ACTIVE && sub.getStatus() != SubscriptionStatus.PAST_DUE
+                && sub.getStatus() != SubscriptionStatus.CANCELLED) {
             return false;
         }
 
@@ -158,7 +193,11 @@ public class SubscriptionService {
         Subscription sub = subscriptionRepository.findByProfessionalId(userId).orElse(null);
         if (sub == null) return false; // sin fila de suscripción = sin acceso
 
-        if (sub.getStatus() != SubscriptionStatus.ACTIVE) return false;
+        // CANCELLED también pasa acá: cancelar (desde el panel o directo en Mercado Pago) corta el
+        // próximo cobro, pero el profesional ya pagó este período y lo sigue usando hasta que
+        // termine — el check de abajo (currentPeriodEnd) es lo que corta el acceso que realmente
+        // corresponde, no el status.
+        if (sub.getStatus() != SubscriptionStatus.ACTIVE && sub.getStatus() != SubscriptionStatus.CANCELLED) return false;
         if (sub.getCurrentPeriodEnd() == null) return false; // ACTIVE sin período pagado = inconsistente, no dejamos pasar
 
         return sub.getCurrentPeriodEnd().isAfter(LocalDateTime.now());
@@ -314,7 +353,11 @@ public class SubscriptionService {
         Usuario prof = usuarioRepository.findById(professionalId)
                 .orElseThrow(() -> new IllegalArgumentException("Profesional no encontrado: " + professionalId));
 
-        if (emitInvoice && !"COURTESY".equalsIgnoreCase(method)) {
+        // Solo bloquea el alta si la facturación ARCA está realmente habilitada — mientras
+        // arca.enabled=false (todavía sin certificados/alta real ante ARCA) generateInvoiceForPayment
+        // no va a intentar nada igual, así que exigir CUIT acá solo trabaría el alta manual sin
+        // motivo real.
+        if (emitInvoice && arcaConfig.isEnabled() && !"COURTESY".equalsIgnoreCase(method)) {
             if (prof.getEffectiveTaxId() == null || prof.getEffectiveTaxId().isBlank()) {
                 throw new IllegalStateException("No se puede emitir factura: el profesional no tiene CUIT/CUIL cargado");
             }
@@ -352,6 +395,7 @@ public class SubscriptionService {
         subscription.setNextBillingDate(end);
         subscription.setGraceUntil(grace);
         subscription.setCancelAtPeriodEnd(false);
+        subscription.setAvisoVencimientoEnviado(false);
         subscription.setUpdatedAt(now);
 
         subscription = subscriptionRepository.save(subscription);
@@ -383,14 +427,55 @@ public class SubscriptionService {
 
         // 6. Facturación ARCA si corresponde
         if (emitInvoice && !"COURTESY".equalsIgnoreCase(method)) {
+            emitirFacturaTrasCommit(payment.getId(), "pago manual");
+        }
+
+        // 7. Mail de pago confirmado al profesional — mismo criterio que la facturación: un alta
+        // de cortesía no es un pago real, así que no corresponde el mail de "pago confirmado".
+        if (!"COURTESY".equalsIgnoreCase(method)) {
             try {
-                invoiceService.generateInvoiceForPayment(payment.getId());
+                resendEmailService.enviarSuscripcionPagoConfirmado(
+                        prof.getEmail(), prof.getNombre(), plan.getName(), payment.getAmountArs(), end);
             } catch (Exception e) {
-                log.error("Error emitiendo factura ARCA para pago manual {}: {}", payment.getId(), e.getMessage(), e);
+                log.error("Error al enviar mail de pago confirmado para profesional {}: {}", prof.getId(), e.getMessage(), e);
             }
         }
 
         return payment;
+    }
+
+    // Dispara la emisión de factura ARCA recién DESPUÉS de que la transacción que activa la
+    // suscripción/registra el pago haya confirmado — nunca desde adentro de esa misma
+    // transacción. generateInvoiceForPayment es @Transactional (REQUIRED): si se la llama desde
+    // adentro y tira una excepción (ej. "el profesional no tiene CUIT/CUIL cargado"), Spring
+    // marca la transacción compartida como rollback-only en el aspecto ANTES de que nuestro
+    // try/catch llegue a atraparla — así que igual termina en UnexpectedRollbackException al
+    // commitear, revirtiendo silenciosamente TODO (suscripción activada, pago registrado
+    // incluidos), sin ningún error visible para quien miraba la pantalla. Se detectó así: un
+    // profesional pagaba de verdad en Mercado Pago, pero la suscripción se quedaba en el estado
+    // viejo para siempre. La factura fallida igual se recupera sola — hay un cron diario
+    // (SubscriptionReconciliationScheduler.checkPaymentsWithoutInvoice) que reintenta facturar
+    // cualquier pago aprobado sin factura.
+    private void emitirFacturaTrasCommit(Long paymentId, String contexto) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            // No hay transacción activa (ej. tests) — generarla en el momento es lo mejor posible.
+            try {
+                invoiceService.generateInvoiceForPayment(paymentId);
+            } catch (Exception e) {
+                log.error("Error emitiendo factura ARCA para {} {}: {}", contexto, paymentId, e.getMessage(), e);
+            }
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    invoiceService.generateInvoiceForPayment(paymentId);
+                } catch (Exception e) {
+                    log.error("Error emitiendo factura ARCA para {} {}: {}", contexto, paymentId, e.getMessage(), e);
+                }
+            }
+        });
     }
 
     /**
@@ -416,6 +501,53 @@ public class SubscriptionService {
             return null;
         }
 
+        return activarPagoSuscripcion(sub, mpPaymentId, amount, status);
+    }
+
+    /**
+     * Mismo caso que processMercadoPagoPaymentWebhook, pero para cuando Mercado Pago notifica el
+     * cobro de una suscripción como un webhook "payment" genérico (type=payment) en vez del
+     * "subscription_authorized_payment" esperado — depende de qué tópicos tenga suscriptos la
+     * app de MP en su panel de desarrollador, y en la práctica el genérico es el que más llega.
+     * Ahí no hay preapproval_id a mano, pero sí external_reference — que es justamente el "sub-
+     * {subscriptionId}" que nosotros mismos seteamos al crear el Preapproval (ver
+     * crearSuscripcionPreapproval), así que identificamos la suscripción por ahí en vez de por
+     * mpPreapprovalId. Sin esto, un profesional que paga y solo recibe el webhook genérico se
+     * queda viendo el cartel de "reactivá tu cuenta" para siempre pese a haber pagado.
+     */
+    @Transactional
+    public SubscriptionPayment processMercadoPagoPaymentByExternalReference(
+            String externalReference,
+            String mpPaymentId,
+            BigDecimal amount,
+            String status
+    ) {
+        if (externalReference == null || !externalReference.startsWith("sub-")) {
+            return null;
+        }
+        Long subscriptionId;
+        try {
+            subscriptionId = Long.parseLong(externalReference.substring(4));
+        } catch (NumberFormatException e) {
+            log.warn("external_reference de suscripción con formato inesperado: {}", externalReference);
+            return null;
+        }
+
+        Optional<SubscriptionPayment> existing = paymentRepository.findByMpPaymentId(mpPaymentId);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        Subscription sub = subscriptionRepository.findById(subscriptionId).orElse(null);
+        if (sub == null) {
+            log.warn("Webhook de pago de Mercado Pago recibido para suscripción desconocida: {}", subscriptionId);
+            return null;
+        }
+
+        return activarPagoSuscripcion(sub, mpPaymentId, amount, status);
+    }
+
+    private SubscriptionPayment activarPagoSuscripcion(Subscription sub, String mpPaymentId, BigDecimal amount, String status) {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime nextEnd = now.plusMonths(mesesDelCiclo(sub));
 
@@ -426,6 +558,7 @@ public class SubscriptionService {
         sub.setCurrentPeriodEnd(nextEnd);
         sub.setNextBillingDate(nextEnd);
         sub.setGraceUntil(nextEnd.plusDays(7));
+        sub.setAvisoVencimientoEnviado(false);
         subscriptionRepository.save(sub);
 
         String idemKey = "MP-" + mpPaymentId;
@@ -452,14 +585,68 @@ public class SubscriptionService {
                 "Estado: " + status + ", Monto: " + payment.getAmountArs());
 
         if ("APPROVED".equalsIgnoreCase(payment.getStatus())) {
+            emitirFacturaTrasCommit(payment.getId(), "pago MP");
             try {
-                invoiceService.generateInvoiceForPayment(payment.getId());
+                resendEmailService.enviarSuscripcionPagoConfirmado(
+                        sub.getProfessional().getEmail(), sub.getProfessional().getNombre(),
+                        sub.getPlan() != null ? sub.getPlan().getName() : null, payment.getAmountArs(), nextEnd);
             } catch (Exception e) {
-                log.error("Error emitiendo factura ARCA para pago MP {}: {}", payment.getId(), e.getMessage());
+                log.error("Error al enviar mail de pago confirmado (MP) para suscripción {}: {}", sub.getId(), e.getMessage(), e);
             }
         }
 
         return payment;
+    }
+
+    /**
+     * Cancelación desde el propio panel del profesional (Ajustes > Mi Suscripción). Corta el
+     * próximo cobro recurrente en Mercado Pago, pero NO revoca el acceso ahora mismo — el
+     * profesional ya pagó el período vigente y lo sigue usando hasta currentPeriodEnd (ver
+     * isAccessAllowed, que trata CANCELLED igual que ACTIVE mientras el período no haya vencido).
+     */
+    @Transactional
+    public void cancelarSuscripcion(Long professionalId) {
+        Subscription sub = subscriptionRepository.findByProfessionalId(professionalId)
+                .orElseThrow(() -> new IllegalStateException("No contás con una suscripción registrada."));
+
+        if (Boolean.TRUE.equals(sub.getCancelAtPeriodEnd())) {
+            return; // ya estaba cancelada — idempotente, no reintenta cancelar en MP de nuevo
+        }
+
+        if (sub.getMpPreapprovalId() != null && sub.getBillingSource() == BillingSource.MERCADOPAGO) {
+            try {
+                mercadoPagoService.cancelarSuscripcionPreapproval(sub.getMpPreapprovalId());
+            } catch (com.mercadopago.exceptions.MPApiException e) {
+                // Mismo problema que en iniciarCheckout: e.getMessage() es siempre el genérico
+                // "Api error. Check response for details" — el motivo real viene en el body.
+                String detalle = e.getApiResponse() != null ? e.getApiResponse().getContent() : e.getMessage();
+                log.error("Error de la API de Mercado Pago cancelando preapproval {} para profesional {} (status {}): {}",
+                        sub.getMpPreapprovalId(), professionalId,
+                        e.getApiResponse() != null ? e.getApiResponse().getStatusCode() : null, detalle);
+                throw new IllegalStateException(
+                        "No se pudo cancelar el cobro recurrente en Mercado Pago. Intentá de nuevo o escribinos a soporte.", e);
+            } catch (Exception e) {
+                log.error("Error cancelando preapproval {} en Mercado Pago para profesional {}: {}",
+                        sub.getMpPreapprovalId(), professionalId, e.getMessage(), e);
+                throw new IllegalStateException(
+                        "No se pudo cancelar el cobro recurrente en Mercado Pago. Intentá de nuevo o escribinos a soporte.", e);
+            }
+        }
+
+        sub.setCancelAtPeriodEnd(true);
+        sub.setUpdatedAt(LocalDateTime.now());
+        subscriptionRepository.save(sub);
+
+        logEvent(sub.getId(), "SUBSCRIPTION_CANCELLED_BY_PROFESSIONAL", "professional", String.valueOf(professionalId),
+                "El profesional canceló su suscripción — mantiene acceso hasta " + sub.getCurrentPeriodEnd());
+
+        try {
+            resendEmailService.enviarSuscripcionCancelada(
+                    sub.getProfessional().getEmail(), sub.getProfessional().getNombre(),
+                    sub.getPlan() != null ? sub.getPlan().getName() : null, sub.getCurrentPeriodEnd());
+        } catch (Exception e) {
+            log.error("Error al enviar mail de suscripción cancelada para profesional {}: {}", professionalId, e.getMessage(), e);
+        }
     }
 
     /**

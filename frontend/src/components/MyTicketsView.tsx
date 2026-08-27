@@ -122,7 +122,7 @@ export default function MyTicketsView({ onClose }: { onClose: () => void }) {
       zIndex: 9999,
       padding: 'var(--space-4)'
     }}>
-      <div className="card" style={{
+      <div className="card mobile-modal-card" style={{
         maxWidth: '600px',
         width: '100%',
         maxHeight: '85vh',
@@ -137,7 +137,7 @@ export default function MyTicketsView({ onClose }: { onClose: () => void }) {
           <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>
             {view === 'detail' && selected ? selected.asunto : view === 'new' ? 'Nuevo ticket' : 'Mis Tickets'}
           </h3>
-          <button onClick={onClose} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
+          <button onClick={onClose} className="btn btn--ghost btn--sm mobile-modal-close" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
         </div>
 
         {view === 'list' && (
@@ -243,7 +243,7 @@ export default function MyTicketsView({ onClose }: { onClose: () => void }) {
             )}
             <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
               <input
-                className="form-input"
+                className="form-input chat-reply-input"
                 value={reply}
                 onChange={(e) => setReply(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !sending) handleResponder() }}

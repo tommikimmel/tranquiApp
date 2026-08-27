@@ -144,6 +144,27 @@ public class SubscriptionController {
     }
 
     /**
+     * Cancela la suscripción del profesional autenticado: corta el próximo cobro en Mercado
+     * Pago, pero conserva el acceso hasta que termine el período ya pagado (ver
+     * SubscriptionService.cancelarSuscripcion). Vive bajo /api/subscriptions/ a propósito —
+     * mismo motivo que /checkout: un profesional bloqueado por falta de pago igual tiene que
+     * poder cancelar.
+     */
+    @PostMapping("/cancel")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<?> cancelarSuscripcion(@AuthenticationPrincipal UserDetails userDetails) {
+        Usuario prof = usuarioRepository.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+
+        try {
+            subscriptionService.cancelarSuscripcion(prof.getId());
+            return ResponseEntity.ok(Map.of("cancelled", true));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.unprocessableEntity().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
      * Historial de facturas electrónicas del profesional autenticado
      */
     @GetMapping("/my-invoices")

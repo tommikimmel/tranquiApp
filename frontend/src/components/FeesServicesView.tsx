@@ -938,13 +938,13 @@ export default function FeesServicesView({
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: '20px', zIndex: 9999
           }}>
-            <div className="card" style={{ maxWidth: '480px', width: '100%', maxHeight: '86vh', overflowY: 'auto', padding: 0 }}>
+            <div className="card mobile-modal-card mobile-modal-card--flush" style={{ maxWidth: '480px', width: '100%', maxHeight: '86vh', overflowY: 'auto', padding: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '18px 22px 14px', borderBottom: '1px solid var(--color-border)' }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', fontFamily: 'var(--font-heading)' }}>Lo que ve el paciente</h3>
                   <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: 'var(--color-text-secondary)' }}>Al reservar un turno, en este orden</p>
                 </div>
-                <button className="btn btn--ghost btn--sm" onClick={() => setShowPatientPreview(false)}>✕</button>
+                <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setShowPatientPreview(false)}>✕</button>
               </div>
               <div style={{ padding: '18px 22px' }}>
                 {vivos.filter((t: any) => t.enabled).length === 0 ? (

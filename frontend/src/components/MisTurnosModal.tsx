@@ -41,7 +41,7 @@ export default function MisTurnosModal({ appointments, loading, onClose, onCance
   const turnos = appointments.filter(a => a.ocupaAgenda !== false)
 
   return (
-    <div style={{
+    <div className="app-modal-overlay" style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(0,0,0,0.5)',
@@ -52,7 +52,7 @@ export default function MisTurnosModal({ appointments, loading, onClose, onCance
       zIndex: 9999,
       padding: 'var(--space-4)'
     }}>
-      <div className="card" style={{
+      <div className="card app-modal-card" style={{
         maxWidth: '600px',
         width: '100%',
         maxHeight: '85vh',
@@ -65,7 +65,7 @@ export default function MisTurnosModal({ appointments, loading, onClose, onCance
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
           <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Mis Turnos Reservados</h3>
-          <button onClick={onClose} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
+          <button onClick={onClose} className="btn btn--ghost btn--sm app-modal-close" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
         </div>
         {loading ? (
           <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}><div className="checkout-spinner" style={{ margin: 'auto' }} /></div>
@@ -85,7 +85,7 @@ export default function MisTurnosModal({ appointments, loading, onClose, onCance
                   flexDirection: 'column',
                   gap: 'var(--space-2)'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)' }}>
                     <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>
                       {formatDateDDMMYYYY(appt.fecha)} · {appt.hour} hs
                     </span>
@@ -97,6 +97,7 @@ export default function MisTurnosModal({ appointments, loading, onClose, onCance
                       ) })()}
                       {appt.status !== 'completed' && (
                         <button
+                          className="app-modal-btn"
                           onClick={() => onCancel(appt.id)}
                           style={{
                             border: 'none',
@@ -104,7 +105,8 @@ export default function MisTurnosModal({ appointments, loading, onClose, onCance
                             cursor: 'pointer',
                             color: 'var(--color-danger)',
                             fontSize: '12px',
-                            fontWeight: 'bold'
+                            fontWeight: 'bold',
+                            padding: '0 var(--space-1)'
                           }}
                           title="Cancelar Turno"
                         >
@@ -129,7 +131,7 @@ export default function MisTurnosModal({ appointments, loading, onClose, onCance
                         }
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn btn--ghost btn--sm"
+                        className="btn btn--ghost btn--sm app-modal-btn"
                         style={{
                           fontSize: '10px',
                           padding: 'var(--space-1) var(--space-2)',
@@ -167,7 +169,7 @@ export default function MisTurnosModal({ appointments, loading, onClose, onCance
                       href={appt.meetLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn btn--primary"
+                      className="btn btn--primary app-modal-btn"
                       style={{ fontSize: '11px', padding: 'var(--space-2) var(--space-4)', width: 'fit-content', display: 'flex', gap: '4px', alignItems: 'center', marginTop: 'var(--space-1)' }}
                     >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14 }}><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
@@ -179,7 +181,7 @@ export default function MisTurnosModal({ appointments, loading, onClose, onCance
                       href={appt.checkoutUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn"
+                      className="btn app-modal-btn"
                       style={{
                         fontSize: '11px',
                         padding: 'var(--space-2) var(--space-5)',

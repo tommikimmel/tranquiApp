@@ -809,9 +809,14 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
                             <button
                               className="btn btn--primary btn--sm"
                               onClick={() => {
+                                // openManualModal() es lo que genera la clave de idempotencia
+                                // (y resetea el resto del formulario) — llamarlo primero y recién
+                                // después preseleccionar el profesional evita mandar el pago con
+                                // idempotencyKey vacío (rechazado por el backend: "La clave de
+                                // idempotencia es obligatoria").
+                                openManualModal()
                                 const profUser = users.find((u) => u.id === sub.professionalId)
                                 if (profUser) handleSelectProf(profUser)
-                                setShowManualModal(true)
                               }}
                             >
                               Cobro / Renovar
@@ -840,7 +845,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-4)' }}>
+          <div className="sub-plans-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-4)' }}>
             {plans.map((p) => (
               <div
                 key={p.id}
@@ -1121,13 +1126,13 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
           }}
           onClick={(e) => e.target === e.currentTarget && setEditingPlan(null)}
         >
-          <div className="card" style={{ maxWidth: '520px', width: '100%', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div className="card mobile-modal-card" style={{ maxWidth: '520px', width: '100%', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Modificar Precio Base / Plan</h3>
                 <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Código: {editingPlan.code}</span>
               </div>
-              <button className="btn btn--ghost btn--sm" onClick={() => setEditingPlan(null)}>✕</button>
+              <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setEditingPlan(null)}>✕</button>
             </div>
 
             <form onSubmit={handleSavePlan} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
@@ -1145,7 +1150,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+              <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>
                     Precio Base Mensual (ARS) *
@@ -1255,7 +1260,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
           }}
           onClick={(e) => e.target === e.currentTarget && setSelectedSubForAudit(null)}
         >
-          <div className="card" style={{ maxWidth: '600px', width: '100%', maxHeight: '80vh', overflowY: 'auto', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div className="card mobile-modal-card" style={{ maxWidth: '600px', width: '100%', maxHeight: '80vh', overflowY: 'auto', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>
@@ -1265,7 +1270,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
                   {selectedSubForAudit.professionalName} ({selectedSubForAudit.professionalEmail})
                 </span>
               </div>
-              <button className="btn btn--ghost btn--sm" onClick={() => setSelectedSubForAudit(null)}>✕</button>
+              <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setSelectedSubForAudit(null)}>✕</button>
             </div>
 
             {loadingSubEvents ? (
@@ -1304,7 +1309,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
           }}
           onClick={(e) => e.target === e.currentTarget && setSelectedSubForStatus(null)}
         >
-          <div className="card" style={{ maxWidth: '480px', width: '100%', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div className="card mobile-modal-card" style={{ maxWidth: '480px', width: '100%', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>
               Modificar Estado de Suscripción
             </h3>
@@ -1365,7 +1370,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
           onClick={(e) => e.target === e.currentTarget && setShowManualModal(false)}
         >
           <div
-            className="card"
+            className="card mobile-modal-card"
             style={{
               maxWidth: '640px',
               width: '100%',
@@ -1384,7 +1389,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
                   Registrá cobros en efectivo o transferencia con emisión correlativa de Factura C.
                 </span>
               </div>
-              <button className="btn btn--ghost btn--sm" onClick={() => setShowManualModal(false)}>✕</button>
+              <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setShowManualModal(false)}>✕</button>
             </div>
 
             <form onSubmit={handleManualSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
@@ -1474,7 +1479,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
               </div>
 
               {/* 3. Monto y Método */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+              <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>
                     Monto Cobrado (ARS) *
@@ -1508,7 +1513,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
               </div>
 
               {/* 4. Fechas del Período */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+              <div className="stack-mobile-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>
                     Fecha Inicio *
@@ -1605,7 +1610,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
           }}
           onClick={(e) => e.target === e.currentTarget && setSelectedInvoiceForNc(null)}
         >
-          <div className="card" style={{ maxWidth: '520px', width: '100%', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div className="card mobile-modal-card" style={{ maxWidth: '520px', width: '100%', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold', color: 'var(--color-danger)' }}>
               Emitir Nota de Crédito C
             </h3>

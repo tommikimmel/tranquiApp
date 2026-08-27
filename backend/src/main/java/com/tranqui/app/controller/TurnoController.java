@@ -115,4 +115,53 @@ public class TurnoController {
         turnoService.reprogramarTurno(turnoId, fecha, hora);
         return ResponseEntity.ok().build();
     }
+
+    /**
+     * Público (sin login), llegado desde el botón "Confirmar asistencia" del mail de recordatorio
+     * enviado 2 días antes del turno (ver TurnoService#enviarRecordatoriosConfirmacionAsistencia).
+     * El token prueba que el click vino de ese mail en vez de alguien adivinando el turnoId.
+     */
+    @GetMapping("/turnos/{turnoId}/confirmar-asistencia")
+    public ResponseEntity<String> confirmarAsistencia(@PathVariable Long turnoId, @RequestParam String token) {
+        try {
+            turnoService.confirmarAsistenciaPaciente(turnoId, token);
+            return paginaHtml(true, "¡Asistencia confirmada!", "Le avisamos al profesional que vas a estar en tu turno. ¡Te esperamos!");
+        } catch (Exception e) {
+            return paginaHtml(false, "No pudimos confirmar tu turno", e.getMessage());
+        }
+    }
+
+    /**
+     * Público (sin login), contraparte del botón "No podré asistir" del mismo mail — cancela el
+     * turno con la misma lógica (y política de reembolso) que una cancelación normal del paciente.
+     */
+    @GetMapping("/turnos/{turnoId}/no-asistira")
+    public ResponseEntity<String> noAsistira(@PathVariable Long turnoId, @RequestParam String token) {
+        try {
+            turnoService.marcarNoAsistiraPorToken(turnoId, token);
+            return paginaHtml(true, "Turno cancelado", "Avisamos al profesional que no vas a poder asistir. Gracias por avisarnos con anticipación.");
+        } catch (Exception e) {
+            return paginaHtml(false, "No pudimos procesar tu solicitud", e.getMessage());
+        }
+    }
+
+    // Página HTML mínima y con la misma identidad visual que los mails de Tranqui App — es lo que
+    // ve el paciente al tocar un botón del correo, no una API pensada para ser consumida por el
+    // frontend.
+    private ResponseEntity<String> paginaHtml(boolean exito, String titulo, String mensaje) {
+        String color = exito ? "#16a34a" : "#dc2626";
+        String emoji = exito ? "✅" : "⚠️";
+        String html = "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\">" +
+                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
+                "<title>" + titulo + "</title></head>" +
+                "<body style=\"margin:0;background:#eef2f7;font-family:'Segoe UI',Helvetica,Arial,sans-serif;\">" +
+                "<div style=\"max-width:420px;margin:64px auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:36px 32px;text-align:center;\">" +
+                "<div style=\"font-size:20px;font-weight:700;color:#0f172a;margin-bottom:18px;\">Tranqui<span style=\"color:#009ee3;\">App</span></div>" +
+                "<div style=\"font-size:36px;margin-bottom:10px;\">" + emoji + "</div>" +
+                "<h1 style=\"font-size:19px;color:#0f172a;margin:0 0 10px;\">" + titulo + "</h1>" +
+                "<p style=\"font-size:14px;color:#334155;line-height:1.6;margin:0;\">" + (mensaje != null ? mensaje : "") + "</p>" +
+                "<p style=\"font-size:12px;color:#94a3b8;margin-top:24px;\">Ya podés cerrar esta ventana.</p>" +
+                "</div></body></html>";
+        return ResponseEntity.ok().contentType(org.springframework.http.MediaType.TEXT_HTML).body(html);
+    }
 }

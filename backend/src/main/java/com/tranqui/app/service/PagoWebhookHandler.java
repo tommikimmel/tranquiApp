@@ -40,6 +40,9 @@ public class PagoWebhookHandler {
     @Autowired
     private NotificacionService notificacionService;
 
+    @Autowired
+    private ResendEmailService resendEmailService;
+
     @Transactional
     public void procesarAprobacionConcepto(Long solicitudId, String transactionId) {
         SolicitudDocumento solicitud = solicitudRepository.findById(solicitudId)
@@ -142,6 +145,23 @@ public class PagoWebhookHandler {
             log.error("Error al crear notificaciones de confirmación para el turno ID: {}", turnoId, e);
         }
 
+        // Mail al profesional avisándole del nuevo turno reservado — solo para turnos reales, no
+        // para documentos (recetas/certificados/informes tienen su propio flujo de aviso).
+        if (!esDocumento && turno.getMedico().getEmail() != null) {
+            try {
+                resendEmailService.enviarNuevoTurnoProfesional(
+                        turno.getMedico().getEmail(),
+                        turno.getMedico().getNombre(),
+                        turno.getPaciente().getNombre(),
+                        turno.getFecha(),
+                        turno.getHoraInicio(),
+                        turno.getModalidad() != null ? turno.getModalidad().name() : null,
+                        resolverTipoTurnoLabel(turno));
+            } catch (Exception e) {
+                log.error("Error al enviar mail de nuevo turno al médico para turno ID: {}", turnoId, e);
+            }
+        }
+
         // Intentar notificar por WhatsApp — salvo que el paciente haya desactivado estas
         // notificaciones desde "Mi Cuenta". No aplica a documentos: no hay fecha/hora real ni
         // link de videollamada que recordar.
@@ -154,6 +174,19 @@ public class PagoWebhookHandler {
                 log.error("Error al enviar recordatorio de WhatsApp para el turno ID: {}", turnoId, e);
             }
         }
+    }
+
+    // Same shape as TurnoService#resolverTypeLabel (private there) but only needs to cover real
+    // turnos — this is only ever called for !esDocumento, so servicioId/tipo here can't be a
+    // receta/certificado.
+    private String resolverTipoTurnoLabel(Turno turno) {
+        if (turno.getTipo() == com.tranqui.app.model.TipoTurno.OBRA_SOCIAL || turno.getTipo() == com.tranqui.app.model.TipoTurno.OSDE) {
+            return "Obra Social";
+        }
+        if (turno.getTipo() == com.tranqui.app.model.TipoTurno.SOBRETUNO) {
+            return "Sobreturno";
+        }
+        return "Consulta particular";
     }
 
     private String resolverTipoDocumentoLabel(Turno turno) {

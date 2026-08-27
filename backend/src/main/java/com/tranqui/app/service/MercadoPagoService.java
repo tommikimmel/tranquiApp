@@ -6,10 +6,13 @@ import com.mercadopago.client.preference.PreferenceRequest;
 import com.mercadopago.client.preference.PreferenceBackUrlsRequest;
 import com.mercadopago.client.preapproval.PreapprovalClient;
 import com.mercadopago.client.preapproval.PreapprovalCreateRequest;
+import com.mercadopago.client.preapproval.PreapprovalUpdateRequest;
 import com.mercadopago.client.preapproval.PreApprovalAutoRecurringCreateRequest;
+import com.mercadopago.client.payment.PaymentClient;
 import com.mercadopago.core.MPRequestOptions;
 import com.mercadopago.resources.preference.Preference;
 import com.mercadopago.resources.preapproval.Preapproval;
+import com.mercadopago.resources.payment.Payment;
 import com.tranqui.app.model.Plan;
 import com.tranqui.app.model.Turno;
 import com.tranqui.app.model.Usuario;
@@ -92,7 +95,13 @@ public class MercadoPagoService {
                 .frequencyType("months")
                 .transactionAmount(esAnual ? plan.getPriceArsAnual() : plan.getPriceArs())
                 .currencyId("ARS")
-                .startDate(OffsetDateTime.now())
+                // OffsetDateTime.now() queda en el pasado para cuando la request llega a validarse
+                // del lado de Mercado Pago (latencia de red + posible desfasaje de reloj entre este
+                // servidor y el de MP), y la API rechaza el Preapproval entero con "Invalid value
+                // for auto_recurring.start_date, cannot be a past date". Un margen de 10 minutos
+                // no afecta al profesional — igual autoriza el pago de inmediato al entrar al
+                // checkout, start_date solo define desde cuándo puede arrancar a cobrar.
+                .startDate(OffsetDateTime.now().plusMinutes(10))
                 .build();
 
         PreapprovalCreateRequest request = PreapprovalCreateRequest.builder()
@@ -111,6 +120,27 @@ public class MercadoPagoService {
 
     public String checkoutUrlFor(Preapproval preapproval) {
         return isSandbox ? preapproval.getSandboxInitPoint() : preapproval.getInitPoint();
+    }
+
+    // Corta el cobro recurrente del lado de Mercado Pago (si no se llama esto, MP sigue
+    // debitando todos los meses aunque nuestra base ya haya marcado la suscripción como
+    // cancelada). El acceso local no se corta acá — sigue vigente hasta currentPeriodEnd, ver
+    // SubscriptionService.cancelarSuscripcion.
+    public void cancelarSuscripcionPreapproval(String preapprovalId) throws Exception {
+        PreapprovalUpdateRequest request = PreapprovalUpdateRequest.builder()
+                .status("cancelled")
+                .build();
+        MPRequestOptions options = MPRequestOptions.builder().accessToken(adminAccessToken).build();
+        buildPreapprovalClient().update(preapprovalId, request, options);
+    }
+
+    // Usado por WebhookController para reconocer un webhook "payment" genérico como el cobro de
+    // una suscripción: los pagos recurrentes de Preapproval los cobra la cuenta ADMIN (no el
+    // OAuth por-profesional que usan los pagos de turno), así que hay que leerlo con este token
+    // en vez de buscar a qué médico pertenece.
+    public Payment obtenerPagoAdmin(Long paymentId) throws Exception {
+        MPRequestOptions options = MPRequestOptions.builder().accessToken(adminAccessToken).build();
+        return new PaymentClient().get(paymentId, options);
     }
 
     public String crearPreferenciaPago(Turno turno, Usuario medico) throws Exception {

@@ -51,7 +51,7 @@ export default function CompleteProfileModal({ user, onComplete, onLogout }: Com
   }
 
   return (
-    <div style={{
+    <div className="app-modal-overlay" style={{
       position: 'fixed',
       inset: 0,
       backgroundColor: 'rgba(0,0,0,0.5)',
@@ -63,7 +63,7 @@ export default function CompleteProfileModal({ user, onComplete, onLogout }: Com
       padding: 'var(--space-4)',
       overflowY: 'auto'
     }}>
-      <div className="card" style={{
+      <div className="card app-modal-card" style={{
         maxWidth: '480px',
         width: '100%',
         padding: 'var(--space-6)',
@@ -92,7 +92,7 @@ export default function CompleteProfileModal({ user, onComplete, onLogout }: Com
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+          <div className="modal-field-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
             <div className="form-group">
               <label className="form-label form-label--required">Nombre</label>
               <input
@@ -115,7 +115,7 @@ export default function CompleteProfileModal({ user, onComplete, onLogout }: Com
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+          <div className="modal-field-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
             <div className="form-group">
               <label className="form-label form-label--required">Sexo</label>
               <select className="form-select" value={sexo} onChange={(e) => setSexo(e.target.value)}>
@@ -137,7 +137,7 @@ export default function CompleteProfileModal({ user, onComplete, onLogout }: Com
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--space-3)' }}>
+          <div className="modal-field-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--space-3)' }}>
             <div className="form-group">
               <label className="form-label form-label--required">Documento</label>
               <select className="form-select" value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
@@ -193,7 +193,7 @@ export default function CompleteProfileModal({ user, onComplete, onLogout }: Com
             </div>
           </div>
 
-          <button type="submit" disabled={loading} className="btn btn--primary" style={{ width: '100%', marginTop: 'var(--space-2)' }}>
+          <button type="submit" disabled={loading} className="btn btn--primary app-modal-btn" style={{ width: '100%', marginTop: 'var(--space-2)' }}>
             {loading ? 'Guardando...' : 'Guardar y continuar'}
           </button>
           <button

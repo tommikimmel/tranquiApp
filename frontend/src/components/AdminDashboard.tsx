@@ -546,7 +546,7 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
       flexDirection: 'column'
     }}>
       {/* Admin Header */}
-      <header style={{
+      <header className="admin-dashboard__header" style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -574,10 +574,10 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
       </header>
 
       {/* Body: Sidebar + Main Content */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'flex-start', width: '100%' }}>
+      <div className="admin-dashboard__body" style={{ flex: 1, display: 'flex', alignItems: 'flex-start', width: '100%' }}>
 
         {/* Sidebar Navigation */}
-        <aside style={{
+        <aside className="admin-dashboard__sidebar" style={{
           width: '260px',
           flexShrink: 0,
           borderRight: '1px solid var(--color-border)',
@@ -629,7 +629,7 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
         </aside>
 
         {/* Main Content Area */}
-        <main style={{
+        <main className="admin-dashboard__main" style={{
           flex: 1,
           minWidth: 0,
           padding: 'var(--space-8)',
@@ -791,6 +791,7 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
                 </span>
                 <input
                   type="text"
+                  className="admin-dashboard__search-input"
                   placeholder="Buscar por nombre, email o rol..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -914,7 +915,7 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
           }}
           onClick={(e) => e.target === e.currentTarget && setDetailUser(null)}
         >
-          <div className="card" style={{ maxWidth: '640px', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div className="card mobile-modal-card" style={{ maxWidth: '640px', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
                 <Avatar name={`${detailUser.nombre} ${detailUser.apellido || ''}`} fotoUrl={detailUser.fotoUrl} size={44} />
@@ -923,7 +924,7 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>{detailUser.email}</span>
                 </div>
               </div>
-              <button className="btn btn--ghost btn--sm" onClick={() => setDetailUser(null)}>✕</button>
+              <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setDetailUser(null)}>✕</button>
             </div>
             <ProfessionalDetailPanel pro={detailUser} />
           </div>
@@ -941,7 +942,7 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
             zIndex: 9999, padding: 'var(--space-4)'
           }}
         >
-          <div className="card" style={{ maxWidth: '420px', width: '100%', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', textAlign: 'center' }}>
+          <div className="card mobile-modal-card" style={{ maxWidth: '420px', width: '100%', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', textAlign: 'center' }}>
             <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Contraseña reseteada</h3>
             <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
               Se le mandó un mail a <strong>{generatedPassword.email}</strong> con esta contraseña temporal. Es solo por si lo necesitás como respaldo:

@@ -109,7 +109,7 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
               flexDirection: 'column',
               gap: 'var(--space-2)'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="patients-chat-header__row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
                   <button
                     type="button"
@@ -144,7 +144,7 @@ export default function PatientsView({ onUnreadChatsChange }: { onUnreadChatsCha
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                <div className="patients-chat-header__actions" style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                   <button
                     type="button"
                     className="btn btn--sm btn--secondary"

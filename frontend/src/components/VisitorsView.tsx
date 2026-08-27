@@ -71,17 +71,17 @@ export default function VisitorsView() {
         </div>
       </div>
 
-      <div className="card" style={{ 
-        padding: 0, 
-        display: 'grid', 
-        gridTemplateColumns: '320px 1fr', 
+      <div className="card visitors-grid" style={{
+        padding: 0,
+        display: 'grid',
+        gridTemplateColumns: '320px 1fr',
         height: 'calc(100vh - var(--header-height) - var(--space-24))',
         overflow: 'hidden'
       }}>
         {/* Left Side: Reps List */}
-        <div style={{ 
-          borderRight: '1px solid var(--color-border)', 
-          display: 'flex', 
+        <div className="visitors-grid__sidebar" style={{
+          borderRight: '1px solid var(--color-border)',
+          display: 'flex',
           flexDirection: 'column',
           height: '100%'
         }}>
@@ -259,6 +259,7 @@ export default function VisitorsView() {
               >
                 <input
                   type="text"
+                  className="chat-reply-input"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   placeholder={`Responder a ${selectedCanal.nombre}...`}

@@ -70,6 +70,7 @@ export default function TurnoDetailModal({ appt, onClose, onCancel }: {
 
   return (
     <div
+      className="app-modal-overlay"
       style={{
         position: 'fixed',
         top: 0, left: 0, right: 0, bottom: 0,
@@ -83,7 +84,7 @@ export default function TurnoDetailModal({ appt, onClose, onCancel }: {
       }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="card" style={{
+      <div className="card app-modal-card" style={{
         maxWidth: '480px',
         width: '100%',
         maxHeight: '85vh',
@@ -96,7 +97,7 @@ export default function TurnoDetailModal({ appt, onClose, onCancel }: {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
           <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Detalle del turno</h3>
-          <button onClick={onClose} className="btn btn--ghost btn--sm" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
+          <button onClick={onClose} className="btn btn--ghost btn--sm app-modal-close" style={{ fontSize: '16px', padding: '4px' }}><IconClose /></button>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -137,7 +138,7 @@ export default function TurnoDetailModal({ appt, onClose, onCancel }: {
                 }
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn btn--ghost btn--sm"
+                className="btn btn--ghost btn--sm app-modal-btn"
                 style={{
                   fontSize: '11px',
                   padding: 'var(--space-1) var(--space-2)',
@@ -173,7 +174,7 @@ export default function TurnoDetailModal({ appt, onClose, onCancel }: {
               href={appt.meetLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn btn--primary"
+              className="btn btn--primary app-modal-btn"
               style={{ fontSize: '13px', padding: 'var(--space-2) var(--space-4)', width: 'fit-content', display: 'flex', gap: '6px', alignItems: 'center' }}
             >
               <IconVideoCam size={15} /> Unirse a la videollamada
@@ -185,7 +186,7 @@ export default function TurnoDetailModal({ appt, onClose, onCancel }: {
               href={appt.checkoutUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn"
+              className="btn app-modal-btn"
               style={{
                 fontSize: '13px',
                 padding: 'var(--space-2) var(--space-5)',
@@ -207,6 +208,7 @@ export default function TurnoDetailModal({ appt, onClose, onCancel }: {
 
           {appt.status !== 'completed' && (
             <button
+              className="app-modal-btn"
               onClick={() => { onClose(); onCancel(appt.id) }}
               style={{
                 background: 'transparent',
