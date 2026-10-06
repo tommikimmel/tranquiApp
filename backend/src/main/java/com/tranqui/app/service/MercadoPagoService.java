@@ -46,9 +46,6 @@ public class MercadoPagoService {
     @Value("${mercadopago.enabled:false}")
     private boolean isEnabled;
 
-    @Value("${mercadopago.sandbox:true}")
-    private boolean isSandbox;
-
     @Value("${payment.simulation.enabled:false}")
     private boolean paymentSimulationEnabled;
 
@@ -140,7 +137,7 @@ public class MercadoPagoService {
     }
 
     public String checkoutUrlFor(Preapproval preapproval) {
-        return isSandbox ? preapproval.getSandboxInitPoint() : preapproval.getInitPoint();
+        return preapproval.getInitPoint();
     }
 
     // Corta el cobro recurrente del lado de Mercado Pago (si no se llama esto, MP sigue
@@ -259,7 +256,7 @@ public class MercadoPagoService {
         // so concurrent requests for different professionals never cross wires.
         MPRequestOptions options = MPRequestOptions.builder().accessToken(accessToken).build();
         Preference preference = client.create(request, options);
-        return isSandbox ? preference.getSandboxInitPoint() : preference.getInitPoint();
+        return preference.getInitPoint();
     }
 
     public String crearPreferenciaDocumento(com.tranqui.app.model.SolicitudDocumento solicitud) throws Exception {
@@ -307,6 +304,6 @@ public class MercadoPagoService {
 
         MPRequestOptions options = MPRequestOptions.builder().accessToken(accessToken).build();
         Preference preference = client.create(request, options);
-        return isSandbox ? preference.getSandboxInitPoint() : preference.getInitPoint();
+        return preference.getInitPoint();
     }
 }

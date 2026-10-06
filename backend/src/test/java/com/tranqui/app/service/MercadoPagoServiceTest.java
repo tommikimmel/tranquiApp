@@ -234,19 +234,7 @@ class MercadoPagoServiceTest {
     }
 
     @Test
-    void checkoutUrlFor_whenSandbox_returnsSandboxInitPoint() {
-        ReflectionTestUtils.setField(mercadoPagoService, "isSandbox", true);
-        Preapproval preapproval = mock(Preapproval.class);
-        when(preapproval.getSandboxInitPoint()).thenReturn("https://sandbox.mercadopago.com.ar/init");
-
-        String url = mercadoPagoService.checkoutUrlFor(preapproval);
-
-        assertEquals("https://sandbox.mercadopago.com.ar/init", url);
-    }
-
-    @Test
-    void checkoutUrlFor_whenNotSandbox_returnsRealInitPoint() {
-        ReflectionTestUtils.setField(mercadoPagoService, "isSandbox", false);
+    void checkoutUrlFor_returnsRealInitPoint() {
         Preapproval preapproval = mock(Preapproval.class);
         when(preapproval.getInitPoint()).thenReturn("https://www.mercadopago.com.ar/init");
 
