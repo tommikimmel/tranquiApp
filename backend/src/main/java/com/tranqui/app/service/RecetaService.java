@@ -35,7 +35,7 @@ public class RecetaService {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
-    private WhatsAppService whatsAppService;
+    private ResendEmailService resendEmailService;
 
     @Autowired
     private Qbi2RecipeClient qbi2RecipeClient;
@@ -351,31 +351,20 @@ public class RecetaService {
             log.error("Error al auto-marcar turnos de receta como enviados para médico ID {} / paciente ID {}", medico.getId(), paciente.getId(), e);
         }
 
-        // Construct message for patient
-        String text = String.format(
-            "Hola %s, %s (Matrícula: %s) registró una prescripción para vos en Tranqui.\n\n" +
-            "Medicación:\n%s\n\n" +
-            "Indicaciones: %s\n\n" +
-            "Descargá tu receta electrónica oficial acá: %s\n\n" +
-            "N° de recetario: %s%s\n" +
-            "Válida para presentar en cualquier farmacia adherida a Innovamed/QBI2.",
-            paciente.getNombre(),
-            medico.getNombre(),
-            medico.getMatricula() != null ? medico.getMatricula() : "S/N",
-            medsFormatted,
-            receta.getIndicaciones() != null ? receta.getIndicaciones() : "Sin indicaciones extra",
-            pdfUrl,
-            receta.getQbi2IdReceta() != null ? receta.getQbi2IdReceta() : "S/N",
-            receta.getQbi2Verificador() != null ? (" · Verificador: " + receta.getQbi2Verificador()) : ""
-        );
-
-        // Try to send WhatsApp notification
-        try {
-            if (paciente.getTelefono() != null && !paciente.getTelefono().trim().isEmpty()) {
-                whatsAppService.enviarMensajeWhatsApp(paciente.getTelefono(), text);
+        // Aviso al paciente con el link a la receta. Best-effort, igual que lo anterior: un fallo
+        // del mail nunca deshace una receta ya emitida en QBI2.
+        if (paciente.getEmail() != null && paciente.isNotificacionesEmailHabilitadas()) {
+            try {
+                resendEmailService.enviarRecetaEmitidaPaciente(
+                        paciente.getEmail(),
+                        paciente.getNombre(),
+                        medico.getNombre(),
+                        medico.getMatricula(),
+                        pdfUrl,
+                        receta.getQbi2IdReceta() != null ? String.valueOf(receta.getQbi2IdReceta()) : null);
+            } catch (Exception e) {
+                log.error("Error al enviar mail de receta emitida al paciente ID: {}", paciente.getId(), e);
             }
-        } catch (Exception e) {
-            log.error("Error al enviar WhatsApp de receta para paciente ID: {}", paciente.getId(), e);
         }
 
         return mapToDto(receta);

@@ -40,6 +40,29 @@ public class SubscriptionReconciliationScheduler {
     @Autowired
     private ResendEmailService resendEmailService;
 
+    @Autowired
+    private com.tranqui.app.repository.UsuarioRepository usuarioRepository;
+
+    // Las alertas que requieren acción humana no pueden quedar solo en el log (nadie lo mira
+    // todos los días): se mandan por mail a todos los administradores.
+    private void notificarAdmins(String titulo, String mensaje) {
+        List<com.tranqui.app.model.Usuario> admins;
+        try {
+            admins = usuarioRepository.findByRol(com.tranqui.app.model.Rol.ADMIN);
+        } catch (Exception e) {
+            log.error("No se pudo obtener la lista de administradores para la alerta '{}': {}", titulo, e.getMessage());
+            return;
+        }
+        for (com.tranqui.app.model.Usuario admin : admins) {
+            if (admin.getEmail() == null) continue;
+            try {
+                resendEmailService.enviarAlertaAdmin(admin.getEmail(), titulo, mensaje);
+            } catch (Exception e) {
+                log.error("No se pudo enviar la alerta '{}' a {}: {}", titulo, admin.getEmail(), e.getMessage());
+            }
+        }
+    }
+
     /**
      * Cron diario de reconciliación y alertas (§11):
      * Se ejecuta todos los días a las 04:00 AM.
@@ -164,6 +187,8 @@ public class SubscriptionReconciliationScheduler {
         List<Invoice> failed = invoiceRepository.findFailedInvoices();
         if (!failed.isEmpty()) {
             log.warn("ALERTA: Existen {} facturas en estado FAILED que requieren atención administrativa.", failed.size());
+            notificarAdmins("Hay " + failed.size() + " facturas con error",
+                    "Existen " + failed.size() + " facturas en estado FAILED que requieren atención administrativa.");
         }
     }
 
@@ -235,8 +260,10 @@ public class SubscriptionReconciliationScheduler {
         BigDecimal umbral80 = topeCatA.multiply(new BigDecimal("0.80"));
 
         if (sum12m.compareTo(umbral80) >= 0) {
-            log.warn("⚠️ ALERTA MONOTRIBUTO: La facturación rodante de los últimos 12 meses ($ {}) superó el 80% del tope de Categoría A ($ {})",
+            log.warn("ALERTA MONOTRIBUTO: La facturación rodante de los últimos 12 meses ($ {}) superó el 80% del tope de Categoría A ($ {})",
                     sum12m, topeCatA);
+            notificarAdmins("Facturación cerca del tope de monotributo",
+                    "La facturación de los últimos 12 meses ($ " + sum12m + ") superó el 80% del tope de la Categoría A ($ " + topeCatA + ").");
         }
     }
 }

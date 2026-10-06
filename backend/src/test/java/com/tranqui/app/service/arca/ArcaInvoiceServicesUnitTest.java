@@ -343,7 +343,16 @@ class ArcaInvoiceServicesUnitTest {
     }
 
     @Test
+    void testInvoiceService_emitirNotaDeCredito_rechazaSiArcaNoEstaHabilitado() {
+        when(arcaConfig.isEnabled()).thenReturn(false);
+
+        assertThrows(IllegalStateException.class, () -> invoiceService.emitirNotaDeCredito(200L, "motivo", 1L));
+        verifyNoInteractions(arcaWsfeService);
+    }
+
+    @Test
     void testInvoiceService_emitirNotaDeCredito_successAndValidation() {
+        when(arcaConfig.isEnabled()).thenReturn(true);
         when(invoiceRepository.findById(200L)).thenReturn(Optional.of(invoice));
 
         InvoiceSequence seq = InvoiceSequence.builder().puntoVenta(1).cbteTipo(13).lastNumber(10L).build();

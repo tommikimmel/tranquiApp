@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
+import { Icon } from './Icon'
 import '../styles/checkout.css'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
@@ -70,14 +71,6 @@ function IconMail({ size = 16 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
       <rect x="2" y="4" width="20" height="16" rx="2" /><polyline points="2 6 12 13 22 6" />
-    </svg>
-  )
-}
-
-function IconWhatsapp({ size = 16 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: size, height: size, display: 'inline-block', verticalAlign: 'middle' }}>
-      <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.46 1.33 4.96L2.05 22l5.25-1.38a9.87 9.87 0 0 0 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm5.8 14.09c-.24.68-1.4 1.3-1.93 1.38-.5.08-1.11.11-1.79-.11-.41-.13-.94-.31-1.62-.6-2.85-1.23-4.71-4.1-4.85-4.29-.14-.19-1.16-1.54-1.16-2.94 0-1.4.73-2.09.99-2.37.26-.28.57-.35.76-.35.19 0 .38 0 .55.01.18.01.41-.07.64.49.24.57.81 1.98.88 2.12.07.14.12.31.02.5-.09.19-.14.31-.28.48-.14.17-.29.37-.42.5-.14.14-.28.29-.12.57.16.28.71 1.17 1.52 1.9 1.05.94 1.93 1.23 2.21 1.37.28.14.44.12.6-.07.16-.19.68-.79.87-1.06.19-.28.37-.23.62-.14.26.09 1.63.77 1.91.91.28.14.47.21.54.33.07.12.07.68-.17 1.36z" />
     </svg>
   )
 }
@@ -734,17 +727,6 @@ function StepSelect({
                     <IconMail size={14} /> {professional.emailContacto}
                   </a>
                 )}
-                {professional.telefono && (
-                  <a
-                    href={`https://api.whatsapp.com/send?phone=${professional.telefono.replace(/\D/g, '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn--primary btn--sm"
-                    style={{ gap: '6px' }}
-                  >
-                    <IconWhatsapp size={14} /> WhatsApp
-                  </a>
-                )}
               </div>
             )}
 
@@ -1264,8 +1246,8 @@ function StepSelect({
                   }
                 </button>
                 <div className="fine">
-                  <span>🕐 Sesión de 50 minutos</span>
-                  <span>🗓 Cancelación gratuita hasta 24 hs antes</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Icon.Clock size={14} /> Sesión de 50 minutos</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Icon.CalendarSmall size={14} /> Cancelación con reembolso hasta 48 hs antes</span>
                 </div>
               </div>
             </div>
@@ -1424,7 +1406,9 @@ function StepConfirmed({
   modality: 'online' | 'presencial'
   isDocumentOnly?: boolean
 }) {
-  const actualMeetLink = meetLink || `https://meet.google.com/${Math.random().toString(36).slice(2, 5)}-${Math.random().toString(36).slice(2, 6)}-${Math.random().toString(36).slice(2, 5)}`
+  // Nunca inventar un link: si Google Calendar todavía no generó la sala real, se avisa que el
+  // link aparece en Mis Turnos (y llega por mail) en cuanto esté listo.
+  const actualMeetLink = meetLink && meetLink.trim() ? meetLink : null
   // No real modalidad applies to a document-only request — no consultorio, no videollamada.
   const isPresencial = !isDocumentOnly && modality === 'presencial'
 
@@ -1560,17 +1544,23 @@ function StepConfirmed({
           </div>
           <div className="checkout-meet-card__content">
             <div className="checkout-meet-card__label">Link de videollamada</div>
-            <div className="checkout-meet-card__sublabel">Este link se activa 10 minutos antes de tu sesión</div>
+            <div className="checkout-meet-card__sublabel">
+              {actualMeetLink
+                ? 'Este link se activa 10 minutos antes de tu sesión'
+                : 'Lo estamos generando: en unos minutos lo vas a ver en Mis Turnos y te llega por mail'}
+            </div>
           </div>
-          <a
-            href={actualMeetLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn--primary btn--sm"
-            id="btn-meet-link"
-          >
-            Abrir Meet
-          </a>
+          {actualMeetLink && (
+            <a
+              href={actualMeetLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn--primary btn--sm"
+              id="btn-meet-link"
+            >
+              Abrir Meet
+            </a>
+          )}
         </div>
       )}
 
@@ -1856,7 +1846,7 @@ export default function CheckoutFlow({
                 borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: '13px',
                 color: holdTimer > 0 ? '#ad7c11' : '#ff4d4f', fontWeight: 'bold'
               }}>
-                <span>⏱️ Reserva bloqueada por 5 minutos:</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Icon.Clock size={14} /> Reserva bloqueada por 5 minutos:</span>
                 <span style={{ fontSize: '15px', fontFamily: 'monospace' }}>
                   {holdTimer > 0 ? formatTimer(holdTimer) : '00:00 (Expirado)'}
                 </span>
@@ -1944,7 +1934,7 @@ export default function CheckoutFlow({
                     // Release the PENDIENTE_PAGO turno now instead of leaving it to block
                     // this same patient email from re-booking for the next 5 minutes
                     // (until LiberarTurnosScheduler's cleanup pass runs).
-                    await api.abandonarReservaPendiente(createdTurn.turnoId)
+                    await api.abandonarReservaPendiente(createdTurn.turnoId, createdTurn.tokenReserva)
                   } catch (err) {
                     console.error("Error al liberar la reserva pendiente:", err)
                   }

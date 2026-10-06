@@ -113,12 +113,19 @@ public class WebhookController {
                 java.math.BigDecimal amount = node.has("transaction_amount") ? new java.math.BigDecimal(node.get("transaction_amount").asText()) : null;
                 String payStatus = node.has("status") ? node.get("status").asText() : null;
 
-                // Si MP no incluyó preapproval_id en el webhook (caso estándar), consultamos /v1/authorized_payments/{id}
-                if ((preapprovalId == null || preapprovalId.isBlank()) && subPaymentId != null && !subPaymentId.isBlank()) {
+                // Consultamos /authorized_payments/{id}: trae el preapproval_id (MP no siempre lo
+                // manda en el webhook) y, sobre todo, el ID del pago real (detalle.payment.id). Ese
+                // es el mismo ID que llega por el webhook genérico "payment" para el mismo cobro —
+                // el ID del authorized_payment es otro número — así que deduplicar por él es lo que
+                // evita registrar (y extender el período) dos veces cuando llegan ambos avisos.
+                if (subPaymentId != null && !subPaymentId.isBlank()) {
                     try {
                         var detalle = mercadoPagoService.obtenerDetalleAuthorizedPayment(subPaymentId);
                         if (detalle != null) {
-                            if (detalle.has("preapproval_id")) {
+                            if (detalle.has("payment") && detalle.get("payment").hasNonNull("id")) {
+                                subPaymentId = detalle.get("payment").get("id").asText();
+                            }
+                            if ((preapprovalId == null || preapprovalId.isBlank()) && detalle.has("preapproval_id")) {
                                 preapprovalId = detalle.get("preapproval_id").asText();
                             }
                             if (amount == null && detalle.has("transaction_amount")) {

@@ -39,6 +39,9 @@ class SubscriptionReconciliationSchedulerUnitTest {
     @Mock
     private ResendEmailService resendEmailService;
 
+    @Mock
+    private com.tranqui.app.repository.UsuarioRepository usuarioRepository;
+
     @InjectMocks
     private SubscriptionReconciliationScheduler scheduler;
 
@@ -80,6 +83,8 @@ class SubscriptionReconciliationSchedulerUnitTest {
         when(subscriptionRepository.findExpiredActiveSubscriptions(any())).thenReturn(List.of(sub));
         when(subscriptionRepository.findExpiringManualSubscriptions(any(), any())).thenReturn(List.of(sub));
         when(paymentRepository.sumApprovedPaymentsSince(any())).thenReturn(new BigDecimal("15000000.00"));
+        when(usuarioRepository.findByRol(com.tranqui.app.model.Rol.ADMIN)).thenReturn(List.of(
+                Usuario.builder().id(1L).email("admin@tranqui.com").rol(com.tranqui.app.model.Rol.ADMIN).build()));
 
         scheduler.runDailyReconciliation();
 
@@ -87,6 +92,9 @@ class SubscriptionReconciliationSchedulerUnitTest {
         verify(resendEmailService, atLeastOnce()).enviarAvisoSuspensionSuscripcion(any(), any(), any());
         verify(invoiceService).generateInvoiceForPayment(99L);
         verify(resendEmailService).enviarAvisoVencimientoManualSuscripcion(any(), any(), any(), any(), anyInt());
+        // Facturas FAILED y tope de monotributo superado: alerta por mail al admin
+        verify(resendEmailService).enviarAlertaAdmin(eq("admin@tranqui.com"), contains("facturas con error"), anyString());
+        verify(resendEmailService).enviarAlertaAdmin(eq("admin@tranqui.com"), contains("monotributo"), anyString());
     }
 
     @Test

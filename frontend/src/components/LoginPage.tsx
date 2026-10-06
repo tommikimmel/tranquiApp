@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Icon } from './Icon'
 import { api } from '../api/api'
 import AddressMapPicker from './AddressMapPicker'
 import DateInputDDMMYYYY from './DateInputDDMMYYYY'
@@ -203,6 +204,24 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
       setLoading(false)
     }
   }
+
+  // Precios del plan sugerido: siempre del catálogo real (los edita el admin), nunca hardcodeados.
+  const [preciosPlanes, setPreciosPlanes] = useState<Record<string, number>>({})
+  useEffect(() => {
+    let cancelado = false
+    Promise.resolve()
+      .then(() => api.getSubscriptionPlans())
+      .then((planes: any) => {
+        if (cancelado || !Array.isArray(planes)) return
+        const precios: Record<string, number> = {}
+        planes.forEach((p: any) => { if (p?.code && typeof p.priceArs === 'number') precios[p.code] = p.priceArs })
+        setPreciosPlanes(precios)
+      })
+      .catch(() => {})
+    return () => { cancelado = true }
+  }, [])
+  const precioPlan = (code: string) =>
+    preciosPlanes[code] != null ? ` ($${preciosPlanes[code].toLocaleString('es-AR')} ARS/mes)` : ''
 
   // Load Google Identity Services and (re)render the button every time the login tab's
   // <div id="google-signin-btn"> mounts. That div only exists while activeTab === 'login' —
@@ -598,7 +617,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
             marginBottom: 'var(--space-1)'
           }}
         >
-          ← Volver a la página principal
+          <Icon.ArrowLeft /> Volver a la página principal
         </button>
 
         <div style={{ textAlign: 'center' }}>
@@ -852,7 +871,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                 </div>
 
                 <button type="button" className="btn btn--primary" onClick={handleNextStep} style={{ width: '100%', marginTop: 'var(--space-2)' }}>
-                  Siguiente →
+                  Siguiente <Icon.ArrowRight />
                 </button>
               </div>
             )}
@@ -930,7 +949,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label form-label--required">Teléfono Móvil (WhatsApp)</label>
+                  <label className="form-label form-label--required">Teléfono móvil</label>
                   <div className="phone-input">
                     <span className="phone-input__prefix">+54</span>
                     <input
@@ -976,11 +995,11 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
                 <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                   <button type="button" className="btn btn--ghost" onClick={handlePrevStep} style={{ flex: 1 }}>
-                    ← Anterior
+                    <Icon.ArrowLeft /> Anterior
                   </button>
                   {totalSteps > 2 ? (
                     <button type="button" className="btn btn--primary" onClick={handleNextStep} style={{ flex: 1 }}>
-                      Siguiente →
+                      Siguiente <Icon.ArrowRight />
                     </button>
                   ) : (
                     <button type="submit" disabled={loading || !acceptedTerms} className="btn btn--primary" style={{ flex: 1 }}>
@@ -1076,11 +1095,11 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
                       <span><strong>Plan sugerido para tu profesión:</strong>{' '}
                       {profession === 'psiquiatra' ? (
                         <span>
-                          <strong>Plan Clínico ($225.000 ARS/mes)</strong> · Incluye módulo oficial de Recetas Electrónicas QBI2 con psicofármacos y firma digital.
+                          <strong>Plan Clínico{precioPlan('clinico')}</strong> · Incluye módulo oficial de Recetas Electrónicas QBI2 con psicofármacos y firma digital.
                         </span>
                       ) : (
                         <span>
-                          <strong>Plan Consultorio ($149.500 ARS/mes)</strong> · Incluye adquisición de pacientes por zona geográfica, agenda y turnero online.
+                          <strong>Plan Consultorio{precioPlan('consultorio')}</strong> · Incluye adquisición de pacientes por zona geográfica, agenda y turnero online.
                         </span>
                       )}
                       </span>
@@ -1285,7 +1304,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
 
                 <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                   <button type="button" className="btn btn--ghost" onClick={handlePrevStep} style={{ flex: 1 }}>
-                    ← Anterior
+                    <Icon.ArrowLeft /> Anterior
                   </button>
                   <button type="submit" disabled={loading || !acceptedTerms} className="btn btn--primary" style={{ flex: 1 }}>
                     {loading ? 'Creando cuenta...' : 'Finalizar Registro'}
@@ -1386,7 +1405,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
               onClick={() => { setActiveTab('login'); }}
               style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', fontSize: '12px', cursor: 'pointer', padding: 0, textAlign: 'center' }}
             >
-              ← Volver a Iniciar Sesión
+              <Icon.ArrowLeft /> Volver a Iniciar Sesión
             </button>
           </form>
         )}
@@ -1456,7 +1475,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
               onClick={() => { setActiveTab('login'); }}
               style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', fontSize: '12px', cursor: 'pointer', padding: 0, textAlign: 'center' }}
             >
-              ← Cancelar y volver a Iniciar Sesión
+              <Icon.ArrowLeft /> Cancelar y volver a Iniciar Sesión
             </button>
           </form>
         )}

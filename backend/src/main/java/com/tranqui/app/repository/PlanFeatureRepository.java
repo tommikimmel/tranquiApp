@@ -9,4 +9,5 @@ import java.util.List;
 public interface PlanFeatureRepository extends JpaRepository<PlanFeature, Long> {
     List<PlanFeature> findByPlanId(Long planId);
     boolean existsByPlanIdAndFeatureKey(Long planId, String featureKey);
+    List<PlanFeature> findByFeatureKey(String featureKey);
 }

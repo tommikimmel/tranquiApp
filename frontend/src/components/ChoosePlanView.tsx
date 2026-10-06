@@ -9,7 +9,6 @@ import '../styles/checkout.css'
 // el DTO solo trae las keys crudas (snake_case), no un nombre para mostrar.
 const FEATURE_LABELS: Record<string, string> = {
   recetas_electronicas: 'Recetas Electrónicas QBI2',
-  bot_whatsapp: 'Notificaciones por WhatsApp',
   mp_split: 'Cobro anticipado del turno',
   google_meet: 'Google Meet y Calendario',
   historia_clinica: 'Historia Clínica Digital',

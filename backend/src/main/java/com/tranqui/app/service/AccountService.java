@@ -73,11 +73,10 @@ public class AccountService {
     }
 
     @Transactional
-    public MiCuentaDto actualizarPreferenciasNotificacion(String email, boolean emailHabilitado, boolean whatsappHabilitado) {
+    public MiCuentaDto actualizarPreferenciasNotificacion(String email, boolean emailHabilitado) {
         Usuario u = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
         u.setNotificacionesEmailHabilitadas(emailHabilitado);
-        u.setNotificacionesWhatsappHabilitadas(whatsappHabilitado);
         usuarioRepository.save(u);
         return construirDto(u);
     }
@@ -176,7 +175,6 @@ public class AccountService {
                 .domicilioPais(u.getDomicilioPais())
                 .tienePassword(u.getPassword() != null)
                 .notificacionesEmailHabilitadas(u.isNotificacionesEmailHabilitadas())
-                .notificacionesWhatsappHabilitadas(u.isNotificacionesWhatsappHabilitadas())
                 .build();
     }
 }

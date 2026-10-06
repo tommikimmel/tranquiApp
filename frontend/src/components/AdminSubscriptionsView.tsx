@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react'
+import { Icon } from './Icon'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 import type {
   AdminOverviewStatsDto,
   SubscriptionDto,
-  InvoiceDto,
   PlanDto,
   ManualPaymentRequest,
   SubscriptionEventDto,
@@ -138,7 +138,7 @@ function SubscriptionEventCard({ ev, professionalLabel }: { ev: SubscriptionEven
       {hasTransition && (
         <div style={{ fontSize: '12.5px', marginBottom: '4px' }}>
           Estado: <span style={{ color: 'var(--color-text-secondary)' }}>{statusLabel(ev.previousStatus)}</span>
-          {' ➔ '}
+          {' '}<Icon.ArrowRight size={12} />{' '}
           <strong style={{ color: colors.fg }}>{statusLabel(ev.newStatus)}</strong>
         </div>
       )}
@@ -175,11 +175,10 @@ interface UserLite {
 export default function AdminSubscriptionsView({ users = [] }: { users?: UserLite[] }) {
   const { showAlert } = useAlert()
   const [loading, setLoading] = useState(true)
-  const [subTab, setSubTab] = useState<'overview' | 'subscriptions' | 'plans' | 'invoices' | 'events'>('overview')
+  const [subTab, setSubTab] = useState<'overview' | 'subscriptions' | 'plans' | 'events'>('overview')
 
   const [overview, setOverview] = useState<AdminOverviewStatsDto | null>(null)
   const [subscriptions, setSubscriptions] = useState<SubscriptionDto[]>([])
-  const [invoices, setInvoices] = useState<InvoiceDto[]>([])
   const [plans, setPlans] = useState<PlanDto[]>([])
   const [allEvents, setAllEvents] = useState<SubscriptionEventDto[]>([])
   const [eventTypeFilter, setEventTypeFilter] = useState<string>('TODOS')
@@ -190,7 +189,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
   const [manualProfSearch, setManualProfSearch] = useState('')
   const [selectedProf, setSelectedProf] = useState<UserLite | null>(null)
   const [selectedPlanId, setSelectedPlanId] = useState<number | ''>('')
-  const [manualAmount, setManualAmount] = useState<number>(149500)
+  const [manualAmount, setManualAmount] = useState<number>(0)
   const [manualMethod, setManualMethod] = useState<'MANUAL_TRANSFER' | 'MANUAL_CASH' | 'COURTESY'>('MANUAL_TRANSFER')
   const [manualStartDate, setManualStartDate] = useState(new Date().toISOString().split('T')[0])
   const [manualEndDate, setManualEndDate] = useState(
@@ -198,14 +197,8 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
   )
   const [manualReference, setManualReference] = useState('')
   const [manualNotes, setManualNotes] = useState('')
-  const [manualEmitInvoice, setManualEmitInvoice] = useState(true)
   const [manualIdempotencyKey, setManualIdempotencyKey] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  // Modal Credit Note state
-  const [selectedInvoiceForNc, setSelectedInvoiceForNc] = useState<InvoiceDto | null>(null)
-  const [ncReason, setNcReason] = useState('Anulación de comprobante por devolución o ajuste')
-  const [isSubmittingNc, setIsSubmittingNc] = useState(false)
 
   // Modal Edit Plan / Base Price state
   const [editingPlan, setEditingPlan] = useState<PlanDto | null>(null)
@@ -230,10 +223,9 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
   const fetchData = async () => {
     setLoading(true)
     try {
-      const [overviewData, subsData, invoicesData, plansData, eventsData] = await Promise.all([
+      const [overviewData, subsData, plansData, eventsData] = await Promise.all([
         api.getAdminSubscriptionOverview(),
         api.getAdminSubscriptionsList(),
-        api.getAdminInvoices(),
         // Catálogo completo (activos + ocultos) — con getSubscriptionPlans() (solo activos, el
         // mismo endpoint público que usa ChoosePlanView) un plan desactivado desaparecía de acá
         // sin forma de volver a activarlo.
@@ -242,11 +234,10 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
       ])
       setOverview(overviewData)
       setSubscriptions(subsData)
-      setInvoices(invoicesData)
       setPlans(plansData)
       setAllEvents(Array.isArray(eventsData) ? eventsData : [])
     } catch (err: any) {
-      showAlert('Error al cargar datos de suscripciones y facturación: ' + err.message, 'error')
+      showAlert('Error al cargar datos de suscripciones: ' + err.message, 'error')
     } finally {
       setLoading(false)
     }
@@ -262,13 +253,12 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
     setSelectedProf(null)
     setManualProfSearch('')
     setSelectedPlanId(visiblePlans.length > 0 ? visiblePlans[0].id : '')
-    setManualAmount(visiblePlans.length > 0 ? visiblePlans[0].priceArs : 149500)
+    setManualAmount(visiblePlans.length > 0 ? visiblePlans[0].priceArs : 0)
     setManualMethod('MANUAL_TRANSFER')
     setManualStartDate(new Date().toISOString().split('T')[0])
     setManualEndDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
     setManualReference('')
     setManualNotes('')
-    setManualEmitInvoice(true)
     setShowManualModal(true)
   }
 
@@ -326,7 +316,8 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
         periodEnd: manualEndDate + 'T23:59:59',
         receiptReference: manualReference,
         notes: manualNotes,
-        emitInvoice: manualMethod !== 'COURTESY' && manualEmitInvoice,
+        // Facturación electrónica ARCA todavía no habilitada: no se emite comprobante.
+        emitInvoice: false,
         idempotencyKey: manualIdempotencyKey,
       }
 
@@ -338,22 +329,6 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
       showAlert('Error al registrar pago manual: ' + err.message, 'error')
     } finally {
       setIsSubmitting(false)
-    }
-  }
-
-  const handleEmitNotaCredito = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedInvoiceForNc) return
-    setIsSubmittingNc(true)
-    try {
-      await api.emitirNotaDeCredito(selectedInvoiceForNc.id, ncReason)
-      showAlert('Nota de Crédito C emitida exitosamente en ARCA.', 'success')
-      setSelectedInvoiceForNc(null)
-      fetchData()
-    } catch (err: any) {
-      showAlert('Error al emitir Nota de Crédito: ' + err.message, 'error')
-    } finally {
-      setIsSubmittingNc(false)
     }
   }
 
@@ -487,7 +462,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 'var(--text-xl)', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-            Suscripciones y Facturación ARCA
+            Suscripciones
           </h2>
           <p style={{ margin: '4px 0 0 0', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
             Administración completa de planes, precios base de cupo, altas manuales, auditoría de eventos y comprobantes ARCA.
@@ -591,11 +566,6 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
             <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', display: 'block' }}>MRR (Ingreso Mensual Recurrente)</span>
             <strong style={{ fontSize: '24px', color: 'var(--color-success)' }}>{formatCurrency(overview.mrr ?? 0)}</strong>
           </div>
-
-          <div className="card" style={{ padding: 'var(--space-4)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
-            <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', display: 'block' }}>Facturas Emitidas</span>
-            <strong style={{ fontSize: '24px', color: 'var(--color-text-primary)' }}>{invoices.length ?? 0}</strong>
-          </div>
         </div>
       )}
 
@@ -642,28 +612,6 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
               <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
             </svg>
             Planes y Precios Base ({plans.length})
-          </span>
-        </button>
-
-        <button
-          onClick={() => setSubTab('invoices')}
-          style={{
-            padding: '8px 16px',
-            border: 'none',
-            background: 'none',
-            borderBottom: subTab === 'invoices' ? '3px solid var(--color-primary)' : '3px solid transparent',
-            color: subTab === 'invoices' ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-            fontWeight: '700',
-            cursor: 'pointer',
-            fontSize: '14px',
-            whiteSpace: 'nowrap'
-          }}
-        >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
-            </svg>
-            Facturas Electrónicas ARCA ({invoices.length})
           </span>
         </button>
 
@@ -931,116 +879,6 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
         </div>
       )}
 
-      {/* ── SubTab 3: Invoices Table ── */}
-      {subTab === 'invoices' && (
-        <div className="card" style={{ padding: 'var(--space-5)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}>
-              <div className="checkout-spinner" style={{ margin: '0 auto var(--space-3)' }} />
-              <p>Cargando comprobantes...</p>
-            </div>
-          ) : invoices.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--color-text-secondary)' }}>
-              No hay comprobantes electrónicos emitidos todavía.
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                    <th style={{ padding: '10px' }}>Comprobante</th>
-                    <th style={{ padding: '10px' }}>Fecha Emisión</th>
-                    <th style={{ padding: '10px' }}>Receptor (Profesional)</th>
-                    <th style={{ padding: '10px' }}>Importe Total</th>
-                    <th style={{ padding: '10px' }}>CAE / Vencimiento</th>
-                    <th style={{ padding: '10px' }}>Estado</th>
-                    <th style={{ padding: '10px', textAlign: 'right' }}>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map((inv) => {
-                    const statusBadge =
-                      inv.status === 'ISSUED'
-                        ? 'badge--success'
-                        : inv.status === 'VOIDED'
-                        ? 'badge--neutral'
-                        : 'badge--error'
-
-                    const cbteTipoName = inv.cbteTipo === 13 ? 'Nota de Crédito C' : 'Factura C'
-
-                    return (
-                      <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        <td style={{ padding: '10px' }}>
-                          <strong>{cbteTipoName}</strong>
-                          <span style={{ display: 'block', fontSize: '12px', fontFamily: 'monospace', color: 'var(--color-text-secondary)' }}>
-                            #{String(inv.puntoVenta).padStart(5, '0')}-{String(inv.cbteNumero).padStart(8, '0')}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px', fontSize: '12px' }}>
-                          {new Date(inv.fechaEmision).toLocaleDateString('es-AR')}
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          <strong style={{ display: 'block' }}>{inv.receptorNombre}</strong>
-                          <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                            CUIT/Doc: {inv.receptorDocNro}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px', fontWeight: 'bold' }}>{formatCurrency(inv.importeTotal)}</td>
-                        <td style={{ padding: '10px', fontSize: '12px' }}>
-                          {inv.cae ? (
-                            <>
-                              <span style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{inv.cae}</span>
-                              <span style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)' }}>
-                                Vto: {inv.caeVencimiento ? new Date(inv.caeVencimiento).toLocaleDateString('es-AR') : '—'}
-                              </span>
-                            </>
-                          ) : (
-                            <span style={{ color: 'var(--color-text-secondary)' }}>Sin CAE</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          <span className={`badge ${statusBadge}`}>
-                            {inv.status === 'ISSUED' ? 'Emitida' : inv.status === 'VOIDED' ? 'Anulada' : inv.status}
-                          </span>
-                        </td>
-                        <td style={{ padding: '10px', textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                            {inv.pdfUrl && (
-                              <a
-                                href={api.getInvoicePdfUrl(inv.id)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="btn btn--secondary btn--sm"
-                                title="Descargar comprobante PDF oficial con QR ARCA"
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                              >
-                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                                </svg>
-                                PDF
-                              </a>
-                            )}
-                            {inv.status === 'ISSUED' && inv.cbteTipo === 11 && (
-                              <button
-                                className="btn btn--danger btn--sm"
-                                onClick={() => setSelectedInvoiceForNc(inv)}
-                                title="Emitir Nota de Crédito C para anular esta Factura C"
-                              >
-                                Anular (NC)
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ── SubTab 4: Global Event Audit Trail ── */}
       {subTab === 'events' && (
         <div className="card" style={{ padding: 'var(--space-5)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }}>
@@ -1132,7 +970,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
                 <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Modificar Precio Base / Plan</h3>
                 <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Código: {editingPlan.code}</span>
               </div>
-              <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setEditingPlan(null)}>✕</button>
+              <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setEditingPlan(null)} aria-label="Cerrar"><Icon.X /></button>
             </div>
 
             <form onSubmit={handleSavePlan} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
@@ -1270,7 +1108,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
                   {selectedSubForAudit.professionalName} ({selectedSubForAudit.professionalEmail})
                 </span>
               </div>
-              <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setSelectedSubForAudit(null)}>✕</button>
+              <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setSelectedSubForAudit(null)} aria-label="Cerrar"><Icon.X /></button>
             </div>
 
             {loadingSubEvents ? (
@@ -1386,10 +1224,10 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
               <div>
                 <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Alta / Cobro de Suscripción Manual</h3>
                 <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                  Registrá cobros en efectivo o transferencia con emisión correlativa de Factura C.
+                  Registrá cobros en efectivo o transferencia.
                 </span>
               </div>
-              <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setShowManualModal(false)}>✕</button>
+              <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setShowManualModal(false)} aria-label="Cerrar"><Icon.X /></button>
             </div>
 
             <form onSubmit={handleManualSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
@@ -1507,7 +1345,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
                   >
                     <option value="MANUAL_TRANSFER">Transferencia Bancaria</option>
                     <option value="MANUAL_CASH">Efectivo en Mano</option>
-                    <option value="COURTESY">Cortesía (Sin cobro ni factura)</option>
+                    <option value="COURTESY">Cortesía (sin cobro)</option>
                   </select>
                 </div>
               </div>
@@ -1556,22 +1394,6 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
                 />
               </div>
 
-              {/* 6. Checkbox Emitir Factura ARCA */}
-              {manualMethod !== 'COURTESY' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', backgroundColor: '#F3F4F6', borderRadius: 'var(--radius-sm)' }}>
-                  <input
-                    type="checkbox"
-                    id="emitFacturaCheck"
-                    checked={manualEmitInvoice}
-                    onChange={(e) => setManualEmitInvoice(e.target.checked)}
-                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                  />
-                  <label htmlFor="emitFacturaCheck" style={{ fontSize: '13px', cursor: 'pointer', fontWeight: '600' }}>
-                    Emitir Factura C Electrónica en ARCA automáticamente (con CAE y QR oficial)
-                  </label>
-                </div>
-              )}
-
               {/* Idempotency key badge */}
               <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
                 Clave de idempotencia única: <code style={{ backgroundColor: '#eee', padding: '2px 4px' }}>{manualIdempotencyKey}</code>
@@ -1583,7 +1405,7 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
                   Cancelar
                 </button>
                 <button type="submit" disabled={isSubmitting || !selectedProf} className="btn btn--primary" style={{ fontWeight: 'bold' }}>
-                  {isSubmitting ? 'Registrando y Facturando...' : 'Confirmar Alta y Facturar'}
+                  {isSubmitting ? 'Registrando...' : 'Confirmar alta'}
                 </button>
               </div>
             </form>
@@ -1591,60 +1413,6 @@ export default function AdminSubscriptionsView({ users = [] }: { users?: UserLit
         </div>
       )}
 
-      {/* ── Modal: Emitir Nota de Crédito C (§10.5) ── */}
-      {selectedInvoiceForNc && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: 'var(--space-4)'
-          }}
-          onClick={(e) => e.target === e.currentTarget && setSelectedInvoiceForNc(null)}
-        >
-          <div className="card mobile-modal-card" style={{ maxWidth: '520px', width: '100%', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold', color: 'var(--color-danger)' }}>
-              Emitir Nota de Crédito C
-            </h3>
-            <p style={{ margin: 0, fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-              Se anulará la Factura C <strong>#{String(selectedInvoiceForNc.puntoVenta).padStart(5, '0')}-{String(selectedInvoiceForNc.cbteNumero).padStart(8, '0')}</strong> emitida a nombre de <strong>{selectedInvoiceForNc.receptorNombre}</strong> por <strong>{formatCurrency(selectedInvoiceForNc.importeTotal)}</strong>.
-            </p>
-
-            <form onSubmit={handleEmitNotaCredito} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>
-                  Motivo de la Nota de Crédito *
-                </label>
-                <input
-                  type="text"
-                  value={ncReason}
-                  onChange={(e) => setNcReason(e.target.value)}
-                  className="form-input"
-                  style={{ width: '100%' }}
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
-                <button type="button" onClick={() => setSelectedInvoiceForNc(null)} className="btn btn--secondary">
-                  Cancelar
-                </button>
-                <button type="submit" disabled={isSubmittingNc} className="btn btn--danger" style={{ fontWeight: 'bold' }}>
-                  {isSubmittingNc ? 'Emitiendo NC...' : 'Confirmar Emisión en ARCA'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -74,16 +74,6 @@ public class Subscription {
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
 
-    // Whether SubscriptionReconciliationScheduler#checkExpiringManualSubscriptions already sent
-    // the "tu suscripción vence pronto" email for the CURRENT currentPeriodEnd — that check re-runs
-    // daily and would otherwise re-match (and re-email) the same subscription every day of its
-    // 7-day warning window. Reset to false whenever a payment extends currentPeriodEnd (see
-    // SubscriptionService#registerManualPayment / activarPagoSuscripcion), so the next billing
-    // cycle gets its own warning.
-    @Builder.Default
-    @Column(name = "aviso_vencimiento_enviado", nullable = false)
-    private Boolean avisoVencimientoEnviado = false;
-
     @Builder.Default
     @Column(name = "renewal_reminder_sent", nullable = false, columnDefinition = "boolean default false")
     private Boolean renewalReminderSent = false;

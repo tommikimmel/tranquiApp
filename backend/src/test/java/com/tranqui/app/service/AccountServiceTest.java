@@ -81,10 +81,9 @@ class AccountServiceTest {
     }
 
     @Test
-    void actualizarPreferenciasNotificacion_persisteAmbasBanderas() {
-        MiCuentaDto dto = accountService.actualizarPreferenciasNotificacion(paciente.getEmail(), false, true);
+    void actualizarPreferenciasNotificacion_persisteLaBanderaDeEmail() {
+        MiCuentaDto dto = accountService.actualizarPreferenciasNotificacion(paciente.getEmail(), false);
         assertFalse(dto.isNotificacionesEmailHabilitadas());
-        assertTrue(dto.isNotificacionesWhatsappHabilitadas());
     }
 
     @Test

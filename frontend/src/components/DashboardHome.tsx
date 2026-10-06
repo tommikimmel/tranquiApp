@@ -390,7 +390,7 @@ export default function DashboardHome({
     <>
       <div className="dashboard-home-greeting">
         <div>
-          <h1>Hola, {medicoInfo?.name ? medicoInfo.name : 'Doctor/a'} 👋</h1>
+          <h1>Hola, {medicoInfo?.name ? medicoInfo.name : 'Doctor/a'}</h1>
           <p>Este es el resumen de tu consultorio hoy</p>
         </div>
         <div className="dashboard-home-date-pill">{capitalizedFullDate}</div>
@@ -725,7 +725,7 @@ export default function DashboardHome({
                               color: 'var(--color-text-primary)',
                               width: '100%'
                             }}>
-                              📅 {externalEvent.title}
+                              <Icon.CalendarSmall size={12} /> {externalEvent.title}
                             </div>
                           )}
                           {apptsInCell.length > 0 ? apptsInCell.map((appt) => (
@@ -762,7 +762,7 @@ export default function DashboardHome({
                                   {appt.horaInicio ? `${appt.horaInicio} · ` : ''}{appt.patientName}
                                 </span>
                                 {appt.meetUrl && (
-                                  <span title="Videollamada Google Meet" style={{ color: '#1a73e8', fontSize: '10px' }}>📹</span>
+                                  <span title="Videollamada Google Meet" style={{ color: '#1a73e8', display: 'inline-flex' }}><Icon.Video size={12} /></span>
                                 )}
                               </div>
                               {appt.attendanceStatus && appt.attendanceStatus !== 'ESPERANDO' && (
@@ -778,7 +778,7 @@ export default function DashboardHome({
                                   alignItems: 'center',
                                   gap: '2px'
                                 }}>
-                                  <span>{appt.attendanceStatus === 'LLEGO' ? '🚶‍♂️' : appt.attendanceStatus === 'AUSENTE' ? '❌' : '✓'}</span>
+                                  <span style={{ display: 'inline-flex' }}>{appt.attendanceStatus === 'LLEGO' ? <Icon.User size={12} /> : appt.attendanceStatus === 'AUSENTE' ? <Icon.X size={12} /> : <Icon.Check size={12} />}</span>
                                   {appt.attendanceStatus}
                                 </div>
                               )}

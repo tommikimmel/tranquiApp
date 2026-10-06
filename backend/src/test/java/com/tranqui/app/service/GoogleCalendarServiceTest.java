@@ -56,20 +56,6 @@ class GoogleCalendarServiceTest {
     }
 
     @Test
-    void testCrearEventoReunionFailsSimulated() {
-        Turno turno = Turno.builder()
-                .id(1L)
-                .fecha(LocalDate.now())
-                .horaInicio(LocalTime.of(9, 0))
-                .horaFin(LocalTime.of(9, 45))
-                .tipo(TipoTurno.PARTICULAR)
-                .metadataAfiliado("FAIL_CALENDAR")
-                .build();
-
-        assertThrows(RuntimeException.class, () -> googleCalendarService.crearEventoReunion(turno));
-    }
-
-    @Test
     void testObtenerEventosDelDiaNotConnected() {
         Usuario medico = new Usuario();
         medico.setId(123L);

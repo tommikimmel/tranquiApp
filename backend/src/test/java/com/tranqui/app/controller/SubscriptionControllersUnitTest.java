@@ -175,28 +175,6 @@ class SubscriptionControllersUnitTest {
         assertEquals(HttpStatus.BAD_REQUEST, errResp.getStatusCode());
     }
 
-    @Test
-    void getMyInvoices_and_downloadInvoicePdf() {
-        when(userDetails.getUsername()).thenReturn("carlos@example.com");
-        when(usuarioRepository.findByEmail("carlos@example.com")).thenReturn(Optional.of(profesional));
-        when(invoiceService.getInvoicesForProfessional(1L)).thenReturn(List.of(invoice));
-
-        ResponseEntity<List<InvoiceResponseDto>> resp = subscriptionController.getMyInvoices(userDetails);
-        assertEquals(HttpStatus.OK, resp.getStatusCode());
-        assertEquals(1, resp.getBody().size());
-
-        // download pdf
-        when(invoiceService.getInvoiceById(200L)).thenReturn(Optional.of(invoice));
-        ResponseEntity<byte[]> pdfResp = subscriptionController.downloadInvoicePdf(200L);
-        assertEquals(HttpStatus.OK, pdfResp.getStatusCode());
-        assertNotNull(pdfResp.getBody());
-
-        // blank pdf
-        invoice.setPdfBase64(null);
-        ResponseEntity<byte[]> notFoundResp = subscriptionController.downloadInvoicePdf(200L);
-        assertEquals(HttpStatus.NOT_FOUND, notFoundResp.getStatusCode());
-    }
-
     // --- AdminSubscriptionController tests ---
 
     @Test

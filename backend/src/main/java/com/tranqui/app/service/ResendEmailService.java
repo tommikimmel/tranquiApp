@@ -63,11 +63,13 @@ public class ResendEmailService {
     private static final String[] TONO_PELIGRO = {"#b91c1c", "#fee2e2", "#dc2626"};
     private static final String[] TONO_NEUTRO = {"#475569", "#f1f5f9", "#475569"};
 
-    private String plantilla(String badgeEmoji, String badgeTexto, String[] tono, String titulo, String cuerpoHtml) {
-        return plantilla(badgeEmoji, badgeTexto, tono, titulo, cuerpoHtml, null, null);
+    // Sin emojis ni íconos en el badge: regla de producto (nada de emojis) y los clientes de
+    // correo (Gmail, Outlook) bloquean SVG, así que el badge es solo texto con color.
+    private String plantilla(String badgeTexto, String[] tono, String titulo, String cuerpoHtml) {
+        return plantilla(badgeTexto, tono, titulo, cuerpoHtml, null, null);
     }
 
-    private String plantilla(String badgeEmoji, String badgeTexto, String[] tono, String titulo, String cuerpoHtml,
+    private String plantilla(String badgeTexto, String[] tono, String titulo, String cuerpoHtml,
                               String ctaTexto, String ctaUrl) {
         String badgeColor = tono[0];
         String badgeFondo = tono[1];
@@ -89,7 +91,7 @@ public class ResendEmailService {
                 "</td></tr>" +
                 "<tr><td style=\"background:#ffffff;padding:36px 32px 8px;border-left:1px solid " + COLOR_BORDER + ";border-right:1px solid " + COLOR_BORDER + ";\">" +
                 "<span style=\"display:inline-block;background:" + badgeFondo + ";color:" + badgeColor + ";font-size:12px;font-weight:700;padding:5px 12px;border-radius:999px;letter-spacing:0.2px;\">" +
-                badgeEmoji + " " + badgeTexto + "</span>" +
+                badgeTexto + "</span>" +
                 "<h1 style=\"font-size:21px;color:" + COLOR_INK + ";margin:16px 0 18px;line-height:1.3;\">" + titulo + "</h1>" +
                 "<div style=\"font-size:15px;color:#334155;line-height:1.65;\">" + cuerpoHtml + "</div>" +
                 cta +
@@ -152,7 +154,7 @@ public class ResendEmailService {
         String cuerpo = "<p>Tu código de verificación para activar tu cuenta en <strong>Tranqui App</strong> es:</p>" +
                 cajaDestacada(codigo) +
                 "<p style=\"font-size:13px;color:" + COLOR_MUTED + ";margin-top:15px;\">Este código es válido durante 15 minutos. Si no solicitaste este registro, podés ignorar este correo.</p>";
-        String html = plantilla("✅", "Verificación de cuenta", TONO_INFO,
+        String html = plantilla("Verificación de cuenta", TONO_INFO,
                 "¡Hola, " + nombreOUsuario(nombre) + "!", cuerpo);
         enviarCorreo(toEmail, asunto, html);
     }
@@ -162,7 +164,7 @@ public class ResendEmailService {
         String cuerpo = "<p>Hola " + nombreOUsuario(nombre) + ", solicitaste restablecer tu contraseña en <strong>Tranqui App</strong>. Tu código de recuperación es:</p>" +
                 cajaDestacada(codigo) +
                 "<p style=\"font-size:13px;color:" + COLOR_MUTED + ";margin-top:15px;\">El código expira en 15 minutos. Si no solicitaste este cambio, te recomendamos revisar la seguridad de tu cuenta.</p>";
-        String html = plantilla("🔑", "Recuperación de contraseña", TONO_INFO,
+        String html = plantilla("Recuperación de contraseña", TONO_INFO,
                 "Recuperación de contraseña", cuerpo);
         enviarCorreo(toEmail, asunto, html);
     }
@@ -172,7 +174,7 @@ public class ResendEmailService {
         String cuerpo = "<p><strong>De:</strong> " + nombreOUsuario(nombreUsuario) + " (" + emailUsuario + ")</p>" +
                 "<p><strong>Rol:</strong> " + rolUsuario + "</p>" +
                 "<p>El usuario solicitó, desde \"Mi Cuenta\" &gt; \"Privacidad\", una copia de los datos personales que Tranqui App tiene registrados a su nombre.</p>";
-        String html = plantilla("📄", "Solicitud Ley 25.326", TONO_INFO,
+        String html = plantilla("Solicitud Ley 25.326", TONO_INFO,
                 "Solicitud de copia de datos personales", cuerpo);
         enviarCorreo("soporte@tranquisalud.com", asuntoFinal, html, emailUsuario);
     }
@@ -185,7 +187,7 @@ public class ResendEmailService {
         String cuerpo = "<p>El equipo de soporte de <strong>Tranqui App</strong> respondió tu consulta \"" + asuntoTicket + "\":</p>" +
                 "<div style=\"background:" + COLOR_PANEL + ";border:1px solid " + COLOR_BORDER + ";padding:15px;border-radius:8px;white-space:pre-wrap;color:" + COLOR_INK + ";margin:16px 0;\">" + respuesta + "</div>" +
                 "<p style=\"font-size:13px;color:" + COLOR_MUTED + ";\">Podés ver la conversación completa y responder desde \"Mis Tickets\" en Tranqui App.</p>";
-        String html = plantilla("💬", "Respuesta de soporte", TONO_INFO,
+        String html = plantilla("Respuesta de soporte", TONO_INFO,
                 "¡Hola, " + nombreOUsuario(nombreUsuario) + "!", cuerpo, "Ir a Mis Tickets", frontendUrl);
         enviarCorreo(toEmail, asunto, html);
     }
@@ -197,7 +199,7 @@ public class ResendEmailService {
         String cuerpo = "<p>Un administrador reseteó tu contraseña en <strong>Tranqui App</strong>. Tu contraseña temporal es:</p>" +
                 cajaDestacada(passwordTemporal) +
                 "<p style=\"font-size:13px;color:" + COLOR_MUTED + ";margin-top:15px;\">Es temporal: al iniciar sesión con ella, te vamos a pedir que elijas una contraseña nueva antes de poder usar el resto de la aplicación. Si no solicitaste este cambio, contactate con nosotros.</p>";
-        String html = plantilla("🔐", "Nueva contraseña temporal", TONO_ALERTA,
+        String html = plantilla("Nueva contraseña temporal", TONO_ALERTA,
                 "¡Hola, " + nombreOUsuario(nombreUsuario) + "!", cuerpo);
         enviarCorreo(toEmail, asunto, html);
     }
@@ -213,7 +215,7 @@ public class ResendEmailService {
         String asunto = "Tu " + tipoLower + " de " + medicoNombre;
         String cuerpo = "<p><strong>" + medicoNombre + "</strong> te envió tu " + tipoLower + " adjunto en este correo.</p>" +
                 "<p style=\"font-size:13px;color:" + COLOR_MUTED + ";\">Enviado a través de Tranqui App.</p>";
-        String html = plantilla("📎", "Documento adjunto", TONO_EXITO,
+        String html = plantilla("Documento adjunto", TONO_EXITO,
                 "¡Hola, " + nombreOUsuario(pacienteNombre) + "!", cuerpo);
 
         String base64Content = extraerBase64(archivoDataUri);
@@ -241,7 +243,7 @@ public class ResendEmailService {
                         "Modalidad", modalidadLabel,
                         "Tipo de consulta", tipoLabel
                 );
-        String html = plantilla("🗓️", "Nuevo turno reservado", TONO_EXITO,
+        String html = plantilla("Nuevo turno reservado", TONO_EXITO,
                 "¡Tenés un nuevo turno, " + nombreOUsuario(nombreProfesional) + "!", cuerpo,
                 "Ver en Tranqui App", frontendUrl);
         enviarCorreo(toEmail, asunto, html);
@@ -256,7 +258,7 @@ public class ResendEmailService {
                         "Fecha", fecha != null ? fecha.format(FECHA_FMT) : null,
                         "Hora", hora != null ? hora.format(HORA_FMT) + " hs" : null
                 );
-        String html = plantilla("❌", "Turno cancelado", TONO_PELIGRO,
+        String html = plantilla("Turno cancelado", TONO_PELIGRO,
                 "Un turno fue cancelado, " + nombreOUsuario(nombreProfesional), cuerpo,
                 "Ver mi agenda", frontendUrl);
         enviarCorreo(toEmail, asunto, html);
@@ -271,7 +273,7 @@ public class ResendEmailService {
                         "Nueva fecha", fechaNueva != null ? fechaNueva.format(FECHA_FMT) : null,
                         "Nueva hora", horaNueva != null ? horaNueva.format(HORA_FMT) + " hs" : null
                 );
-        String html = plantilla("🔄", "Turno reprogramado", TONO_ALERTA,
+        String html = plantilla("Turno reprogramado", TONO_ALERTA,
                 "Turno reprogramado, " + nombreOUsuario(nombreProfesional), cuerpo,
                 "Ver mi agenda", frontendUrl);
         enviarCorreo(toEmail, asunto, html);
@@ -301,8 +303,165 @@ public class ResendEmailService {
                 dosBotones("Confirmar asistencia", confirmarUrl, TONO_EXITO[2],
                         "No podré asistir", noAsistiraUrl, TONO_PELIGRO[2]) +
                 "<p style=\"font-size:12px;color:" + COLOR_MUTED + ";margin-top:18px;\">Si tocás \"No podré asistir\", tu turno se cancela automáticamente siguiendo la política de cancelación habitual.</p>";
-        String html = plantilla("📅", "Confirmá tu turno", TONO_ALERTA,
+        String html = plantilla("Confirmá tu turno", TONO_ALERTA,
                 "¡Hola, " + nombreOUsuario(nombrePaciente) + "!", cuerpo);
+        enviarCorreo(toEmail, asunto, html);
+    }
+
+    // ================================================================================
+    // ALERTAS INTERNAS — al equipo de administración (SubscriptionReconciliationScheduler)
+    // ================================================================================
+
+    public void enviarAlertaAdmin(String toEmail, String titulo, String mensaje) {
+        String html = plantilla("Alerta interna", TONO_ALERTA, titulo,
+                "<p>" + mensaje + "</p>", "Ir al panel de admin", frontendUrl);
+        enviarCorreo(toEmail, "[Tranqui App · Alerta] " + titulo, html);
+    }
+
+    // ================================================================================
+    // TURNOS — notificaciones al paciente (confirmado / cancelado / reprogramado / receta)
+    // ================================================================================
+
+    private static final String POLITICA_CANCELACION_HTML =
+            "<p style=\"font-size:12px;color:" + COLOR_MUTED + ";margin-top:18px;\">Podés cancelar desde Mis Turnos " +
+            "hasta 48 horas antes del turno y se te reembolsa el total. Con menos de 48 horas de anticipación, el " +
+            "turno se cancela pero no corresponde reembolso.</p>";
+
+    public enum ResultadoReembolso { REEMBOLSADO, SIN_REEMBOLSO, SIN_PAGO, PENDIENTE }
+
+    // meetUrl puede venir vacío para un turno online si Google Calendar todavía no generó el link
+    // real (ver GoogleCalendarSyncService#exportarTurnosPendientesAGoogleCalendar): en ese caso
+    // se avisa que el link aparece en Mis Turnos en vez de mandar uno inexistente.
+    public void enviarTurnoConfirmadoPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
+                                               LocalDate fecha, LocalTime hora, boolean esOnline, String tipoLabel,
+                                               String direccion, String meetUrl, BigDecimal monto) {
+        String asunto = "Turno confirmado con " + nombreProfesional + " — " + (fecha != null ? fecha.format(FECHA_FMT) : "");
+        String lugar = esOnline
+                ? (meetUrl != null && !meetUrl.isBlank()
+                    ? "<a href=\"" + meetUrl + "\" style=\"color:" + TONO_EXITO[2] + ";\">Unirse a Google Meet</a>"
+                    : "El link de la videollamada va a estar en Mis Turnos")
+                : direccion;
+        String cuerpo = "<p>Tu pago fue aprobado y tu turno quedó confirmado. Estos son los detalles:</p>" +
+                panelInfo(
+                        "Profesional", nombreProfesional,
+                        "Fecha", fecha != null ? fecha.format(FECHA_FMT) : null,
+                        "Hora", hora != null ? hora.format(HORA_FMT) + " hs" : null,
+                        "Modalidad", esOnline ? "Online (videollamada)" : "Presencial",
+                        "Tipo de consulta", tipoLabel,
+                        esOnline ? "Videollamada" : "Lugar", lugar,
+                        "Monto abonado", monto != null ? "$ " + String.format(Locale.GERMANY, "%,.0f", monto) : null
+                ) +
+                (esOnline
+                        ? "<p>El link se activa 10 minutos antes. Buscá un lugar tranquilo y con buena conexión.</p>"
+                        : "<p>Te recomendamos llegar 10 minutos antes.</p>") +
+                POLITICA_CANCELACION_HTML;
+        String html = plantilla("Turno confirmado", TONO_EXITO,
+                "¡Listo, " + nombreOUsuario(nombrePaciente) + "! Tu turno está confirmado", cuerpo,
+                "Ver mis turnos", frontendUrl);
+        enviarCorreo(toEmail, asunto, html);
+    }
+
+    // Para servicios que no ocupan agenda (receta, certificado, informe): no hay fecha/hora, el
+    // profesional lo prepara y se lo entrega al paciente.
+    public void enviarDocumentoPagadoPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
+                                               String tipoDocumentoLabel, BigDecimal monto) {
+        String asunto = "Pago confirmado — " + tipoDocumentoLabel;
+        String cuerpo = "<p>Recibimos tu pago. " + nombreProfesional + " ya tiene tu pedido y te lo va a enviar en cuanto lo prepare.</p>" +
+                panelInfo(
+                        "Profesional", nombreProfesional,
+                        "Pedido", tipoDocumentoLabel,
+                        "Monto abonado", monto != null ? "$ " + String.format(Locale.GERMANY, "%,.0f", monto) : null
+                );
+        String html = plantilla("Pago confirmado", TONO_EXITO,
+                "¡Gracias, " + nombreOUsuario(nombrePaciente) + "!", cuerpo,
+                "Ir a Tranqui App", frontendUrl);
+        enviarCorreo(toEmail, asunto, html);
+    }
+
+    // fecha/hora en null para documentos (no ocupan agenda).
+    public void enviarTurnoCanceladoPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
+                                              LocalDate fecha, LocalTime hora, boolean canceladoPorProfesional,
+                                              ResultadoReembolso reembolso) {
+        String asunto = "Turno cancelado" + (fecha != null ? " — " + fecha.format(FECHA_FMT) : "");
+        String motivo = canceladoPorProfesional
+                ? "<p>" + nombreProfesional + " tuvo que cancelar tu turno. Te pedimos disculpas por el inconveniente.</p>"
+                : "<p>Cancelaste tu turno con " + nombreProfesional + ".</p>";
+        String detalleReembolso = switch (reembolso) {
+            case REEMBOLSADO -> "Se reembolsa el total abonado al mismo medio de pago. La acreditación depende de los plazos de Mercado Pago.";
+            case SIN_REEMBOLSO -> "La cancelación se hizo con menos de 48 horas de anticipación, así que según la política de cancelación no corresponde reembolso.";
+            case PENDIENTE -> "Te corresponde el reembolso del total abonado, pero no pudimos procesarlo automáticamente. Ya estamos revisándolo: si en 5 días hábiles no lo ves acreditado, escribinos desde Soporte.";
+            case SIN_PAGO -> null;
+        };
+        String cuerpo = motivo +
+                panelInfo(
+                        "Profesional", nombreProfesional,
+                        "Fecha", fecha != null ? fecha.format(FECHA_FMT) : null,
+                        "Hora", hora != null ? hora.format(HORA_FMT) + " hs" : null
+                ) +
+                (detalleReembolso != null ? "<p>" + detalleReembolso + "</p>" : "") +
+                "<p>Podés reservar un nuevo turno cuando quieras.</p>";
+        String html = plantilla("Turno cancelado", TONO_PELIGRO,
+                "Tu turno fue cancelado, " + nombreOUsuario(nombrePaciente), cuerpo,
+                "Reservar otro turno", frontendUrl);
+        enviarCorreo(toEmail, asunto, html);
+    }
+
+    public void enviarTurnoReprogramadoPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
+                                                 LocalDate fechaNueva, LocalTime horaNueva, boolean esOnline,
+                                                 String direccion, String meetUrl) {
+        String asunto = "Tu turno fue reprogramado — " + (fechaNueva != null ? fechaNueva.format(FECHA_FMT) : "");
+        String lugar = esOnline
+                ? (meetUrl != null && !meetUrl.isBlank()
+                    ? "<a href=\"" + meetUrl + "\" style=\"color:" + TONO_ALERTA[2] + ";\">Unirse a Google Meet</a>"
+                    : "El link de la videollamada va a estar en Mis Turnos")
+                : direccion;
+        String cuerpo = "<p>" + nombreProfesional + " reprogramó tu turno. La nueva fecha y hora son:</p>" +
+                panelInfo(
+                        "Profesional", nombreProfesional,
+                        "Nueva fecha", fechaNueva != null ? fechaNueva.format(FECHA_FMT) : null,
+                        "Nueva hora", horaNueva != null ? horaNueva.format(HORA_FMT) + " hs" : null,
+                        "Modalidad", esOnline ? "Online (videollamada)" : "Presencial",
+                        esOnline ? "Videollamada" : "Lugar", lugar
+                ) +
+                "<p>Si el nuevo horario no te queda bien, escribile a tu profesional por el chat de Tranqui App.</p>" +
+                POLITICA_CANCELACION_HTML;
+        String html = plantilla("Turno reprogramado", TONO_ALERTA,
+                "Tu turno cambió de horario, " + nombreOUsuario(nombrePaciente), cuerpo,
+                "Ver mis turnos", frontendUrl);
+        enviarCorreo(toEmail, asunto, html);
+    }
+
+    // Enviado cuando el link real de Meet se genera después de confirmado el turno (Google
+    // Calendar no estaba disponible en ese momento o el profesional lo conectó más tarde).
+    public void enviarLinkVideollamadaPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
+                                                LocalDate fecha, LocalTime hora, String meetUrl) {
+        String asunto = "Ya tenés el link de tu sesión online — " + (fecha != null ? fecha.format(FECHA_FMT) : "");
+        String cuerpo = "<p>Ya está listo el link de la videollamada de tu turno con " + nombreProfesional + ".</p>" +
+                panelInfo(
+                        "Profesional", nombreProfesional,
+                        "Fecha", fecha != null ? fecha.format(FECHA_FMT) : null,
+                        "Hora", hora != null ? hora.format(HORA_FMT) + " hs" : null
+                ) +
+                "<p>El link se activa 10 minutos antes. También lo tenés en Mis Turnos.</p>";
+        String html = plantilla("Link de videollamada", TONO_INFO,
+                "Tu sesión online está lista, " + nombreOUsuario(nombrePaciente), cuerpo,
+                "Unirse a Google Meet", meetUrl);
+        enviarCorreo(toEmail, asunto, html);
+    }
+
+    public void enviarRecetaEmitidaPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
+                                             String matricula, String pdfUrl, String nroRecetario) {
+        String asunto = "Tu receta electrónica de " + nombreProfesional;
+        String cuerpo = "<p>" + nombreProfesional + " emitió una receta electrónica oficial para vos. Podés presentarla en cualquier farmacia adherida a Innovamed/QBI2.</p>" +
+                panelInfo(
+                        "Profesional", nombreProfesional,
+                        "Matrícula", matricula,
+                        "N° de recetario", nroRecetario
+                );
+        boolean tienePdf = pdfUrl != null && !pdfUrl.isBlank();
+        String html = plantilla("Receta emitida", TONO_INFO,
+                "Tu receta está lista, " + nombreOUsuario(nombrePaciente), cuerpo,
+                tienePdf ? "Descargar receta" : "Ver en Tranqui App", tienePdf ? pdfUrl : frontendUrl);
         enviarCorreo(toEmail, asunto, html);
     }
 

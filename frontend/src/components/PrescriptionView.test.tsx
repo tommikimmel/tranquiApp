@@ -541,7 +541,7 @@ describe('PrescriptionView — history tab', () => {
     await user.click(screen.getByRole('button', { name: /Ver PDF oficial de Receta/ }))
     expect(await screen.findByText(/todavía no tiene el documento oficial de QBI2\/Innovamed/)).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: '✕' }))
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }))
     expect(screen.queryByText('Detalle de Receta #10')).not.toBeInTheDocument()
   })
 

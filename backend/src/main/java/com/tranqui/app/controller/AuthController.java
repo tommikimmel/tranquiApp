@@ -511,7 +511,7 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         return ResponseEntity.ok(accountService.actualizarPreferenciasNotificacion(
-                userDetails.getUsername(), dto.isEmailHabilitado(), dto.isWhatsappHabilitado()));
+                userDetails.getUsername(), dto.isEmailHabilitado()));
     }
 
     @PostMapping("/mi-cuenta/password")

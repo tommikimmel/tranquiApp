@@ -48,6 +48,10 @@ class TurnoServiceTest {
     @MockBean
     private com.tranqui.app.service.ResendEmailService resendEmailService;
 
+    // Spy: delega en el servicio real salvo en el test que simula una caída de Google Calendar.
+    @org.springframework.boot.test.mock.mockito.SpyBean
+    private com.tranqui.app.service.GoogleCalendarService googleCalendarService;
+
     private Usuario paciente;
     private Usuario medico;
     private Turno turno;
@@ -170,9 +174,10 @@ class TurnoServiceTest {
 
     @Test
     void whenGoogleCalendarFails_thenShouldRollbackTransaction() {
-        // Trigger FAIL_CALENDAR simulation in GoogleCalendarService
+        org.mockito.Mockito.doThrow(new RuntimeException("Google Calendar caído"))
+                .when(googleCalendarService).crearEventoReunion(org.mockito.ArgumentMatchers.any());
         assertThrows(RuntimeException.class, () -> {
-            turnoService.confirmarTurnoOsde(turno.getId(), "FAIL_CALENDAR");
+            turnoService.confirmarTurnoOsde(turno.getId(), "OSDE-123");
         });
 
         // Verify database state remains unchanged
@@ -199,6 +204,7 @@ class TurnoServiceTest {
         assertNotNull(response);
         assertEquals("PENDIENTE_PAGO", response.getEstado());
         assertNotNull(response.getCheckoutUrl());
+        assertNotNull(response.getTokenReserva());
         assertFalse(response.getCheckoutUrl().isEmpty());
         
         // Clean up created turno & patient if created
@@ -498,7 +504,7 @@ class TurnoServiceTest {
     }
 
     @Test
-    void testReprogramarTurno_updatesFechaHoraAndAttemptsWhatsapp() {
+    void testReprogramarTurno_updatesFechaHora() {
         LocalDate nuevaFecha = LocalDate.now().plusDays(4);
         turnoService.reprogramarTurno(turno.getId(), nuevaFecha.toString(), "14:30");
 
@@ -506,17 +512,6 @@ class TurnoServiceTest {
         assertEquals(nuevaFecha, dbTurno.getFecha());
         assertEquals(LocalTime.of(14, 30), dbTurno.getHoraInicio());
         assertEquals(LocalTime.of(15, 15), dbTurno.getHoraFin());
-    }
-
-    @Test
-    void testReprogramarTurno_includesMeetLinkInMessageWhenPresent() {
-        turno.setTelemedicinaUrl("https://meet.google.com/existing-link");
-        turnoRepository.save(turno);
-
-        turnoService.reprogramarTurno(turno.getId(), LocalDate.now().plusDays(4).toString(), "10:00");
-
-        Turno dbTurno = turnoRepository.findById(turno.getId()).orElseThrow();
-        assertEquals(LocalTime.of(10, 0), dbTurno.getHoraInicio());
     }
 
     @Test
@@ -838,7 +833,9 @@ class TurnoServiceTest {
 
     @Test
     void testAbandonarReservaPendiente_cancelsWhenPendientePago() {
-        turnoService.abandonarReservaPendiente(turno.getId());
+        turno.setTokenReserva("tok-a");
+        turnoRepository.save(turno);
+        turnoService.abandonarReservaPendiente(turno.getId(), "tok-a");
 
         Turno db = turnoRepository.findById(turno.getId()).orElseThrow();
         assertEquals(EstadoTurno.CANCELADO, db.getEstado());
@@ -847,9 +844,10 @@ class TurnoServiceTest {
     @Test
     void testAbandonarReservaPendiente_doesNothingWhenAlreadyConfirmed() {
         turno.setEstado(EstadoTurno.CONFIRMADO);
+        turno.setTokenReserva("tok-b");
         turnoRepository.save(turno);
 
-        turnoService.abandonarReservaPendiente(turno.getId());
+        turnoService.abandonarReservaPendiente(turno.getId(), "tok-b");
 
         Turno db = turnoRepository.findById(turno.getId()).orElseThrow();
         assertEquals(EstadoTurno.CONFIRMADO, db.getEstado());
@@ -858,7 +856,7 @@ class TurnoServiceTest {
     @Test
     void testAbandonarReservaPendiente_turnoNoEncontrado_throws() {
         assertThrows(jakarta.persistence.EntityNotFoundException.class,
-                () -> turnoService.abandonarReservaPendiente(-1L));
+                () -> turnoService.abandonarReservaPendiente(-1L, "x"));
     }
 
     // --- marcarRecetasEnviadasParaPaciente --------------------------------------------------

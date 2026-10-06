@@ -136,7 +136,7 @@ export const SETTINGS_TABS: { id: SettingsTab; label: string; Icon: (props: { si
   { id: 'presencia', label: 'Presencia y Experiencia', Icon: Icon.Star },
   { id: 'notificaciones', label: 'Notificaciones', Icon: Icon.BellSimple },
   { id: 'integraciones', label: 'Integraciones', Icon: Icon.MercadoPago },
-  { id: 'suscripcion', label: 'Suscripción y Facturas', Icon: Icon.CreditCard },
+  { id: 'suscripcion', label: 'Suscripción', Icon: Icon.CreditCard },
   { id: 'privacidad', label: 'Privacidad y Datos', Icon: Icon.Shield },
 ]
 

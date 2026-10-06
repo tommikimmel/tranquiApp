@@ -44,9 +44,6 @@ class TurnoServiceMoreCoverageUnitTest {
     private MercadoPagoService mercadoPagoService;
 
     @Mock
-    private WhatsAppService whatsappService;
-
-    @Mock
     private NotificacionService notificacionService;
 
     @Mock
@@ -79,7 +76,6 @@ class TurnoServiceMoreCoverageUnitTest {
                 .nombre("Paciente Juan")
                 .email("paciente@example.com")
                 .telefono("+5491112345678")
-                .notificacionesWhatsappHabilitadas(true)
                 .rol(Rol.PACIENTE)
                 .build();
 
@@ -126,13 +122,20 @@ class TurnoServiceMoreCoverageUnitTest {
 
     @Test
     void testAbandonarReservaPendiente() {
+        turno.setTokenReserva("tok-10");
         when(turnoRepository.findById(10L)).thenReturn(Optional.of(turno));
-        turnoService.abandonarReservaPendiente(10L);
+
+        // Sin token o con uno ajeno -> rechazado, la reserva sigue pendiente
+        assertThrows(IllegalStateException.class, () -> turnoService.abandonarReservaPendiente(10L, null));
+        assertThrows(IllegalStateException.class, () -> turnoService.abandonarReservaPendiente(10L, "otro"));
+        assertEquals(EstadoTurno.PENDIENTE_PAGO, turno.getEstado());
+
+        turnoService.abandonarReservaPendiente(10L, "tok-10");
         assertEquals(EstadoTurno.CANCELADO, turno.getEstado());
 
         // Already confirmed -> untouched
         turno.setEstado(EstadoTurno.CONFIRMADO);
-        turnoService.abandonarReservaPendiente(10L);
+        turnoService.abandonarReservaPendiente(10L, "tok-10");
         assertEquals(EstadoTurno.CONFIRMADO, turno.getEstado());
     }
 
@@ -152,6 +155,55 @@ class TurnoServiceMoreCoverageUnitTest {
         // Paciente cancels
         turnoService.cancelarTurno(10L, "paciente@example.com");
         verify(reembolsoService).procesarReembolso(turno, medico, false);
+    }
+
+    @Test
+    void cancelarTurno_mailAlPacienteInformaElResultadoDelReembolso() throws Exception {
+        turno.setOcupaAgenda(true);
+        turno.setPago(Pago.builder().estado(EstadoPago.APROBADO).build());
+        when(turnoRepository.findById(10L)).thenReturn(Optional.of(turno));
+        when(turnoRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        // Con 48 hs o más: reembolsado
+        when(reembolsoService.procesarReembolso(turno, medico, false)).thenReturn(true);
+        turnoService.cancelarTurno(10L, "paciente@example.com");
+        verify(resendEmailService).enviarTurnoCanceladoPaciente(eq("paciente@example.com"), anyString(), anyString(),
+                eq(turno.getFecha()), eq(turno.getHoraInicio()), eq(false), eq(ResendEmailService.ResultadoReembolso.REEMBOLSADO));
+
+        // Con menos de 48 hs: sin reembolso
+        when(reembolsoService.procesarReembolso(turno, medico, false)).thenReturn(false);
+        turnoService.cancelarTurno(10L, "paciente@example.com");
+        verify(resendEmailService).enviarTurnoCanceladoPaciente(eq("paciente@example.com"), anyString(), anyString(),
+                any(), any(), eq(false), eq(ResendEmailService.ResultadoReembolso.SIN_REEMBOLSO));
+
+        // Falla Mercado Pago: reembolso pendiente
+        when(reembolsoService.procesarReembolso(turno, medico, false)).thenThrow(new RuntimeException("MP caído"));
+        turnoService.cancelarTurno(10L, "paciente@example.com");
+        verify(resendEmailService).enviarTurnoCanceladoPaciente(eq("paciente@example.com"), anyString(), anyString(),
+                any(), any(), eq(false), eq(ResendEmailService.ResultadoReembolso.PENDIENTE));
+    }
+
+    @Test
+    void cancelarTurno_porElProfesional_yPacienteSinPago() throws Exception {
+        turno.setOcupaAgenda(true);
+        when(turnoRepository.findById(10L)).thenReturn(Optional.of(turno));
+        when(turnoRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        turnoService.cancelarTurno(10L, "medico@example.com");
+
+        verify(resendEmailService).enviarTurnoCanceladoPaciente(eq("paciente@example.com"), anyString(), anyString(),
+                any(), any(), eq(true), eq(ResendEmailService.ResultadoReembolso.SIN_PAGO));
+    }
+
+    @Test
+    void cancelarTurno_noMandaMailSiElPacienteDesactivoLasNotificaciones() {
+        paciente.setNotificacionesEmailHabilitadas(false);
+        when(turnoRepository.findById(10L)).thenReturn(Optional.of(turno));
+        when(turnoRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        turnoService.cancelarTurno(10L, "paciente@example.com");
+
+        verify(resendEmailService, never()).enviarTurnoCanceladoPaciente(any(), any(), any(), any(), any(), anyBoolean(), any());
     }
 
     @Test
@@ -212,7 +264,8 @@ class TurnoServiceMoreCoverageUnitTest {
         assertEquals(LocalDate.of(2026, 11, 15), turno.getFecha());
         assertEquals(LocalTime.of(14, 0), turno.getHoraInicio());
         verify(calendarService).actualizarEventoReunion(turno);
-        verify(whatsappService).enviarMensajeWhatsApp(eq("+5491112345678"), anyString());
+        verify(resendEmailService).enviarTurnoReprogramadoPaciente(eq("paciente@example.com"), anyString(), anyString(),
+                eq(LocalDate.of(2026, 11, 15)), eq(LocalTime.of(14, 0)), anyBoolean(), any(), any());
     }
 
     @Test

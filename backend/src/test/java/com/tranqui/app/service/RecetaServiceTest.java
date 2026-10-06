@@ -65,9 +65,6 @@ class RecetaServiceTest {
     @MockBean
     private SubscriptionService subscriptionService;
 
-    @MockBean
-    private WhatsAppService whatsAppService;
-
     private Usuario medico;
     private Usuario paciente;
     private Usuario otroPaciente;
@@ -612,22 +609,5 @@ class RecetaServiceTest {
         } finally {
             turnoRepository.delete(turnoRecetaFueraDeTurno);
         }
-    }
-
-    // ── fallo de WhatsApp post-emisión: no debe romper la respuesta exitosa ──────────
-
-    @Test
-    void testEmitirReceta_fallaEnvioDeWhatsapp_quedaSwallowedYNoRompeLaRespuesta() {
-        doThrow(new RuntimeException("Twilio caído")).when(whatsAppService)
-                .enviarMensajeWhatsApp(anyString(), anyString());
-
-        RecetaDto dto = RecetaDto.builder()
-                .pacienteId(paciente.getId())
-                .diagnosis("Control")
-                .medications(Arrays.asList(medicamento("Ibuprofeno", null)))
-                .build();
-
-        RecetaResponseDto result = assertDoesNotThrow(() -> recetaService.emitirReceta(medico.getEmail(), dto));
-        assertNotNull(result);
     }
 }

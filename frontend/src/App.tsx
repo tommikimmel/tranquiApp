@@ -34,6 +34,7 @@ const PrivacyPolicyPage = lazy(() => import('./components/PrivacyPolicyPage'))
 const TermsPage = lazy(() => import('./components/TermsPage'))
 const MiCuentaView = lazy(() => import('./components/MiCuentaView'))
 const MyTicketsView = lazy(() => import('./components/MyTicketsView'))
+const HelpFaqModal = lazy(() => import('./components/HelpFaqModal'))
 import { api, getBackendOrigin } from './api/api'
 import { useAlert } from './context/AlertContext'
 import { useDocumentTitle } from './hooks/useDocumentTitle'
@@ -80,6 +81,7 @@ export default function App() {
   // the remaining case, the professional dashboard shell rendered directly here in App().
   useDocumentTitle(view === 'dashboard' ? 'Panel Profesional — Tranqui App' : 'Tranqui App')
   const [showTicketsView, setShowTicketsView] = useState(false)
+  const [showHelpModal, setShowHelpModal] = useState(false)
   const [mpConnected, setMpConnected] = useState(false)
   const [googleConnected, setGoogleConnected] = useState(false)
   const [mpEnabled, setMpEnabled] = useState(false)
@@ -581,7 +583,7 @@ export default function App() {
   const handleRescheduleAppointment = (turnoId: number, fecha: string, hora: string) => {
     api.reprogramarTurno(turnoId, fecha, hora)
       .then(() => {
-        showAlert("Turno reprogramado con éxito. Se ha enviado una notificación por WhatsApp al paciente.", "success");
+        showAlert("Turno reprogramado con éxito.", "success");
         refreshDashboardAppointments();
       })
       .catch(err => {
@@ -1014,6 +1016,19 @@ export default function App() {
           </div>
 
           <button
+            onClick={() => setShowHelpModal(true)}
+            className="btn btn--ghost btn--sm dashboard-header__action-btn"
+            title="Ayuda y preguntas frecuentes, con videos explicativos"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            Ayuda
+          </button>
+
+          <button
             onClick={() => setShowTicketsView(true)}
             className="btn btn--ghost btn--sm dashboard-header__action-btn"
             title="Ver mis tickets de soporte"
@@ -1069,6 +1084,11 @@ export default function App() {
       {showTicketsView && (
         <Suspense fallback={null}>
           <MyTicketsView onClose={() => setShowTicketsView(false)} />
+        </Suspense>
+      )}
+      {showHelpModal && (
+        <Suspense fallback={null}>
+          <HelpFaqModal onClose={() => setShowHelpModal(false)} defaultAudience="profesional" />
         </Suspense>
       )}
 

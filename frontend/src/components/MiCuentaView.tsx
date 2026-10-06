@@ -1,4 +1,6 @@
 import React, { useEffect, useState, type ReactNode } from 'react'
+import { Icon } from './Icon'
+import ConfirmDialog from './ConfirmDialog'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
@@ -99,7 +101,7 @@ const MCIcon = {
 
 const TABS: { id: MiCuentaTab; label: string; Icon: (props?: { size?: number }) => React.JSX.Element }[] = [
   { id: 'datos', label: 'Datos personales', Icon: MCIcon.User },
-  { id: 'suscripcion', label: 'Mi Suscripción y Facturas', Icon: MCIcon.CreditCard },
+  { id: 'suscripcion', label: 'Mi Suscripción', Icon: MCIcon.CreditCard },
   { id: 'password', label: 'Contraseña', Icon: MCIcon.Lock },
   { id: 'notificaciones', label: 'Notificaciones', Icon: MCIcon.Bell },
   { id: 'privacidad', label: 'Acceso a mis datos', Icon: MCIcon.Shield },
@@ -149,7 +151,6 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
 
   // Notificaciones state
   const [notifEmail, setNotifEmail] = useState(true)
-  const [notifWhatsapp, setNotifWhatsapp] = useState(true)
   const [savingNotif, setSavingNotif] = useState(false)
 
   // Privacidad state
@@ -162,9 +163,8 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  // Suscripciones y Facturas ARCA state
+  // Suscripción state
   const [mySub, setMySub] = useState<any>(null)
-  const [myInvoices, setMyInvoices] = useState<any[]>([])
 
   useEffect(() => {
     api.getMiCuenta()
@@ -181,7 +181,6 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
         setObraSocial(data.obraSocial || '')
         setNumAfiliado(data.numAfiliado || '')
         setNotifEmail(data.notificacionesEmailHabilitadas !== false)
-        setNotifWhatsapp(data.notificacionesWhatsappHabilitadas !== false)
       })
       .catch((err) => {
         console.error('Error al cargar Mi Cuenta:', err)
@@ -189,18 +188,17 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
       })
       .finally(() => setLoading(false))
 
-    // Cargar suscripción y facturas ARCA
+    // Cargar suscripción
     api.getMySubscription().then((s: any) => setMySub(s)).catch(() => {})
-    api.getMyInvoices().then((invs: any) => setMyInvoices(Array.isArray(invs) ? invs : [])).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const [cancellingSub, setCancellingSub] = useState(false);
-  const handleCancelarSuscripcion = () => {
-    const fechaFin = mySub?.currentPeriodEnd ? new Date(mySub.currentPeriodEnd).toLocaleDateString('es-AR') : 'el fin del período abonado';
-    if (!window.confirm(`¿Confirmás que querés cancelar la renovación automática de tu suscripción?\n\nNo se te cobrará ningún nuevo período en Mercado Pago y mantendrás el acceso total a tu cuenta y agenda hasta el ${fechaFin}.\nPasada esa fecha, tu perfil se pausará del buscador público.`)) {
-      return;
-    }
+  const [showCancelSubDialog, setShowCancelSubDialog] = useState(false);
+  const fechaFinSuscripcion = mySub?.currentPeriodEnd ? new Date(mySub.currentPeriodEnd).toLocaleDateString('es-AR') : 'el fin del período abonado';
+  const handleCancelarSuscripcion = () => setShowCancelSubDialog(true);
+  const confirmarCancelacionSuscripcion = () => {
+    setShowCancelSubDialog(false);
     setCancellingSub(true);
     api.cancelMySubscription()
       .then((res: any) => {
@@ -238,7 +236,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
       })
       setCuenta(updated)
       onUserUpdated?.((prev: any) => ({ ...prev, nombre: updated.nombre, telefono: updated.telefono }))
-      showAlert('Tus datos se guardaron correctamente ✓', 'success')
+      showAlert('Tus datos se guardaron correctamente', 'success')
     } catch (err: any) {
       showAlert(err.message || 'No pudimos guardar tus datos. Intentá de nuevo.', 'error')
     } finally {
@@ -257,7 +255,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
-      showAlert('Contraseña actualizada correctamente ✓', 'success')
+      showAlert('Contraseña actualizada correctamente', 'success')
     } catch (err: any) {
       showAlert(err.message || 'No pudimos actualizar tu contraseña.', 'error')
     } finally {
@@ -265,16 +263,14 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
     }
   }
 
-  const handleToggleNotif = async (which: 'email' | 'whatsapp', value: boolean) => {
-    const nextEmail = which === 'email' ? value : notifEmail
-    const nextWhatsapp = which === 'whatsapp' ? value : notifWhatsapp
-    if (which === 'email') setNotifEmail(value); else setNotifWhatsapp(value)
+  const handleToggleNotifEmail = async (value: boolean) => {
+    setNotifEmail(value)
     setSavingNotif(true)
     try {
-      await api.actualizarPreferenciasNotificacion({ emailHabilitado: nextEmail, whatsappHabilitado: nextWhatsapp })
+      await api.actualizarPreferenciasNotificacion({ emailHabilitado: value })
     } catch (err: any) {
       // revert on failure
-      if (which === 'email') setNotifEmail(!value); else setNotifWhatsapp(!value)
+      setNotifEmail(!value)
       showAlert(err.message || 'No pudimos guardar tu preferencia.', 'error')
     } finally {
       setSavingNotif(false)
@@ -286,7 +282,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
     try {
       await api.solicitarCopiaDatos()
       setCopiaDatosSolicitada(true)
-      showAlert('Tu solicitud fue enviada. Te responderemos por email dentro de los próximos 10 días hábiles ✓', 'success')
+      showAlert('Tu solicitud fue enviada. Te responderemos por email dentro de los próximos 10 días hábiles', 'success')
     } catch (err: any) {
       showAlert(err.message || 'No pudimos enviar tu solicitud. Intentá de nuevo.', 'error')
     } finally {
@@ -487,10 +483,10 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                 <div className="card">
                   <div className="card__header">
                     <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <MCIcon.CreditCard size={18} /> Mi Suscripción y Facturas ARCA
+                      <MCIcon.CreditCard size={18} /> Mi Suscripción
                     </h2>
                     <p className="card__subtitle">
-                      Gestioná tu membresía profesional y descargá tus comprobantes oficiales con CAE y código QR emitidos por ARCA.
+                      Gestioná tu membresía profesional.
                     </p>
                   </div>
 
@@ -532,7 +528,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                           alignItems: 'center',
                           gap: '10px'
                         }}>
-                          <span style={{ fontSize: '18px' }}>⚠️</span>
+                          <span style={{ display: 'inline-flex', flexShrink: 0 }}><Icon.AlertTriangle size={18} /></span>
                           <div>
                             <strong>Renovación automática cancelada:</strong> No se realizarán más cobros en Mercado Pago.
                             Mantendrás acceso total a todas las funciones profesionales hasta el <strong>{mySub.currentPeriodEnd ? new Date(mySub.currentPeriodEnd).toLocaleDateString('es-AR') : ''}</strong>.
@@ -549,6 +545,21 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                           >
                             {cancellingSub ? 'Cancelando...' : 'Cancelar renovación automática'}
                           </button>
+                  {showCancelSubDialog && (
+                    <ConfirmDialog
+                      title="¿Cancelar la renovación automática?"
+                      confirmLabel="Sí, cancelar renovación"
+                      cancelLabel="No, mantener"
+                      danger
+                      busy={cancellingSub}
+                      onConfirm={confirmarCancelacionSuscripcion}
+                      onClose={() => setShowCancelSubDialog(false)}
+                    >
+                      <p style={{ margin: '0 0 8px' }}>No se te va a cobrar ningún período nuevo en Mercado Pago.</p>
+                      <p style={{ margin: '0 0 8px' }}>Mantenés el acceso completo a tu cuenta y tu agenda hasta el <strong>{fechaFinSuscripcion}</strong>.</p>
+                      <p style={{ margin: 0 }}>Después de esa fecha, tu perfil deja de aparecer en el buscador.</p>
+                    </ConfirmDialog>
+                  )}
                         </div>
                       )}
 
@@ -557,53 +568,14 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                           <strong style={{ fontSize: '13px', display: 'block', marginBottom: '8px' }}>Funcionalidades habilitadas:</strong>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                             {mySub.activeFeatures.map((feat: string) => (
-                              <span key={feat} className="badge badge--neutral" style={{ fontSize: '12px' }}>
-                                ✓ {feat.replace(/_/g, ' ')}
+                              <span key={feat} className="badge badge--neutral" style={{ fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <Icon.Check size={12} /> {feat.replace(/_/g, ' ')}
                               </span>
                             ))}
                           </div>
                         </div>
                       )}
 
-                      <div style={{ marginTop: 'var(--space-2)' }}>
-                        <strong style={{ fontSize: '14px', display: 'block', marginBottom: '8px' }}>Comprobantes y Facturas C:</strong>
-                        {myInvoices.length === 0 ? (
-                          <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>No hay facturas emitidas todavía.</p>
-                        ) : (
-                          <div style={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
-                              <thead>
-                                <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                                  <th style={{ padding: '8px' }}>Comprobante</th>
-                                  <th style={{ padding: '8px' }}>Fecha</th>
-                                  <th style={{ padding: '8px' }}>Monto</th>
-                                  <th style={{ padding: '8px' }}>CAE</th>
-                                  <th style={{ padding: '8px', textAlign: 'right' }}>Descarga</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {myInvoices.map((inv: any) => (
-                                  <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                                    <td style={{ padding: '8px' }}>
-                                      <strong>{inv.cbteTipoNombre}</strong> #{String(inv.puntoVenta).padStart(5, '0')}-{String(inv.cbteNumero).padStart(8, '0')}
-                                    </td>
-                                    <td style={{ padding: '8px' }}>{new Date(inv.fechaEmision).toLocaleDateString('es-AR')}</td>
-                                    <td style={{ padding: '8px', fontWeight: 'bold' }}>$ {inv.importeTotal?.toLocaleString('es-AR')}</td>
-                                    <td style={{ padding: '8px', fontFamily: 'monospace' }}>{inv.cae || '—'}</td>
-                                    <td style={{ padding: '8px', textAlign: 'right' }}>
-                                      {inv.pdfUrl && (
-                                        <a href={api.getInvoicePdfUrl(inv.id)} target="_blank" rel="noreferrer" className="btn btn--secondary btn--sm">
-                                          📥 Descargar Factura C
-                                        </a>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
                     </div>
                   ) : (
                     <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-text-secondary)' }}>
@@ -677,24 +649,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                         </div>
                       </div>
                       <label className="toggle">
-                        <input type="checkbox" checked={notifEmail} disabled={savingNotif} onChange={(e) => handleToggleNotif('email', e.target.checked)} />
-                        <span className="toggle__track" />
-                      </label>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ width: '34px', height: '34px', borderRadius: 'var(--radius-sm)', background: 'var(--neutral-100)', color: 'var(--color-primary-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <MCIcon.Phone size={16} />
-                        </span>
-                        <div>
-                          <strong style={{ fontSize: 'var(--text-sm)' }}>Notificaciones por WhatsApp</strong>
-                          <p style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
-                            Recordatorios de turno y avisos de cancelación/reprogramación.
-                          </p>
-                        </div>
-                      </div>
-                      <label className="toggle">
-                        <input type="checkbox" checked={notifWhatsapp} disabled={savingNotif} onChange={(e) => handleToggleNotif('whatsapp', e.target.checked)} />
+                        <input type="checkbox" checked={notifEmail} disabled={savingNotif} onChange={(e) => handleToggleNotifEmail(e.target.checked)} />
                         <span className="toggle__track" />
                       </label>
                     </div>
@@ -727,7 +682,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                       >
                         <MCIcon.Download />
                         {copiaDatosSolicitada
-                          ? 'Solicitud enviada ✓'
+                          ? 'Solicitud enviada'
                           : solicitandoCopiaDatos
                             ? 'Enviando...'
                             : 'Solicitar una copia de mis datos'}

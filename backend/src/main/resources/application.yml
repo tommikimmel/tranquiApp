@@ -12,6 +12,15 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:tomaskimmel}
     password: ${SPRING_DATASOURCE_PASSWORD:securepassword}
     driver-class-name: org.postgresql.Driver
+  # Flyway corre antes que Hibernate. baseline-on-migrate: una base existente sin historial se
+  # marca como versión 1 (el esquema que ya creó ddl-auto) y solo se le aplican V2 en adelante.
+  # ddl-auto: update sigue creando tablas/columnas nuevas; los cambios destructivos (borrar o
+  # renombrar columnas, migrar datos) van como migraciones en db/migration.
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration
   jpa:
     hibernate:
       ddl-auto: update
@@ -19,14 +28,6 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-
-twilio:
-  account:
-    sid: ${TWILIO_ACCOUNT_SID:ACmockaccount}
-  auth:
-    token: ${TWILIO_AUTH_TOKEN:mocktoken}
-  whatsapp:
-    number: ${TWILIO_WHATSAPP_NUMBER:+14155238886}
 
 google:
   client-id: ${GOOGLE_CLIENT_ID:dummy-client-id}
@@ -66,6 +67,8 @@ app:
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
   # Siembra cuentas de prueba con password conocida (ver DataInitializer). Nunca en producción.
   seed-test-accounts: ${SEED_TEST_ACCOUNTS:false}
+  # Password inicial de admin@tranqui.com (solo si la cuenta no existe). Sin default conocido.
+  admin-initial-password: ${ADMIN_INITIAL_PASSWORD:}
 
 site:
   access:

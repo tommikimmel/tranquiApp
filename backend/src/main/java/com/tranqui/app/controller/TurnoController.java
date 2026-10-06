@@ -5,6 +5,7 @@ import com.tranqui.app.model.dto.TurnoResponseDto;
 import com.tranqui.app.service.TurnoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -78,8 +79,13 @@ public class TurnoController {
      * free their slot instead of blocking themselves for 5 minutes until the cleanup job runs.
      */
     @PostMapping("/turnos/{turnoId}/abandonar-pago")
-    public ResponseEntity<Void> abandonarReservaPendiente(@PathVariable Long turnoId) {
-        turnoService.abandonarReservaPendiente(turnoId);
+    public ResponseEntity<Void> abandonarReservaPendiente(@PathVariable Long turnoId,
+                                                          @RequestParam(required = false) String token) {
+        try {
+            turnoService.abandonarReservaPendiente(turnoId, token);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         return ResponseEntity.ok().build();
     }
 
@@ -150,16 +156,20 @@ public class TurnoController {
     // frontend.
     private ResponseEntity<String> paginaHtml(boolean exito, String titulo, String mensaje) {
         String color = exito ? "#16a34a" : "#dc2626";
-        String emoji = exito ? "✅" : "⚠️";
+        // Ícono SVG inline (check o alerta): esta página se abre en el navegador, así que SVG se
+        // ve bien — a diferencia de los mails, donde los clientes de correo lo bloquean.
+        String icono = exito
+                ? "<svg width=\"44\" height=\"44\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"" + color + "\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><polyline points=\"16 9 10.5 15 8 12.5\"/></svg>"
+                : "<svg width=\"44\" height=\"44\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"" + color + "\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z\"/><line x1=\"12\" y1=\"9\" x2=\"12\" y2=\"13\"/><line x1=\"12\" y1=\"17\" x2=\"12.01\" y2=\"17\"/></svg>";
         String html = "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\">" +
                 "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
                 "<title>" + titulo + "</title></head>" +
                 "<body style=\"margin:0;background:#eef2f7;font-family:'Segoe UI',Helvetica,Arial,sans-serif;\">" +
                 "<div style=\"max-width:420px;margin:64px auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:36px 32px;text-align:center;\">" +
                 "<div style=\"font-size:20px;font-weight:700;color:#0f172a;margin-bottom:18px;\">Tranqui<span style=\"color:#009ee3;\">App</span></div>" +
-                "<div style=\"font-size:36px;margin-bottom:10px;\">" + emoji + "</div>" +
+                "<div style=\"margin-bottom:10px;\">" + icono + "</div>" +
                 "<h1 style=\"font-size:19px;color:#0f172a;margin:0 0 10px;\">" + titulo + "</h1>" +
-                "<p style=\"font-size:14px;color:#334155;line-height:1.6;margin:0;\">" + (mensaje != null ? mensaje : "") + "</p>" +
+                "<p style=\"font-size:14px;color:#334155;line-height:1.6;margin:0;\">" + (mensaje != null ? org.springframework.web.util.HtmlUtils.htmlEscape(mensaje) : "") + "</p>" +
                 "<p style=\"font-size:12px;color:#94a3b8;margin-top:24px;\">Ya podés cerrar esta ventana.</p>" +
                 "</div></body></html>";
         return ResponseEntity.ok().contentType(org.springframework.http.MediaType.TEXT_HTML).body(html);

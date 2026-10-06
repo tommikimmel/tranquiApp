@@ -104,12 +104,8 @@ public class Turno {
     @OneToOne(mappedBy = "turno", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Pago pago;
 
-    @Builder.Default
-    @Column(name = "recordatorio_enviado", nullable = false)
-    private Boolean recordatorioEnviado = false;
-
     // Only meaningful for document-only turnos (ocupaAgenda == false): whether the médico has
-    // marked the receta/certificado/informe as sent to the patient (via email or WhatsApp,
+    // marked the receta/certificado/informe as sent to the patient (via email,
     // through their own client — see TurnoController#marcarDocumentoEnviado). Drives the
     // "Documento pendiente" / "Documento enviado" state shown to the patient in "Mis Turnos".
     // Same safe-backfill reasoning as ocupaAgenda: this table already has production rows.
@@ -149,6 +145,12 @@ public class Turno {
     // the click actually came from that email instead of someone guessing the turnoId.
     @Column(name = "token_confirmacion_asistencia", length = 64)
     private String tokenConfirmacionAsistencia;
+
+    // Token de un solo uso que se entrega a quien hizo la reserva (TurnoResponseDto.tokenReserva).
+    // El endpoint público abandonar-pago lo exige: sin él, cualquiera que adivinara el turnoId
+    // podía liberar la reserva pendiente de otra persona.
+    @Column(name = "token_reserva", length = 64)
+    private String tokenReserva;
 
     @PrePersist
     protected void onCreate() {

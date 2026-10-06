@@ -16,14 +16,12 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
 
     List<Turno> findByEstadoAndFechaCreacionBefore(EstadoTurno estado, java.time.LocalDateTime limit);
 
-    List<Turno> findByEstadoAndFechaAndRecordatorioEnviado(EstadoTurno estado, LocalDate fecha, Boolean recordatorioEnviado);
-
     // Used by TurnoService#enviarRecordatoriosConfirmacionAsistencia — ocupaAgenda = true excludes
     // document-only turnos (recetas, certificados, informes) automatically, since those are always
     // booked with ocupaAgenda = false (see reservarTurno). That's what keeps this feature scoped to
     // real turnos only, without needing a separate esReceta check.
-    List<Turno> findByEstadoAndFechaAndOcupaAgendaAndConfirmacionAsistenciaEmailEnviado(
-            EstadoTurno estado, LocalDate fecha, boolean ocupaAgenda, boolean confirmacionAsistenciaEmailEnviado);
+    List<Turno> findByEstadoAndFechaBetweenAndOcupaAgendaAndConfirmacionAsistenciaEmailEnviado(
+            EstadoTurno estado, LocalDate desde, LocalDate hasta, boolean ocupaAgenda, boolean confirmacionAsistenciaEmailEnviado);
 
     // JOIN FETCH t.paciente: every caller of this method (ClinicalService, MedicoService,
     // TurnoService.obtenerTodosTurnos) reads t.getPaciente() while mapping the result, which

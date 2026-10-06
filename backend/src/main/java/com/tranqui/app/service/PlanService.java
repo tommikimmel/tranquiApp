@@ -37,11 +37,24 @@ public class PlanService {
     public void initDefaultPlansAndFeatures() {
         seedFeatures();
         seedPlans();
+        retirarFeature("bot_whatsapp"); // notificaciones por WhatsApp (Twilio) — no se ofrecen por ahora
+    }
+
+    // Saca una funcionalidad que ya no se ofrece de todos los planes y del catálogo. Idempotente:
+    // las bases que ya la tenían sembrada se limpian en el próximo arranque.
+    private void retirarFeature(String featureKey) {
+        List<PlanFeature> vinculos = planFeatureRepository.findByFeatureKey(featureKey);
+        if (!vinculos.isEmpty()) {
+            planFeatureRepository.deleteAll(vinculos);
+            log.info("Funcionalidad '{}' retirada de {} plan(es).", featureKey, vinculos.size());
+        }
+        if (featureRepository.existsById(featureKey)) {
+            featureRepository.deleteById(featureKey);
+        }
     }
 
     private void seedFeatures() {
         createFeatureIfNotExists("recetas_electronicas", "Recetas Electrónicas QBI2", "Emisión legal de recetas y psicofármacos con firma digital integrada");
-        createFeatureIfNotExists("bot_whatsapp", "Bot y Notificaciones de WhatsApp", "Recordatorios y confirmaciones automáticas de turnos a pacientes");
         createFeatureIfNotExists("mp_split", "Cobro Anticipado y Mercado Pago Split", "Cobro automático de señas y honorarios con reducción de ausentismo");
         createFeatureIfNotExists("google_meet", "Google Meet & Calendario", "Sincronización bidireccional de agenda y links automáticos de telemedicina");
         createFeatureIfNotExists("historia_clinica", "Historia Clínica Digital", "Registro clínico, evoluciones, diagnósticos y adjuntos de pacientes");
@@ -141,14 +154,12 @@ public class PlanService {
         // Attach features
         linkPlanFeature(consultorio, "historia_clinica");
         linkPlanFeature(consultorio, "agenda_compartida");
-        linkPlanFeature(consultorio, "bot_whatsapp");
         linkPlanFeature(consultorio, "mp_split");
         linkPlanFeature(consultorio, "google_meet");
         linkPlanFeature(consultorio, "reportes");
 
         linkPlanFeature(clinico, "historia_clinica");
         linkPlanFeature(clinico, "agenda_compartida");
-        linkPlanFeature(clinico, "bot_whatsapp");
         linkPlanFeature(clinico, "mp_split");
         linkPlanFeature(clinico, "google_meet");
         linkPlanFeature(clinico, "reportes");
@@ -156,7 +167,6 @@ public class PlanService {
 
         linkPlanFeature(equipo, "historia_clinica");
         linkPlanFeature(equipo, "agenda_compartida");
-        linkPlanFeature(equipo, "bot_whatsapp");
         linkPlanFeature(equipo, "mp_split");
         linkPlanFeature(equipo, "google_meet");
         linkPlanFeature(equipo, "reportes");

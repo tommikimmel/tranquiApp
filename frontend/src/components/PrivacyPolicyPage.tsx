@@ -5,7 +5,7 @@ import '../styles/privacy.css'
 const CONTACT_EMAIL = 'soporte@tranquisalud.com'
 const RESPONSABLE_NOMBRE = 'Enso Tomás García Criscuolo'
 const RESPONSABLE_CUIT = '20-47473505-3'
-const LAST_UPDATED = '10 de agosto de 2026'
+const LAST_UPDATED = '6 de octubre de 2026'
 
 const SECTIONS: { id: string; title: string }[] = [
   { id: 'responsable', title: '1. Responsable del tratamiento' },
@@ -127,7 +127,7 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
                 número de documento, CUIL/CUIT.
               </li>
               <li>
-                <strong>Datos de contacto:</strong> email, teléfono/WhatsApp.
+                <strong>Datos de contacto:</strong> email, teléfono.
               </li>
               <li>
                 <strong>Domicilio:</strong> dirección particular o del consultorio (incluyendo, si la
@@ -197,7 +197,7 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
               <li>Brindar la consulta en sí (por videollamada o presencial) y su seguimiento clínico.</li>
               <li>Emitir recetas electrónicas válidas legalmente, lo que requiere enviar tus datos a QBI2/Innovamed (ver sección 7).</li>
               <li>Procesar los pagos entre paciente y profesional.</li>
-              <li>Enviarte notificaciones operativas por WhatsApp o email (confirmaciones de turno, recordatorios, recetas emitidas, códigos de verificación).</li>
+              <li>Enviarte notificaciones operativas por email (confirmaciones de turno, recordatorios, recetas emitidas, códigos de verificación).</li>
               <li>Sincronizar turnos con tu Google Calendar, si sos profesional y activás esa función.</li>
               <li>Prevenir fraude, abuso y uso indebido de la Plataforma, y cumplir obligaciones legales (por ejemplo, las que exige la normativa de historia clínica).</li>
               <li>Mejorar la Plataforma en base a su uso agregado y no identificado individualmente.</li>
@@ -247,10 +247,6 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
                 datos de tarjeta ni de cuenta bancaria.
               </li>
               <li>
-                <strong>Twilio (WhatsApp Business API):</strong> envía las notificaciones de WhatsApp
-                (confirmaciones de turno, recordatorios, avisos de receta emitida) a tu número de teléfono.
-              </li>
-              <li>
                 <strong>Resend:</strong> envía los emails transaccionales (verificación de cuenta,
                 recuperación de contraseña).
               </li>
@@ -267,7 +263,7 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
 
           <Section id="transferencia-internacional" title="8. Transferencia internacional de datos">
             <p>
-              Algunos de los proveedores mencionados en la sección anterior (Google, Twilio, Resend)
+              Algunos de los proveedores mencionados en la sección anterior (Google, Resend)
               procesan datos en servidores ubicados fuera de la República Argentina, típicamente en
               Estados Unidos. Al usar la Plataforma, aceptás esta transferencia internacional, que
               realizamos únicamente hacia proveedores que aplican estándares de seguridad y protección de

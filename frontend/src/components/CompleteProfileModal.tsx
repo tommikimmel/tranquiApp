@@ -163,7 +163,7 @@ export default function CompleteProfileModal({ user, onComplete, onLogout }: Com
           </div>
 
           <div className="form-group">
-            <label className="form-label form-label--required">Teléfono Móvil (WhatsApp)</label>
+            <label className="form-label form-label--required">Teléfono móvil</label>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <span style={{
                 padding: '10px 12px',

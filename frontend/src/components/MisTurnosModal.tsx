@@ -176,6 +176,11 @@ export default function MisTurnosModal({ appointments, loading, onClose, onCance
                       Unirse a la videollamada
                     </a>
                   )}
+                  {(appt.modalidad ? appt.modalidad === 'ONLINE' : false) && !appt.meetLink && isConfirmed && (
+                    <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: 'var(--space-1)' }}>
+                      El link de la videollamada se está generando. Te avisamos por mail cuando esté listo.
+                    </span>
+                  )}
                   {!isConfirmed && appt.checkoutUrl && (
                     <a
                       href={appt.checkoutUrl}

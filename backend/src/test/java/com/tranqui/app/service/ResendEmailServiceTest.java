@@ -99,4 +99,30 @@ class ResendEmailServiceTest {
                 "", "certificado.pdf");
         org.junit.jupiter.api.Assertions.assertFalse(badData);
     }
+
+    @Test
+    void mailsDeTurnoAlPaciente_noLanzanExcepcion() {
+        java.time.LocalDate fecha = java.time.LocalDate.of(2026, 11, 3);
+        java.time.LocalTime hora = java.time.LocalTime.of(10, 30);
+        assertDoesNotThrow(() -> resendEmailService.enviarTurnoConfirmadoPaciente("paciente@test.com", "Pedro", "Lic. Gómez",
+                fecha, hora, true, "Consulta particular", null, "https://meet.google.com/abc-defg-hij", new java.math.BigDecimal("60000")));
+        assertDoesNotThrow(() -> resendEmailService.enviarTurnoConfirmadoPaciente("paciente@test.com", null, "Lic. Gómez",
+                fecha, hora, true, "Consulta particular", null, null, null));
+        assertDoesNotThrow(() -> resendEmailService.enviarTurnoConfirmadoPaciente("paciente@test.com", "Pedro", "Lic. Gómez",
+                fecha, hora, false, "Obra Social", "Av. Santa Fe 1234, CABA", null, new java.math.BigDecimal("45000")));
+        assertDoesNotThrow(() -> resendEmailService.enviarDocumentoPagadoPaciente("paciente@test.com", "Pedro", "Dr. Pérez",
+                "un certificado", new java.math.BigDecimal("8000")));
+        for (ResendEmailService.ResultadoReembolso r : ResendEmailService.ResultadoReembolso.values()) {
+            assertDoesNotThrow(() -> resendEmailService.enviarTurnoCanceladoPaciente("paciente@test.com", "Pedro", "Lic. Gómez",
+                    fecha, hora, false, r));
+        }
+        assertDoesNotThrow(() -> resendEmailService.enviarTurnoCanceladoPaciente("paciente@test.com", "Pedro", "Lic. Gómez",
+                null, null, true, ResendEmailService.ResultadoReembolso.REEMBOLSADO));
+        assertDoesNotThrow(() -> resendEmailService.enviarTurnoReprogramadoPaciente("paciente@test.com", "Pedro", "Lic. Gómez",
+                fecha, hora, true, null, null));
+        assertDoesNotThrow(() -> resendEmailService.enviarRecetaEmitidaPaciente("paciente@test.com", "Pedro", "Dr. Pérez",
+                "MN 49281", "https://recetas.example/receta.pdf", "12345"));
+        assertDoesNotThrow(() -> resendEmailService.enviarRecetaEmitidaPaciente("paciente@test.com", "Pedro", "Dr. Pérez",
+                null, null, null));
+    }
 }

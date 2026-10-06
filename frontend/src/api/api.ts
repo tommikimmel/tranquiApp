@@ -160,7 +160,7 @@ export const api = {
   // "Mi Cuenta" — configuración de perfil del paciente (también usable por médicos).
   getMiCuenta: () => apiFetch('/auth/mi-cuenta'),
   actualizarMiCuenta: (data: any) => apiFetch('/auth/mi-cuenta', { method: 'PUT', body: data }),
-  actualizarPreferenciasNotificacion: (data: { emailHabilitado: boolean; whatsappHabilitado: boolean }) =>
+  actualizarPreferenciasNotificacion: (data: { emailHabilitado: boolean }) =>
     apiFetch('/auth/mi-cuenta/notificaciones', { method: 'PUT', body: data as any }),
   cambiarPassword: (data: { currentPassword?: string; newPassword: string }) =>
     apiFetch('/auth/mi-cuenta/password', { method: 'POST', body: data as any }),
@@ -304,7 +304,8 @@ export const api = {
     apiFetch('/pacientes/me/seguimientos', { method: 'POST', body: data as any }),
   getMisInformes: () => apiFetch('/pacientes/me/informes'),
   cancelarTurno: (turnoId: number | string) => apiFetch(`/turnos/${turnoId}/cancelar`, { method: 'POST' }),
-  abandonarReservaPendiente: (turnoId: number | string) => apiFetch(`/turnos/${turnoId}/abandonar-pago`, { method: 'POST' }),
+  abandonarReservaPendiente: (turnoId: number | string, tokenReserva?: string) =>
+    apiFetch(`/turnos/${turnoId}/abandonar-pago?token=${encodeURIComponent(tokenReserva || '')}`, { method: 'POST' }),
   actualizarAsistencia: (turnoId: number | string, asistencia: string) => 
     apiFetch(`/turnos/${turnoId}/asistencia?asistencia=${encodeURIComponent(asistencia)}`, { method: 'PUT' }),
   reprogramarTurno: (turnoId: number | string, fecha: string, hora: string) =>
@@ -324,8 +325,6 @@ export const api = {
   // ── Suscripciones y Facturación ARCA (§5, §8, §10) ─────────────────────────
   getSubscriptionPlans: () => apiFetch('/subscriptions/plans'),
   getMySubscription: () => apiFetch('/subscriptions/my-subscription'),
-  getMyInvoices: () => apiFetch('/subscriptions/my-invoices'),
-  getInvoicePdfUrl: (invoiceId: number | string) => `${API_BASE}/subscriptions/invoices/${invoiceId}/pdf`,
   iniciarCheckoutSuscripcion: (planId: number, billingCycle: 'monthly' | 'annual' = 'monthly') =>
     apiFetch('/subscriptions/checkout', { method: 'POST', body: { planId, billingCycle } as any }),
   cancelMySubscription: () => apiFetch('/subscriptions/cancel', { method: 'POST' }),
@@ -337,8 +336,6 @@ export const api = {
   // getSubscriptionPlans(), que solo trae los planes activos del catálogo público.
   getAdminSubscriptionPlans: () => apiFetch('/admin/subscriptions/plans'),
   registerAdminManualPayment: (data: any) => apiFetch('/admin/subscriptions/manual-payment', { method: 'POST', body: data }),
-  getAdminInvoices: () => apiFetch('/admin/subscriptions/invoices'),
-  emitirNotaDeCredito: (invoiceId: number | string, reason: string) => apiFetch(`/admin/subscriptions/invoices/${invoiceId}/credit-note`, { method: 'POST', body: { reason } as any }),
   ejecutarReconciliacionAdmin: () => apiFetch('/admin/subscriptions/reconciliation/run', { method: 'POST' }),
   updateSubscriptionPlan: (planId: number | string, data: any) => apiFetch(`/admin/subscriptions/plans/${planId}`, { method: 'PUT', body: data }),
   getSubscriptionEvents: (subId?: number | string) => apiFetch(subId ? `/admin/subscriptions/${subId}/events` : '/admin/subscriptions/events'),

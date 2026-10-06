@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react'
+import { Icon } from './Icon'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import '../styles/landing.css'
 import { api } from '../api/api'
@@ -839,7 +840,7 @@ export default function LandingPage({
   // Portal inner tabs
   const [activeDoctorId, setActiveDoctorId] = useState<number | null>(null)
   
-  // Custom states for availability filter and WhatsApp chat
+  // Custom states for availability filter and chat
   const [availabilityDate, setAvailabilityDate] = useState('')
   const [availabilityMap, setAvailabilityMap] = useState<Record<string, number>>({})
   const [checkingAvailability, setCheckingAvailability] = useState(false)
@@ -1682,7 +1683,7 @@ export default function LandingPage({
             </h2>
             <div className="results-sort">
               <span>Ordenar por:</span>
-              <button className="btn btn--ghost btn--sm" id="btn-sort">Próxima disponibilidad ↓</button>
+              <button className="btn btn--ghost btn--sm" id="btn-sort">Próxima disponibilidad <Icon.ArrowDown /></button>
             </div>
           </div>
 
@@ -1801,7 +1802,10 @@ export default function LandingPage({
       {/* Ayuda / FAQ Modal */}
       {showHelpModal && (
         <Suspense fallback={null}>
-          <HelpFaqModal onClose={() => setShowHelpModal(false)} />
+          <HelpFaqModal
+            onClose={() => setShowHelpModal(false)}
+            defaultAudience={currentUser && currentUser.rol !== 'PACIENTE' ? 'profesional' : 'paciente'}
+          />
         </Suspense>
       )}
 
@@ -1817,7 +1821,7 @@ export default function LandingPage({
           />
         )
       })()}
-      {/* WhatsApp Floating Chat Widget */}
+      {/* Floating Chat Widget (chat interno con profesionales) */}
       {currentUser && currentUser.rol === 'PACIENTE' && (
         <>
           {/* Floating Action Button (FAB) */}
@@ -1912,7 +1916,7 @@ export default function LandingPage({
                     }}
                     aria-label="Volver a la lista de chats"
                   >
-                    ←
+                    <Icon.ArrowLeft size={16} />
                   </button>
                 )}
 
@@ -2049,7 +2053,7 @@ export default function LandingPage({
                               <span style={{ fontSize: '13px', fontWeight: tieneNuevos ? 'bold' : 'normal', color: 'var(--color-text-primary)' }}>{chan.nombre}</span>
                               <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>{chan.email}</span>
                             </div>
-                            <span style={{ fontSize: '10px', color: 'var(--color-primary)', fontWeight: 'bold' }}>Chat →</span>
+                            <span style={{ fontSize: '10px', color: 'var(--color-primary)', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>Chat <Icon.ArrowRight size={10} /></span>
                           </div>
                         );
                       })}

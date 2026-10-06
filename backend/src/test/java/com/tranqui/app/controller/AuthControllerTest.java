@@ -427,15 +427,14 @@ class AuthControllerTest {
         Usuario u = crearUsuario("prefs", true);
         Cookie cookie = authCookieFor(u);
 
-        Map<String, Object> body = Map.of("emailHabilitado", false, "whatsappHabilitado", false);
+        Map<String, Object> body = Map.of("emailHabilitado", false);
 
         mockMvc.perform(put("/api/auth/mi-cuenta/notificaciones")
                 .cookie(cookie)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.notificacionesEmailHabilitadas").value(false))
-                .andExpect(jsonPath("$.notificacionesWhatsappHabilitadas").value(false));
+                .andExpect(jsonPath("$.notificacionesEmailHabilitadas").value(false));
     }
 
     // ── mi-cuenta/password ───────────────────────────────────────────

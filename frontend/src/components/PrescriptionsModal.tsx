@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Icon } from './Icon'
 import { openOfficialPrescriptionPdf } from '../utils/pdfGenerator'
 import { useAlert } from '../context/AlertContext'
 
@@ -66,7 +67,7 @@ export default function PrescriptionsModal({ prescriptions, onClose }: {
               style={{ alignSelf: 'flex-start' }}
               onClick={() => setSelectedPrescriptionDetail(null)}
             >
-              ← Volver al listado
+              <Icon.ArrowLeft /> Volver al listado
             </button>
             <div style={{ padding: 'var(--space-4)', backgroundColor: 'var(--neutral-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>

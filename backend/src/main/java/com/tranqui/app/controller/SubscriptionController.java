@@ -1,28 +1,22 @@
 package com.tranqui.app.controller;
 
-import com.tranqui.app.model.Invoice;
 import com.tranqui.app.model.Plan;
 import com.tranqui.app.model.Subscription;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.model.dto.CheckoutRequestDto;
-import com.tranqui.app.model.dto.InvoiceResponseDto;
 import com.tranqui.app.model.dto.PlanResponseDto;
 import com.tranqui.app.model.dto.SubscriptionResponseDto;
 import com.tranqui.app.repository.UsuarioRepository;
-import com.tranqui.app.service.InvoiceService;
 import com.tranqui.app.service.PlanService;
 import com.tranqui.app.service.SubscriptionService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
@@ -35,9 +29,6 @@ public class SubscriptionController {
 
     @Autowired
     private SubscriptionService subscriptionService;
-
-    @Autowired
-    private InvoiceService invoiceService;
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -172,62 +163,4 @@ public class SubscriptionController {
         }
     }
 
-    /**
-     * Historial de facturas electrónicas del profesional autenticado
-     */
-    @GetMapping("/my-invoices")
-    @PreAuthorize("hasAnyRole('PSIQUIATRA', 'ADMIN', 'PACIENTE')")
-    public ResponseEntity<List<InvoiceResponseDto>> getMyInvoices(@AuthenticationPrincipal UserDetails userDetails) {
-        Usuario prof = usuarioRepository.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
-
-        List<Invoice> invoices = invoiceService.getInvoicesForProfessional(prof.getId());
-        List<InvoiceResponseDto> dtos = invoices.stream().map(this::mapInvoiceToDto).toList();
-        return ResponseEntity.ok(dtos);
-    }
-
-    /**
-     * Descarga de comprobante PDF oficial ARCA (Factura C / Nota de Crédito C)
-     */
-    @GetMapping("/invoices/{id}/pdf")
-    public ResponseEntity<byte[]> downloadInvoicePdf(@PathVariable Long id) {
-        Invoice invoice = invoiceService.getInvoiceById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Comprobante no encontrado"));
-
-        if (invoice.getPdfBase64() == null || invoice.getPdfBase64().isBlank()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        byte[] pdfBytes = Base64.getDecoder().decode(invoice.getPdfBase64());
-        String filename = (invoice.getCbteTipo() == 13 ? "NotaCreditoC_" : "FacturaC_") +
-                String.format("%05d-%08d", invoice.getPuntoVenta(), invoice.getCbteNumero()) + ".pdf";
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
-                .contentType(MediaType.APPLICATION_PDF)
-                .body(pdfBytes);
-    }
-
-    private InvoiceResponseDto mapInvoiceToDto(Invoice inv) {
-        return InvoiceResponseDto.builder()
-                .id(inv.getId())
-                .paymentId(inv.getPaymentId())
-                .cbteTipo(inv.getCbteTipo())
-                .cbteTipoNombre(inv.getCbteTipo() == 13 ? "Nota de Crédito C" : "Factura C")
-                .puntoVenta(inv.getPuntoVenta())
-                .cbteNumero(inv.getCbteNumero())
-                .cae(inv.getCae())
-                .caeVencimiento(inv.getCaeVencimiento())
-                .receptorNombre(inv.getReceptorNombre())
-                .receptorDocNro(inv.getReceptorDocNro())
-                .receptorCondicionIva(inv.getReceptorCondicionIva())
-                .importeTotal(inv.getImporteTotal())
-                .fechaEmision(inv.getFechaEmision())
-                .pdfUrl(inv.getPdfUrl())
-                .status(inv.getStatus())
-                .lastError(inv.getLastError())
-                .comprobanteAsociadoId(inv.getComprobanteAsociadoId())
-                .issuedAt(inv.getIssuedAt())
-                .build();
-    }
 }

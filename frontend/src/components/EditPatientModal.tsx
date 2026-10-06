@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Icon } from './Icon'
 import { api } from '../api/api'
 import { type Patient } from '../hooks/usePatients'
 import DateInputDDMMYYYY from './DateInputDDMMYYYY'
@@ -139,7 +140,7 @@ export default function EditPatientModal({
       <div className="card app-modal-card" style={{ maxWidth: '560px', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
           <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Editar datos de {patient.nombre}</h3>
-          <button className="btn btn--ghost btn--sm app-modal-close" onClick={onClose}>✕</button>
+          <button className="btn btn--ghost btn--sm app-modal-close" onClick={onClose} aria-label="Cerrar"><Icon.X /></button>
         </div>
 
         <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', margin: 0 }}>

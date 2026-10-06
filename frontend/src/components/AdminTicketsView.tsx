@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Icon } from './Icon'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 
@@ -157,7 +158,7 @@ export default function AdminTicketsView() {
                     </span>
                     {t.creadorEmail && (
                       <span style={{ color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}>
-                        ✉️ <strong>{t.creadorEmail}</strong>
+                        <Icon.Mail size={12} /> <strong>{t.creadorEmail}</strong>
                       </span>
                     )}
                   </div>
@@ -187,8 +188,8 @@ export default function AdminTicketsView() {
                   <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
                     <span><strong>{selected.creadorNombre}</strong> ({selected.creadorRol === 'PSIQUIATRA' ? 'Profesional' : 'Paciente'})</span>
                     {selected.creadorEmail && (
-                      <a href={`mailto:${selected.creadorEmail}`} style={{ color: 'var(--color-primary)', fontWeight: 'bold', textDecoration: 'underline' }}>
-                        ✉️ {selected.creadorEmail}
+                      <a href={`mailto:${selected.creadorEmail}`} style={{ color: 'var(--color-primary)', fontWeight: 'bold', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Icon.Mail size={14} /> {selected.creadorEmail}
                       </a>
                     )}
                   </div>

@@ -375,21 +375,13 @@ public class Usuario {
 
     // Opt-out notification preferences — default true so nobody stops receiving notifications
     // just because this column got added. See AccountService.actualizarPreferenciasNotificacion
-    // and the checks added to WhatsAppService/ResendEmailService/NotificationScheduler.
+    // and the checks in ResendEmailService.
     @Builder.Default
     @Column(name = "notificaciones_email_habilitadas")
     private Boolean notificacionesEmailHabilitadas = true;
 
-    @Builder.Default
-    @Column(name = "notificaciones_whatsapp_habilitadas")
-    private Boolean notificacionesWhatsappHabilitadas = true;
-
     public boolean isNotificacionesEmailHabilitadas() {
         return notificacionesEmailHabilitadas == null || notificacionesEmailHabilitadas;
-    }
-
-    public boolean isNotificacionesWhatsappHabilitadas() {
-        return notificacionesWhatsappHabilitadas == null || notificacionesWhatsappHabilitadas;
     }
 
     // ── Professional Profile, Matrícula & Datos Fiscales (Plan Suscripciones) ──

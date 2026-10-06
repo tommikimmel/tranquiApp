@@ -424,6 +424,7 @@ describe('CheckoutFlow', () => {
       const user = userEvent.setup()
       ;(api.reservarTurno as any).mockResolvedValueOnce({
         turnoId: 59,
+        tokenReserva: 'tok-59',
         checkoutUrl: 'https://api.mercadopago.com/mock-preference-id-rej',
         precio: 20000,
       })
@@ -440,7 +441,7 @@ describe('CheckoutFlow', () => {
 
       await user.click(screen.getByRole('button', { name: 'Simular Pago Rechazado (Cancelar)' }))
 
-      await waitFor(() => expect(api.abandonarReservaPendiente).toHaveBeenCalledWith(59))
+      await waitFor(() => expect(api.abandonarReservaPendiente).toHaveBeenCalledWith(59, 'tok-59'))
       expect(screen.queryByText('Simulador de Pago de Turno')).not.toBeInTheDocument()
       expect(await screen.findByText('Pago rechazado por el usuario en la simulación.')).toBeInTheDocument()
     })

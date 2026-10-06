@@ -19,7 +19,6 @@ const BUSQUEDAS_POR_ESPECIALIDAD: Record<'consultorio' | 'clinico', { esp: strin
 }
 
 const FEATURE_LABELS: Record<string, string> = {
-  bot_whatsapp: 'Notificaciones por WhatsApp',
   mp_split: 'Cobro anticipado del turno',
   google_meet: 'Google Meet y Calendario',
   historia_clinica: 'Historia Clínica Digital',
@@ -33,7 +32,6 @@ const ICO = {
   buscador: <svg width="17" height="17" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="5.6" stroke="#2FA84F" strokeWidth="1.8" /><path d="M13.2 13.2L17 17" stroke="#2FA84F" strokeWidth="1.8" strokeLinecap="round" /></svg>,
   pin: <svg width="17" height="17" viewBox="0 0 20 20" fill="none"><path d="M10 18s6-5.3 6-9.4A6 6 0 004 8.6C4 12.7 10 18 10 18z" stroke="#2FA84F" strokeWidth="1.6" strokeLinejoin="round" /><circle cx="10" cy="8.5" r="2" fill="#7CC53E" /></svg>,
   agenda: <svg width="17" height="17" viewBox="0 0 20 20" fill="none"><rect x="2.6" y="4" width="14.8" height="13.4" rx="2.2" stroke="#5B6B60" strokeWidth="1.5" /><path d="M2.6 8h14.8M6.6 2.4v3M13.4 2.4v3" stroke="#5B6B60" strokeWidth="1.5" strokeLinecap="round" /></svg>,
-  wsp: <svg width="17" height="17" viewBox="0 0 20 20" fill="none"><path d="M3 17l1.2-3.4A7 7 0 1110 17H3z" stroke="#5B6B60" strokeWidth="1.5" strokeLinejoin="round" /></svg>,
   cobro: <svg width="17" height="17" viewBox="0 0 20 20" fill="none"><rect x="2.4" y="5" width="15.2" height="10.4" rx="2" stroke="#5B6B60" strokeWidth="1.5" /><path d="M2.4 8.4h15.2" stroke="#5B6B60" strokeWidth="1.5" /></svg>,
   meet: <svg width="17" height="17" viewBox="0 0 20 20" fill="none"><rect x="2.4" y="5.4" width="10.6" height="9.2" rx="2" stroke="#5B6B60" strokeWidth="1.5" /><path d="M13 9.6l4.6-2.8v6.4L13 10.4z" stroke="#5B6B60" strokeWidth="1.5" strokeLinejoin="round" /></svg>,
   rep: <svg width="17" height="17" viewBox="0 0 20 20" fill="none"><path d="M3 16.4h14M6 13V8.6M10 13V4.6M14 13v-5" stroke="#5B6B60" strokeWidth="1.7" strokeLinecap="round" /></svg>,
@@ -258,7 +256,7 @@ export default function ReactivarCuentaView({
         .rp-prop-leg{display:flex;justify-content:space-between;margin-top:8px;font-size:12.5px;color:var(--rp-gris)}
         .rp-prop-leg b{color:var(--rp-tinta);font-weight:600}
         .rp-aviso{margin-top:12px;font-size:12.5px;color:#B67A0B;background:#FDF6E6;border:1px solid #F0E0BC;border-radius:9px;padding:9px 12px}
-        .rp-gars{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+        .rp-gars{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:14px}
         .rp-gar{background:var(--rp-papel);border:1px solid var(--rp-linea);border-radius:13px;padding:18px}
         .rp-gar svg{margin-bottom:9px}
         .rp-gar h4{font-family:'Inter';font-size:13.5px;font-weight:600;margin:0 0 3px}
@@ -287,12 +285,12 @@ export default function ReactivarCuentaView({
         <section className="rp-hero">
           <div className="rp-hero-grid">
             <div>
-              <h1>{f(busq.volumen)} personas buscaron {busq.esp} en {ZONA} este año. <em>Ninguna te vio.</em></h1>
+              <h1>{f(busq.volumen)} personas buscaron {busq.esp} en {ZONA} este año. <em>Tu perfil está en pausa.</em></h1>
               <p className="rp-sub">
                 Podrían haber sido tus pacientes. <b>{fechaOculto ? <>Tu perfil está oculto desde el {fechaOculto}</> : 'Tu perfil todavía está oculto'}</b>, así que para esas {f(busq.volumen)} personas tu consultorio no existe. Volvés al buscador apenas reactivás.
               </p>
               <p className="rp-sub2">
-                Tu problema nunca va a ser el precio. Va a ser que nadie sepa que existís. <b>Todos los días que seguís oculto, alguien resuelve su tratamiento con otro profesional</b> — y ese paciente no vuelve.
+                Mientras tu suscripción está inactiva, tu perfil no aparece en el buscador. <b>Reactivala y volvés a estar visible para quienes buscan un profesional en tu zona</b> — tu agenda, tus servicios y tus pacientes siguen tal cual los dejaste.
               </p>
             </div>
             <svg className="rp-embudo" viewBox="0 0 380 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label={`De ${f(VISITAS_ANIO)} personas que entraron a Tranqui este año, ${f(BUSCAN_ZONA)} buscaban ayuda en ${ZONA} y ${f(busq.volumen)} pedían ${busq.esp}. Tu perfil está oculto: ninguna te vio.`}>
@@ -372,7 +370,7 @@ export default function ReactivarCuentaView({
                     <li className="rp-destacado">{ICO.pin}<span>Lugar reservado en tu zona</span></li>
                     {gestionFeatures.map((key) => (
                       <li key={key}>
-                        {ICO[key === 'agenda_compartida' ? 'agenda' : key === 'bot_whatsapp' ? 'wsp' : key === 'mp_split' ? 'cobro' : key === 'google_meet' ? 'meet' : key === 'reportes' ? 'rep' : 'clinica']}
+                        {ICO[key === 'agenda_compartida' ? 'agenda' : key === 'mp_split' ? 'cobro' : key === 'google_meet' ? 'meet' : key === 'reportes' ? 'rep' : 'clinica']}
                         <span>{FEATURE_LABELS[key] || key.replace(/_/g, ' ')}</span>
                       </li>
                     ))}
@@ -509,11 +507,6 @@ export default function ReactivarCuentaView({
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 6v6l4 2" stroke="#2FA84F" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /><circle cx="12" cy="12" r="9" stroke="#2FA84F" strokeWidth="1.5" /></svg>
             <h4>¿Necesitás cancelar?</h4>
             <p>Escribinos a soporte y te la damos de baja sin vueltas — la seguís usando hasta que termine el período pago.</p>
-          </div>
-          <div className="rp-gar">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4.5 8.5l7.5 5 7.5-5" stroke="#2FA84F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><rect x="3" y="5" width="18" height="14" rx="2.4" stroke="#2FA84F" strokeWidth="1.5" /></svg>
-            <h4>Factura electrónica automática</h4>
-            <p>Cada pago genera tu Factura C oficial (ARCA), descargable desde el panel.</p>
           </div>
         </div>
 

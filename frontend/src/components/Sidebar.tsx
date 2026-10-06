@@ -73,7 +73,9 @@ export default function Sidebar({
 
         <nav className="sidebar__nav" role="navigation" aria-label="Navegación principal">
           <span className="sidebar__nav-section-title">Menú Principal</span>
-          {navItems.map(({ id, label, Icon: NavIcon, comingSoon, comingSoonHint }) => (
+          {/* Las secciones "Próximamente" no se muestran hasta que estén listas: un ítem del menú
+              que no lleva a ningún lado genera más dudas que valor. Para lanzar una, sacarle comingSoon. */}
+          {navItems.filter((item) => !item.comingSoon).map(({ id, label, Icon: NavIcon, comingSoon, comingSoonHint }) => (
             <button
               key={id}
               className={`sidebar__nav-item ${activeNav === id ? 'active' : ''}`}

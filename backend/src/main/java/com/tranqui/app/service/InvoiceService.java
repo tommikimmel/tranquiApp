@@ -201,6 +201,12 @@ public class InvoiceService {
      */
     @Transactional
     public synchronized Invoice emitirNotaDeCredito(Long originalInvoiceId, String reason, Long adminId) {
+        // Mismo criterio que generateInvoiceForPayment: mientras la integración con ARCA no esté
+        // operativa no se emite ningún comprobante (ni consume numeración correlativa).
+        if (!arcaConfig.isEnabled()) {
+            throw new IllegalStateException("La facturación electrónica ARCA todavía no está habilitada.");
+        }
+
         Invoice original = invoiceRepository.findById(originalInvoiceId)
                 .orElseThrow(() -> new IllegalArgumentException("Factura original no encontrada"));
 

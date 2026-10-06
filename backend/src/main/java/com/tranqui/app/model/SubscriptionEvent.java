@@ -28,7 +28,7 @@ public class SubscriptionEvent {
 
     // Nombre del enum SubscriptionStatus antes/después de la transición, o null si el evento
     // no representa un cambio de estado (ej. MP_CHECKOUT_CREATED). El panel de admin las usa
-    // para mostrar la transición "Estado A ➔ Estado B" en el historial de auditoría.
+    // para mostrar la transición "Estado A -> Estado B" en el historial de auditoría.
     @Column(name = "previous_status", length = 50)
     private String previousStatus;
 

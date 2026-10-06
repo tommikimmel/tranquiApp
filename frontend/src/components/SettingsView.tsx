@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Fragment } from 'react'
+import ConfirmDialog from './ConfirmDialog'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 import { Icon } from './Icon'
@@ -272,22 +273,20 @@ export default function SettingsView({
     }
   }, [initialTab])
 
-  // Suscripción y Facturas ARCA — mismos endpoints que ya usa Mi Cuenta (paciente), portados
+  // Suscripción — mismo endpoint que ya usa Mi Cuenta (paciente), portado
   // acá porque el profesional gestiona su perfil desde Configuración, no desde /mi-cuenta.
   const [mySub, setMySub] = useState<any>(null)
-  const [myInvoices, setMyInvoices] = useState<any[]>([])
   const [cancellingSub, setCancellingSub] = useState(false)
 
   useEffect(() => {
     api.getMySubscription().then((s: any) => setMySub(s)).catch(() => {})
-    api.getMyInvoices().then((invs: any) => setMyInvoices(Array.isArray(invs) ? invs : [])).catch(() => {})
   }, [])
 
-  const handleCancelarSuscripcion = () => {
-    const fechaFin = mySub?.currentPeriodEnd ? new Date(mySub.currentPeriodEnd).toLocaleDateString('es-AR') : 'el fin del período abonado';
-    if (!window.confirm(`¿Confirmás que querés cancelar la renovación automática de tu suscripción?\n\nNo se te cobrará ningún nuevo período en Mercado Pago y mantendrás el acceso total a tu cuenta y agenda hasta el ${fechaFin}.\nPasada esa fecha, tu perfil se pausará del buscador público.`)) {
-      return;
-    }
+  const [showCancelSubDialog, setShowCancelSubDialog] = useState(false);
+  const fechaFinSuscripcion = mySub?.currentPeriodEnd ? new Date(mySub.currentPeriodEnd).toLocaleDateString('es-AR') : 'el fin del período abonado';
+  const handleCancelarSuscripcion = () => setShowCancelSubDialog(true);
+  const confirmarCancelacionSuscripcion = () => {
+    setShowCancelSubDialog(false);
     setCancellingSub(true);
     api.cancelMySubscription()
       .then((res: any) => {
@@ -471,7 +470,7 @@ export default function SettingsView({
           sitioWeb: formattedSitioWeb
         }
       })
-      showAlert("Configuración guardada con éxito ✓", "success")
+      showAlert("Configuración guardada con éxito", "success")
     } catch (err) {
       console.error(err)
       showAlert("Error al guardar la configuración", "error")
@@ -638,7 +637,7 @@ export default function SettingsView({
               {fotoUrl ? (
                 <img src={fotoUrl} alt="Foto de perfil" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                <span style={{ fontSize: '24px', color: '#9ca3af' }}>👤</span>
+                <span style={{ color: '#9ca3af', display: 'inline-flex' }}><Icon.User size={28} /></span>
               )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
@@ -861,7 +860,7 @@ export default function SettingsView({
           <div className="form-group">
             <label className="form-label form-label--required" htmlFor="input-matricula">Número de Matrícula</label>
             <input id="input-matricula" className="form-input" type="text" inputMode="numeric" maxLength={10} value={matricula} onChange={(e) => setMatricula(e.target.value.replace(/[^\d]/g, '').slice(0, 10))} />
-            <span className="form-helper">Verificada ✓</span>
+            <span className="form-helper" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Icon.Check size={12} /> Verificada</span>
           </div>
 
           <div className="settings-section-label" style={{ gridColumn: 'span 2' }}>Sello y código REFEPS para recetas electrónicas</div>
@@ -1081,8 +1080,8 @@ export default function SettingsView({
               onChange={(e) => setTelefono(e.target.value)}
             />
             <span className="form-helper">
-              Incluí el código de país (+54) y de área. Lo usamos para notificaciones por WhatsApp y
-              para que el equipo de Tranqui App pueda contactarte si hace falta.
+              Incluí el código de país (+54) y de área. Lo usamos para que el equipo de Tranqui App
+              pueda contactarte si hace falta.
             </span>
           </div>
         </div>
@@ -1357,7 +1356,7 @@ export default function SettingsView({
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
           {[
-            { id: 'notif-new-booking', label: 'Nueva reserva', desc: 'Te avisamos por email y WhatsApp cuando un paciente agenda.' },
+            { id: 'notif-new-booking', label: 'Nueva reserva', desc: 'Te avisamos por email cuando un paciente agenda.' },
             { id: 'notif-cancel', label: 'Cancelaciones', desc: 'Notificación cuando un paciente cancela o reprograma.' },
             { id: 'notif-reminder', label: 'Recordatorio de sesión', desc: '1 hora antes del inicio de cada sesión.' },
           ].map(({ id, label, desc }) => (
@@ -1401,10 +1400,10 @@ export default function SettingsView({
         <div className="card">
           <div className="card__header">
             <h2 className="card__title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Icon.CreditCard /> Mi Suscripción y Facturas ARCA
+              <Icon.CreditCard /> Mi Suscripción
             </h2>
             <p className="card__subtitle">
-              Gestioná tu membresía profesional y descargá tus comprobantes oficiales con CAE y código QR emitidos por ARCA.
+              Gestioná tu membresía profesional.
             </p>
           </div>
 
@@ -1446,7 +1445,7 @@ export default function SettingsView({
                   alignItems: 'center',
                   gap: '10px'
                 }}>
-                  <span style={{ fontSize: '18px' }}>⚠️</span>
+                  <span style={{ display: 'inline-flex', flexShrink: 0 }}><Icon.AlertTriangle size={18} /></span>
                   <div>
                     <strong>Renovación automática cancelada:</strong> No se realizarán más cobros en Mercado Pago.
                     Mantendrás acceso total a todas las funciones profesionales hasta el <strong>{mySub.currentPeriodEnd ? new Date(mySub.currentPeriodEnd).toLocaleDateString('es-AR') : ''}</strong>.
@@ -1463,6 +1462,21 @@ export default function SettingsView({
                   >
                     {cancellingSub ? 'Cancelando...' : 'Cancelar renovación automática'}
                   </button>
+                  {showCancelSubDialog && (
+                    <ConfirmDialog
+                      title="¿Cancelar la renovación automática?"
+                      confirmLabel="Sí, cancelar renovación"
+                      cancelLabel="No, mantener"
+                      danger
+                      busy={cancellingSub}
+                      onConfirm={confirmarCancelacionSuscripcion}
+                      onClose={() => setShowCancelSubDialog(false)}
+                    >
+                      <p style={{ margin: '0 0 8px' }}>No se te va a cobrar ningún período nuevo en Mercado Pago.</p>
+                      <p style={{ margin: '0 0 8px' }}>Mantenés el acceso completo a tu cuenta y tu agenda hasta el <strong>{fechaFinSuscripcion}</strong>.</p>
+                      <p style={{ margin: 0 }}>Después de esa fecha, tu perfil deja de aparecer en el buscador.</p>
+                    </ConfirmDialog>
+                  )}
                 </div>
               )}
 
@@ -1479,45 +1493,6 @@ export default function SettingsView({
                 </div>
               )}
 
-              <div style={{ marginTop: 'var(--space-2)' }}>
-                <strong style={{ fontSize: '14px', display: 'block', marginBottom: '8px' }}>Comprobantes y Facturas C:</strong>
-                {myInvoices.length === 0 ? (
-                  <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>No hay facturas emitidas todavía.</p>
-                ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '2px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                          <th style={{ padding: '8px' }}>Comprobante</th>
-                          <th style={{ padding: '8px' }}>Fecha</th>
-                          <th style={{ padding: '8px' }}>Monto</th>
-                          <th style={{ padding: '8px' }}>CAE</th>
-                          <th style={{ padding: '8px', textAlign: 'right' }}>Descarga</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {myInvoices.map((inv: any) => (
-                          <tr key={inv.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                            <td style={{ padding: '8px' }}>
-                              <strong>{inv.cbteTipoNombre}</strong> #{String(inv.puntoVenta).padStart(5, '0')}-{String(inv.cbteNumero).padStart(8, '0')}
-                            </td>
-                            <td style={{ padding: '8px' }}>{new Date(inv.fechaEmision).toLocaleDateString('es-AR')}</td>
-                            <td style={{ padding: '8px', fontWeight: 'bold' }}>$ {inv.importeTotal?.toLocaleString('es-AR')}</td>
-                            <td style={{ padding: '8px', fontFamily: 'monospace' }}>{inv.cae || '—'}</td>
-                            <td style={{ padding: '8px', textAlign: 'right' }}>
-                              {inv.pdfUrl && (
-                                <a href={api.getInvoicePdfUrl(inv.id)} target="_blank" rel="noreferrer" className="btn btn--secondary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                  <Icon.Download size={14} /> Descargar Factura C
-                                </a>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: 'var(--space-6)', color: 'var(--color-text-secondary)' }}>

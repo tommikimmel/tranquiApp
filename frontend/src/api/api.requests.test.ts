@@ -190,7 +190,7 @@ describe('apiFetch (via api.* methods)', () => {
       ['aceptarTerminos', () => api.aceptarTerminos()],
       ['getMiCuenta', () => api.getMiCuenta()],
       ['actualizarMiCuenta', () => api.actualizarMiCuenta({ nombre: 'a' })],
-      ['actualizarPreferenciasNotificacion', () => api.actualizarPreferenciasNotificacion({ emailHabilitado: true, whatsappHabilitado: false })],
+      ['actualizarPreferenciasNotificacion', () => api.actualizarPreferenciasNotificacion({ emailHabilitado: true })],
       ['cambiarPassword', () => api.cambiarPassword({ newPassword: 'Sup3rSecret1' })],
       ['eliminarCuenta', () => api.eliminarCuenta({ password: 'x' })],
       ['eliminarCuenta (sin data)', () => api.eliminarCuenta()],
@@ -246,7 +246,7 @@ describe('apiFetch (via api.* methods)', () => {
       ['crearMiSeguimiento', () => api.crearMiSeguimiento({ estadoAnimo: 'bien', sintomas: '', notas: '' })],
       ['getMisInformes', () => api.getMisInformes()],
       ['cancelarTurno', () => api.cancelarTurno(1)],
-      ['abandonarReservaPendiente', () => api.abandonarReservaPendiente(1)],
+      ['abandonarReservaPendiente', () => api.abandonarReservaPendiente(1, 'tok')],
       ['actualizarAsistencia', () => api.actualizarAsistencia(1, 'PRESENTE')],
       ['reprogramarTurno', () => api.reprogramarTurno(1, '2026-08-20', '10:00')],
       ['marcarDocumentoEnviado', () => api.marcarDocumentoEnviado(1, { data: 'x', nombre: 'y.pdf' })],
@@ -254,13 +254,10 @@ describe('apiFetch (via api.* methods)', () => {
       ['verificarPagoTurno (sin paymentId)', () => api.verificarPagoTurno(1)],
       ['getSubscriptionPlans', () => api.getSubscriptionPlans()],
       ['getMySubscription', () => api.getMySubscription()],
-      ['getMyInvoices', () => api.getMyInvoices()],
       ['iniciarCheckoutSuscripcion', () => api.iniciarCheckoutSuscripcion(1)],
       ['getAdminSubscriptionOverview', () => api.getAdminSubscriptionOverview()],
       ['getAdminSubscriptionsList', () => api.getAdminSubscriptionsList()],
       ['registerAdminManualPayment', () => api.registerAdminManualPayment({ amount: 1 })],
-      ['getAdminInvoices', () => api.getAdminInvoices()],
-      ['emitirNotaDeCredito', () => api.emitirNotaDeCredito(1, 'motivo')],
       ['ejecutarReconciliacionAdmin', () => api.ejecutarReconciliacionAdmin()],
       ['updateSubscriptionPlan', () => api.updateSubscriptionPlan(1, { nombre: 'Plan' })],
       ['getSubscriptionEvents', () => api.getSubscriptionEvents()],
@@ -274,14 +271,6 @@ describe('apiFetch (via api.* methods)', () => {
       expect(fetchSpy).toHaveBeenCalledTimes(1)
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
       expect(options.credentials).toBe('include')
-    })
-  })
-
-  describe('getInvoicePdfUrl', () => {
-    it('builds a direct download URL without issuing a fetch request', () => {
-      const url = api.getInvoicePdfUrl(42)
-      expect(url).toBe('http://localhost:8081/api/subscriptions/invoices/42/pdf')
-      expect(fetchSpy).not.toHaveBeenCalled()
     })
   })
 })

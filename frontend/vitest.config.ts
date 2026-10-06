@@ -8,6 +8,9 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: true,
+    // Los tests de flujos largos con user-event (CheckoutFlow, AgendaView) tardan más de los 5 s
+    // por defecto cuando la máquina está cargada y fallaban por timeout, no por un bug.
+    testTimeout: 20000,
     exclude: ['**/node_modules/**', '**/dist/**', './e2e/**'],
     coverage: {
       provider: 'v8',

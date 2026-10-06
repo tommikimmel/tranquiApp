@@ -26,7 +26,9 @@ description: How to build/launch/drive TranquiApp locally to verify a change.
 
 ## Login (seed users — see `backend/.../config/DataInitializer.java`)
 
-`admin@tranqui.com` / `admin123` is always seeded. Every other seed account (password
+`admin@tranqui.com` is only created if it doesn't exist yet, with `ADMIN_INITIAL_PASSWORD` (or
+`admin123` locally when `SEED_TEST_ACCOUNTS=true`); in production it has its own strong password.
+Every other seed account (password
 `admin123`) is only created when `SEED_TEST_ACCOUNTS=true` is set in `.env` (property
 `app.seed-test-accounts`, default `false`; `deploy.js` forces it to `false` on the VPS, since prod
 runs the same compose file with `SPRING_PROFILES_ACTIVE=dev`):

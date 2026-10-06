@@ -42,9 +42,6 @@ public class TurnoService {
     private MercadoPagoService mercadoPagoService;
 
     @Autowired
-    private WhatsAppService whatsappService;
-
-    @Autowired
     private NotificacionService notificacionService;
 
     @Autowired
@@ -418,6 +415,7 @@ public class TurnoService {
                 .tipo(dto.getTipo())
                 .modalidad(modalidad)
                 .estado(EstadoTurno.PENDIENTE_PAGO)
+                .tokenReserva(java.util.UUID.randomUUID().toString())
                 .precio(precio)
                 .metadataAfiliado(metaAfiliado)
                 .servicioId(servicioId)
@@ -458,6 +456,7 @@ public class TurnoService {
                 .horaInicio(turno.getHoraInicio())
                 .precio(turno.getPrecio())
                 .checkoutUrl(checkoutUrl)
+                .tokenReserva(turno.getTokenReserva())
                 .build();
     }
 
@@ -480,7 +479,23 @@ public class TurnoService {
             }
         }
 
-        return turnoRepository.save(turno);
+        turno = turnoRepository.save(turno);
+
+        Usuario paciente = turno.getPaciente();
+        if (turno.isOcupaAgenda() && paciente != null && paciente.getEmail() != null && paciente.isNotificacionesEmailHabilitadas()) {
+            try {
+                boolean esOnline = turno.getModalidad() == Modalidad.ONLINE;
+                resendEmailService.enviarTurnoConfirmadoPaciente(
+                        paciente.getEmail(), paciente.getNombre(), turno.getMedico().getNombre(),
+                        turno.getFecha(), turno.getHoraInicio(), esOnline, resolverTypeLabel(turno),
+                        esOnline ? null : turno.getMedico().getDomicilioAtencion(),
+                        turno.getTelemedicinaUrl(), null);
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(TurnoService.class)
+                    .error("Error al enviar mail de confirmación al paciente para turno OSDE ID: {}", turnoId, e);
+            }
+        }
+        return turno;
     }
 
     @Transactional(readOnly = true)
@@ -673,9 +688,13 @@ public class TurnoService {
     }
 
     @Transactional
-    public void abandonarReservaPendiente(Long turnoId) {
+    public void abandonarReservaPendiente(Long turnoId, String tokenReserva) {
         Turno turno = turnoRepository.findById(turnoId)
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
+
+        if (tokenReserva == null || turno.getTokenReserva() == null || !turno.getTokenReserva().equals(tokenReserva)) {
+            throw new IllegalStateException("La reserva no corresponde a este token.");
+        }
 
         // Only a still-unpaid reservation may be self-released through this unauthenticated
         // endpoint; anything already confirmed/cancelled is left untouched.
@@ -712,10 +731,15 @@ public class TurnoService {
         // Reembolsar en Mercado Pago si el turno ya estaba pagado. Igual que con Google Calendar,
         // un fallo acá no debe impedir que la cancelación se confirme: se loguea y el médico puede
         // resolverlo manualmente desde Mercado Pago si hace falta.
+        ResendEmailService.ResultadoReembolso resultadoReembolso = ResendEmailService.ResultadoReembolso.SIN_PAGO;
         if (teniaPagoAprobado) {
             try {
-                reembolsoService.procesarReembolso(turno, turno.getMedico(), profesionalCancela);
+                boolean reembolsado = reembolsoService.procesarReembolso(turno, turno.getMedico(), profesionalCancela);
+                resultadoReembolso = reembolsado
+                        ? ResendEmailService.ResultadoReembolso.REEMBOLSADO
+                        : ResendEmailService.ResultadoReembolso.SIN_REEMBOLSO;
             } catch (Exception e) {
+                resultadoReembolso = ResendEmailService.ResultadoReembolso.PENDIENTE;
                 org.slf4j.LoggerFactory.getLogger(TurnoService.class)
                     .error("Error al procesar el reembolso de Mercado Pago para turno ID: {}", turnoId, e);
             }
@@ -750,6 +774,23 @@ public class TurnoService {
             } catch (Exception e) {
                 org.slf4j.LoggerFactory.getLogger(TurnoService.class)
                     .error("Error al enviar mail de turno cancelado al médico para turno ID: {}", turnoId, e);
+            }
+        }
+
+        Usuario paciente = turno.getPaciente();
+        if (paciente != null && paciente.getEmail() != null && paciente.isNotificacionesEmailHabilitadas()) {
+            try {
+                resendEmailService.enviarTurnoCanceladoPaciente(
+                        paciente.getEmail(),
+                        paciente.getNombre(),
+                        turno.getMedico().getNombre(),
+                        turno.isOcupaAgenda() ? turno.getFecha() : null,
+                        turno.isOcupaAgenda() ? turno.getHoraInicio() : null,
+                        profesionalCancela,
+                        resultadoReembolso);
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(TurnoService.class)
+                    .error("Error al enviar mail de turno cancelado al paciente para turno ID: {}", turnoId, e);
             }
         }
     }
@@ -904,37 +945,43 @@ public class TurnoService {
             }
         }
 
-        try {
-            String linkInfo = (turno.getTelemedicinaUrl() != null && !turno.getTelemedicinaUrl().isEmpty()) 
-                    ? " Enlace de videollamada: " + turno.getTelemedicinaUrl() 
-                    : "";
-            String body = String.format(
-                "Hola %s, tu turno con el Dr. %s ha sido reprogramado para el día %s a las %s hs.%s",
-                turno.getPaciente().getNombre(),
-                turno.getMedico().getNombre(),
-                fechaStr,
-                horaStr,
-                linkInfo
-            );
-            if (turno.getPaciente().isNotificacionesWhatsappHabilitadas()) {
-                whatsappService.enviarMensajeWhatsApp(turno.getPaciente().getTelefono(), body);
+        Usuario paciente = turno.getPaciente();
+        if (paciente != null && paciente.getEmail() != null && paciente.isNotificacionesEmailHabilitadas()) {
+            try {
+                boolean esOnline = turno.getModalidad() == Modalidad.ONLINE;
+                resendEmailService.enviarTurnoReprogramadoPaciente(
+                        paciente.getEmail(),
+                        paciente.getNombre(),
+                        turno.getMedico().getNombre(),
+                        nuevaFecha,
+                        nuevaHoraInicio,
+                        esOnline,
+                        esOnline ? null : turno.getMedico().getDomicilioAtencion(),
+                        turno.getTelemedicinaUrl());
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(TurnoService.class)
+                    .error("Error al enviar mail de turno reprogramado al paciente para turno ID: {}", turnoId, e);
             }
-        } catch (Exception e) {
-            System.err.println("Fallo al enviar notificación de reprogramación: " + e.getMessage());
         }
     }
 
     // Llamado por NotificationScheduler una vez por día. Busca turnos reales (ocupaAgenda = true
-    // excluye recetas/certificados/informes, ver reservarTurno) que ocurren en exactamente 2 días
-    // y todavía no recibieron el mail de confirmación de asistencia, genera un token de un solo
-    // uso por turno y envía el mail con los enlaces "Confirmar asistencia" / "No podré asistir".
+    // excluye recetas/certificados/informes, ver reservarTurno) de mañana o pasado mañana que
+    // todavía no recibieron el mail de confirmación de asistencia — antes era solo "exactamente
+    // en 2 días", así que un turno reservado para mañana nunca lo recibía. Genera un token de un
+    // solo uso por turno y envía el mail con los enlaces "Confirmar asistencia" / "No podré asistir".
     @Transactional
     public void enviarRecordatoriosConfirmacionAsistencia() {
-        java.time.LocalDate fechaObjetivo = java.time.LocalDate.now().plusDays(2);
-        List<Turno> turnos = turnoRepository.findByEstadoAndFechaAndOcupaAgendaAndConfirmacionAsistenciaEmailEnviado(
-                EstadoTurno.CONFIRMADO, fechaObjetivo, true, false);
+        java.time.LocalDate hoy = java.time.LocalDate.now();
+        List<Turno> turnos = turnoRepository.findByEstadoAndFechaBetweenAndOcupaAgendaAndConfirmacionAsistenciaEmailEnviado(
+                EstadoTurno.CONFIRMADO, hoy.plusDays(1), hoy.plusDays(2), true, false);
 
         for (Turno turno : turnos) {
+            // El paciente desactivó las notificaciones por email en Mi Cuenta ("Confirmaciones y
+            // recordatorios relacionados a tus turnos").
+            if (turno.getPaciente() == null || !turno.getPaciente().isNotificacionesEmailHabilitadas()) {
+                continue;
+            }
             try {
                 String token = java.util.UUID.randomUUID().toString();
                 turno.setTokenConfirmacionAsistencia(token);

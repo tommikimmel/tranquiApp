@@ -11,5 +11,4 @@ import lombok.Setter;
 @AllArgsConstructor
 public class PreferenciasNotificacionDto {
     private boolean emailHabilitado;
-    private boolean whatsappHabilitado;
 }

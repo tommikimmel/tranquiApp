@@ -50,6 +50,9 @@ class WebhookControllerTest {
     private SubscriptionService subscriptionService;
 
     @MockBean
+    private com.tranqui.app.service.MercadoPagoService mercadoPagoService;
+
+    @MockBean
     private MercadoPagoOAuthService oauthService;
 
     @MockBean
@@ -126,6 +129,23 @@ class WebhookControllerTest {
         verify(subscriptionService).processMercadoPagoPaymentWebhook(
                 eq("pay-9"), eq("preap-2"), eq(new BigDecimal("15000.50")), eq("approved"));
         verifyNoInteractions(pagoWebhookHandler);
+    }
+
+    @Test
+    void receiveWebhook_subscriptionAuthorizedPayment_usaElIdDelPagoRealParaDeduplicar() throws Exception {
+        // El webhook trae el ID del authorized_payment ("ap-1"); el detalle trae el ID del pago real
+        // ("777"), que es el mismo que llega por el webhook genérico "payment" del mismo cobro.
+        when(mercadoPagoService.obtenerDetalleAuthorizedPayment("ap-1")).thenReturn(new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree("{\"preapproval_id\":\"preap-3\",\"transaction_amount\":9000,\"status\":\"processed\",\"payment\":{\"id\":777,\"status\":\"approved\"}}"));
+        String body = "{\"type\":\"subscription_authorized_payment\",\"data\":{\"id\":\"ap-1\"}}";
+        mockMvc.perform(post("/api/payments/webhook")
+                        .header("x-signature", "test-signature")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        verify(subscriptionService).processMercadoPagoPaymentWebhook(
+                eq("777"), eq("preap-3"), eq(new BigDecimal("9000")), eq("processed"));
     }
 
     @Test

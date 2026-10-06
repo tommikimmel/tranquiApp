@@ -133,7 +133,7 @@ describe('LoginPage', () => {
       const [passwordInput, confirmInput] = screen.getAllByPlaceholderText('********')
       await user.type(passwordInput, password)
       await user.type(confirmInput, confirm)
-      await user.click(screen.getByRole('button', { name: 'Siguiente →' }))
+      await user.click(screen.getByRole('button', { name: 'Siguiente' }))
     }
 
     it('blocks advancing to step 2 with a weak password, without calling the API', async () => {
@@ -172,7 +172,7 @@ describe('LoginPage', () => {
       const [passwordInput, confirmInput] = screen.getAllByPlaceholderText('********')
       await user.type(passwordInput, 'Sup3rSecret1')
       await user.type(confirmInput, 'Sup3rSecret1')
-      await user.click(screen.getByRole('button', { name: 'Siguiente →' }))
+      await user.click(screen.getByRole('button', { name: 'Siguiente' }))
       await screen.findByText('Paso 2 de 2')
     }
 
@@ -236,7 +236,7 @@ describe('LoginPage', () => {
 
       await user.click(screen.getByLabelText('Tengo Cobertura / Obra Social o Prepaga'))
       // With hasObraSocial checked, PACIENTE now needs a 3rd step — no terms checkbox here yet.
-      await user.click(screen.getByRole('button', { name: 'Siguiente →' }))
+      await user.click(screen.getByRole('button', { name: 'Siguiente' }))
 
       await screen.findByText('Paso 3 de 3')
 

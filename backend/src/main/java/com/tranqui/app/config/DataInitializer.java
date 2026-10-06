@@ -61,21 +61,34 @@ public class DataInitializer implements CommandLineRunner {
     @org.springframework.beans.factory.annotation.Value("${app.seed-test-accounts:false}")
     private boolean seedTestAccounts;
 
+    // Password inicial de admin@tranqui.com, solo se usa si la cuenta todavía no existe (base
+    // nueva). Nunca un default conocido: sin ADMIN_INITIAL_PASSWORD no se crea el admin, salvo en
+    // local con cuentas de prueba, donde se usa admin123 como el resto de las cuentas sembradas.
+    @org.springframework.beans.factory.annotation.Value("${app.admin-initial-password:}")
+    private String adminInitialPassword;
+
     @Override
     public void run(String... args) throws Exception {
         log.info("Initializing base accounts...");
 
         // Default Admin account
         if (usuarioRepository.findByEmail("admin@tranqui.com").isEmpty()) {
-            Usuario admin = Usuario.builder()
-                    .nombre("Administrador")
-                    .email("admin@tranqui.com")
-                    .password(passwordEncoder.encode("admin123"))
-                    .rol(Rol.ADMIN)
-                    .verificadoAdmin(true)
-                    .build();
-            usuarioRepository.save(admin);
-            log.info("Default admin account created: admin@tranqui.com / admin123");
+            String passwordInicial = adminInitialPassword != null && !adminInitialPassword.isBlank()
+                    ? adminInitialPassword
+                    : (seedTestAccounts ? "admin123" : null);
+            if (passwordInicial == null) {
+                log.warn("admin@tranqui.com no existe y ADMIN_INITIAL_PASSWORD no está configurada — no se crea la cuenta de admin.");
+            } else {
+                Usuario admin = Usuario.builder()
+                        .nombre("Administrador")
+                        .email("admin@tranqui.com")
+                        .password(passwordEncoder.encode(passwordInicial))
+                        .rol(Rol.ADMIN)
+                        .verificadoAdmin(true)
+                        .build();
+                usuarioRepository.save(admin);
+                log.info("Default admin account created: admin@tranqui.com");
+            }
         }
 
         if (!seedTestAccounts) {

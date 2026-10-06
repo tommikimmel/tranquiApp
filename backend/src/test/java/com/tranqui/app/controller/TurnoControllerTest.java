@@ -93,12 +93,20 @@ class TurnoControllerTest {
 
     @Test
     void testAbandonarReservaPendiente_success() throws Exception {
-        doNothing().when(turnoService).abandonarReservaPendiente(1L);
+        doNothing().when(turnoService).abandonarReservaPendiente(1L, "tok");
 
-        mockMvc.perform(post("/api/turnos/1/abandonar-pago"))
+        mockMvc.perform(post("/api/turnos/1/abandonar-pago").param("token", "tok"))
                 .andExpect(status().isOk());
 
-        verify(turnoService, times(1)).abandonarReservaPendiente(1L);
+        verify(turnoService, times(1)).abandonarReservaPendiente(1L, "tok");
+    }
+
+    @Test
+    void testAbandonarReservaPendiente_tokenInvalido_403() throws Exception {
+        org.mockito.Mockito.doThrow(new IllegalStateException("token")).when(turnoService).abandonarReservaPendiente(1L, "malo");
+
+        mockMvc.perform(post("/api/turnos/1/abandonar-pago").param("token", "malo"))
+                .andExpect(status().isForbidden());
     }
 
     // --- asistencia --------------------------------------------------------------------------

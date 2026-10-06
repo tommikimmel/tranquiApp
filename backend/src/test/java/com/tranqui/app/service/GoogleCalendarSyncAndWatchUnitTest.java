@@ -43,6 +43,9 @@ class GoogleCalendarSyncAndWatchUnitTest {
     @Mock
     private UsuarioRepository usuarioRepository;
 
+    @Mock
+    private ResendEmailService resendEmailService;
+
     @InjectMocks
     private GoogleCalendarSyncService syncService;
 
@@ -189,29 +192,21 @@ class GoogleCalendarSyncAndWatchUnitTest {
                 .horaFin(java.time.LocalTime.of(10, 45))
                 .build();
 
-        // FAIL_CALENDAR simulation
-        turno.setMetadataAfiliado("FAIL_CALENDAR");
-        assertThrows(RuntimeException.class, () -> realService.crearEventoReunion(turno));
-
-        // Disabled or disconnected -> returns mock Meet URL
-        turno.setMetadataAfiliado(null);
+        // Disabled (entorno local) -> returns mock Meet URL
         String meetUrl = realService.crearEventoReunion(turno);
         assertNotNull(meetUrl);
         assertTrue(meetUrl.contains("meet.google.com"));
 
-        // When enabled but disconnected
+        // Enabled (producción) but disconnected -> never a fake link: empty until the real event exists
         ReflectionTestUtils.setField(realService, "isEnabled", true);
         medico.setGoogleCalendarConnected(false);
-        String meetUrlDisc = realService.crearEventoReunion(turno);
-        assertNotNull(meetUrlDisc);
-        assertTrue(meetUrlDisc.contains("meet.google.com"));
+        assertEquals("", realService.crearEventoReunion(turno));
+        assertNull(turno.getGoogleEventId());
 
-        // When enabled, connected, but token is null
+        // Enabled, connected, but token is null -> same
         medico.setGoogleCalendarConnected(true);
         when(googleCalendarOAuthService.obtenerAccessToken(medico)).thenReturn(null);
-        String meetUrlNoTok = realService.crearEventoReunion(turno);
-        assertNotNull(meetUrlNoTok);
-        assertTrue(meetUrlNoTok.contains("meet.google.com"));
+        assertEquals("", realService.crearEventoReunion(turno));
 
         // obtenerEventosDelDia when disabled or disconnected
         ReflectionTestUtils.setField(realService, "isEnabled", false);
@@ -274,5 +269,49 @@ class GoogleCalendarSyncAndWatchUnitTest {
 
         pollingScheduler.sincronizarCalendariosConectados();
         verify(usuarioRepository).findByRolAndGoogleCalendarConnectedTrue(Rol.PSIQUIATRA);
+    }
+
+    // ── backfill de turnos sin evento en Google ──────────────────────
+
+    @Test
+    void exportarTurnosPendientes_creaElEventoYLeAvisaAlPacienteDelLinkReal() {
+        Usuario paciente = Usuario.builder().id(2L).nombre("Ana").email("ana@mail.com").rol(Rol.PACIENTE).build();
+        Turno turno = Turno.builder()
+                .id(200L).medico(medico).paciente(paciente)
+                .fecha(java.time.LocalDate.now().plusDays(1))
+                .horaInicio(java.time.LocalTime.of(10, 0)).horaFin(java.time.LocalTime.of(10, 45))
+                .modalidad(com.tranqui.app.model.Modalidad.ONLINE)
+                .build();
+        when(turnoRepository.findTurnosFuturosConfirmadosParaGoogle(eq(1L), any(), any())).thenReturn(List.of(turno));
+        when(googleCalendarService.crearEventoReunion(turno)).thenAnswer(i -> {
+            turno.setGoogleEventId("evt-real");
+            return "https://meet.google.com/abc-defg-hij";
+        });
+
+        syncService.exportarTurnosPendientesAGoogleCalendar(medico);
+
+        assertEquals("https://meet.google.com/abc-defg-hij", turno.getTelemedicinaUrl());
+        verify(turnoRepository).save(turno);
+        verify(resendEmailService).enviarLinkVideollamadaPaciente(eq("ana@mail.com"), eq("Ana"), eq("Dr. Carlos"),
+                eq(turno.getFecha()), eq(turno.getHoraInicio()), eq("https://meet.google.com/abc-defg-hij"));
+    }
+
+    @Test
+    void exportarTurnosPendientes_siGoogleSigueFallandoNoPisaElLinkNiAvisa() {
+        Usuario paciente = Usuario.builder().id(2L).nombre("Ana").email("ana@mail.com").rol(Rol.PACIENTE).build();
+        Turno turno = Turno.builder()
+                .id(201L).medico(medico).paciente(paciente)
+                .fecha(java.time.LocalDate.now().plusDays(1))
+                .horaInicio(java.time.LocalTime.of(10, 0)).horaFin(java.time.LocalTime.of(10, 45))
+                .modalidad(com.tranqui.app.model.Modalidad.ONLINE)
+                .build();
+        when(turnoRepository.findTurnosFuturosConfirmadosParaGoogle(eq(1L), any(), any())).thenReturn(List.of(turno));
+        when(googleCalendarService.crearEventoReunion(turno)).thenReturn("");
+
+        syncService.exportarTurnosPendientesAGoogleCalendar(medico);
+
+        assertNull(turno.getTelemedicinaUrl());
+        verify(turnoRepository, never()).save(any());
+        verifyNoInteractions(resendEmailService);
     }
 }

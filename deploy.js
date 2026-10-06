@@ -15,20 +15,37 @@ if (process.env.VPS_PRIVATE_KEY_PATH) {
   delete config.password;
 }
 
-const localFilePath = path.join(__dirname, 'project.tar.gz');
+const os = require('os');
+
+// Fuera del repo: el tarball es un artefacto temporal, no algo que tenga que vivir junto al código.
+const localFilePath = path.join(os.tmpdir(), 'tranqui-project.tar.gz');
 const remoteFilePath = '/root/project.tar.gz';
 
-// Always package whatever is currently on disk — so `node deploy.js` alone is the single
-// command that ships the latest code, instead of needing a separate "rebuild the tarball"
-// step run by hand first (which is how project.tar.gz went stale before).
-console.log('Rebuilding project.tar.gz from the current source tree...');
-execSync(
-  'tar -czf project.tar.gz ' +
-  "--exclude='frontend/node_modules' --exclude='frontend/dist' --exclude='backend/target' " +
-  '.env .env.template .gitignore README.md backend devops docker-compose.yml frontend',
-  { cwd: __dirname, stdio: 'inherit' }
-);
-console.log('project.tar.gz rebuilt.');
+// Se despliega lo que está commiteado, no la carpeta tal cual: así producción siempre
+// corresponde a un commit concreto (antes llegó a correr un WIP que no estaba en git).
+// `node deploy.js --allow-dirty` permite desplegar igual con cambios sin commitear (solo los
+// archivos trackeados viajan, con su contenido actual en disco).
+const allowDirty = process.argv.includes('--allow-dirty');
+const pendientes = execSync('git status --porcelain', { cwd: __dirname }).toString().trim();
+if (pendientes && !allowDirty) {
+  console.error('Hay cambios sin commitear — commiteá antes de desplegar (o usá --allow-dirty):\n' + pendientes);
+  process.exit(1);
+}
+const commit = execSync('git rev-parse --short HEAD', { cwd: __dirname }).toString().trim();
+console.log(`Empaquetando el commit ${commit}${pendientes ? ' (con cambios locales, --allow-dirty)' : ''}...`);
+// Archivos de git (trackeados + nuevos no ignorados, que con el árbol limpio no hay) dentro de
+// las carpetas que necesita el servidor, más el .env (que está en .gitignore a propósito y es la
+// fuente de los secretos de producción). Respetar .gitignore deja afuera node_modules, target,
+// dist, etc. sin tener que listarlos.
+const archivos = execSync(
+  'git ls-files -z --cached --others --exclude-standard -- .env.template .gitignore README.md backend devops docker-compose.yml frontend',
+  { cwd: __dirname }
+).toString().split('\0').filter((f) => f && fs.existsSync(path.join(__dirname, f)));
+archivos.push('.env');
+const listaPath = path.join(os.tmpdir(), 'tranqui-deploy-files.txt');
+fs.writeFileSync(listaPath, archivos.join('\n') + '\n');
+execSync(`tar -czf "${localFilePath}" -T "${listaPath}"`, { cwd: __dirname, stdio: 'inherit' });
+console.log(`Paquete listo: ${localFilePath}`);
 
 console.log('Connecting to VPS SSH server...');
 const conn = new Client();

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Icon } from './Icon'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -600,7 +601,7 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
                 <path d="M3 21h18M3 10h18M5 10v11M9 10v11M15 10v11M19 10v11M12 2 2 7h20z"/>
               </svg>
             }
-            label="Suscripción y Facturación ARCA"
+            label="Suscripciones"
           />
           <SidebarNavItem
             active={activeSection === 'pending'}
@@ -924,7 +925,7 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>{detailUser.email}</span>
                 </div>
               </div>
-              <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setDetailUser(null)}>✕</button>
+              <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setDetailUser(null)} aria-label="Cerrar"><Icon.X /></button>
             </div>
             <ProfessionalDetailPanel pro={detailUser} />
           </div>

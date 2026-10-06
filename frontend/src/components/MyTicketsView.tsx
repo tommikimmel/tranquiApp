@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Icon } from './Icon'
 import { api } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 
@@ -194,7 +195,7 @@ export default function MyTicketsView({ onClose }: { onClose: () => void }) {
 
         {view === 'new' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            <button className="btn btn--ghost btn--sm" style={{ alignSelf: 'flex-start' }} onClick={() => setView('list')}>← Volver</button>
+            <button className="btn btn--ghost btn--sm" style={{ alignSelf: 'flex-start' }} onClick={() => setView('list')}><Icon.ArrowLeft /> Volver</button>
             <div>
               <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>Asunto</label>
               <input className="form-input" value={asunto} onChange={(e) => setAsunto(e.target.value)} placeholder="Ej: Problema con un pago" style={{ width: '100%' }} />
@@ -212,7 +213,7 @@ export default function MyTicketsView({ onClose }: { onClose: () => void }) {
         {view === 'detail' && selected && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', flex: 1, minHeight: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button className="btn btn--ghost btn--sm" onClick={() => { setView('list'); cargarLista() }}>← Volver</button>
+              <button className="btn btn--ghost btn--sm" onClick={() => { setView('list'); cargarLista() }}><Icon.ArrowLeft /> Volver</button>
               {(() => { const e = ESTADO_LABEL[selected.estado] || { label: selected.estado, cls: 'badge--neutral' }; return (
                 <span className={`badge ${e.cls}`} style={{ fontSize: '9px' }}>{e.label}</span>
               ) })()}

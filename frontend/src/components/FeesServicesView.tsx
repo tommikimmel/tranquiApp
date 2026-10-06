@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { Icon } from './Icon'
 import { useAlert } from '../context/AlertContext'
 import { OBRAS_SOCIALES } from '../constants/obrasSociales'
 
@@ -248,7 +249,7 @@ export default function FeesServicesView({
           ? { ...t, requiereObraSocial: true, obraSocial: t.obraSocial || 'OSDE' }
           : t),
       })
-      showAlert('Honorarios guardados con éxito ✓', 'success')
+      showAlert('Honorarios guardados con éxito', 'success')
     } catch (err) {
       console.error(err)
       showAlert('Error al guardar los honorarios', 'error')
@@ -437,7 +438,7 @@ export default function FeesServicesView({
               </div>
               <p className="honorarios-detalle-tipo">
                 {getServiceType(t) === 'consulta' && 'El paciente reserva, paga y recibe el link de la videoconsulta o concurre a tu consultorio. Ocupa un lugar en tu agenda.'}
-                {getServiceType(t) === 'receta' && 'No ocupa turno. La emitís desde Generar receta y le llega firmada automáticamente por WhatsApp al paciente.'}
+                {getServiceType(t) === 'receta' && 'No ocupa turno. La emitís desde Generar receta.'}
                 {getServiceType(t) === 'documento' && 'No ocupa turno. Tranqui cobra y te notifica, pero el envío del archivo queda de tu lado: la app no lo manda por vos (ej. aptos médicos o historias clínicas).'}
               </p>
             </div>
@@ -944,7 +945,7 @@ export default function FeesServicesView({
                   <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', fontFamily: 'var(--font-heading)' }}>Lo que ve el paciente</h3>
                   <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: 'var(--color-text-secondary)' }}>Al reservar un turno, en este orden</p>
                 </div>
-                <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setShowPatientPreview(false)}>✕</button>
+                <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setShowPatientPreview(false)} aria-label="Cerrar"><Icon.X /></button>
               </div>
               <div style={{ padding: '18px 22px' }}>
                 {vivos.filter((t: any) => t.enabled).length === 0 ? (

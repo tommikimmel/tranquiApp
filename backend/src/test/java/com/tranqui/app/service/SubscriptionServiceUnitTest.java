@@ -144,10 +144,10 @@ class SubscriptionServiceUnitTest {
         when(usuarioRepository.findById(1L)).thenReturn(Optional.of(profesional));
         when(subscriptionRepository.findByProfessionalId(1L)).thenReturn(Optional.of(sub));
         when(planFeatureRepository.existsByPlanIdAndFeatureKey(10L, "RECETAS")).thenReturn(true);
-        when(planFeatureRepository.existsByPlanIdAndFeatureKey(10L, "WHATSAPP")).thenReturn(false);
+        when(planFeatureRepository.existsByPlanIdAndFeatureKey(10L, "REPORTES")).thenReturn(false);
 
         assertTrue(subscriptionService.hasFeature(1L, "RECETAS"));
-        assertFalse(subscriptionService.hasFeature(1L, "WHATSAPP"));
+        assertFalse(subscriptionService.hasFeature(1L, "REPORTES"));
 
         // Admin has all features
         Usuario admin = Usuario.builder().id(2L).rol(Rol.ADMIN).build();

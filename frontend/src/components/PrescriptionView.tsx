@@ -483,7 +483,7 @@ export default function PrescriptionView({ onSend, medicoInfo }: { onSend: (data
               <div className="card mobile-modal-card" style={{ maxWidth: '600px', width: '100%', maxHeight: '85vh', overflowY: 'auto', padding: 'var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-3)' }}>
                   <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'bold' }}>Detalle de Receta #{selectedDetailModal.id}</h3>
-                  <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setSelectedDetailModal(null)}>✕</button>
+                  <button className="btn btn--ghost btn--sm mobile-modal-close" onClick={() => setSelectedDetailModal(null)} aria-label="Cerrar"><Icon.X /></button>
                 </div>
                 <div style={{ padding: 'var(--space-4)', backgroundColor: 'var(--neutral-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
                   <div>
@@ -574,7 +574,7 @@ export default function PrescriptionView({ onSend, medicoInfo }: { onSend: (data
                 Se envió la receta a <strong>{selectedPatientObj?.name || `${selectedPatientObj?.nombre || ''} ${selectedPatientObj?.apellido || ''}`.trim()}</strong>
               </p>
               <p style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-xs)', marginBottom: 'var(--space-8)' }}>
-                Emisor: {doctorName} ({doctorMatricula}) · Notificación enviada por WhatsApp y registrada en el sistema.
+                Emisor: {doctorName} ({doctorMatricula}) · Registrada en el sistema.
               </p>
               <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
                 <button className="btn btn--primary" onClick={handleReset} id="btn-new-prescription">
@@ -1071,7 +1071,7 @@ export default function PrescriptionView({ onSend, medicoInfo }: { onSend: (data
                 )}
 
                 <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)' }}>
-                  Se emite como receta electrónica oficial (QBI2/Innovamed), firmada con tus datos profesionales (<strong>{doctorName} · {doctorMatricula}</strong>), y se le avisa al paciente por WhatsApp y email con el link para descargarla.
+                  Se emite como receta electrónica oficial (QBI2/Innovamed), firmada con tus datos profesionales (<strong>{doctorName} · {doctorMatricula}</strong>), y queda disponible para que el paciente la descargue desde la app.
                 </p>
                 <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
                   <button

@@ -393,7 +393,7 @@ export default function AgendaView({ medicoInfo, initialAvailabilityPresencial, 
       if (ofrecePresencial) saves.push(onSave('PRESENCIAL', presencialGridRef.current?.getDtos() || []))
       if (ofreceOnline) saves.push(onSave('ONLINE', onlineGridRef.current?.getDtos() || []))
       await Promise.all(saves)
-      showAlert("Disponibilidad guardada correctamente ✓", "success")
+      showAlert("Disponibilidad guardada correctamente", "success")
     } catch (err) {
       console.error(err)
       showAlert("Error al guardar disponibilidad", "error")

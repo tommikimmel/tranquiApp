@@ -5,7 +5,7 @@ import '../styles/privacy.css'
 const CONTACT_EMAIL = 'soporte@tranquisalud.com'
 const RESPONSABLE_NOMBRE = 'Enso Tomás García Criscuolo'
 const RESPONSABLE_CUIT = '20-47473505-3'
-const LAST_UPDATED = '10 de agosto de 2026'
+const LAST_UPDATED = '6 de octubre de 2026'
 
 const SECTIONS: { id: string; title: string }[] = [
   { id: 'aceptacion', title: '1. Aceptación de los términos' },
@@ -192,11 +192,19 @@ export default function TermsPage({ currentUser }: { currentUser?: any }) {
               confirmación de un turno queda sujeta a la acreditación del pago cuando corresponda.
             </p>
             <p>
-              Cada profesional define su propia política de cancelación y reprogramación dentro de la
-              Plataforma; te recomendamos revisarla antes de reservar. Tranqui Salud puede reprogramar o
-              cancelar turnos automáticamente ante indisponibilidad detectada (por ejemplo, un conflicto de
-              horario reflejado en el Google Calendar vinculado del profesional) y te notificará el cambio
-              por email o WhatsApp.
+              <strong>Política de cancelación:</strong> podés cancelar un turno hasta <strong>48 horas
+              antes</strong> de su horario de inicio y se te reembolsa el total abonado, de forma
+              automática, al mismo medio de pago. Si cancelás con <strong>menos de 48 horas</strong> de
+              anticipación (incluido el botón "No podré asistir" del recordatorio), el turno se cancela
+              pero <strong>no corresponde reembolso</strong>. Antes de confirmar una cancelación, la
+              Plataforma te indica cuál de los dos casos aplica.
+            </p>
+            <p>
+              Si el turno lo cancela el profesional, se te reembolsa el total abonado sin importar la
+              anticipación. La reprogramación de un turno la realiza el profesional. Tranqui Salud puede
+              reprogramar o cancelar turnos automáticamente ante indisponibilidad detectada (por ejemplo,
+              un conflicto de horario reflejado en el Google Calendar vinculado del profesional) y te
+              notificará el cambio por email.
             </p>
           </Section>
 
@@ -226,7 +234,7 @@ export default function TermsPage({ currentUser }: { currentUser?: any }) {
             <p>
               Las tarifas publicadas por cada profesional son fijadas libremente por él y pueden variar
               según el tipo de consulta. Los reembolsos ante cancelaciones se rigen por la política de
-              cancelación del profesional y por las condiciones del medio de pago utilizado. Si una receta
+              cancelación de la sección 6; los plazos de acreditación dependen del medio de pago utilizado. Si una receta
               electrónica es rechazada después de haberse cobrado la consulta, ver sección 8. Ante
               cualquier disputa de pago, contactanos a <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
             </p>
@@ -308,7 +316,7 @@ export default function TermsPage({ currentUser }: { currentUser?: any }) {
               <strong>Responsabilidad por actos de terceros:</strong> Tranqui Salud no es responsable por
               el contenido de las consultas, diagnósticos, tratamientos o prescripciones brindados por los
               profesionales, ni por decisiones que un paciente tome en base a ellos. Tampoco somos
-              responsables por fallas atribuibles a proveedores externos (Mercado Pago, Google, Twilio,
+              responsables por fallas atribuibles a proveedores externos (Mercado Pago, Google,
               Resend, QBI2/Innovamed) que estén fuera de nuestro control razonable.
             </p>
             <p>

@@ -45,6 +45,9 @@ public class GoogleCalendarSyncService {
     private GoogleCalendarService googleCalendarService;
 
     @Autowired
+    private ResendEmailService resendEmailService;
+
+    @Autowired
     private GoogleCalendarEventoExternoRepository eventoExternoRepository;
 
     @Autowired
@@ -193,11 +196,25 @@ public class GoogleCalendarSyncService {
                         log.warn("Turno ID {} todavía no se pudo exportar a Google Calendar; se reintenta en la próxima sincronización.", turno.getId());
                         continue;
                     }
-                    if (turno.getModalidad() == com.tranqui.app.model.Modalidad.ONLINE && meetUrl != null && !meetUrl.isBlank()) {
+                    boolean linkNuevo = turno.getModalidad() == com.tranqui.app.model.Modalidad.ONLINE
+                            && meetUrl != null && !meetUrl.isBlank() && !meetUrl.equals(turno.getTelemedicinaUrl());
+                    if (linkNuevo) {
                         turno.setTelemedicinaUrl(meetUrl);
                     }
                     turnoRepository.save(turno);
                     log.info("Turno ID {} exportado con éxito a Google Calendar (Event ID: {})", turno.getId(), turno.getGoogleEventId());
+                    // El paciente recibió la confirmación sin link (o con uno que ya no sirve):
+                    // le avisamos que el link real está listo.
+                    if (linkNuevo && turno.getPaciente() != null && turno.getPaciente().getEmail() != null
+                            && turno.getPaciente().isNotificacionesEmailHabilitadas()) {
+                        try {
+                            resendEmailService.enviarLinkVideollamadaPaciente(
+                                    turno.getPaciente().getEmail(), turno.getPaciente().getNombre(), medico.getNombre(),
+                                    turno.getFecha(), turno.getHoraInicio(), meetUrl);
+                        } catch (Exception e) {
+                            log.error("Error al enviar el link de videollamada al paciente del turno ID {}", turno.getId(), e);
+                        }
+                    }
                 } catch (Exception e) {
                     log.error("Fallo al exportar turno ID {} a Google Calendar para médico ID {}", turno.getId(), medico.getId(), e);
                 }

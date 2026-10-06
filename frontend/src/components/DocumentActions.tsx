@@ -19,10 +19,6 @@ export default function DocumentActions({ appt, onMarcarDocumentoEnviado, onNavi
 
   const isReceta = !!appt.esReceta
   const isDocumentoEnviado = !!appt.documentoEnviado
-  const patientPhoneDigits = (appt.patientInfo?.telefono || '').replace(/[^\d]/g, '')
-  const whatsappHref = patientPhoneDigits
-    ? `https://wa.me/${patientPhoneDigits}?text=${encodeURIComponent(`Hola ${appt.patientName}, te enviamos tu ${appt.type.toLowerCase()} adjunto en este mensaje.`)}`
-    : undefined
 
   const handleGoToPrescription = () => {
     const patientObj = appt.patientInfo ? {
@@ -61,10 +57,9 @@ export default function DocumentActions({ appt, onMarcarDocumentoEnviado, onNavi
     <>
       <div className="document-actions">
         {isReceta ? (
-          // Recetas are fully handled inside Recetas Electrónicas: generating one there sends
-          // the patient their WhatsApp notification (RecetaService#emitirReceta) and
+          // Recetas are fully handled inside Recetas Electrónicas: generating one there
           // auto-clears this card (TurnoService#marcarRecetasEnviadasParaPaciente) — no
-          // separate email/WhatsApp/mark-as-sent action belongs here. Once that already
+          // separate email/mark-as-sent action belongs here. Once that already
           // happened (isDocumentoEnviado), there's nothing left to do — showing "Generar
           // receta →" again reads as if the first one never went through.
           !isDocumentoEnviado && onNavigate && (
@@ -74,16 +69,11 @@ export default function DocumentActions({ appt, onMarcarDocumentoEnviado, onNavi
               className="btn btn--primary btn--sm document-actions__btn"
               title={`Generar receta oficial para ${appt.patientName}`}
             >
-              <Icon.FileText size={14} /> Generar receta →
+              <Icon.FileText size={14} /> Generar receta <Icon.ArrowRight size={12} />
             </button>
           )
         ) : (
           <>
-            {whatsappHref && (
-              <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="btn btn--ghost btn--sm document-actions__btn" title="Enviar por WhatsApp">
-                <Icon.MessageCircle size={14} /> WhatsApp
-              </a>
-            )}
             {!isDocumentoEnviado && onMarcarDocumentoEnviado && (
               <button
                 type="button"

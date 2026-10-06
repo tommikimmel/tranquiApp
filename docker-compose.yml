@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-tranqui_app}
       POSTGRES_USER: ${DB_USER:-tomaskimmel}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-securepassword}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
@@ -37,9 +37,10 @@ services:
       TZ: America/Argentina/Buenos_Aires
       SPRING_DATASOURCE_URL: jdbc:postgresql://tranqui-db:5432/${DB_NAME:-tranqui_app}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-tomaskimmel}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-securepassword}
-      SPRING_PROFILES_ACTIVE: dev
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-masterdecryptionkey32charspart12}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      # Sin default: con una clave conocida cualquiera podría descifrar los tokens guardados.
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Falta ENCRYPTION_KEY en .env}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-224301140079-2pa672f7sqcner9nut04j0g99md88n3p.apps.googleusercontent.com}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_CALENDAR_ENABLED: ${GOOGLE_CALENDAR_ENABLED:-false}
@@ -51,7 +52,7 @@ services:
       MERCADOPAGO_SANDBOX: ${MERCADOPAGO_SANDBOX:-true}
       MP_ADMIN_ACCESS_TOKEN: ${MP_ADMIN_ACCESS_TOKEN:-}
       MP_ADMIN_PUBLIC_KEY: ${MP_ADMIN_PUBLIC_KEY:-}
-      PAYMENT_SIMULATION_ENABLED: ${PAYMENT_SIMULATION_ENABLED:-true}
+      PAYMENT_SIMULATION_ENABLED: ${PAYMENT_SIMULATION_ENABLED:-false}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-onboarding@resend.dev}
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:8081}
@@ -62,6 +63,7 @@ services:
       QBI2_RECIPE_TOKEN: ${QBI2_RECIPE_TOKEN:-}
       SITE_ACCESS_PASSWORD: ${SITE_ACCESS_PASSWORD:-}
       SEED_TEST_ACCOUNTS: ${SEED_TEST_ACCOUNTS:-false}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-}
       ARCA_ENABLED: ${ARCA_ENABLED:-false}
       ARCA_ENVIRONMENT: ${ARCA_ENVIRONMENT:-homologacion}
       ARCA_CUIT_EMISOR: ${ARCA_CUIT_EMISOR:-20384910294}
@@ -70,7 +72,7 @@ services:
       ARCA_KEY_PATH: ${ARCA_KEY_PATH:-}
       ARCA_CERT_CONTENT: ${ARCA_CERT_CONTENT:-}
       ARCA_KEY_CONTENT: ${ARCA_KEY_CONTENT:-}
-      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: DEBUG
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: ${LOG_LEVEL_SECURITY:-INFO}
     depends_on:
       tranqui-db:
         condition: service_healthy

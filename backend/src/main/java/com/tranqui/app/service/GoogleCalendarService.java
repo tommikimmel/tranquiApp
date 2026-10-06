@@ -61,12 +61,6 @@ public class GoogleCalendarService {
     public String crearEventoReunion(Turno turno) {
         log.info("Iniciando creación de evento en Google Calendar para el turno ID: {}", turno.getId());
 
-        // For testing simulated connection failures:
-        if (turno.getMetadataAfiliado() != null && turno.getMetadataAfiliado().contains("FAIL_CALENDAR")) {
-            log.error("Fallo simulado de Google Calendar API.");
-            throw new RuntimeException("Simulated Rate Limit / Token Expired on Google Calendar API");
-        }
-
         Usuario medico = turno.getMedico();
         boolean medicoConectado = medico != null && medico.getGoogleCalendarConnected() != null && medico.getGoogleCalendarConnected();
 
@@ -140,10 +134,10 @@ public class GoogleCalendarService {
                         }
                     }
                 }
-                log.warn("No se pudo obtener el Access Token para el médico ID: {}. Usando fallback simulado.", medico.getId());
+                log.warn("No se pudo obtener el Access Token de Google para el médico ID: {}.", medico.getId());
             } catch (Exception e) {
                 log.error("Fallo al crear evento REAL en Google Calendar para turno ID: {}. Error: {}", turno.getId(), e.getMessage());
-                // Fallback en caso de error para no romper la reserva del turno
+                // No se propaga: un fallo de Google nunca debe romper la confirmación del turno.
             }
         }
 
@@ -151,7 +145,17 @@ public class GoogleCalendarService {
             return "";
         }
 
-        log.info("Usando simulación de Google Calendar API. Retornando Meet URL mock dinámico.");
+        // Con Google Calendar habilitado (producción) nunca se inventa un link: un meet.google.com
+        // generado al azar no es una sala real y el paciente terminaba con un link roto. Se
+        // devuelve vacío y el turno queda sin link hasta que se cree el evento real — lo reintenta
+        // GoogleCalendarSyncService#exportarTurnosPendientesAGoogleCalendar cada 5 minutos (si el
+        // profesional tiene el calendario conectado) y le avisa al paciente cuando está listo.
+        if (isEnabled) {
+            log.warn("Turno ID {} online sin link de Meet todavía (Google Calendar no disponible o profesional sin conectar).", turno.getId());
+            return "";
+        }
+
+        log.info("Google Calendar deshabilitado (entorno local): se usa un Meet URL simulado.");
         return generarMeetUrl();
     }
 
