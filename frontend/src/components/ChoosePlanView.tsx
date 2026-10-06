@@ -302,8 +302,8 @@ export default function ChoosePlanView({
           </div>
           <div className="card" style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <Icon.MercadoPago size={18} />
-            <strong style={{ fontSize: 'var(--text-sm)' }}>¿Necesitás dar de baja?</strong>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>Escribinos a soporte y te la cancelamos sin vueltas.</span>
+            <strong style={{ fontSize: 'var(--text-sm)' }}>Cancelación transparente</strong>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>Podés cancelar la renovación automática en cualquier momento con 1 solo clic y mantenés el acceso hasta el fin del período.</span>
           </div>
         </div>
 

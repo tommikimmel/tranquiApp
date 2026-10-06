@@ -92,10 +92,14 @@ public class PagoWebhookHandler {
 
         turno.setEstado(EstadoTurno.CONFIRMADO);
 
-        // Crear evento de Google Meet solo para turnos online; los presenciales no llevan videollamada
-        if (turno.getModalidad() == com.tranqui.app.model.Modalidad.ONLINE) {
+        // Sincronizar en Google Calendar todo turno que ocupa agenda (online y presencial) —
+        // mismo criterio que TurnoService#confirmarTurnoOsde. Antes solo se creaba para online, así
+        // que los turnos presenciales pagos nunca aparecían en el calendario del profesional.
+        if (turno.isOcupaAgenda()) {
             String meetUrl = calendarService.crearEventoReunion(turno);
-            turno.setTelemedicinaUrl(meetUrl);
+            if (turno.getModalidad() == com.tranqui.app.model.Modalidad.ONLINE && meetUrl != null && !meetUrl.isBlank()) {
+                turno.setTelemedicinaUrl(meetUrl);
+            }
         }
         turnoRepository.save(turno);
 

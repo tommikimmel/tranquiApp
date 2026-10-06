@@ -472,10 +472,12 @@ public class TurnoService {
         // Muta a confirmado
         turno.setEstado(EstadoTurno.CONFIRMADO);
 
-        // Sincronizar agenda en Google Calendar solo para turnos online; los presenciales no llevan videollamada
-        if (turno.getModalidad() == Modalidad.ONLINE) {
+        // Sincronizar agenda en Google Calendar para turnos con agenda (online y presencial)
+        if (turno.isOcupaAgenda()) {
             String meetUrl = calendarService.crearEventoReunion(turno);
-            turno.setTelemedicinaUrl(meetUrl);
+            if (turno.getModalidad() == Modalidad.ONLINE && meetUrl != null && !meetUrl.isBlank()) {
+                turno.setTelemedicinaUrl(meetUrl);
+            }
         }
 
         return turnoRepository.save(turno);

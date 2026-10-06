@@ -31,4 +31,22 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
     // Count active subscriptions by plan code
     @Query("SELECT COUNT(s) FROM Subscription s WHERE s.status = 'ACTIVE' AND s.plan.code = :planCode")
     long countActiveByPlanCode(@Param("planCode") String planCode);
+
+    // Active subscriptions due for renewal in the next 3 days that haven't received notice yet
+    @Query("SELECT s FROM Subscription s WHERE s.status = 'ACTIVE' " +
+           "AND s.cancelAtPeriodEnd = false " +
+           "AND (s.renewalReminderSent IS NULL OR s.renewalReminderSent = false) " +
+           "AND COALESCE(s.nextBillingDate, s.currentPeriodEnd) IS NOT NULL " +
+           "AND COALESCE(s.nextBillingDate, s.currentPeriodEnd) >= :now " +
+           "AND COALESCE(s.nextBillingDate, s.currentPeriodEnd) <= :threeDaysFromNow")
+    List<Subscription> findUpcomingRenewalsNeedingNotice(
+            @Param("now") LocalDateTime now,
+            @Param("threeDaysFromNow") LocalDateTime threeDaysFromNow);
+
+    // Subscriptions with cancelAtPeriodEnd=true whose period has expired
+    @Query("SELECT s FROM Subscription s WHERE s.cancelAtPeriodEnd = true " +
+           "AND s.status != 'CANCELLED' " +
+           "AND s.currentPeriodEnd IS NOT NULL " +
+           "AND s.currentPeriodEnd < :now")
+    List<Subscription> findExpiredCancelledSubscriptions(@Param("now") LocalDateTime now);
 }

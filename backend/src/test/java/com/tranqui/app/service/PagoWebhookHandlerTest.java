@@ -121,16 +121,36 @@ class PagoWebhookHandlerTest {
                 .precio(new BigDecimal("60000"))
                 .build();
         when(turnoRepository.findById(11L)).thenReturn(Optional.of(turno));
-        // No modalidad ONLINE en este turno -> el handler nunca llama a calendarService, así que
-        // no corresponde stubearlo acá (evita UnnecessaryStubbingException); este test se enfoca
-        // exclusivamente en que un error de notificación no impida el envío de WhatsApp.
+        // Turno con agenda (presencial por default): el handler crea el evento en Google Calendar
+        // igual (mock devuelve null). Este test se enfoca en que un error de notificación no
+        // impida el envío de WhatsApp.
         doThrow(new RuntimeException("boom")).when(notificacionService)
                 .crearNotificacion(any(), anyString(), anyString(), anyString());
 
         assertDoesNotThrow(() -> handler.procesarAprobacionTurno(11L, "tx-2"));
 
         verify(whatsAppService).enviarMensajeRecordatorio(turno);
-        verifyNoInteractions(calendarService);
+        verify(calendarService).crearEventoReunion(turno);
+    }
+
+    @Test
+    void procesarAprobacionTurno_presencial_creaEventoEnGoogleCalendarSinPisarTelemedicinaUrl() {
+        Turno turno = Turno.builder()
+                .id(13L).medico(medico()).paciente(paciente())
+                .fecha(LocalDate.now().plusDays(1))
+                .horaInicio(LocalTime.of(9, 0)).horaFin(LocalTime.of(9, 45))
+                .tipo(TipoTurno.PARTICULAR).estado(EstadoTurno.PENDIENTE_PAGO)
+                .modalidad(Modalidad.PRESENCIAL)
+                .precio(new BigDecimal("60000"))
+                .build();
+        when(turnoRepository.findById(13L)).thenReturn(Optional.of(turno));
+        when(calendarService.crearEventoReunion(turno)).thenReturn("");
+
+        handler.procesarAprobacionTurno(13L, "tx-presencial");
+
+        verify(calendarService).crearEventoReunion(turno);
+        assertNull(turno.getTelemedicinaUrl());
+        assertEquals(EstadoTurno.CONFIRMADO, turno.getEstado());
     }
 
     @Test
@@ -143,8 +163,7 @@ class PagoWebhookHandlerTest {
                 .precio(new BigDecimal("60000"))
                 .build();
         when(turnoRepository.findById(12L)).thenReturn(Optional.of(turno));
-        // Idem: sin modalidad ONLINE no se llama a calendarService, así que stubearlo acá también
-        // sería un stub innecesario.
+        // calendarService no se stubea: el mock devuelve null y el handler lo tolera.
         doThrow(new RuntimeException("whatsapp down")).when(whatsAppService).enviarMensajeRecordatorio(turno);
 
         assertDoesNotThrow(() -> handler.procesarAprobacionTurno(12L, "tx-3"));

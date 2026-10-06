@@ -68,7 +68,7 @@ public class Subscription {
     private LocalDateTime graceUntil;
 
     @Builder.Default
-    @Column(name = "cancel_at_period_end", nullable = false)
+    @Column(name = "cancel_at_period_end", nullable = false, columnDefinition = "boolean default false")
     private Boolean cancelAtPeriodEnd = false;
 
     @Column(name = "cancelled_at")
@@ -83,6 +83,10 @@ public class Subscription {
     @Builder.Default
     @Column(name = "aviso_vencimiento_enviado", nullable = false)
     private Boolean avisoVencimientoEnviado = false;
+
+    @Builder.Default
+    @Column(name = "renewal_reminder_sent", nullable = false, columnDefinition = "boolean default false")
+    private Boolean renewalReminderSent = false;
 
     @Builder.Default
     @Column(name = "created_at", nullable = false)

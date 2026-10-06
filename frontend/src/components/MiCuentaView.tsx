@@ -195,6 +195,25 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const [cancellingSub, setCancellingSub] = useState(false);
+  const handleCancelarSuscripcion = () => {
+    const fechaFin = mySub?.currentPeriodEnd ? new Date(mySub.currentPeriodEnd).toLocaleDateString('es-AR') : 'el fin del período abonado';
+    if (!window.confirm(`¿Confirmás que querés cancelar la renovación automática de tu suscripción?\n\nNo se te cobrará ningún nuevo período en Mercado Pago y mantendrás el acceso total a tu cuenta y agenda hasta el ${fechaFin}.\nPasada esa fecha, tu perfil se pausará del buscador público.`)) {
+      return;
+    }
+    setCancellingSub(true);
+    api.cancelMySubscription()
+      .then((res: any) => {
+        showAlert(res?.message || 'Suscripción cancelada exitosamente.', 'success');
+        return api.getMySubscription();
+      })
+      .then((s: any) => setMySub(s))
+      .catch((err: any) => {
+        showAlert(err?.message || 'Error al cancelar la suscripción.', 'error');
+      })
+      .finally(() => setCancellingSub(false));
+  };
+
   const handleToggleObraSocial = (value: boolean) => {
     setTieneObraSocial(value)
     if (!value) {
@@ -499,6 +518,39 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                           {mySub.status === 'ACTIVE' ? 'Suscripción Activa' : mySub.status}
                         </span>
                       </div>
+
+                      {mySub.cancelAtPeriodEnd ? (
+                        <div style={{
+                          padding: 'var(--space-3) var(--space-4)',
+                          backgroundColor: '#fffbeb',
+                          border: '1px solid #fde68a',
+                          borderRadius: 'var(--radius-md)',
+                          color: '#92400e',
+                          fontSize: '13px',
+                          lineHeight: 1.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px'
+                        }}>
+                          <span style={{ fontSize: '18px' }}>⚠️</span>
+                          <div>
+                            <strong>Renovación automática cancelada:</strong> No se realizarán más cobros en Mercado Pago.
+                            Mantendrás acceso total a todas las funciones profesionales hasta el <strong>{mySub.currentPeriodEnd ? new Date(mySub.currentPeriodEnd).toLocaleDateString('es-AR') : ''}</strong>.
+                          </div>
+                        </div>
+                      ) : mySub.status === 'ACTIVE' && (
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            className="btn btn--outline-danger btn--sm"
+                            onClick={handleCancelarSuscripcion}
+                            disabled={cancellingSub}
+                            style={{ fontSize: '12px', padding: '6px 12px' }}
+                          >
+                            {cancellingSub ? 'Cancelando...' : 'Cancelar renovación automática'}
+                          </button>
+                        </div>
+                      )}
 
                       {mySub.activeFeatures && mySub.activeFeatures.length > 0 && (
                         <div>

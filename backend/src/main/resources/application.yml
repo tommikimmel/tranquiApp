@@ -64,6 +64,8 @@ qbi2:
 app:
   public-url: ${APP_PUBLIC_URL:http://localhost:8081}
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  # Siembra cuentas de prueba con password conocida (ver DataInitializer). Nunca en producción.
+  seed-test-accounts: ${SEED_TEST_ACCOUNTS:false}
 
 site:
   access:

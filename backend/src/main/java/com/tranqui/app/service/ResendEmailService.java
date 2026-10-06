@@ -17,6 +17,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -31,6 +32,8 @@ public class ResendEmailService {
 
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
+
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.forLanguageTag("es-AR"));
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -304,61 +307,184 @@ public class ResendEmailService {
     }
 
     // ================================================================================
-    // SUSCRIPCIÓN — próxima a vencer / vencida / pago confirmado / cancelada
+    // SUSCRIPCIÓN — preaviso de renovación / pago confirmado / pago fallido / cancelada /
+    // suspendida / vencimiento de alta manual
     // ================================================================================
 
-    public void enviarSuscripcionProximaAVencer(String toEmail, String nombreProfesional, String planNombre, LocalDateTime vence) {
-        String asunto = "Tu suscripción a Tranqui App vence pronto";
-        String cuerpo = "<p>Tu suscripción al plan <strong>" + planNombre + "</strong> está por vencer. Renovala para no perder acceso a Tranqui App.</p>" +
-                panelInfo(
-                        "Plan", planNombre,
-                        "Vence el", vence != null ? vence.format(FECHA_FMT) : null
-                );
-        String html = plantilla("⏰", "Tu suscripción vence pronto", TONO_ALERTA,
-                "Renová tu suscripción, " + nombreOUsuario(nombreProfesional), cuerpo,
-                "Renovar suscripción", frontendUrl);
-        enviarCorreo(toEmail, asunto, html);
+    public void enviarPreavisoRenovacionSuscripcion(String toEmail, String nombre, String nombrePlan, BigDecimal monto, LocalDateTime fechaCobro, String billingCycle) {
+        String asunto = "Recordatorio: tu suscripción se renovará en 3 días - Tranqui App";
+        String fechaStr = fechaCobro != null ? fechaCobro.format(DATE_FORMATTER) : "en los próximos 3 días";
+        String cicloStr = "annual".equalsIgnoreCase(billingCycle) ? "anual" : "mensual";
+        String montoStr = monto != null ? String.format(Locale.GERMANY, "%,.2f", monto) : "0,00";
+
+        String htmlContent = String.format(
+                "<div style=\"font-family: Arial, sans-serif; padding: 24px; max-width: 550px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b;\">" +
+                        "<h2 style=\"color: #009ee3; margin-top: 0;\">Tranqui App</h2>" +
+                        "<h3 style=\"color: #0f172a; margin-top: 0;\">Hola, %s</h3>" +
+                        "<p style=\"font-size: 15px; line-height: 1.5;\">Te recordamos que en <strong>3 días</strong> (el <strong>%s</strong>) se renovará automáticamente tu suscripción al <strong>Plan %s (%s)</strong>.</p>" +
+                        "<div style=\"background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; margin: 20px 0;\">" +
+                        "  <p style=\"margin: 0 0 8px 0; font-size: 14px;\"><strong>Monto a debitar:</strong> $%s ARS</p>" +
+                        "  <p style=\"margin: 0 0 8px 0; font-size: 14px;\"><strong>Fecha de débito:</strong> %s</p>" +
+                        "  <p style=\"margin: 0; font-size: 14px;\"><strong>Medio de pago:</strong> Débito automático (Mercado Pago)</p>" +
+                        "</div>" +
+                        "<p style=\"font-size: 14px; line-height: 1.5;\">Si deseás continuar con el servicio, no necesitás realizar ninguna acción. El cobro se procesará automáticamente y mantendrás todas tus funcionalidades y la visibilidad de tu agenda sin interrupciones.</p>" +
+                        "<p style=\"font-size: 14px; line-height: 1.5;\">Si querés cambiar de plan o cancelar la renovación automática antes de que se acredite el pago, podés gestionarlo ingresando a tu cuenta en Tranqui App antes del %s. En caso de cancelar, no se realizará ningún nuevo débito y mantendrás el acceso completo hasta esa fecha.</p>" +
+                        "<div style=\"text-align: center; margin: 25px 0;\">" +
+                        "  <a href=\"%s/panel\" style=\"background-color: #009ee3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;\">Gestionar mi suscripción</a>" +
+                        "</div>" +
+                        "<p style=\"font-size: 12px; color: #64748b; margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px;\">Este es un mensaje automático de Tranqui App. Si tenés dudas o necesitás asistencia, respondé a este correo o escribinos desde la sección de Soporte.</p>" +
+                        "</div>",
+                nombre != null ? nombre : "Profesional",
+                fechaStr,
+                nombrePlan != null ? nombrePlan : "Profesional",
+                cicloStr,
+                montoStr,
+                fechaStr,
+                fechaStr,
+                frontendUrl
+        );
+
+        enviarCorreo(toEmail, asunto, htmlContent);
     }
 
-    public void enviarSuscripcionVencida(String toEmail, String nombreProfesional, String planNombre) {
-        String asunto = "Tu suscripción a Tranqui App venció";
-        String cuerpo = "<p>Tu suscripción al plan <strong>" + planNombre + "</strong> venció y tu acceso a Tranqui App quedó suspendido. Reactivala para volver a usar la plataforma.</p>" +
-                panelInfo("Plan", planNombre);
-        String html = plantilla("🚫", "Suscripción vencida", TONO_PELIGRO,
-                "Tu acceso quedó suspendido, " + nombreOUsuario(nombreProfesional), cuerpo,
-                "Reactivar mi cuenta", frontendUrl);
-        enviarCorreo(toEmail, asunto, html);
+    public void enviarConfirmacionPagoSuscripcion(String toEmail, String nombre, String nombrePlan, BigDecimal monto, LocalDateTime periodoInicio, LocalDateTime periodoFin, String comprobanteRef) {
+        String asunto = "¡Pago confirmado! Tu suscripción a Tranqui App está activa";
+        String inicioStr = periodoInicio != null ? periodoInicio.format(DATE_FORMATTER) : "hoy";
+        String finStr = periodoFin != null ? periodoFin.format(DATE_FORMATTER) : "próximo período";
+        String montoStr = monto != null ? String.format(Locale.GERMANY, "%,.2f", monto) : "0,00";
+
+        String htmlContent = String.format(
+                "<div style=\"font-family: Arial, sans-serif; padding: 24px; max-width: 550px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b;\">" +
+                        "<h2 style=\"color: #10b981; margin-top: 0;\">¡Pago recibido con éxito!</h2>" +
+                        "<p style=\"font-size: 15px; line-height: 1.5;\">Hola <strong>%s</strong>, confirmamos que se procesó correctamente el pago de tu suscripción en <strong>Tranqui App</strong>.</p>" +
+                        "<div style=\"background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin: 20px 0;\">" +
+                        "  <p style=\"margin: 0 0 8px 0; font-size: 14px;\"><strong>Plan:</strong> %s</p>" +
+                        "  <p style=\"margin: 0 0 8px 0; font-size: 14px;\"><strong>Monto abonado:</strong> $%s ARS</p>" +
+                        "  <p style=\"margin: 0 0 8px 0; font-size: 14px;\"><strong>Período cubierto:</strong> del %s al %s</p>" +
+                        "  <p style=\"margin: 0; font-size: 14px;\"><strong>Referencia:</strong> %s</p>" +
+                        "</div>" +
+                        "<p style=\"font-size: 14px; line-height: 1.5;\">Tu cuenta se encuentra activa y tu perfil continúa visible en el buscador público para que tus pacientes puedan agendar turnos.</p>" +
+                        "<p style=\"font-size: 14px; line-height: 1.5;\">Tu Factura C electrónica oficial ante ARCA ya fue emitida y se encuentra disponible para descargar en formato PDF desde la pestaña <strong>Mi Suscripción y Facturas ARCA</strong> en tu cuenta.</p>" +
+                        "<div style=\"text-align: center; margin: 25px 0;\">" +
+                        "  <a href=\"%s/panel\" style=\"background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;\">Ir a mi panel</a>" +
+                        "</div>" +
+                        "<p style=\"font-size: 12px; color: #64748b; margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px;\">Gracias por ser parte de la comunidad de profesionales de Tranqui App.</p>" +
+                        "</div>",
+                nombre != null ? nombre : "Profesional",
+                nombrePlan != null ? nombrePlan : "Profesional",
+                montoStr,
+                inicioStr,
+                finStr,
+                comprobanteRef != null ? comprobanteRef : "Pago Mercado Pago",
+                frontendUrl
+        );
+
+        enviarCorreo(toEmail, asunto, htmlContent);
     }
 
-    public void enviarSuscripcionPagoConfirmado(String toEmail, String nombreProfesional, String planNombre,
-                                                 BigDecimal monto, LocalDateTime proximoCobro) {
-        String asunto = "Pago confirmado — Tranqui App";
-        String montoStr = monto != null ? "$ " + monto.toPlainString() : null;
-        String cuerpo = "<p>Recibimos tu pago. Tu suscripción a <strong>Tranqui App</strong> sigue activa. ¡Gracias por confiar en nosotros!</p>" +
-                panelInfo(
-                        "Plan", planNombre,
-                        "Monto", montoStr,
-                        "Próximo cobro", proximoCobro != null ? proximoCobro.format(FECHA_FMT) : null
-                );
-        String html = plantilla("✅", "Pago confirmado", TONO_EXITO,
-                "¡Gracias, " + nombreOUsuario(nombreProfesional) + "!", cuerpo,
-                "Ir a Tranqui App", frontendUrl);
-        enviarCorreo(toEmail, asunto, html);
+    public void enviarAvisoPagoFallidoSuscripcion(String toEmail, String nombre, String nombrePlan, BigDecimal monto, LocalDateTime fechaVencimientoGracia) {
+        String asunto = "Problema con el cobro de tu suscripción - Período de gracia activado";
+        String graciaStr = fechaVencimientoGracia != null ? fechaVencimientoGracia.format(DATE_FORMATTER) : "en 7 días";
+        String montoStr = monto != null ? String.format(Locale.GERMANY, "%,.2f", monto) : "0,00";
+
+        String htmlContent = String.format(
+                "<div style=\"font-family: Arial, sans-serif; padding: 24px; max-width: 550px; border: 1px solid #fecaca; border-radius: 12px; color: #1e293b;\">" +
+                        "<h2 style=\"color: #ef4444; margin-top: 0;\">No pudimos procesar tu pago</h2>" +
+                        "<p style=\"font-size: 15px; line-height: 1.5;\">Hola <strong>%s</strong>, te informamos que Mercado Pago no pudo debitar el cobro automático correspondiente a tu <strong>Plan %s</strong> ($%s ARS).</p>" +
+                        "<div style=\"background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 16px; margin: 20px 0;\">" +
+                        "  <p style=\"margin: 0 0 8px 0; font-size: 14px; color: #92400e;\"><strong>Período de gracia de 7 días activo</strong></p>" +
+                        "  <p style=\"margin: 0; font-size: 13px; color: #78350f; line-height: 1.4;\">Para que tus pacientes no sufran interrupciones en su atención médica, tu acceso a Tranqui App y la visibilidad de tu agenda continuarán habilitados hasta el <strong>%s</strong>.</p>" +
+                        "</div>" +
+                        "<p style=\"font-size: 14px; line-height: 1.5;\">Por favor ingresá a tu panel para actualizar tu medio de pago o reintentar la suscripción. Si el pago no se acredita antes del %s, el acceso a las funciones profesionales quedará temporalmente suspendido.</p>" +
+                        "<div style=\"text-align: center; margin: 25px 0;\">" +
+                        "  <a href=\"%s/panel\" style=\"background-color: #ef4444; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;\">Regularizar medio de pago</a>" +
+                        "</div>" +
+                        "<p style=\"font-size: 12px; color: #64748b; margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px;\">Si ya regularizaste el pago en las últimas horas, podés desestimar este mensaje.</p>" +
+                        "</div>",
+                nombre != null ? nombre : "Profesional",
+                nombrePlan != null ? nombrePlan : "Profesional",
+                montoStr,
+                graciaStr,
+                graciaStr,
+                frontendUrl
+        );
+
+        enviarCorreo(toEmail, asunto, htmlContent);
     }
 
-    public void enviarSuscripcionCancelada(String toEmail, String nombreProfesional, String planNombre, LocalDateTime accesoHasta) {
-        String asunto = "Cancelaste tu suscripción — Tranqui App";
-        String cuerpo = "<p>Confirmamos que cancelaste la renovación automática de tu suscripción al plan <strong>" + planNombre + "</strong>. " +
-                "Vas a seguir teniendo acceso hasta que termine el período que ya pagaste.</p>" +
-                panelInfo(
-                        "Plan", planNombre,
-                        "Acceso hasta", accesoHasta != null ? accesoHasta.format(FECHA_FMT) : null
-                ) +
-                "<p style=\"font-size:13px;color:" + COLOR_MUTED + ";\">Si te arrepentiste, podés reactivar la renovación automática desde Tranqui App antes de esa fecha.</p>";
-        String html = plantilla("🔒", "Suscripción cancelada", TONO_NEUTRO,
-                "Cancelaste tu suscripción, " + nombreOUsuario(nombreProfesional), cuerpo,
-                "Ir a Tranqui App", frontendUrl);
-        enviarCorreo(toEmail, asunto, html);
+    public void enviarConfirmacionCancelacionSuscripcion(String toEmail, String nombre, String nombrePlan, LocalDateTime accesoHasta) {
+        String asunto = "Suscripción cancelada - Tranqui App";
+        String accesoHastaStr = accesoHasta != null ? accesoHasta.format(DATE_FORMATTER) : "el fin del período abonado";
+
+        String htmlContent = String.format(
+                "<div style=\"font-family: Arial, sans-serif; padding: 24px; max-width: 550px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b;\">" +
+                        "<h2 style=\"color: #0f172a; margin-top: 0;\">Confirmación de cancelación</h2>" +
+                        "<p style=\"font-size: 15px; line-height: 1.5;\">Hola <strong>%s</strong>, confirmamos que cancelaste la renovación automática de tu suscripción al <strong>Plan %s</strong> en Tranqui App.</p>" +
+                        "<div style=\"background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; margin: 20px 0;\">" +
+                        "  <p style=\"margin: 0 0 8px 0; font-size: 14px;\"><strong>Renovación automática:</strong> Cancelada en Mercado Pago (no se realizarán nuevos cobros).</p>" +
+                        "  <p style=\"margin: 0; font-size: 14px;\"><strong>Acceso garantizado hasta:</strong> %s</p>" +
+                        "</div>" +
+                        "<p style=\"font-size: 14px; line-height: 1.5;\">Tal como establece nuestra política, <strong>mantendrás acceso total a tu agenda, pacientes y funcionalidades hasta el %s</strong>, fecha en la que concluye el período que ya tenías abonado.</p>" +
+                        "<p style=\"font-size: 14px; line-height: 1.5;\">Pasada esa fecha, tu perfil se pausará del buscador público. Podés reactivar tu plan cuando lo desees con un solo clic desde tu cuenta.</p>" +
+                        "<div style=\"text-align: center; margin: 25px 0;\">" +
+                        "  <a href=\"%s/panel\" style=\"background-color: #009ee3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;\">Ir a mi cuenta</a>" +
+                        "</div>" +
+                        "<p style=\"font-size: 12px; color: #64748b; margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px;\">Lamentamos verte partir. Si tenés algún comentario o sugerencia sobre cómo podemos mejorar, no dudes en escribirnos.</p>" +
+                        "</div>",
+                nombre != null ? nombre : "Profesional",
+                nombrePlan != null ? nombrePlan : "Profesional",
+                accesoHastaStr,
+                accesoHastaStr,
+                frontendUrl
+        );
+
+        enviarCorreo(toEmail, asunto, htmlContent);
+    }
+
+    public void enviarAvisoSuspensionSuscripcion(String toEmail, String nombre, String nombrePlan) {
+        String asunto = "Suscripción suspendida - Tranqui App";
+
+        String htmlContent = String.format(
+                "<div style=\"font-family: Arial, sans-serif; padding: 24px; max-width: 550px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b;\">" +
+                        "<h2 style=\"color: #64748b; margin-top: 0;\">Tu suscripción ha finalizado</h2>" +
+                        "<p style=\"font-size: 15px; line-height: 1.5;\">Hola <strong>%s</strong>, te informamos que ha finalizado el período de acceso a tu suscripción del <strong>Plan %s</strong> en Tranqui App.</p>" +
+                        "<p style=\"font-size: 14px; line-height: 1.5;\">A partir de este momento tu perfil ha dejado de estar visible en el buscador público para nuevos turnos y el acceso a las funciones profesionales ha quedado restringido.</p>" +
+                        "<p style=\"font-size: 14px; line-height: 1.5;\">Tu historial clínico, pacientes registrados e información profesional continúan resguardados de forma segura. Podés reactivar tu suscripción en cualquier momento para retomar tu atención.</p>" +
+                        "<div style=\"text-align: center; margin: 25px 0;\">" +
+                        "  <a href=\"%s/panel\" style=\"background-color: #009ee3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;\">Reactivar mi suscripción</a>" +
+                        "</div>" +
+                        "<p style=\"font-size: 12px; color: #64748b; margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px;\">Si creés que se trata de un error, por favor contactate con nosotros a soporte@tranquisalud.com.</p>" +
+                        "</div>",
+                nombre != null ? nombre : "Profesional",
+                nombrePlan != null ? nombrePlan : "Profesional",
+                frontendUrl
+        );
+
+        enviarCorreo(toEmail, asunto, htmlContent);
+    }
+
+    public void enviarAvisoVencimientoManualSuscripcion(String toEmail, String nombre, String nombrePlan, LocalDateTime fechaVencimiento, int diasRestantes) {
+        String asunto = String.format("Tu suscripción a Tranqui App vence en %d días", diasRestantes);
+        String vencimientoStr = fechaVencimiento != null ? fechaVencimiento.format(DATE_FORMATTER) : "próximamente";
+
+        String htmlContent = String.format(
+                "<div style=\"font-family: Arial, sans-serif; padding: 24px; max-width: 550px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b;\">" +
+                        "<h2 style=\"color: #009ee3; margin-top: 0;\">Aviso de vencimiento de suscripción</h2>" +
+                        "<p style=\"font-size: 15px; line-height: 1.5;\">Hola <strong>%s</strong>, te recordamos que tu período abonado del <strong>Plan %s</strong> vence el próximo <strong>%s</strong> (%d días restantes).</p>" +
+                        "<p style=\"font-size: 14px; line-height: 1.5;\">Para continuar usando la plataforma sin interrupciones ni perder la visibilidad de tu agenda, podés renovar tu suscripción adhiriéndote al débito automático con Mercado Pago o realizando una nueva transferencia bancaria.</p>" +
+                        "<div style=\"text-align: center; margin: 25px 0;\">" +
+                        "  <a href=\"%s/panel\" style=\"background-color: #009ee3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;\">Renovar mi plan</a>" +
+                        "</div>" +
+                        "<p style=\"font-size: 12px; color: #64748b; margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 15px;\">Equipo de Tranqui App.</p>" +
+                        "</div>",
+                nombre != null ? nombre : "Profesional",
+                nombrePlan != null ? nombrePlan : "Profesional",
+                vencimientoStr,
+                diasRestantes,
+                frontendUrl
+        );
+
+        enviarCorreo(toEmail, asunto, htmlContent);
     }
 
     // ================================================================================

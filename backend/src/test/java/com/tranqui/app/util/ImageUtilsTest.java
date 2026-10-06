@@ -80,4 +80,16 @@ class ImageUtilsTest {
     void resizeIfNeeded_null_returnsNull() {
         assertNull(ImageUtils.resizeIfNeeded(null, 640, 1024));
     }
+
+    @Test
+    void resizeIfNeeded_corruptBase64_returnsOriginal() {
+        String corrupt = "data:image/png;base64,!!!invalid base64!!!";
+        assertEquals(corrupt, ImageUtils.resizeIfNeeded(corrupt, 640, 10));
+    }
+
+    @Test
+    void resizeIfNeeded_unreadableImage_returnsOriginal() {
+        String fakeBytes = "data:image/png;base64," + Base64.getEncoder().encodeToString("not-image-bytes".getBytes());
+        assertEquals(fakeBytes, ImageUtils.resizeIfNeeded(fakeBytes, 640, 5));
+    }
 }

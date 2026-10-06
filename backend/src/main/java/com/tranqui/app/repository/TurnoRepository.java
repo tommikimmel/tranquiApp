@@ -106,4 +106,10 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
     // DB default (false).
     @org.springframework.data.jpa.repository.Query("SELECT t FROM Turno t WHERE t.esReceta = false AND (t.servicioId = 'receta-fuera' OR t.tipo = 'RECETA')")
     List<Turno> findLegacyRecetasSinFlag();
+
+    @org.springframework.data.jpa.repository.Query("SELECT t FROM Turno t WHERE t.medico.id = :medicoId AND t.fecha >= :fecha AND t.estado = :estado AND t.ocupaAgenda = true")
+    List<Turno> findTurnosFuturosConfirmadosParaGoogle(
+            @org.springframework.data.repository.query.Param("medicoId") Long medicoId,
+            @org.springframework.data.repository.query.Param("fecha") LocalDate fecha,
+            @org.springframework.data.repository.query.Param("estado") EstadoTurno estado);
 }

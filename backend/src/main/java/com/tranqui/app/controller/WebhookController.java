@@ -87,7 +87,21 @@ public class WebhookController {
 
             if ("subscription_preapproval".equals(topic) || action.startsWith("subscription_preapproval")) {
                 String preapprovalId = node.has("data") && node.get("data").has("id") ? node.get("data").get("id").asText() : dataId;
-                String subStatus = node.has("status") ? node.get("status").asText() : "authorized";
+                String subStatus = node.has("status") ? node.get("status").asText() : null;
+
+                // Si MP no mandó el status en el body del webhook, lo consultamos directamente a la API de MP
+                if (subStatus == null && preapprovalId != null && !preapprovalId.isBlank()) {
+                    try {
+                        var mpSub = mercadoPagoService.obtenerPreapproval(preapprovalId);
+                        if (mpSub != null && mpSub.getStatus() != null) {
+                            subStatus = mpSub.getStatus();
+                        }
+                    } catch (Exception e) {
+                        log.warn("No se pudo obtener estado de preapproval {} desde MP: {}", preapprovalId, e.getMessage());
+                    }
+                }
+                if (subStatus == null) subStatus = "authorized";
+
                 log.info("Procesando webhook subscription_preapproval: id={}, status={}", preapprovalId, subStatus);
                 subscriptionService.processMercadoPagoPreapprovalWebhook(preapprovalId, subStatus);
                 return ResponseEntity.ok().build();
@@ -95,10 +109,33 @@ public class WebhookController {
 
             if ("subscription_authorized_payment".equals(topic) || action.startsWith("subscription_authorized_payment")) {
                 String subPaymentId = node.has("data") && node.get("data").has("id") ? node.get("data").get("id").asText() : dataId;
-                String preapprovalId = node.has("preapproval_id") ? node.get("preapproval_id").asText() : "";
+                String preapprovalId = node.has("preapproval_id") ? node.get("preapproval_id").asText() : null;
                 java.math.BigDecimal amount = node.has("transaction_amount") ? new java.math.BigDecimal(node.get("transaction_amount").asText()) : null;
-                String payStatus = node.has("status") ? node.get("status").asText() : "approved";
-                log.info("Procesando webhook subscription_authorized_payment: id={}, preapprovalId={}, status={}", subPaymentId, preapprovalId, payStatus);
+                String payStatus = node.has("status") ? node.get("status").asText() : null;
+
+                // Si MP no incluyó preapproval_id en el webhook (caso estándar), consultamos /v1/authorized_payments/{id}
+                if ((preapprovalId == null || preapprovalId.isBlank()) && subPaymentId != null && !subPaymentId.isBlank()) {
+                    try {
+                        var detalle = mercadoPagoService.obtenerDetalleAuthorizedPayment(subPaymentId);
+                        if (detalle != null) {
+                            if (detalle.has("preapproval_id")) {
+                                preapprovalId = detalle.get("preapproval_id").asText();
+                            }
+                            if (amount == null && detalle.has("transaction_amount")) {
+                                amount = new java.math.BigDecimal(detalle.get("transaction_amount").asText());
+                            }
+                            if (payStatus == null && detalle.has("status")) {
+                                payStatus = detalle.get("status").asText();
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.warn("No se pudo consultar detalle de authorized_payment {} en MP: {}", subPaymentId, e.getMessage());
+                    }
+                }
+                if (payStatus == null) payStatus = "approved";
+                if (preapprovalId == null) preapprovalId = "";
+
+                log.info("Procesando webhook subscription_authorized_payment: id={}, preapprovalId={}, status={}, amount={}", subPaymentId, preapprovalId, payStatus, amount);
                 subscriptionService.processMercadoPagoPaymentWebhook(subPaymentId, preapprovalId, amount, payStatus);
                 return ResponseEntity.ok().build();
             }

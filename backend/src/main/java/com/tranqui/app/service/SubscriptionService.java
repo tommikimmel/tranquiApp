@@ -90,6 +90,17 @@ public class SubscriptionService {
         }
         BigDecimal montoElegido = "annual".equals(billingCycle) ? plan.getPriceArsAnual() : plan.getPriceArs();
 
+        // Si el profesional ya tenía un preapproval previo en Mercado Pago, lo cancelamos
+        // para que no se sigan debitando fondos duplicados en Mercado Pago por suscripciones huérfanas.
+        if (sub.getMpPreapprovalId() != null && !sub.getMpPreapprovalId().isBlank()) {
+            try {
+                log.info("Cancelando preapproval previo {} en Mercado Pago para profesional {}", sub.getMpPreapprovalId(), professionalId);
+                mercadoPagoService.cancelarSuscripcionPreapproval(sub.getMpPreapprovalId());
+            } catch (Exception e) {
+                log.warn("No se pudo cancelar el preapproval previo {} en Mercado Pago: {}", sub.getMpPreapprovalId(), e.getMessage());
+            }
+        }
+
         try {
             var preapproval = mercadoPagoService.crearSuscripcionPreapproval(profesional, plan, sub.getId(), billingCycle);
 
@@ -157,8 +168,12 @@ public class SubscriptionService {
         }
 
         Subscription sub = subOpt.get();
-        if (sub.getStatus() != SubscriptionStatus.ACTIVE && sub.getStatus() != SubscriptionStatus.PAST_DUE
-                && sub.getStatus() != SubscriptionStatus.CANCELLED) {
+        boolean periodoVigente = sub.getCurrentPeriodEnd() != null && sub.getCurrentPeriodEnd().isAfter(LocalDateTime.now());
+        boolean statusPermitido = sub.getStatus() == SubscriptionStatus.ACTIVE 
+                || sub.getStatus() == SubscriptionStatus.PAST_DUE
+                || (sub.getStatus() == SubscriptionStatus.CANCELLED && periodoVigente);
+
+        if (!statusPermitido) {
             return false;
         }
 
@@ -178,10 +193,9 @@ public class SubscriptionService {
 
     /**
      * Paywall (Etapa 1): ¿este profesional tiene acceso real a la app en este momento?
-     * Deliberadamente estricto y en tiempo real (no depende del cron diario de reconciliación,
-     * que solo corre 1 vez por día y mira graceUntil, no currentPeriodEnd) — se evalúa en cada
-     * request vía SubscriptionAccessFilter. Admin y roles no-profesionales (paciente, visitador)
-     * nunca están sujetos a este gate.
+     * Deliberadamente estricto y en tiempo real — se evalúa en cada request vía SubscriptionAccessFilter.
+     * En caso de cancelación de suscripción, el profesional conserva acceso pleno hasta la fecha exacta de
+     * finalización de su período pagado (currentPeriodEnd).
      */
     public boolean isAccessAllowed(Long userId) {
         if (userId == null) return false;
@@ -193,14 +207,16 @@ public class SubscriptionService {
         Subscription sub = subscriptionRepository.findByProfessionalId(userId).orElse(null);
         if (sub == null) return false; // sin fila de suscripción = sin acceso
 
-        // CANCELLED también pasa acá: cancelar (desde el panel o directo en Mercado Pago) corta el
-        // próximo cobro, pero el profesional ya pagó este período y lo sigue usando hasta que
-        // termine — el check de abajo (currentPeriodEnd) es lo que corta el acceso que realmente
-        // corresponde, no el status.
-        if (sub.getStatus() != SubscriptionStatus.ACTIVE && sub.getStatus() != SubscriptionStatus.CANCELLED) return false;
-        if (sub.getCurrentPeriodEnd() == null) return false; // ACTIVE sin período pagado = inconsistente, no dejamos pasar
+        // Si la suscripción está ACTIVE, o si fue CANCELLED pero aún tiene período pagado vigente:
+        // el profesional mantiene acceso completo hasta el vencimiento exacto de currentPeriodEnd.
+        boolean periodoVigente = sub.getCurrentPeriodEnd() != null && sub.getCurrentPeriodEnd().isAfter(LocalDateTime.now());
+        boolean statusValido = sub.getStatus() == SubscriptionStatus.ACTIVE 
+                || (sub.getStatus() == SubscriptionStatus.CANCELLED && periodoVigente);
 
-        return sub.getCurrentPeriodEnd().isAfter(LocalDateTime.now());
+        if (!statusValido) return false;
+        if (sub.getCurrentPeriodEnd() == null) return false;
+
+        return periodoVigente;
     }
 
     // Corre una sola vez por arranque real (idempotente: solo toca filas que nunca tuvieron
@@ -395,7 +411,7 @@ public class SubscriptionService {
         subscription.setNextBillingDate(end);
         subscription.setGraceUntil(grace);
         subscription.setCancelAtPeriodEnd(false);
-        subscription.setAvisoVencimientoEnviado(false);
+        subscription.setRenewalReminderSent(false);
         subscription.setUpdatedAt(now);
 
         subscription = subscriptionRepository.save(subscription);
@@ -434,10 +450,17 @@ public class SubscriptionService {
         // de cortesía no es un pago real, así que no corresponde el mail de "pago confirmado".
         if (!"COURTESY".equalsIgnoreCase(method)) {
             try {
-                resendEmailService.enviarSuscripcionPagoConfirmado(
-                        prof.getEmail(), prof.getNombre(), plan.getName(), payment.getAmountArs(), end);
+                resendEmailService.enviarConfirmacionPagoSuscripcion(
+                        prof.getEmail(),
+                        prof.getNombre(),
+                        plan.getName(),
+                        payment.getAmountArs(),
+                        start,
+                        end,
+                        receiptReference != null && !receiptReference.isBlank() ? receiptReference : "Pago Manual " + method
+                );
             } catch (Exception e) {
-                log.error("Error al enviar mail de pago confirmado para profesional {}: {}", prof.getId(), e.getMessage(), e);
+                log.error("Error enviando email de confirmación de pago manual a {}: {}", prof.getEmail(), e.getMessage());
             }
         }
 
@@ -558,7 +581,7 @@ public class SubscriptionService {
         sub.setCurrentPeriodEnd(nextEnd);
         sub.setNextBillingDate(nextEnd);
         sub.setGraceUntil(nextEnd.plusDays(7));
-        sub.setAvisoVencimientoEnviado(false);
+        sub.setRenewalReminderSent(false);
         subscriptionRepository.save(sub);
 
         String idemKey = "MP-" + mpPaymentId;
@@ -587,66 +610,34 @@ public class SubscriptionService {
         if ("APPROVED".equalsIgnoreCase(payment.getStatus())) {
             emitirFacturaTrasCommit(payment.getId(), "pago MP");
             try {
-                resendEmailService.enviarSuscripcionPagoConfirmado(
-                        sub.getProfessional().getEmail(), sub.getProfessional().getNombre(),
-                        sub.getPlan() != null ? sub.getPlan().getName() : null, payment.getAmountArs(), nextEnd);
+                resendEmailService.enviarConfirmacionPagoSuscripcion(
+                        sub.getProfessional().getEmail(),
+                        sub.getProfessional().getNombre(),
+                        sub.getPlan() != null ? sub.getPlan().getName() : "Profesional",
+                        payment.getAmountArs(),
+                        sub.getCurrentPeriodStart(),
+                        sub.getCurrentPeriodEnd(),
+                        payment.getReceiptReference()
+                );
             } catch (Exception e) {
-                log.error("Error al enviar mail de pago confirmado (MP) para suscripción {}: {}", sub.getId(), e.getMessage(), e);
+                log.error("Error enviando email de confirmación de pago MP a {}: {}", sub.getProfessional().getEmail(), e.getMessage());
+            }
+        } else {
+            // Pago rechazado
+            try {
+                resendEmailService.enviarAvisoPagoFallidoSuscripcion(
+                        sub.getProfessional().getEmail(),
+                        sub.getProfessional().getNombre(),
+                        sub.getPlan() != null ? sub.getPlan().getName() : "Profesional",
+                        payment.getAmountArs(),
+                        sub.getGraceUntil()
+                );
+            } catch (Exception e) {
+                log.error("Error enviando email de pago fallido MP a {}: {}", sub.getProfessional().getEmail(), e.getMessage());
             }
         }
 
         return payment;
-    }
-
-    /**
-     * Cancelación desde el propio panel del profesional (Ajustes > Mi Suscripción). Corta el
-     * próximo cobro recurrente en Mercado Pago, pero NO revoca el acceso ahora mismo — el
-     * profesional ya pagó el período vigente y lo sigue usando hasta currentPeriodEnd (ver
-     * isAccessAllowed, que trata CANCELLED igual que ACTIVE mientras el período no haya vencido).
-     */
-    @Transactional
-    public void cancelarSuscripcion(Long professionalId) {
-        Subscription sub = subscriptionRepository.findByProfessionalId(professionalId)
-                .orElseThrow(() -> new IllegalStateException("No contás con una suscripción registrada."));
-
-        if (Boolean.TRUE.equals(sub.getCancelAtPeriodEnd())) {
-            return; // ya estaba cancelada — idempotente, no reintenta cancelar en MP de nuevo
-        }
-
-        if (sub.getMpPreapprovalId() != null && sub.getBillingSource() == BillingSource.MERCADOPAGO) {
-            try {
-                mercadoPagoService.cancelarSuscripcionPreapproval(sub.getMpPreapprovalId());
-            } catch (com.mercadopago.exceptions.MPApiException e) {
-                // Mismo problema que en iniciarCheckout: e.getMessage() es siempre el genérico
-                // "Api error. Check response for details" — el motivo real viene en el body.
-                String detalle = e.getApiResponse() != null ? e.getApiResponse().getContent() : e.getMessage();
-                log.error("Error de la API de Mercado Pago cancelando preapproval {} para profesional {} (status {}): {}",
-                        sub.getMpPreapprovalId(), professionalId,
-                        e.getApiResponse() != null ? e.getApiResponse().getStatusCode() : null, detalle);
-                throw new IllegalStateException(
-                        "No se pudo cancelar el cobro recurrente en Mercado Pago. Intentá de nuevo o escribinos a soporte.", e);
-            } catch (Exception e) {
-                log.error("Error cancelando preapproval {} en Mercado Pago para profesional {}: {}",
-                        sub.getMpPreapprovalId(), professionalId, e.getMessage(), e);
-                throw new IllegalStateException(
-                        "No se pudo cancelar el cobro recurrente en Mercado Pago. Intentá de nuevo o escribinos a soporte.", e);
-            }
-        }
-
-        sub.setCancelAtPeriodEnd(true);
-        sub.setUpdatedAt(LocalDateTime.now());
-        subscriptionRepository.save(sub);
-
-        logEvent(sub.getId(), "SUBSCRIPTION_CANCELLED_BY_PROFESSIONAL", "professional", String.valueOf(professionalId),
-                "El profesional canceló su suscripción — mantiene acceso hasta " + sub.getCurrentPeriodEnd());
-
-        try {
-            resendEmailService.enviarSuscripcionCancelada(
-                    sub.getProfessional().getEmail(), sub.getProfessional().getNombre(),
-                    sub.getPlan() != null ? sub.getPlan().getName() : null, sub.getCurrentPeriodEnd());
-        } catch (Exception e) {
-            log.error("Error al enviar mail de suscripción cancelada para profesional {}: {}", professionalId, e.getMessage(), e);
-        }
     }
 
     /**
@@ -667,7 +658,22 @@ public class SubscriptionService {
 
         sub.setStatus(newStatus);
         if (newStatus == SubscriptionStatus.CANCELLED) {
+            sub.setCancelAtPeriodEnd(true);
             sub.setCancelledAt(LocalDateTime.now());
+            // Si aún tiene período pagado vigente, conservamos status ACTIVE para garantizar acceso hasta el fin del ciclo
+            if (sub.getCurrentPeriodEnd() != null && sub.getCurrentPeriodEnd().isAfter(LocalDateTime.now())) {
+                sub.setStatus(SubscriptionStatus.ACTIVE);
+            }
+            try {
+                resendEmailService.enviarConfirmacionCancelacionSuscripcion(
+                        sub.getProfessional().getEmail(),
+                        sub.getProfessional().getNombre(),
+                        sub.getPlan() != null ? sub.getPlan().getName() : "Profesional",
+                        sub.getCurrentPeriodEnd()
+                );
+            } catch (Exception e) {
+                log.error("Error enviando email de cancelación MP a {}: {}", sub.getProfessional().getEmail(), e.getMessage());
+            }
         }
         // Activa el período de acceso acá mismo en vez de esperar al webhook separado
         // subscription_authorized_payment (que confirma el primer cobro, pero puede tardar más en
@@ -688,6 +694,82 @@ public class SubscriptionService {
         logEvent(sub.getId(), "MP_PREAPPROVAL_STATUS_CHANGED", oldStatus.name(), newStatus.name(),
                 "MP_WEBHOOK", mpPreapprovalId,
                 "Cambio de estado: " + oldStatus + " -> " + newStatus);
+    }
+
+    /**
+     * Cancela la suscripción a pedido del profesional.
+     * Cancela de inmediato el débito recurrente en Mercado Pago para que no se cobre ningún período futuro,
+     * pero preserva el acceso total a la plataforma hasta la fecha de expiración del plan (currentPeriodEnd).
+     */
+    @Transactional
+    public Subscription cancelarSuscripcionPorProfesional(Long professionalId) {
+        Subscription sub = subscriptionRepository.findByProfessionalId(professionalId)
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Suscripción no encontrada para el profesional: " + professionalId));
+
+        if (Boolean.TRUE.equals(sub.getCancelAtPeriodEnd())) {
+            return sub; // ya estaba cancelada — idempotente, no reintenta cancelar en MP de nuevo
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Cancelar en Mercado Pago si tiene Preapproval asignado. Si MP no confirma, cortamos
+        // acá: marcarla como cancelada igual dejaría al profesional creyendo que no se le va a
+        // volver a cobrar mientras el débito recurrente sigue vivo en MP.
+        if (sub.getMpPreapprovalId() != null && !sub.getMpPreapprovalId().isBlank()
+                && sub.getBillingSource() == BillingSource.MERCADOPAGO) {
+            try {
+                log.info("Cancelando suscripción en Mercado Pago (preapproval: {}) para profesional {}", sub.getMpPreapprovalId(), professionalId);
+                mercadoPagoService.cancelarSuscripcionPreapproval(sub.getMpPreapprovalId());
+            } catch (com.mercadopago.exceptions.MPApiException e) {
+                // e.getMessage() es siempre el genérico "Api error. Check response for details" —
+                // el motivo real viene en el body.
+                String detalle = e.getApiResponse() != null ? e.getApiResponse().getContent() : e.getMessage();
+                log.error("Error de la API de Mercado Pago cancelando preapproval {} para profesional {} (status {}): {}",
+                        sub.getMpPreapprovalId(), professionalId,
+                        e.getApiResponse() != null ? e.getApiResponse().getStatusCode() : null, detalle);
+                throw new IllegalStateException(
+                        "No se pudo cancelar el cobro recurrente en Mercado Pago. Intentá de nuevo o escribinos a soporte.", e);
+            } catch (Exception e) {
+                log.error("Error cancelando preapproval {} en Mercado Pago para profesional {}: {}",
+                        sub.getMpPreapprovalId(), professionalId, e.getMessage(), e);
+                throw new IllegalStateException(
+                        "No se pudo cancelar el cobro recurrente en Mercado Pago. Intentá de nuevo o escribinos a soporte.", e);
+            }
+        }
+
+        SubscriptionStatus estadoPrevio = sub.getStatus();
+        sub.setCancelAtPeriodEnd(true);
+        sub.setCancelledAt(now);
+
+        // Si su período pagado sigue vigente, dejamos status ACTIVE (con cancelAtPeriodEnd=true)
+        // para que no sufra bloqueos inmediatos de acceso. Si ya venció, pasa a CANCELLED de una vez.
+        if (sub.getCurrentPeriodEnd() != null && sub.getCurrentPeriodEnd().isAfter(now)) {
+            sub.setStatus(SubscriptionStatus.ACTIVE);
+        } else {
+            sub.setStatus(SubscriptionStatus.CANCELLED);
+        }
+        sub.setUpdatedAt(now);
+        sub = subscriptionRepository.save(sub);
+
+        // 2. Auditoría
+        logEvent(sub.getId(), "SUBSCRIPTION_CANCELLED_BY_PROFESSIONAL",
+                estadoPrevio != null ? estadoPrevio.name() : null, sub.getStatus().name(),
+                "PROFESSIONAL", String.valueOf(professionalId),
+                "Renovación cancelada por el profesional. Acceso habilitado hasta: " + sub.getCurrentPeriodEnd());
+
+        // 3. Enviar email de confirmación de cancelación
+        try {
+            resendEmailService.enviarConfirmacionCancelacionSuscripcion(
+                    sub.getProfessional().getEmail(),
+                    sub.getProfessional().getNombre(),
+                    sub.getPlan() != null ? sub.getPlan().getName() : "Profesional",
+                    sub.getCurrentPeriodEnd()
+            );
+        } catch (Exception e) {
+            log.error("Error enviando email de cancelación al profesional {}: {}", sub.getProfessional().getEmail(), e.getMessage());
+        }
+
+        return sub;
     }
 
     // 12 meses si el profesional contrató el ciclo anual, 1 mes en cualquier otro caso

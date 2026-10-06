@@ -81,7 +81,11 @@ conn.on('ready', () => {
         // 4. Update environment variables for production
         `echo "=== Configuring .env file ==="
         sed -i 's|APP_PUBLIC_URL=.*|APP_PUBLIC_URL=https://tranquisalud.com|g' /app/.env
-        sed -i 's|FRONTEND_URL=.*|FRONTEND_URL=https://tranquisalud.com|g' /app/.env`,
+        sed -i 's|FRONTEND_URL=.*|FRONTEND_URL=https://tranquisalud.com|g' /app/.env
+        # Nunca sembrar cuentas de prueba (password admin123 conocida) en producción, aunque el
+        # .env local que viaja en el tarball lo tenga en true.
+        sed -i '/^SEED_TEST_ACCOUNTS=/d' /app/.env
+        echo 'SEED_TEST_ACCOUNTS=false' >> /app/.env`,
         
         // 5. Rebuild images with --no-cache. Plain `docker compose up --build` reuses cached
         // layers whenever the copied files hash the same as before, which can silently keep

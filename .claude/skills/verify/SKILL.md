@@ -26,14 +26,16 @@ description: How to build/launch/drive TranquiApp locally to verify a change.
 
 ## Login (seed users — see `backend/.../config/DataInitializer.java`)
 
-As of 2026-08-24, `DataInitializer` only seeds `admin@tranqui.com` / `admin123` — the demo
-médico/paciente accounts it used to create (`medico.verificado@gmail.com`,
-`medico.sinverificar@gmail.com`, `paciente.completo@gmail.com`, `paciente.sindatos@gmail.com`)
-were removed on purpose (no default non-admin accounts, including in production). To exercise a
-médico or paciente flow locally, register a fresh account through the app instead of relying on a
-seeded one; note `frontend/e2e/patient-and-professional-flow.spec.ts`, `frontend/capture_all.js`,
-and `frontend/capture_all.cjs` still reference the old seed emails and need updating before they'll
-run against a freshly-cleaned DB.
+`admin@tranqui.com` / `admin123` is always seeded. Every other seed account (password
+`admin123`) is only created when `SEED_TEST_ACCOUNTS=true` is set in `.env` (property
+`app.seed-test-accounts`, default `false`; `deploy.js` forces it to `false` on the VPS, since prod
+runs the same compose file with `SPRING_PROFILES_ACTIVE=dev`):
+- `medico.verificado@gmail.com` / `profesional.test@tranqui.com` — fully verified professionals
+  with an active subscription and seed availability.
+- `medico.sinverificar@gmail.com` — unverified professional.
+- `paciente.completo@gmail.com` / `paciente.test@tranqui.com` — patients with complete profile.
+- `paciente.sindatos@gmail.com` — patient with no data.
+- `admin.test@tranqui.com` — second admin.
 
 ## Gotchas
 

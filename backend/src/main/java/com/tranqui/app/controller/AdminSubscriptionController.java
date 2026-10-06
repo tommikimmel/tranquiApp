@@ -23,6 +23,8 @@ import java.util.Map;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminSubscriptionController {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminSubscriptionController.class);
+
     @Autowired
     private SubscriptionService subscriptionService;
 
@@ -37,6 +39,12 @@ public class AdminSubscriptionController {
 
     @Autowired
     private SubscriptionReconciliationScheduler reconciliationScheduler;
+
+    @Autowired
+    private com.tranqui.app.service.MercadoPagoService mercadoPagoService;
+
+    @Autowired
+    private com.tranqui.app.service.ResendEmailService resendEmailService;
 
     /**
      * Resumen de métricas administrativas, MRR y estado de topes de Monotributo (§3)
@@ -271,6 +279,46 @@ public class AdminSubscriptionController {
         SubscriptionStatus oldStatus = sub.getStatus();
         sub.setStatus(newStatus);
         sub.setUpdatedAt(java.time.LocalDateTime.now());
+
+        if (newStatus == SubscriptionStatus.CANCELLED) {
+            sub.setCancelAtPeriodEnd(true);
+            sub.setCancelledAt(java.time.LocalDateTime.now());
+            if (sub.getMpPreapprovalId() != null && !sub.getMpPreapprovalId().isBlank()) {
+                try {
+                    mercadoPagoService.cancelarSuscripcionPreapproval(sub.getMpPreapprovalId());
+                } catch (Exception e) {
+                    // El admin ya decidió cancelar: no bloqueamos el cambio de estado local, pero dejamos
+                    // rastro para cancelar a mano en MP si el débito quedó vivo.
+                    log.error("No se pudo cancelar el preapproval {} en Mercado Pago (suscripción #{}): {}",
+                            sub.getMpPreapprovalId(), sub.getId(), e.getMessage(), e);
+                }
+            }
+            try {
+                if (sub.getProfessional() != null) {
+                    resendEmailService.enviarConfirmacionCancelacionSuscripcion(
+                            sub.getProfessional().getEmail(),
+                            sub.getProfessional().getNombre(),
+                            sub.getPlan() != null ? sub.getPlan().getName() : "Profesional",
+                            sub.getCurrentPeriodEnd()
+                    );
+                }
+            } catch (Exception e) {
+                // ignore
+            }
+        } else if (newStatus == SubscriptionStatus.SUSPENDED) {
+            try {
+                if (sub.getProfessional() != null) {
+                    resendEmailService.enviarAvisoSuspensionSuscripcion(
+                            sub.getProfessional().getEmail(),
+                            sub.getProfessional().getNombre(),
+                            sub.getPlan() != null ? sub.getPlan().getName() : "Profesional"
+                    );
+                }
+            } catch (Exception e) {
+                // ignore
+            }
+        }
+
         subscriptionRepository.save(sub);
 
         subscriptionService.logEvent(sub.getId(), "ADMIN_STATUS_CHANGE", oldStatus.name(), newStatus.name(),

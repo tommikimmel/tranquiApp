@@ -44,6 +44,7 @@ class AuthControllerUnitTest {
     @Mock private org.springframework.core.env.Environment env;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private ResendEmailService resendEmailService;
+    @Mock private com.tranqui.app.service.AccountService accountService;
 
     @InjectMocks
     private AuthController authController;
@@ -293,5 +294,161 @@ class AuthControllerUnitTest {
         authController.logout(httpResponse);
 
         assertTrue(httpResponse.getHeader("Set-Cookie").contains("SameSite=Lax"));
+    }
+
+    // ── Email Verification & Password Reset ──────────────────────────
+
+    @Test
+    void verifyEmail_branches() {
+        com.tranqui.app.model.dto.VerifyEmailDto dto = new com.tranqui.app.model.dto.VerifyEmailDto();
+        dto.setEmail("user@mail.com");
+        dto.setCodigo("123456");
+
+        // Not found
+        when(usuarioRepository.findByEmail("user@mail.com")).thenReturn(Optional.empty());
+        assertEquals(HttpStatus.NOT_FOUND, authController.verifyEmail(dto).getStatusCode());
+
+        Usuario u = Usuario.builder().email("user@mail.com").codigoVerificacion("123456").build();
+        when(usuarioRepository.findByEmail("user@mail.com")).thenReturn(Optional.of(u));
+
+        // Already verified
+        u.setEmailVerificado(true);
+        assertEquals(HttpStatus.OK, authController.verifyEmail(dto).getStatusCode());
+
+        // Wrong code
+        u.setEmailVerificado(false);
+        u.setCodigoVerificacion("999999");
+        assertEquals(HttpStatus.BAD_REQUEST, authController.verifyEmail(dto).getStatusCode());
+
+        // Expired
+        u.setCodigoVerificacion("123456");
+        u.setCodigoVerificacionExpiresAt(java.time.LocalDateTime.now().minusMinutes(1));
+        assertEquals(HttpStatus.BAD_REQUEST, authController.verifyEmail(dto).getStatusCode());
+
+        // Success
+        u.setCodigoVerificacionExpiresAt(java.time.LocalDateTime.now().plusMinutes(10));
+        assertEquals(HttpStatus.OK, authController.verifyEmail(dto).getStatusCode());
+        assertTrue(u.getEmailVerificado());
+    }
+
+    @Test
+    void resendCode_branches() {
+        com.tranqui.app.model.dto.VerifyEmailDto dto = new com.tranqui.app.model.dto.VerifyEmailDto();
+        dto.setEmail("user@mail.com");
+
+        when(usuarioRepository.findByEmail("user@mail.com")).thenReturn(Optional.empty());
+        assertEquals(HttpStatus.NOT_FOUND, authController.resendCode(dto).getStatusCode());
+
+        Usuario u = Usuario.builder().email("user@mail.com").emailVerificado(true).build();
+        when(usuarioRepository.findByEmail("user@mail.com")).thenReturn(Optional.of(u));
+        assertEquals(HttpStatus.OK, authController.resendCode(dto).getStatusCode());
+
+        u.setEmailVerificado(false);
+        assertEquals(HttpStatus.OK, authController.resendCode(dto).getStatusCode());
+        verify(resendEmailService).enviarCodigoVerificacion(eq("user@mail.com"), any(), anyString());
+    }
+
+    @Test
+    void forgotPassword_and_resetPassword() {
+        com.tranqui.app.model.dto.ForgotPasswordDto fpDto = new com.tranqui.app.model.dto.ForgotPasswordDto();
+        fpDto.setEmail("user@mail.com");
+
+        // Not found returns 200 anyway for enumeration protection
+        when(usuarioRepository.findByEmail("user@mail.com")).thenReturn(Optional.empty());
+        assertEquals(HttpStatus.OK, authController.forgotPassword(fpDto).getStatusCode());
+
+        Usuario u = Usuario.builder().email("user@mail.com").build();
+        when(usuarioRepository.findByEmail("user@mail.com")).thenReturn(Optional.of(u));
+        assertEquals(HttpStatus.OK, authController.forgotPassword(fpDto).getStatusCode());
+
+        // Reset password
+        com.tranqui.app.model.dto.ResetPasswordDto rpDto = new com.tranqui.app.model.dto.ResetPasswordDto();
+        rpDto.setEmail("user@mail.com");
+        rpDto.setCodigo("123456");
+        rpDto.setNewPassword("weak");
+        assertEquals(HttpStatus.BAD_REQUEST, authController.resetPassword(rpDto).getStatusCode());
+
+        rpDto.setNewPassword("StrongPass1");
+        u.setResetPasswordCode("123456");
+        u.setResetPasswordExpiresAt(java.time.LocalDateTime.now().plusMinutes(10));
+        when(passwordEncoder.encode("StrongPass1")).thenReturn("hashedPass");
+        assertEquals(HttpStatus.OK, authController.resetPassword(rpDto).getStatusCode());
+    }
+
+    // ── Complete Profile, Terms, Account Settings ────────────────────
+
+    @Test
+    void completeProfile_branches() {
+        User principal = new User("user@mail.com", "x", Collections.emptyList());
+        com.tranqui.app.model.dto.CompleteProfileDto dto = com.tranqui.app.model.dto.CompleteProfileDto.builder()
+                .nombre("Juan")
+                .apellido("Perez")
+                .sexo("M")
+                .fechaNacimiento(java.time.LocalDate.of(1990, 1, 1))
+                .tipoDocumento("DNI")
+                .numeroDocumento(12345678)
+                .telefono("1122334455")
+                .build();
+
+        // Unauthorized
+        assertEquals(HttpStatus.UNAUTHORIZED, authController.completeProfile(dto, null).getStatusCode());
+
+        // Bad request on missing fields
+        com.tranqui.app.model.dto.CompleteProfileDto emptyDto = com.tranqui.app.model.dto.CompleteProfileDto.builder().build();
+        assertEquals(HttpStatus.BAD_REQUEST, authController.completeProfile(emptyDto, principal).getStatusCode());
+
+        // Success
+        Usuario u = Usuario.builder().email("user@mail.com").build();
+        when(usuarioRepository.findByEmail("user@mail.com")).thenReturn(Optional.of(u));
+        ResponseEntity<?> resp = authController.completeProfile(dto, principal);
+        assertEquals(HttpStatus.OK, resp.getStatusCode());
+        assertTrue(u.isPerfilCompleto());
+    }
+
+    @Test
+    void aceptarTerminos_and_miCuentaEndpoints() {
+        User principal = new User("user@mail.com", "x", Collections.emptyList());
+        Usuario u = Usuario.builder().email("user@mail.com").build();
+
+        // Aceptar terminos
+        assertEquals(HttpStatus.UNAUTHORIZED, authController.aceptarTerminos(null).getStatusCode());
+        setDev(false);
+        when(usuarioRepository.findByEmail("user@mail.com")).thenReturn(Optional.of(u));
+        assertEquals(HttpStatus.OK, authController.aceptarTerminos(principal).getStatusCode());
+
+        // Mi cuenta
+        assertEquals(HttpStatus.UNAUTHORIZED, authController.obtenerMiCuenta(null).getStatusCode());
+        assertEquals(HttpStatus.OK, authController.obtenerMiCuenta(principal).getStatusCode());
+
+        // Actualizar mi cuenta
+        com.tranqui.app.model.dto.MiCuentaDto cDto = new com.tranqui.app.model.dto.MiCuentaDto();
+        assertEquals(HttpStatus.UNAUTHORIZED, authController.actualizarMiCuenta(cDto, null).getStatusCode());
+        assertEquals(HttpStatus.OK, authController.actualizarMiCuenta(cDto, principal).getStatusCode());
+
+        // Actualizar notificaciones
+        com.tranqui.app.model.dto.PreferenciasNotificacionDto nDto = new com.tranqui.app.model.dto.PreferenciasNotificacionDto();
+        assertEquals(HttpStatus.UNAUTHORIZED, authController.actualizarPreferenciasNotificacion(nDto, null).getStatusCode());
+        assertEquals(HttpStatus.OK, authController.actualizarPreferenciasNotificacion(nDto, principal).getStatusCode());
+
+        // Cambiar password
+        com.tranqui.app.model.dto.CambiarPasswordDto pDto = new com.tranqui.app.model.dto.CambiarPasswordDto();
+        pDto.setCurrentPassword("old");
+        pDto.setNewPassword("new");
+        assertEquals(HttpStatus.UNAUTHORIZED, authController.cambiarPassword(pDto, null).getStatusCode());
+        assertEquals(HttpStatus.OK, authController.cambiarPassword(pDto, principal).getStatusCode());
+
+        doThrow(new IllegalArgumentException("Error pass")).when(accountService).cambiarPassword(any(), any(), any());
+        assertEquals(HttpStatus.BAD_REQUEST, authController.cambiarPassword(pDto, principal).getStatusCode());
+
+        // Set new password
+        com.tranqui.app.model.dto.SetNewPasswordDto npDto = new com.tranqui.app.model.dto.SetNewPasswordDto();
+        npDto.setNewPassword("ValidPass1");
+        assertEquals(HttpStatus.UNAUTHORIZED, authController.setNewPassword(npDto, null).getStatusCode());
+        assertEquals(HttpStatus.OK, authController.setNewPassword(npDto, principal).getStatusCode());
+
+        // Eliminar cuenta
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        assertEquals(HttpStatus.UNAUTHORIZED, authController.eliminarCuenta(null, null, res).getStatusCode());
+        assertEquals(HttpStatus.OK, authController.eliminarCuenta(null, principal, res).getStatusCode());
     }
 }

@@ -42,4 +42,61 @@ class ResendEmailServiceTest {
     void enviarPasswordTemporal_noLanzaExcepcion() {
         assertDoesNotThrow(() -> resendEmailService.enviarPasswordTemporal("pedro@test.com", "Pedro", "Ab3xY9kLmP"));
     }
+
+    @Test
+    void enviarPreavisoRenovacionSuscripcion_noLanzaExcepcion() {
+        assertDoesNotThrow(() -> resendEmailService.enviarPreavisoRenovacionSuscripcion(
+                "dr.test@gmail.com", "Dr. Pérez", "Clínico",
+                new java.math.BigDecimal("35000.00"), java.time.LocalDateTime.now().plusDays(3), "monthly"));
+    }
+
+    @Test
+    void enviarConfirmacionPagoSuscripcion_noLanzaExcepcion() {
+        assertDoesNotThrow(() -> resendEmailService.enviarConfirmacionPagoSuscripcion(
+                "dr.test@gmail.com", "Dr. Pérez", "Clínico",
+                new java.math.BigDecimal("35000.00"), java.time.LocalDateTime.now(), java.time.LocalDateTime.now().plusMonths(1), "MP ID 987654321"));
+    }
+
+    @Test
+    void enviarAvisoPagoFallidoSuscripcion_noLanzaExcepcion() {
+        assertDoesNotThrow(() -> resendEmailService.enviarAvisoPagoFallidoSuscripcion(
+                "dr.test@gmail.com", "Dr. Pérez", "Clínico",
+                new java.math.BigDecimal("35000.00"), java.time.LocalDateTime.now().plusDays(7)));
+    }
+
+    @Test
+    void enviarConfirmacionCancelacionSuscripcion_noLanzaExcepcion() {
+        assertDoesNotThrow(() -> resendEmailService.enviarConfirmacionCancelacionSuscripcion(
+                "dr.test@gmail.com", "Dr. Pérez", "Clínico", java.time.LocalDateTime.now().plusDays(20)));
+    }
+
+    @Test
+    void enviarAvisoSuspensionSuscripcion_noLanzaExcepcion() {
+        assertDoesNotThrow(() -> resendEmailService.enviarAvisoSuspensionSuscripcion(
+                "dr.test@gmail.com", "Dr. Pérez", "Clínico"));
+    }
+
+    @Test
+    void enviarAvisoVencimientoManualSuscripcion_noLanzaExcepcion() {
+        assertDoesNotThrow(() -> resendEmailService.enviarAvisoVencimientoManualSuscripcion(
+                "dr.test@gmail.com", "Dr. Pérez", "Consultorio", java.time.LocalDateTime.now().plusDays(3), 3));
+    }
+
+    @Test
+    void enviarSolicitudCopiaDatos_noLanzaExcepcion() {
+        assertDoesNotThrow(() -> resendEmailService.enviarSolicitudCopiaDatos("Pedro Gomez", "pedro@test.com", "PACIENTE"));
+    }
+
+    @Test
+    void enviarDocumentoAdjunto_devuelveTrueEnMockMode() {
+        boolean ok = resendEmailService.enviarDocumentoAdjunto(
+                "paciente@test.com", "Pedro", "Dr. Pérez", "Certificado",
+                "data:application/pdf;base64,c29tZS1mYWtlLXBkZi1ieXRlcw==", "certificado.pdf");
+        org.junit.jupiter.api.Assertions.assertTrue(ok);
+
+        boolean badData = resendEmailService.enviarDocumentoAdjunto(
+                "paciente@test.com", "Pedro", "Dr. Pérez", "Certificado",
+                "", "certificado.pdf");
+        org.junit.jupiter.api.Assertions.assertFalse(badData);
+    }
 }

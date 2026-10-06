@@ -99,6 +99,8 @@ public class GoogleCalendarSyncService {
                 medico.setGoogleSyncToken(nextSyncToken);
                 usuarioRepository.save(medico);
             }
+
+            exportarTurnosPendientesAGoogleCalendar(medico);
         } catch (GoogleJsonResponseException e) {
             if (e.getStatusCode() == 410) {
                 // Sync token expired/invalidated by Google — the only recovery is a full resync.
@@ -160,8 +162,46 @@ public class GoogleCalendarSyncService {
 
             medico.setGoogleSyncToken(nextSyncToken);
             usuarioRepository.save(medico);
+
+            exportarTurnosPendientesAGoogleCalendar(medico);
         } catch (Exception e) {
             log.error("Fallo en la sincronización completa de Google Calendar para médico ID {}", medico.getId(), e);
+        }
+    }
+
+    @Transactional
+    public void exportarTurnosPendientesAGoogleCalendar(Usuario medico) {
+        boolean medicoConectado = medico != null && medico.getGoogleCalendarConnected() != null && medico.getGoogleCalendarConnected();
+        if (!isEnabled || !medicoConectado) {
+            return;
+        }
+
+        java.time.LocalDate hoy = java.time.LocalDate.now();
+        List<com.tranqui.app.model.Turno> turnos = turnoRepository.findTurnosFuturosConfirmadosParaGoogle(
+                medico.getId(), hoy, com.tranqui.app.model.EstadoTurno.CONFIRMADO
+        );
+
+        for (com.tranqui.app.model.Turno turno : turnos) {
+            if (turno.getGoogleEventId() == null || turno.getGoogleEventId().isBlank()) {
+                try {
+                    String meetUrl = googleCalendarService.crearEventoReunion(turno);
+                    // crearEventoReunion no tira excepción si Google falla: devuelve un Meet simulado
+                    // sin setear googleEventId. Solo pisamos el link del paciente cuando el evento
+                    // real se creó — si no, cada pasada (cada 5 min) le cambiaría el link por otro
+                    // falso hasta que Google responda.
+                    if (turno.getGoogleEventId() == null || turno.getGoogleEventId().isBlank()) {
+                        log.warn("Turno ID {} todavía no se pudo exportar a Google Calendar; se reintenta en la próxima sincronización.", turno.getId());
+                        continue;
+                    }
+                    if (turno.getModalidad() == com.tranqui.app.model.Modalidad.ONLINE && meetUrl != null && !meetUrl.isBlank()) {
+                        turno.setTelemedicinaUrl(meetUrl);
+                    }
+                    turnoRepository.save(turno);
+                    log.info("Turno ID {} exportado con éxito a Google Calendar (Event ID: {})", turno.getId(), turno.getGoogleEventId());
+                } catch (Exception e) {
+                    log.error("Fallo al exportar turno ID {} a Google Calendar para médico ID {}", turno.getId(), medico.getId(), e);
+                }
+            }
         }
     }
 

@@ -79,9 +79,15 @@ public class GoogleCalendarService {
                             .setApplicationName("TranquiApp")
                             .build();
 
+                    boolean esOnline = turno.getModalidad() == com.tranqui.app.model.Modalidad.ONLINE;
+                    String modalidadTexto = esOnline ? "Online" : "Presencial";
+                    String pacienteNombre = turno.getPaciente() != null && turno.getPaciente().getNombre() != null
+                            ? turno.getPaciente().getNombre()
+                            : "Paciente";
+
                     Event event = new Event()
-                            .setSummary("[Tranqui App] Consulta - " + (turno.getPaciente() != null ? turno.getPaciente().getNombre() : "Paciente"))
-                            .setDescription("Consulta de telemedicina con Tranqui App");
+                            .setSummary("[Tranqui App] Consulta " + modalidadTexto + " - " + pacienteNombre)
+                            .setDescription("Consulta " + (esOnline ? "de telemedicina" : "presencial") + " con Tranqui App");
 
                     java.time.ZonedDateTime startZoned = java.time.ZonedDateTime.of(turno.getFecha(), turno.getHoraInicio(), java.time.ZoneId.of("America/Argentina/Buenos_Aires"));
                     java.time.ZonedDateTime endZoned = java.time.ZonedDateTime.of(turno.getFecha(), turno.getHoraFin(), java.time.ZoneId.of("America/Argentina/Buenos_Aires"));
@@ -98,12 +104,14 @@ public class GoogleCalendarService {
                             .setTimeZone("America/Argentina/Buenos_Aires");
                     event.setEnd(end);
 
-                    ConferenceSolutionKey solutionKey = new ConferenceSolutionKey().setType("hangoutsMeet");
-                    CreateConferenceRequest createRequest = new CreateConferenceRequest()
-                            .setRequestId(UUID.randomUUID().toString())
-                            .setConferenceSolutionKey(solutionKey);
-                    ConferenceData conferenceData = new ConferenceData().setCreateRequest(createRequest);
-                    event.setConferenceData(conferenceData);
+                    if (esOnline) {
+                        ConferenceSolutionKey solutionKey = new ConferenceSolutionKey().setType("hangoutsMeet");
+                        CreateConferenceRequest createRequest = new CreateConferenceRequest()
+                                .setRequestId(UUID.randomUUID().toString())
+                                .setConferenceSolutionKey(solutionKey);
+                        ConferenceData conferenceData = new ConferenceData().setCreateRequest(createRequest);
+                        event.setConferenceData(conferenceData);
+                    }
 
                     event = service.events().insert("primary", event)
                             .setConferenceDataVersion(1)
@@ -122,10 +130,14 @@ public class GoogleCalendarService {
                         meetUrl = event.getHangoutLink();
                     }
 
-                    if (!meetUrl.isEmpty()) {
+                    if (event.getId() != null) {
                         turno.setGoogleEventId(event.getId());
                         log.info("Evento creado con éxito en Google Calendar REAL. Event ID: {}, Meet URL: {}", event.getId(), meetUrl);
-                        return meetUrl;
+                        if (!meetUrl.isEmpty()) {
+                            return meetUrl;
+                        } else if (!esOnline) {
+                            return "";
+                        }
                     }
                 }
                 log.warn("No se pudo obtener el Access Token para el médico ID: {}. Usando fallback simulado.", medico.getId());
@@ -133,6 +145,10 @@ public class GoogleCalendarService {
                 log.error("Fallo al crear evento REAL en Google Calendar para turno ID: {}. Error: {}", turno.getId(), e.getMessage());
                 // Fallback en caso de error para no romper la reserva del turno
             }
+        }
+
+        if (turno.getModalidad() == com.tranqui.app.model.Modalidad.PRESENCIAL) {
+            return "";
         }
 
         log.info("Usando simulación de Google Calendar API. Retornando Meet URL mock dinámico.");

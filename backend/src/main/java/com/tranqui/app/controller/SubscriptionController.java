@@ -144,23 +144,31 @@ public class SubscriptionController {
     }
 
     /**
-     * Cancela la suscripción del profesional autenticado: corta el próximo cobro en Mercado
-     * Pago, pero conserva el acceso hasta que termine el período ya pagado (ver
-     * SubscriptionService.cancelarSuscripcion). Vive bajo /api/subscriptions/ a propósito —
-     * mismo motivo que /checkout: un profesional bloqueado por falta de pago igual tiene que
-     * poder cancelar.
+     * Cancela la renovación automática de la suscripción del profesional autenticado: corta el
+     * débito recurrente en Mercado Pago, pero conserva el acceso hasta currentPeriodEnd (ver
+     * SubscriptionService.cancelarSuscripcionPorProfesional). Vive bajo /api/subscriptions/ a
+     * propósito — mismo motivo que /checkout: un profesional bloqueado por falta de pago igual
+     * tiene que poder cancelar.
      */
     @PostMapping("/cancel")
     @PreAuthorize("hasRole('PSIQUIATRA')")
-    public ResponseEntity<?> cancelarSuscripcion(@AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<?> cancelarMiSuscripcion(@AuthenticationPrincipal UserDetails userDetails) {
         Usuario prof = usuarioRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
 
         try {
-            subscriptionService.cancelarSuscripcion(prof.getId());
-            return ResponseEntity.ok(Map.of("cancelled", true));
+            Subscription sub = subscriptionService.cancelarSuscripcionPorProfesional(prof.getId());
+            return ResponseEntity.ok(Map.of(
+                    "message", "Suscripción cancelada exitosamente. Mantendrás acceso a todas las funcionalidades hasta el fin del período abonado.",
+                    "status", sub.getStatus().name(),
+                    "cancelAtPeriodEnd", Boolean.TRUE.equals(sub.getCancelAtPeriodEnd()),
+                    "currentPeriodEnd", sub.getCurrentPeriodEnd() != null ? sub.getCurrentPeriodEnd().toString() : ""
+            ));
         } catch (IllegalStateException e) {
+            // Mercado Pago no confirmó la cancelación del débito: no marcamos nada como cancelado.
             return ResponseEntity.unprocessableEntity().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
