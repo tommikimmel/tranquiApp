@@ -44,7 +44,12 @@ const archivos = execSync(
 archivos.push('.env');
 const listaPath = path.join(os.tmpdir(), 'tranqui-deploy-files.txt');
 fs.writeFileSync(listaPath, archivos.join('\n') + '\n');
-execSync(`tar -czf "${localFilePath}" -T "${listaPath}"`, { cwd: __dirname, stdio: 'inherit' });
+let tarCmd = 'tar';
+try {
+  execSync('tar --force-local --version', { stdio: 'ignore' });
+  tarCmd = 'tar --force-local';
+} catch (_) {}
+execSync(`${tarCmd} -czf "${localFilePath}" -T "${listaPath}"`, { cwd: __dirname, stdio: 'inherit' });
 console.log(`Paquete listo: ${localFilePath}`);
 
 console.log('Connecting to VPS SSH server...');
