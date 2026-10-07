@@ -19,12 +19,17 @@ El proyecto se divide en dos directorios principales en la raíz (`frontend/` y 
 
 ```text
 tranqui/
-├── .agent/                  # Directorio de agentes de IA y metadatos
-│   ├── Etapas/              # Plan de etapas detalladas
-│   ├── Skills/              # Habilidades del agente para desarrollo
-│   ├── Prompts/             # Prompts estructurados
-│   ├── ADRs/                # Architecture Decision Records
-│   └── Base de Datos/       # DDL y diseño de base de datos
+├── AGENTS.md                # Reglas de trabajo para agentes de IA (CLAUDE.md apunta acá)
+├── CHANGELOG.md             # Historial de versiones
+├── docs/                    # Documentación (ver docs/README.md)
+│   ├── flujo/               # Git, SDD, releases y hotfixes
+│   ├── entornos/            # Local, producción y secretos
+│   ├── specs/               # Especificaciones SDD de cada cambio
+│   ├── sprints/             # División de tareas por sprint
+│   ├── arquitectura/        # Contexto técnico y base de datos
+│   ├── adr/                 # Architecture Decision Records
+│   ├── etapas/              # Plan original por etapas (histórico)
+│   └── guias-tecnicas/      # Guías por tema (Docker, MP, auth, chat…)
 ├── docker-compose.yml       # Orquestador local y producción
 ├── .env.template            # Plantilla de variables de entorno globales
 ├── README.md
