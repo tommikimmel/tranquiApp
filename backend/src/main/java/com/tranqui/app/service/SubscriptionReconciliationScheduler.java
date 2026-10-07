@@ -12,12 +12,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+@Transactional
 public class SubscriptionReconciliationScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(SubscriptionReconciliationScheduler.class);
@@ -88,10 +90,15 @@ public class SubscriptionReconciliationScheduler {
      */
     @Scheduled(cron = "0 0 * * * ?")
     @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    @Transactional
     public void runHourlyAlertsCheck() {
-        log.info("Ejecutando verificación de preavisos de renovación y cancelaciones diferidas...");
-        checkUpcomingRenewals();
-        checkCancelledSubscriptionsPeriodEnd();
+        try {
+            log.info("Ejecutando verificación de preavisos de renovación y cancelaciones diferidas...");
+            checkUpcomingRenewals();
+            checkCancelledSubscriptionsPeriodEnd();
+        } catch (Exception e) {
+            log.error("Error durante la verificación horaria de alertas de suscripción: {}", e.getMessage(), e);
+        }
     }
 
     /**
@@ -133,30 +140,35 @@ public class SubscriptionReconciliationScheduler {
      * Check 0b: Suscripciones canceladas cuyo período pagado (currentPeriodEnd) ha concluido.
      * En ese momento exacto el acceso se suspende y se envía el mail correspondiente.
      */
+    @Transactional
     public void checkCancelledSubscriptionsPeriodEnd() {
         LocalDateTime now = LocalDateTime.now();
         List<Subscription> expiredCancelled = subscriptionRepository.findExpiredCancelledSubscriptions(now);
         for (Subscription sub : expiredCancelled) {
-            log.info("Finalizando período de gracia de suscripción cancelada #{} (profesional {})",
-                    sub.getId(), sub.getProfessional().getEmail());
-            SubscriptionStatus previo = sub.getStatus();
-            sub.setStatus(SubscriptionStatus.CANCELLED);
-            sub.setCancelAtPeriodEnd(false);
-            subscriptionRepository.save(sub);
-
-            subscriptionService.logEvent(sub.getId(), "SUBSCRIPTION_ACCESS_EXPIRED_AFTER_CANCELLATION",
-                    previo != null ? previo.name() : null, SubscriptionStatus.CANCELLED.name(),
-                    "SYSTEM", "CRON",
-                    "Período pagado finalizado tras cancelación previa. Cuenta bloqueada.");
-
             try {
-                resendEmailService.enviarAvisoSuspensionSuscripcion(
-                        sub.getProfessional().getEmail(),
-                        sub.getProfessional().getNombre(),
-                        sub.getPlan() != null ? sub.getPlan().getName() : "Profesional"
-                );
+                String profEmail = (sub.getProfessional() != null) ? sub.getProfessional().getEmail() : "sin-email";
+                String profNombre = (sub.getProfessional() != null) ? sub.getProfessional().getNombre() : "Profesional";
+                log.info("Finalizando período de gracia de suscripción cancelada #{} (profesional {})",
+                        sub.getId(), profEmail);
+                SubscriptionStatus previo = sub.getStatus();
+                sub.setStatus(SubscriptionStatus.CANCELLED);
+                sub.setCancelAtPeriodEnd(false);
+                subscriptionRepository.save(sub);
+
+                subscriptionService.logEvent(sub.getId(), "SUBSCRIPTION_ACCESS_EXPIRED_AFTER_CANCELLATION",
+                        previo != null ? previo.name() : null, SubscriptionStatus.CANCELLED.name(),
+                        "SYSTEM", "CRON",
+                        "Período pagado finalizado tras cancelación previa. Cuenta bloqueada.");
+
+                if (sub.getProfessional() != null && sub.getProfessional().getEmail() != null) {
+                    resendEmailService.enviarAvisoSuspensionSuscripcion(
+                            profEmail,
+                            profNombre,
+                            sub.getPlan() != null ? sub.getPlan().getName() : "Profesional"
+                    );
+                }
             } catch (Exception e) {
-                log.error("Error al enviar email de suspensión por fin de período a {}: {}", sub.getProfessional().getEmail(), e.getMessage());
+                log.error("Error al procesar cancelación diferida de suscripción #{}: {}", sub.getId(), e.getMessage());
             }
         }
     }
@@ -195,27 +207,32 @@ public class SubscriptionReconciliationScheduler {
     /**
      * Check 3: Subscriptions activas con next_billing_date vencida + gracia
      */
+    @Transactional
     public void checkExpiredActiveSubscriptions() {
         LocalDateTime now = LocalDateTime.now();
         List<Subscription> expired = subscriptionRepository.findExpiredActiveSubscriptions(now);
         for (Subscription sub : expired) {
-            log.warn("Suspendiendo suscripción #{} de {} por vencimiento de gracia", sub.getId(), sub.getProfessional().getEmail());
-            SubscriptionStatus estadoPrevio = sub.getStatus();
-            sub.setStatus(SubscriptionStatus.SUSPENDED);
-            subscriptionRepository.save(sub);
-            subscriptionService.logEvent(sub.getId(), "SUBSCRIPTION_SUSPENDED_GRACE_EXPIRED",
-                    estadoPrevio != null ? estadoPrevio.name() : null, SubscriptionStatus.SUSPENDED.name(),
-                    "SYSTEM", "CRON",
-                    "Suscripción suspendida tras vencer la ventana de gracia.");
-
             try {
-                resendEmailService.enviarAvisoSuspensionSuscripcion(
-                        sub.getProfessional().getEmail(),
-                        sub.getProfessional().getNombre(),
-                        sub.getPlan() != null ? sub.getPlan().getName() : "Profesional"
-                );
+                String profEmail = (sub.getProfessional() != null) ? sub.getProfessional().getEmail() : "sin-email";
+                String profNombre = (sub.getProfessional() != null) ? sub.getProfessional().getNombre() : "Profesional";
+                log.warn("Suspendiendo suscripción #{} de {} por vencimiento de gracia", sub.getId(), profEmail);
+                SubscriptionStatus estadoPrevio = sub.getStatus();
+                sub.setStatus(SubscriptionStatus.SUSPENDED);
+                subscriptionRepository.save(sub);
+                subscriptionService.logEvent(sub.getId(), "SUBSCRIPTION_SUSPENDED_GRACE_EXPIRED",
+                        estadoPrevio != null ? estadoPrevio.name() : null, SubscriptionStatus.SUSPENDED.name(),
+                        "SYSTEM", "CRON",
+                        "Suscripción suspendida tras vencer la ventana de gracia.");
+
+                if (sub.getProfessional() != null && sub.getProfessional().getEmail() != null) {
+                    resendEmailService.enviarAvisoSuspensionSuscripcion(
+                            profEmail,
+                            profNombre,
+                            sub.getPlan() != null ? sub.getPlan().getName() : "Profesional"
+                    );
+                }
             } catch (Exception e) {
-                log.error("Error al enviar email de suspensión a {}: {}", sub.getProfessional().getEmail(), e.getMessage());
+                log.error("Error al procesar suspensión de suscripción #{}: {}", sub.getId(), e.getMessage());
             }
         }
     }
@@ -223,28 +240,33 @@ public class SubscriptionReconciliationScheduler {
     /**
      * Check 4: Altas manuales con current_period_end < 7 días
      */
+    @Transactional
     public void checkExpiringManualSubscriptions() {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime sevenDays = now.plusDays(7);
         List<Subscription> expiring = subscriptionRepository.findExpiringManualSubscriptions(now, sevenDays);
         for (Subscription sub : expiring) {
-            log.info("Aviso preventivo: Suscripción manual #{} (profesional {}) vence el {}",
-                    sub.getId(), sub.getProfessional().getEmail(), sub.getCurrentPeriodEnd());
             try {
-                long dias = java.time.temporal.ChronoUnit.DAYS.between(now.toLocalDate(), sub.getCurrentPeriodEnd().toLocalDate());
-                // Un aviso a 7, 3 y 1 día del vencimiento. Este check corre una vez por día, así que
-                // cada umbral matchea un solo día (con <= 1 el último aviso salía dos veces).
-                if (dias == 7 || dias == 3 || dias == 1) {
-                    resendEmailService.enviarAvisoVencimientoManualSuscripcion(
-                            sub.getProfessional().getEmail(),
-                            sub.getProfessional().getNombre(),
-                            sub.getPlan() != null ? sub.getPlan().getName() : "Profesional",
-                            sub.getCurrentPeriodEnd(),
-                            (int) dias
-                    );
+                String profEmail = (sub.getProfessional() != null) ? sub.getProfessional().getEmail() : "sin-email";
+                String profNombre = (sub.getProfessional() != null) ? sub.getProfessional().getNombre() : "Profesional";
+                log.info("Aviso preventivo: Suscripción manual #{} (profesional {}) vence el {}",
+                        sub.getId(), profEmail, sub.getCurrentPeriodEnd());
+                if (sub.getCurrentPeriodEnd() != null) {
+                    long dias = java.time.temporal.ChronoUnit.DAYS.between(now.toLocalDate(), sub.getCurrentPeriodEnd().toLocalDate());
+                    // Un aviso a 7, 3 y 1 día del vencimiento. Este check corre una vez por día, así que
+                    // cada umbral matchea un solo día (con <= 1 el último aviso salía dos veces).
+                    if (dias == 7 || dias == 3 || dias == 1) {
+                        resendEmailService.enviarAvisoVencimientoManualSuscripcion(
+                                profEmail,
+                                profNombre,
+                                sub.getPlan() != null ? sub.getPlan().getName() : "Profesional",
+                                sub.getCurrentPeriodEnd(),
+                                (int) dias
+                        );
+                    }
                 }
             } catch (Exception e) {
-                log.error("Error enviando email de aviso manual a {}: {}", sub.getProfessional().getEmail(), e.getMessage());
+                log.error("Error enviando email de aviso manual para suscripción #{}: {}", sub.getId(), e.getMessage());
             }
         }
     }
