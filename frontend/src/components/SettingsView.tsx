@@ -9,6 +9,7 @@ import MPConnectBanner from './MPConnectBanner'
 import GoogleCalendarConnectBanner from './GoogleCalendarConnectBanner'
 import { OBRAS_SOCIALES } from '../constants/obrasSociales'
 import { normalizeToIsoDate } from '../utils/dashboardHelpers'
+import { fileToProfilePhoto, renderProfilePhoto } from '../utils/profilePhoto'
 import {
   getMissingRequirements,
   PROVINCIAS_ARGENTINA,
@@ -129,13 +130,9 @@ export default function SettingsView({
   const handleCapturePhoto = () => {
     const video = videoRef.current
     if (!video || !video.videoWidth) return
-    const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-    setFotoUrl(canvas.toDataURL('image/jpeg', 0.9))
+    const dataUrl = renderProfilePhoto(video, video.videoWidth, video.videoHeight)
+    if (!dataUrl) return
+    setFotoUrl(dataUrl)
     handleCloseCamera()
   }
 
@@ -660,17 +657,18 @@ export default function SettingsView({
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-                      const MAX_FOTO_BYTES = 3 * 1024 * 1024
+                      // Se reduce a 400 px antes de guardarla (utils/profilePhoto), así que el límite solo evita
+                      // decodificar archivos enormes en el navegador.
+                      const MAX_FOTO_BYTES = 10 * 1024 * 1024
                       if (file.size > MAX_FOTO_BYTES) {
-                        showAlert(`La foto pesa ${(file.size / (1024 * 1024)).toFixed(1)}MB — el máximo permitido es 3MB. Elegí una imagen más liviana.`, 'error')
+                        showAlert(`La foto pesa ${(file.size / (1024 * 1024)).toFixed(1)}MB — el máximo permitido es 10MB. Elegí una imagen más liviana.`, 'error')
                         e.target.value = ''
                         return
                       }
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setFotoUrl(reader.result as string);
-                      };
-                      reader.readAsDataURL(file);
+                      fileToProfilePhoto(file)
+                        .then(setFotoUrl)
+                        .catch(() => showAlert('No pudimos leer esa imagen. Probá con una foto JPG o PNG.', 'error'))
+                        .finally(() => { e.target.value = '' })
                     }}
                   />
                 </label>
