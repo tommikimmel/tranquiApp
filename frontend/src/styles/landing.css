@@ -135,6 +135,82 @@
   50%       { opacity: 0.5; transform: scale(1.3); }
 }
 
+.btn-crisis-text--short {
+  display: none;
+}
+
+.btn-crisis-text--full {
+  display: inline;
+}
+
+/* ── Header User Dropdown ──────────────────────────────────── */
+.header-user-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 4px 10px 4px 5px;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.header-user-btn:hover {
+  background: var(--neutral-50);
+  border-color: var(--green-300);
+}
+
+.header-user-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.header-user-name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-user-chevron {
+  font-size: 9px;
+  color: var(--color-text-secondary);
+  transition: transform var(--transition-fast);
+  display: inline-block;
+  line-height: 1;
+}
+
+.header-user-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background-color: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  width: 200px;
+  max-width: calc(100vw - 24px);
+  display: flex;
+  flex-direction: column;
+  z-index: 1001;
+  overflow: hidden;
+}
+
 /* ── Crisis Modal ──────────────────────────────────────────── */
 .crisis-modal-overlay {
   position: fixed;
@@ -882,7 +958,7 @@
 @media (max-width: 768px) {
   .public-header {
     padding: 0 var(--space-3);
-    height: auto;
+    height: 56px;
     min-height: 56px;
   }
 
@@ -893,22 +969,26 @@
   .public-header__logo {
     font-size: var(--text-lg);
     gap: var(--space-1);
+    flex-shrink: 0;
   }
 
   .public-header__logo-icon {
-    height: 30px;
+    height: 28px;
   }
 
+  /* Single-row header on mobile: keep elements aligned without wrapping or amontonamiento */
   .public-header__actions {
     gap: 6px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-end;
-    row-gap: var(--space-2);
+    align-items: center;
+    flex-shrink: 0;
   }
 
   .header-pro-actions {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: flex-end;
+    gap: 4px;
   }
 
   .header-pro-actions .btn {
@@ -917,15 +997,52 @@
   }
 
   .btn-faq {
-    padding: 4px 8px !important;
+    padding: 6px 8px !important;
     font-size: 11px !important;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-full);
+    min-width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-faq-text {
+    display: none;
   }
 
   .btn-crisis {
-    padding: 4px 10px;
+    padding: 4px 8px;
     font-size: 11px;
+    gap: 5px;
+    border-radius: var(--radius-full);
+    flex-shrink: 0;
+  }
+
+  .btn-crisis-text--full {
+    display: none;
+  }
+
+  .btn-crisis-text--short {
+    display: inline;
+  }
+
+  .header-user-btn {
+    padding: 3px 8px 3px 4px;
+    gap: 5px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .header-user-avatar {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+  }
+
+  .header-user-name {
+    max-width: 80px;
   }
 
   .header-pro-name {
@@ -1015,13 +1132,50 @@
 
 @media (max-width: 480px) {
   .public-header {
-    padding: 6px var(--space-2);
+    padding: 0 var(--space-2);
   }
-  .btn-faq-text {
-    display: none;
+  .public-header__inner {
+    gap: 4px;
   }
-  .btn-crisis-text {
+  .public-header__logo {
+    font-size: 1rem;
+    gap: 4px;
+  }
+  .public-header__logo-icon {
+    height: 25px;
+  }
+  .public-header__actions {
+    gap: 4px;
+  }
+  .header-user-btn {
+    padding: 2px 6px 2px 3px;
+    gap: 4px;
+  }
+  .header-user-name {
+    max-width: 65px;
+    font-size: 11px;
+  }
+  .btn-crisis {
+    padding: 3px 6px;
     font-size: 10.5px;
+    gap: 4px;
+  }
+  .btn-faq {
+    padding: 4px !important;
+    min-width: 28px;
+    height: 28px;
+  }
+}
+
+@media (max-width: 360px) {
+  .header-user-name {
+    max-width: 45px;
+  }
+  .public-header__logo {
+    font-size: 0.9rem;
+  }
+  .public-header__logo-icon {
+    height: 22px;
   }
 }
 

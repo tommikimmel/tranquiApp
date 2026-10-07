@@ -438,13 +438,14 @@ function PublicHeader({
         </a>
         <span className="public-header__tagline">por Tranqui Neurociencias</span>
         <div className="public-header__spacer" />
-        <div className="public-header__actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+        <div className="public-header__actions">
           
           {/* Help Button */}
           <button
             className="btn btn--ghost btn--sm btn-faq"
             onClick={onOpenHelp}
             title="Ayuda y preguntas frecuentes"
+            aria-label="Ayuda y preguntas frecuentes"
           >
             <IconHelp />
             <span className="btn-faq-text">Ayuda / FAQ</span>
@@ -454,9 +455,14 @@ function PublicHeader({
             className="btn-crisis"
             onClick={onCrisis}
             id="btn-crisis-trigger"
+            title="Líneas de ayuda urgente y contención en crisis"
+            aria-label="Ayuda urgente"
           >
             <span className="btn-crisis__dot" aria-hidden="true" />
-            <span className="btn-crisis-text">Ayuda urgente</span>
+            <span className="btn-crisis-text">
+              <span className="btn-crisis-text--full">Ayuda urgente</span>
+              <span className="btn-crisis-text--short">Urgente</span>
+            </span>
           </button>
 
           {currentUser ? (
@@ -483,53 +489,20 @@ function PublicHeader({
               <div ref={dropdownRef} style={{ position: 'relative' }}>
                 <button
                   onClick={() => setShowDropdown(!showDropdown)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-2)',
-                    background: 'none',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-lg)',
-                    padding: 'var(--space-2) var(--space-3)',
-                    cursor: 'pointer',
-                    fontSize: 'var(--text-sm)',
-                    fontWeight: 'bold',
-                    color: 'var(--color-text-primary)'
-                  }}
+                  className="header-user-btn"
+                  aria-label="Menú de usuario"
+                  aria-expanded={showDropdown}
+                  title={currentUser.nombre}
                 >
-                  <div style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    backgroundColor: 'var(--color-primary)',
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '11px',
-                    fontWeight: 'bold'
-                  }}>
+                  <div className="header-user-avatar">
                     {currentUser.nombre.substring(0, 2).toUpperCase()}
                   </div>
-                  <span>{currentUser.nombre}</span>
-                  <span style={{ fontSize: '10px' }}>▼</span>
+                  <span className="header-user-name">{currentUser.nombre}</span>
+                  <span className="header-user-chevron">▼</span>
                 </button>
 
                 {showDropdown && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '40px',
-                    right: 0,
-                    backgroundColor: 'white',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-md)',
-                    boxShadow: 'var(--shadow-lg)',
-                    width: '200px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    zIndex: 1001,
-                    overflow: 'hidden'
-                  }}>
+                  <div className="header-user-dropdown">
                     <button
                       onClick={() => {
                         setShowDropdown(false);

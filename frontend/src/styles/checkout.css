@@ -682,9 +682,16 @@
 @media (max-width: 640px) {
   .checkout-header__inner {
     padding: var(--space-3) var(--space-4);
+    gap: var(--space-2);
   }
 
   .checkout-header__step-label {
+    display: none;
+  }
+
+  /* "Pago seguro" text crowds the back button + logo on the narrowest phones (~360px and
+     under) — the lock icon alone still reads as "this is secure" at a glance. */
+  .checkout-header__secure span {
     display: none;
   }
 

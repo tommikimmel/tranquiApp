@@ -1747,22 +1747,8 @@ export default function SettingsView({
       </div>
 
       {/* Floating Sticky Save Bar */}
-      <div style={{
-        position: 'sticky',
-        bottom: '16px',
-        alignSelf: 'flex-end',
-        zIndex: 100,
-        backgroundColor: 'rgba(255, 255, 255, 0.96)',
-        backdropFilter: 'blur(8px)',
-        border: '1.5px solid var(--color-primary)',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-        borderRadius: '999px',
-        padding: '6px 14px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px'
-      }}>
-        <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-primary)' }}>
+      <div className="settings-save-bar">
+        <span className="settings-save-bar__label">
           ¿Terminaste de editar?
         </span>
         <button

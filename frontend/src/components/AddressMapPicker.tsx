@@ -125,6 +125,11 @@ export default function AddressMapPicker({
   const suggestDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const skipNextSuggestFetch = useRef(false)
   const suggestBoxRef = useRef<HTMLDivElement>(null)
+  // The address arrives pre-filled with whatever the médico already saved. Without this guard,
+  // the debounced-suggestions effect below runs on that very first render too and pops the
+  // dropdown open for an address the médico isn't editing — this skips only that one mount-time
+  // run; every real edit afterward still fetches normally.
+  const isInitialSuggestMount = useRef(true)
 
   const onDireccionChangeRef = useRef(onDireccionChange)
   useEffect(() => {
@@ -172,6 +177,7 @@ export default function AddressMapPicker({
   // text itself is enough for Nominatim to disambiguate within Argentina.
   useEffect(() => {
     if (mapsReady) return // Google's native Places widget already provides its own dropdown
+    if (isInitialSuggestMount.current) { isInitialSuggestMount.current = false; return }
     if (skipNextSuggestFetch.current) { skipNextSuggestFetch.current = false; return }
     if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current)
 

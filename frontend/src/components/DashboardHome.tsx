@@ -814,8 +814,8 @@ export default function DashboardHome({
             </div>
           </div>
         ) : (
-          /* Monthly Calendar Grid — compact, icon-focused calendar */
-          <div style={{ width: '100%', maxWidth: '560px', margin: 'var(--space-3) auto 0' }}>
+          /* Monthly Calendar Grid — spans 100% of container on desktop */
+          <div style={{ width: '100%', margin: 'var(--space-3) 0 0' }}>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(7, 1fr)',
@@ -823,16 +823,19 @@ export default function DashboardHome({
               backgroundColor: 'var(--color-border)',
               borderRadius: 'var(--radius-lg)',
               overflow: 'hidden',
-              boxShadow: 'var(--shadow-sm)'
+              boxShadow: 'var(--shadow-sm)',
+              width: '100%'
             }}>
               {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((dName) => (
                 <div key={dName} style={{
                   backgroundColor: 'var(--green-50)',
                   color: 'var(--color-primary)',
-                  padding: '6px 2px',
+                  padding: '8px 2px',
                   textAlign: 'center',
                   fontWeight: 'bold',
-                  fontSize: '11px'
+                  fontSize: '11px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.02em'
                 }}>
                   {dName}
                 </div>
@@ -848,21 +851,22 @@ export default function DashboardHome({
                 return (
                   <div key={index} style={{
                     backgroundColor: isToday ? '#F0F9F1' : '#ffffff',
-                    minHeight: '52px',
-                    padding: '4px',
+                    minHeight: '60px',
+                    padding: '6px 4px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '3px',
-                    opacity: isCurrentMonth ? 1 : 0.35
+                    gap: '4px',
+                    opacity: isCurrentMonth ? 1 : 0.35,
+                    transition: 'background-color 0.15s ease'
                   }}>
                     <div style={{
                       fontWeight: isToday ? 'bold' : '500',
                       fontSize: '12px',
                       color: isToday ? 'white' : 'var(--color-text-primary)',
                       borderRadius: '50%',
-                      width: '22px',
-                      height: '22px',
+                      width: '24px',
+                      height: '24px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -871,15 +875,15 @@ export default function DashboardHome({
                       {d.getDate()}
                     </div>
                     {dayItemsTotal > 0 && (
-                      <div style={{ display: 'flex', gap: '3px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
                         {dayAppts.map((a) => (
                           <span
                             key={a.id}
                             onClick={() => setSelectedAppt(a)}
                             title={`Turno: ${a.hour} hs - ${a.patientName}`}
                             style={{
-                              width: '7px',
-                              height: '7px',
+                              width: '8px',
+                              height: '8px',
                               borderRadius: '50%',
                               backgroundColor: a.status === 'confirmed' ? 'var(--color-primary)' : '#f59e0b',
                               display: 'inline-block',
@@ -892,8 +896,8 @@ export default function DashboardHome({
                             key={evt.id}
                             title={`Evento: ${evt.title}`}
                             style={{
-                              width: '7px',
-                              height: '7px',
+                              width: '8px',
+                              height: '8px',
                               borderRadius: '50%',
                               backgroundColor: '#3b82f6',
                               display: 'inline-block'

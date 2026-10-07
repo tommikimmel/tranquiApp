@@ -936,7 +936,7 @@ export default function App() {
               style={{ position: 'relative' }}
             >
               <Icon.Bell hasUnread={unreadCount > 0} />
-              <span>Notificaciones</span>
+              <span className="dashboard-header__action-label">Notificaciones</span>
               {unreadCount > 0 && (
                 <span style={{
                   backgroundColor: 'var(--color-error)',
@@ -1036,7 +1036,7 @@ export default function App() {
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
-            Soporte
+            <span className="dashboard-header__action-label">Soporte</span>
           </button>
 
           <div className="dashboard-header__divider" />
@@ -1070,13 +1070,15 @@ export default function App() {
             <button
               onClick={handleLogout}
               className="btn btn--outline btn--sm dashboard-header__action-btn"
+              aria-label="Cerrar sesión"
+              title="Cerrar sesión"
             >
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
-              Cerrar sesión
+              <span className="dashboard-header__action-label">Cerrar sesión</span>
             </button>
           </div>
         </div>

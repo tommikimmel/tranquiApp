@@ -1517,7 +1517,10 @@
 @media (max-width: 768px) {
   .dashboard-layout {
     grid-template-columns: 1fr;
-    grid-template-rows: var(--header-height) 1fr auto;
+    /* minmax (not a fixed var(--header-height)) so the row grows with the header instead of the
+       header spilling over into the content row below it — see the note on .dashboard-header
+       just below for why the header can now be taller than --header-height on mobile. */
+    grid-template-rows: minmax(var(--header-height), auto) 1fr auto;
   }
 
   /* .sidebar and its children are NOT restyled here on purpose — this was the original
@@ -1528,15 +1531,15 @@
 
   .dashboard-header {
     grid-column: 1;
-    /* .dashboard-header__actions wraps to 2 rows below ~360-400px, but the header's own
-       height stayed fixed at var(--header-height) with align-items:center — the wrapped second
-       row had nowhere to go and rendered on top of the page title/content underneath instead of
-       pushing it down. Letting the header grow (and padding it top/bottom instead of relying on
-       a fixed height) fixes that without touching the desktop layout above this breakpoint. */
+    /* .dashboard-header__actions can still wrap to 2 rows on very narrow phones even with the
+       action buttons reduced to icon-only below — the header's own height stayed fixed at
+       var(--header-height) with align-items:center, so a wrapped second row had nowhere to go
+       and rendered on top of the page content underneath instead of pushing it down. Letting the
+       header grow (and padding it top/bottom instead of relying on a fixed height) fixes that
+       without touching the desktop layout above this breakpoint. */
     height: auto;
     min-height: var(--header-height);
-    padding-top: var(--space-3);
-    padding-bottom: var(--space-3);
+    padding: var(--space-3) var(--space-4);
     flex-wrap: wrap;
     row-gap: var(--space-2);
   }
@@ -1544,6 +1547,24 @@
   .dashboard-header__actions {
     flex-wrap: wrap;
     row-gap: var(--space-2);
+    gap: var(--space-2);
+  }
+
+  /* Icon-only action buttons on mobile — "Notificaciones" / "Soporte" / "Cerrar sesión" as full
+     text pills crowded the header and forced it onto two visually cluttered rows. The icon alone
+     (plus aria-label/title, still present in the JSX) keeps every action reachable in one tidy
+     row; the notification unread badge and dropdown are unaffected. */
+  .dashboard-header__action-label {
+    display: none;
+  }
+
+  .dashboard-header__action-btn {
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+  }
+
+  .dashboard-header__profile {
+    gap: var(--space-2);
   }
 
   .dashboard-main {
@@ -2149,12 +2170,6 @@
   align-items: stretch;
 }
 
-@media (max-width: 860px) {
-  .settings-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
 .settings-submenu {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -2187,14 +2202,6 @@
   border-radius: 4px;
 }
 
-@media (max-width: 860px) {
-  .settings-submenu {
-    position: static;
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-}
-
 .settings-submenu-item {
   display: flex;
   align-items: center;
@@ -2208,12 +2215,6 @@
   text-align: left;
   font-family: var(--font-body);
   transition: background var(--transition-fast), border-color var(--transition-fast);
-}
-
-@media (max-width: 860px) {
-  .settings-submenu-item {
-    width: auto;
-  }
 }
 
 .settings-submenu-item:hover {
@@ -2272,6 +2273,32 @@
   flex-direction: column;
   gap: var(--space-5);
   min-width: 0;
+}
+
+/* Floating "Guardar cambios" pill at the end of the settings content — sticks near the bottom
+   of the scrolling page so it's reachable without hunting for a save button after a long form.
+   See the ≤768px override below for why its offset has to grow on mobile. */
+.settings-save-bar {
+  position: sticky;
+  bottom: 16px;
+  align-self: flex-end;
+  z-index: 100;
+  background-color: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid var(--color-primary);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-radius: 999px;
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-save-bar__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
 }
 
 .settings-section-label {
@@ -3623,44 +3650,29 @@
     gap: var(--space-4);
   }
 
+  /* Mobile/tablet sub-nav: same card look as the desktop vertical list (icon box, label +
+     status stacked, active/hover states) — all of that keeps coming from the base,
+     non-media .settings-submenu-item rules above, which already render a full-width row.
+     The only thing that needs to change per breakpoint is the CONTAINER: a 2-column grid on
+     tablet-sized screens, collapsing to a single column (one item per row, full width) on
+     phones — see the ≤640px override further down. This replaced an earlier horizontal
+     pill-scroller design that squeezed icon/label/status into a cramped single-line chip. */
   .settings-submenu {
-    display: flex;
-    flex-direction: row;
-    overflow-x: auto;
-    padding-bottom: var(--space-2);
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
     gap: var(--space-2);
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .settings-submenu-item {
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-full);
-    background-color: var(--color-surface);
-    border: 1px solid var(--color-border);
-    flex-shrink: 0;
-    width: auto;
-  }
-
-  .settings-submenu-item.active {
-    background-color: var(--color-primary);
-    color: white;
-    border-color: var(--color-primary);
-  }
-
-  .settings-submenu-item.active .settings-submenu-status {
-    background-color: rgba(255, 255, 255, 0.25);
-    color: white;
-  }
-
-  .settings-submenu-item.active .settings-submenu-icon {
-    color: white;
   }
 }
 
 @media (max-width: 640px) {
+  /* Below phone width the 2-column tablet grid (see the ≤1024px block above) gets too tight
+     for icon + label + status per item — one full-width row per sub-item instead, so
+     "Perfil profesional" / "Presencia" / etc. are always easy to read and tap. */
+  .settings-submenu {
+    grid-template-columns: 1fr;
+  }
+
   .dashboard-content {
     padding: var(--space-3);
   }
@@ -3810,6 +3822,16 @@
 
   .dashboard-main {
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* 2b. "Guardar cambios" floating bar (SettingsView) vs. the fixed bottom tab bar above —
+     the bar's own bottom:16px only cleared empty space on desktop; on mobile that's inside the
+     56px-tall bottom nav's footprint, and the nav's z-index:1000 (!important, right above) sits
+     above the bar's z-index:100, so the nav painted over the button entirely. Push the bar clear
+     of the bar's height (+ the iOS home-indicator safe area) and outrank its z-index. */
+  .settings-save-bar {
+    bottom: calc(56px + var(--space-3) + env(safe-area-inset-bottom, 0px)) !important;
+    z-index: 1001 !important;
   }
 
   /* 3. Patient Chat Section Mobile Optimization */
@@ -4036,7 +4058,35 @@
   .agenda-view-agenda-daynames > div,
   .agenda-view-agenda-day-col {
     flex: none;
-    width: 92px;
+    /* Narrower than the desktop flex-1 columns, but still wide enough for the "HH:mm" slot
+       label — trims how far the médico has to scroll to see the rest of the week. */
+    width: 78px;
+  }
+
+  /* The hour column normally scrolls out of view along with the day columns, so once a médico
+     scrolls right they lose track of which hour they're looking at — pin it to the left edge of
+     the scroll container instead, same trick as a spreadsheet's frozen first column. */
+  .agenda-view-agenda-corner,
+  .agenda-view-agenda-hours {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+  }
+
+  .agenda-view-agenda-hour-label {
+    font-size: 10.5px;
+  }
+
+  /* Unselected slots normally only reveal their time label on :hover/:focus-visible — a
+     touchscreen has no hover, so on mobile every empty slot showed as a blank dashed box until
+     tapped, which is exactly the "no se ve con claridad" complaint. Show the label always here
+     instead of gating it behind a pointer event mobile doesn't have. */
+  .agenda-view-agenda-slot-time {
+    font-size: 10.5px;
+  }
+
+  .agenda-view-agenda-slot--empty .agenda-view-agenda-slot-time {
+    opacity: 1;
   }
 
   .agenda-view-settings-row {
@@ -4050,6 +4100,32 @@
   .agenda-view-field input[type="text"],
   .agenda-view-select-wrap select {
     font-size: 16px; /* iOS zoom-on-focus guard */
+  }
+}
+
+/* ── AppointmentCard: general size compaction on mobile ────────
+   Padding, divider height and hour/name font sizes are desktop-generous
+   (var(--text-lg) hour, 40px divider, --space-4/--space-5 padding) — fine
+   spread across a wide "Turnos de hoy" list, but the same row on a phone
+   reads oversized relative to how little info it actually holds. Scale
+   everything down together instead of just letting the 480px block below
+   handle wrapping. */
+@media (max-width: 640px) {
+  .appointment-item {
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .appointment-item__time {
+    min-width: 52px;
+  }
+
+  .appointment-item__hour {
+    font-size: var(--text-base);
+  }
+
+  .appointment-item__divider {
+    height: 30px;
   }
 }
 
