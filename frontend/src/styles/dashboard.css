@@ -216,7 +216,7 @@
   height: var(--header-height);
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 500;
 }
 
 .dashboard-header__title {
@@ -2124,9 +2124,22 @@
   cursor: not-allowed;
 }
 
-@media (max-width: 900px) {
+/* Cuando se reduce el tamaño de pantalla: la sección de disponibilidad semanal
+   ocupa el 100% del ancho y la sección de notas y pendientes queda abajo a ancho completo. */
+@media (max-width: 1200px) {
   .agenda-view {
     grid-template-columns: 1fr;
+    gap: var(--space-5);
+  }
+
+  .agenda-view-panel--availability {
+    width: 100%;
+    order: 1;
+  }
+
+  .agenda-view-panel--notes {
+    width: 100%;
+    order: 2;
   }
 }
 
@@ -2183,7 +2196,7 @@
   position: sticky;
   top: calc(var(--header-height) + 20px);
   align-self: start;
-  z-index: 5;
+  z-index: 100;
   max-height: calc(100vh - var(--header-height) - 40px);
   overflow-y: auto;
   scrollbar-width: thin;
@@ -3650,28 +3663,22 @@
     gap: var(--space-4);
   }
 
-  /* Mobile/tablet sub-nav: same card look as the desktop vertical list (icon box, label +
-     status stacked, active/hover states) — all of that keeps coming from the base,
-     non-media .settings-submenu-item rules above, which already render a full-width row.
-     The only thing that needs to change per breakpoint is the CONTAINER: a 2-column grid on
-     tablet-sized screens, collapsing to a single column (one item per row, full width) on
-     phones — see the ≤640px override further down. This replaced an earlier horizontal
-     pill-scroller design that squeezed icon/label/status into a cramped single-line chip. */
+  /* Submenú de configuración en tablet y mobile: mantiene exactamente el mismo
+     estilo vertical de desktop (lista de filas completas con ícono, título y estado),
+     con ancho 100% y z-index elevado para evitar superposiciones con contenidos inferiores. */
   .settings-submenu {
-    position: static;
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-2);
+    position: relative;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    max-height: none;
+    overflow-y: visible;
   }
 }
 
 @media (max-width: 640px) {
-  /* Below phone width the 2-column tablet grid (see the ≤1024px block above) gets too tight
-     for icon + label + status per item — one full-width row per sub-item instead, so
-     "Perfil profesional" / "Presencia" / etc. are always easy to read and tap. */
-  .settings-submenu {
-    grid-template-columns: 1fr;
-  }
 
   .dashboard-content {
     padding: var(--space-3);
@@ -4095,6 +4102,11 @@
 
   .agenda-view-panel {
     padding: 16px;
+  }
+
+  .agenda-view-panel__head {
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
 
   .agenda-view-field input[type="text"],

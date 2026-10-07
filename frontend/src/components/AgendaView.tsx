@@ -405,7 +405,7 @@ export default function AgendaView({ medicoInfo, initialAvailabilityPresencial, 
   return (
     <div className="agenda-view">
       {/* Weekly availability panel */}
-      <div className="agenda-view-panel">
+      <div className="agenda-view-panel agenda-view-panel--availability">
         <div className="agenda-view-panel__head">
           <div>
             <div className="agenda-view-panel__title">Disponibilidad semanal</div>
@@ -489,7 +489,7 @@ export default function AgendaView({ medicoInfo, initialAvailabilityPresencial, 
       </div>
 
       {/* Notes / pendientes panel */}
-      <div className="agenda-view-panel">
+      <div className="agenda-view-panel agenda-view-panel--notes">
         <div className="agenda-view-panel__head">
           <div>
             <div className="agenda-view-panel__title">Notas y pendientes</div>
