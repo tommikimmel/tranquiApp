@@ -53,6 +53,14 @@ public class MedicoController {
     @Value("${mercadopago.enabled:false}")
     private boolean mercadoPagoEnabled;
 
+    @Value("${google.calendar.enabled:false}")
+    private boolean googleCalendarEnabled;
+
+    // Solo true en el perfil "local" (application-local.yml): habilita simular integraciones que
+    // en producción requieren OAuth real. Default false, así nunca se activa en producción.
+    @Value("${app.local-simulations:false}")
+    private boolean localSimulations;
+
     @GetMapping
     public ResponseEntity<List<MedicoDto>> obtenerMedicos() {
         return ResponseEntity.ok(medicoService.obtenerMedicosActivos());
@@ -199,8 +207,30 @@ public class MedicoController {
     public ResponseEntity<Map<String, Object>> obtenerEstadoGoogleCalendar(@AuthenticationPrincipal UserDetails userDetails) {
         Usuario medico = obtenerMedicoAutenticado(userDetails);
         return ResponseEntity.ok(Map.of(
-                "connected", medico.getGoogleCalendarConnected() != null && medico.getGoogleCalendarConnected()
+                "connected", medico.getGoogleCalendarConnected() != null && medico.getGoogleCalendarConnected(),
+                "simulated", googleCalendarSimulado()
         ));
+    }
+
+    /**
+     * Solo entorno local: marca Google Calendar como vinculado sin pasar por el OAuth de Google,
+     * igual que /mercadopago/connect-simulado. Exige google.calendar.enabled=false y
+     * app.local-simulations=true (solo perfil "local"), así nunca está disponible en producción.
+     */
+    @PostMapping("/google-calendar/connect-simulado")
+    @PreAuthorize("hasRole('PSIQUIATRA')")
+    public ResponseEntity<?> simularConexionGoogleCalendar(@AuthenticationPrincipal UserDetails userDetails) {
+        if (!googleCalendarSimulado()) {
+            return ResponseEntity.status(403).body("La simulación de Google Calendar solo está disponible en el entorno local.");
+        }
+        Usuario medico = obtenerMedicoAutenticado(userDetails);
+        medico.setGoogleCalendarConnected(true);
+        usuarioRepository.save(medico);
+        return ResponseEntity.ok().build();
+    }
+
+    private boolean googleCalendarSimulado() {
+        return localSimulations && !googleCalendarEnabled;
     }
 
     @GetMapping("/google-calendar/connect")

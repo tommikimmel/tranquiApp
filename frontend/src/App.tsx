@@ -84,6 +84,8 @@ export default function App() {
   const [showHelpModal, setShowHelpModal] = useState(false)
   const [mpConnected, setMpConnected] = useState(false)
   const [googleConnected, setGoogleConnected] = useState(false)
+  // true solo en el entorno local: "Vincular Google Calendar" se simula sin pasar por Google.
+  const [googleSimulated, setGoogleSimulated] = useState(false)
   const [mpEnabled, setMpEnabled] = useState(false)
 
   // API states
@@ -214,7 +216,7 @@ export default function App() {
             api.getTurnos(),
             api.getNotificaciones(),
             api.getMercadoPagoStatus().catch(() => ({ connected: false })),
-            api.getGoogleCalendarStatus().catch(() => ({ connected: false })),
+            api.getGoogleCalendarStatus().catch(() => ({ connected: false, simulated: false })),
             api.getTieneNoLeidos().catch(() => false),
             api.getEventosExternosGoogleCalendar().catch((err) => {
               console.error("Error al obtener eventos externos de Google Calendar:", err)
@@ -231,6 +233,7 @@ export default function App() {
             setMpConnected(!!mpStatus?.connected)
             setMpEnabled(!!(mpStatus as any)?.mercadopagoEnabled)
             setGoogleConnected(!!googleStatus?.connected)
+            setGoogleSimulated(!!googleStatus?.simulated)
             setExternalEvents((eventosExternos as ExternalEvent[]) || [])
           })
         })
@@ -447,6 +450,18 @@ export default function App() {
   }, [])
 
   const handleConnectGoogle = async () => {
+    if (googleSimulated) {
+      try {
+        await api.simularConexionGoogleCalendar()
+        setGoogleConnected(true)
+        showAlert('Conexión simulada (entorno local): tu Google Calendar quedó vinculado para pruebas.', 'success')
+      } catch (err) {
+        console.error("Error al simular la conexión de Google Calendar:", err)
+        showAlert('No se pudo simular la conexión con Google Calendar.', 'error')
+      }
+      return
+    }
+
     try {
       const { url } = await api.getGoogleCalendarConnectUrl()
       window.location.href = url

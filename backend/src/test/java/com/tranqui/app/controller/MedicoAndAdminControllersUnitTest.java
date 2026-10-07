@@ -96,6 +96,35 @@ class MedicoAndAdminControllersUnitTest {
     // --- MedicoController tests ---
 
     @Test
+    void simularConexionGoogleCalendar_soloEnEntornoLocal() {
+        when(userDetails.getUsername()).thenReturn("carlos@example.com");
+        when(usuarioRepository.findByEmail("carlos@example.com")).thenReturn(Optional.of(medico));
+        ReflectionTestUtils.setField(medicoController, "googleCalendarEnabled", false);
+        ReflectionTestUtils.setField(medicoController, "localSimulations", true);
+
+        ResponseEntity<?> resp = medicoController.simularConexionGoogleCalendar(userDetails);
+
+        assertEquals(HttpStatus.OK, resp.getStatusCode());
+        assertEquals(Boolean.TRUE, medico.getGoogleCalendarConnected());
+        verify(usuarioRepository).save(medico);
+        assertEquals(Boolean.TRUE, medicoController.obtenerEstadoGoogleCalendar(userDetails).getBody().get("simulated"));
+    }
+
+    @Test
+    void simularConexionGoogleCalendar_rechazadaFueraDelEntornoLocal() {
+        // Producción: sin app.local-simulations (default false), aunque Calendar esté apagado.
+        ReflectionTestUtils.setField(medicoController, "googleCalendarEnabled", false);
+        ReflectionTestUtils.setField(medicoController, "localSimulations", false);
+        assertEquals(HttpStatus.FORBIDDEN, medicoController.simularConexionGoogleCalendar(userDetails).getStatusCode());
+
+        // Con Calendar real habilitado tampoco se puede simular.
+        ReflectionTestUtils.setField(medicoController, "googleCalendarEnabled", true);
+        ReflectionTestUtils.setField(medicoController, "localSimulations", true);
+        assertEquals(HttpStatus.FORBIDDEN, medicoController.simularConexionGoogleCalendar(userDetails).getStatusCode());
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
     void testMedicoController_perfilAndStats() {
         when(userDetails.getUsername()).thenReturn("carlos@example.com");
         MedicoDto dto = MedicoDto.builder().nombre("Carlos").build();

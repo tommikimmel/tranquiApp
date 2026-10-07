@@ -68,10 +68,19 @@ app:
   seed-test-accounts: ${SEED_TEST_ACCOUNTS:false}
   # Password inicial de admin@tranqui.com (solo si la cuenta no existe). Sin default conocido.
   admin-initial-password: ${ADMIN_INITIAL_PASSWORD:}
+  # Datos de demo realistas (LocalDemoSeeder). Solo tienen efecto con el perfil "local".
+  demo-data: ${DEMO_DATA:false}
+  # Simulación de integraciones con OAuth real (Google Calendar). Solo true en el perfil "local".
+  local-simulations: false
 
 site:
   access:
     password: ${SITE_ACCESS_PASSWORD:}
+
+# Transporte de los mails: "resend" (API de Resend, producción) o "smtp" (spring.mail.*, usado en
+# el entorno local con Mailpit). Ver ResendEmailService.
+mail:
+  transport: ${MAIL_TRANSPORT:resend}
 
 resend:
   api-key: ${RESEND_API_KEY:}

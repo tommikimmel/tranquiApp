@@ -82,9 +82,18 @@ Contexto técnico ampliado: [docs/arquitectura/contexto.md](docs/arquitectura/co
 | Tests | `./mvnw test` |
 | Empaquetar | `./mvnw -DskipTests package` |
 
-### Entorno local completo
+### Entorno local completo (desde la raíz)
 
-Ver [docs/entornos/local.md](docs/entornos/local.md).
+| Qué | Comando |
+|---|---|
+| Levantar todo (verifica puertos y pregunta antes de frenar algo) | `npm run local` |
+| Logs del backend | `npm run local:logs` |
+| Frenar | `npm run local:down` |
+| Borrar la base local y volver a sembrar | `npm run local:reset` |
+
+App en `localhost:5173`, mails en `localhost:8025`, cuentas de demo con contraseña `admin123`.
+Detalle en [docs/entornos/local.md](docs/entornos/local.md). Nunca frenes procesos ni contenedores
+ajenos sin preguntarle al usuario.
 
 ---
 

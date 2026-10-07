@@ -1,8 +1,14 @@
 package com.tranqui.app.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -15,6 +21,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -32,6 +39,14 @@ public class ResendEmailService {
 
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
+
+    // "resend" (producción) o "smtp" (entorno local con Mailpit, ver application-local.yml).
+    @Value("${mail.transport:resend}")
+    private String transport;
+
+    // Solo existe cuando spring.mail.host está configurado (perfil local); en producción no hay bean.
+    @Autowired
+    private ObjectProvider<JavaMailSender> mailSenderProvider;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.forLanguageTag("es-AR"));
 
@@ -657,6 +672,9 @@ public class ResendEmailService {
     }
 
     private boolean enviarCorreoConAdjunto(String toEmail, String asunto, String htmlBody, String filename, String base64Content) {
+        if (usarSmtp()) {
+            return enviarPorSmtp(toEmail, asunto, htmlBody, null, filename, base64Content);
+        }
         if (apiKey == null || apiKey.trim().isEmpty() || !apiKey.startsWith("re_")) {
             log.info("==================================================================");
             log.info("[RESEND MOCK/DEV MODE] No hay API Key de Resend configurada.");
@@ -708,6 +726,10 @@ public class ResendEmailService {
     }
 
     private void enviarCorreo(String toEmail, String asunto, String htmlBody, String replyTo) {
+        if (usarSmtp()) {
+            enviarPorSmtp(toEmail, asunto, htmlBody, replyTo, null, null);
+            return;
+        }
         if (apiKey == null || apiKey.trim().isEmpty() || !apiKey.startsWith("re_")) {
             log.info("==================================================================");
             log.info("[RESEND MOCK/DEV MODE] No hay API Key de Resend configurada.");
@@ -747,6 +769,44 @@ public class ResendEmailService {
             }
         } catch (Exception e) {
             log.error("Excepción al enviar correo mediante Resend a {}", toEmail, e);
+        }
+    }
+
+    // ================================================================================
+    // Transporte SMTP — solo entorno local (Mailpit). Mismo HTML que se envía por Resend.
+    // ================================================================================
+
+    private boolean usarSmtp() {
+        return "smtp".equalsIgnoreCase(transport);
+    }
+
+    private boolean enviarPorSmtp(String toEmail, String asunto, String htmlBody, String replyTo,
+                                  String filename, String base64Content) {
+        JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
+        if (mailSender == null) {
+            log.warn("mail.transport=smtp pero no hay spring.mail.host configurado: no se envió el correo a {} ({})", toEmail, asunto);
+            return false;
+        }
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            boolean conAdjunto = filename != null && base64Content != null;
+            MimeMessageHelper helper = new MimeMessageHelper(message, conAdjunto, "UTF-8");
+            helper.setFrom(String.format("Tranqui App <%s>", fromEmail));
+            helper.setTo(toEmail);
+            helper.setSubject(asunto);
+            helper.setText(htmlBody, true);
+            if (replyTo != null && !replyTo.isBlank()) {
+                helper.setReplyTo(replyTo);
+            }
+            if (conAdjunto) {
+                helper.addAttachment(filename, new ByteArrayResource(Base64.getDecoder().decode(base64Content)));
+            }
+            mailSender.send(message);
+            log.info("Correo enviado por SMTP a {} ({})", toEmail, asunto);
+            return true;
+        } catch (Exception e) {
+            log.error("Error al enviar correo por SMTP a {}", toEmail, e);
+            return false;
         }
     }
 }
