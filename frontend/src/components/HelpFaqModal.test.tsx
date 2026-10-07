@@ -36,13 +36,13 @@ describe('HelpFaqModal', () => {
   it('plays the explanatory video with Spanish subtitles', async () => {
     const { container } = render(<HelpFaqModal onClose={() => {}} />)
 
-    await userEvent.click(screen.getByRole('button', { name: /¿Cómo cancelo un turno\?/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Cerré la ventana de pago/ }))
     await userEvent.click(screen.getByRole('button', { name: /Ver video explicativo/ }))
 
     const video = container.ownerDocument.querySelector('video')
-    expect(video).toHaveAttribute('src', '/videos/V-P11.webm')
+    expect(video).toHaveAttribute('src', '/videos/V-P07.webm')
     const track = video?.querySelector('track')
-    expect(track).toHaveAttribute('src', '/videos/V-P11.vtt')
+    expect(track).toHaveAttribute('src', '/videos/V-P07.vtt')
     expect(track).toHaveAttribute('srclang', 'es')
 
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar video' }))
@@ -59,5 +59,11 @@ describe('HelpFaqModal', () => {
   it('has unique question ids', () => {
     const ids = FAQ_ITEMS.map(i => i.id)
     expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('only shows the video button on questions that have a video', async () => {
+    render(<HelpFaqModal onClose={() => {}} />)
+    await userEvent.click(screen.getByRole('button', { name: /¿Cómo cancelo un turno\?/ }))
+    expect(screen.queryByRole('button', { name: /Ver video explicativo/ })).not.toBeInTheDocument()
   })
 })

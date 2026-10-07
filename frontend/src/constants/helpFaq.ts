@@ -47,7 +47,7 @@ Te llega un **código de 6 dígitos** al email: lo ingresás y la cuenta queda a
     answer: `En la pantalla de ingreso tocá **"Recuperar contraseña"**, poné tu email y vas a recibir un código. Ingresalo junto con tu nueva contraseña.
 
 Si entraste con Google, no tenés contraseña: usá **"Ingresar con Google"**.`,
-    video: { id: 'V-P01', title: 'Recuperar tu contraseña', start: 0 },
+    video: { id: 'V-P01', title: 'Recuperar tu contraseña', start: 75 },
   },
   {
     id: 'P03',
@@ -56,7 +56,6 @@ Si entraste con Google, no tenés contraseña: usá **"Ingresar con Google"**.`,
     answer: `En la página de inicio filtrá por **profesión** (psicólogo/a o psiquiatra), **especialidad**, **modalidad** (online o presencial) y **motivo de consulta**: los chips salen de los temas que atienden los profesionales. Cada tarjeta muestra la disponibilidad próxima.
 
 Tocá la tarjeta para ver el perfil completo: formación, matrícula, experiencia, a quién atiende y precio.`,
-    video: { id: 'V-P03', title: 'Cómo encontrar al profesional indicado' },
   },
   {
     id: 'P04',
@@ -67,7 +66,6 @@ Tocá la tarjeta para ver el perfil completo: formación, matrícula, experienci
 El **psiquiatra** es médico: puede hacer diagnóstico, indicar tratamiento farmacológico y **emitir recetas**.
 
 Si no sabés por dónde empezar, una primera consulta con un psicólogo/a suele ser lo indicado, y si hace falta te deriva.`,
-    video: { id: 'V-P04', title: '¿Psicólogo o psiquiatra?' },
   },
   {
     id: 'P05',
@@ -103,7 +101,6 @@ Si no llegaste a pagar, entrá a **"Mis Turnos"** (menú de tu perfil, arriba a 
     answer: `Depende del profesional. Si trabaja con tu cobertura, al reservar vas a ver la opción de **obra social**, donde elegís la cobertura y cargás tu **número de afiliado**. Algunos profesionales tienen tarifas especiales para coberturas puntuales.
 
 Podés guardar tu obra social en **Mi Cuenta** para no cargarla cada vez.`,
-    video: { id: 'V-P08', title: 'Atenderte con tu obra social o prepaga' },
   },
   {
     id: 'P09',
@@ -112,14 +109,12 @@ Podés guardar tu obra social en **Mi Cuenta** para no cargarla cada vez.`,
     answer: `En los turnos **online** se genera un link de **Google Meet**. Lo encontrás en el mail de confirmación, en **"Mis Turnos"** y en el inicio el día del turno (**"Unirse a la llamada"**).
 
 El link **se activa 10 minutos antes**. Buscá un lugar tranquilo y con buena conexión.`,
-    video: { id: 'V-P09', title: 'Cómo entrar a tu sesión online' },
   },
   {
     id: 'P10',
     audience: 'paciente',
     question: 'Tengo un turno presencial, ¿cómo llego?',
     answer: `En la confirmación, en el mail y en **"Mis Turnos"** está la **dirección del consultorio** con un **mapa**. Te recomendamos llegar 10 minutos antes.`,
-    video: { id: 'V-P10', title: 'Cómo llegar a tu turno presencial' },
   },
   {
     id: 'P11',
@@ -131,7 +126,6 @@ El link **se activa 10 minutos antes**. Buscá un lugar tranquilo y con buena co
 - Si faltan **menos de 48 horas**, el turno se cancela pero **no corresponde reembolso**.
 
 Antes de confirmar, la app te muestra cuál de los dos casos aplica. Si el turno lo cancela el profesional, el reembolso es total siempre.`,
-    video: { id: 'V-P11', title: 'Cancelar un turno y cuándo te devuelven el dinero' },
   },
   {
     id: 'P12',
@@ -151,7 +145,6 @@ Si preferís, podés cancelar y reservar otro horario, teniendo en cuenta la reg
 - **"No podré asistir"** cancela el turno con la misma política de reembolso que una cancelación normal.
 
 No hace falta iniciar sesión.`,
-    video: { id: 'V-P13', title: 'Confirmar asistencia desde el mail' },
   },
   {
     id: 'P14',
@@ -160,21 +153,18 @@ No hace falta iniciar sesión.`,
     answer: `En el perfil del profesional, además de las consultas, aparecen los **documentos** que ofrece (receta, certificado, informe), cada uno con su precio. Elegís el documento, pagás y el profesional te lo entrega: las recetas electrónicas te llegan firmadas y el resto por mail.
 
 Las **recetas solo las emiten psiquiatras**.`,
-    video: { id: 'V-P14', title: 'Pedir una receta, un certificado o un informe' },
   },
   {
     id: 'P15',
     audience: 'paciente',
     question: '¿Cómo hablo con mi profesional?',
     answer: `Desde la tarjeta o el perfil del profesional, con el botón **"Chatear"**. El chat no reemplaza a la sesión ni sirve para urgencias.`,
-    video: { id: 'V-P15', title: 'Hablar con tu profesional por chat' },
   },
   {
     id: 'P16',
     audience: 'paciente',
     question: '¿Cómo cambio mis datos, mi obra social o las notificaciones?',
     answer: `En **Mi Cuenta** podés editar tus datos personales y documento, tu obra social y número de afiliado, tu contraseña, y activar o desactivar las notificaciones por **email** (confirmaciones y recordatorios de tus turnos).`,
-    video: { id: 'V-P16', title: 'Editar tus datos, tu obra social y las notificaciones' },
   },
   {
     id: 'P17',
@@ -189,7 +179,6 @@ En **Mi Cuenta** podés **solicitar una copia** de todos tus datos, y en la **Po
     audience: 'paciente',
     question: '¿Cómo pido una copia de mis datos?',
     answer: `En **Mi Cuenta** tocá **"Solicitar copia de mis datos"**. El equipo te la envía por email.`,
-    video: { id: 'V-P16', title: 'Editar tus datos, tu obra social y las notificaciones' },
   },
   {
     id: 'P19',
@@ -198,7 +187,6 @@ En **Mi Cuenta** podés **solicitar una copia** de todos tus datos, y en la **Po
     answer: `En **Mi Cuenta**, al final, está **eliminar cuenta**: escribís **ELIMINAR** para confirmar.
 
 Es **permanente** y **cancela todos tus turnos futuros**. Revisá antes los reembolsos que te correspondan.`,
-    video: { id: 'V-P19', title: 'Eliminar tu cuenta' },
   },
   {
     id: 'P20',
@@ -211,7 +199,6 @@ Es **permanente** y **cancela todos tus turnos futuros**. Revisá antes los reem
     audience: 'paciente',
     question: 'Tengo un problema, ¿cómo contacto a soporte?',
     answer: `Tocá **"Soporte"** (menú de tu perfil o acceso rápido del inicio), contanos qué pasa (por ejemplo, "Problema con un pago") y se crea un **ticket**. La respuesta te llega en la misma sección y por email.`,
-    video: { id: 'V-P21', title: 'Contactar a soporte' },
   },
 
   // ── Profesionales ────────────────────────────────────────────────────────────────────────
@@ -241,7 +228,6 @@ Después cargás tus **datos fiscales** (CUIT, condición frente al IVA, razón 
     audience: 'profesional',
     question: '¿Cómo completo mi perfil público?',
     answer: `En **Configuración** completás todo lo que ve el paciente: foto, descripción, especialidad, modalidades (online y/o presencial), dirección del consultorio con el mapa, formación, experiencia laboral, temas que tratás, pacientes que atendés (adultos, adolescentes…) y tus redes (Instagram, LinkedIn).`,
-    video: { id: 'V-R03', title: 'Completar tu perfil público' },
   },
   {
     id: 'R04',
@@ -258,7 +244,6 @@ Si tarda o hay un dato mal cargado, escribí a soporte.`,
     answer: `En **Configuración → Integración con Mercado Pago** tocá conectar e iniciá sesión en tu cuenta de Mercado Pago para autorizar a Tranqui. A partir de ahí, lo que pagan tus pacientes va **directo a tu cuenta**.
 
 Sin esta conexión no podés aparecer en el buscador.`,
-    video: { id: 'V-R05', title: 'Conectar Mercado Pago' },
   },
   {
     id: 'R06',
@@ -270,14 +255,12 @@ Sin esta conexión no podés aparecer en el buscador.`,
 - **Tus eventos personales** de Google bloquean esos horarios en Tranqui, para que nadie reserve cuando estás ocupado/a.
 
 Los turnos confirmados antes de conectar se suben solos en los minutos siguientes.`,
-    video: { id: 'V-R06', title: 'Conectar Google Calendar' },
   },
   {
     id: 'R07',
     audience: 'profesional',
     question: '¿Cómo configuro mis días y horarios de atención?',
     answer: `En **Agenda → Disponibilidad semanal** cargás los bloques de cada día (por ejemplo, lunes de 9 a 13 y de 14 a 18), la **duración del turno** y el **intervalo entre turnos**. La app calcula los **horarios reservables** que ve el paciente.`,
-    video: { id: 'V-R07', title: 'Configurar tus horarios de atención' },
   },
   {
     id: 'R08',
@@ -289,14 +272,12 @@ Los turnos confirmados antes de conectar se suben solos en los minutos siguiente
 - **Recetas y documentos**, que **no ocupan turno**.
 
 Podés reordenarlos (así los ve el paciente), archivarlos y **aumentar todos los precios** en un porcentaje con redondeo. Al cargar el precio podés escribir "90k" o "90 mil".`,
-    video: { id: 'V-R08', title: 'Honorarios y servicios' },
   },
   {
     id: 'R09',
     audience: 'profesional',
     question: '¿Dónde veo mis turnos del día y cómo inicio una sesión?',
     answer: `En **Inicio** están las **sesiones de hoy** y los **próximos eventos**. Cada turno online tiene el botón de **Google Meet**. Desde el turno también podés **marcar la asistencia** del paciente.`,
-    video: { id: 'V-R09', title: 'Tu día: sesiones, Meet y asistencia' },
   },
   {
     id: 'R10',
@@ -305,14 +286,12 @@ Podés reordenarlos (así los ve el paciente), archivarlos y **aumentar todos lo
     answer: `Desde el turno en **Inicio** o en la **Agenda**: con **reprogramar** elegís la nueva fecha y hora y el paciente recibe el aviso; con **cancelar**, el paciente recibe el reembolso.
 
 Si tenés Google Calendar conectado, el evento se actualiza o se borra solo.`,
-    video: { id: 'V-R10', title: 'Reprogramar o cancelar el turno de un paciente' },
   },
   {
     id: 'R11',
     audience: 'profesional',
     question: 'Un paciente pidió un documento, ¿cómo se lo entrego?',
     answer: `En **Inicio → Documentos solicitados** ves las recetas, certificados e informes pagados y pendientes de entregar. La receta electrónica la emitís desde la app y le llega firmada al paciente. Los demás documentos se los enviás por mail.`,
-    video: { id: 'V-R11', title: 'Entregar documentos solicitados' },
   },
   {
     id: 'R12',
@@ -327,14 +306,12 @@ La emisión de recetas electrónicas **todavía no está habilitada**: estamos t
     audience: 'profesional',
     question: '¿Para qué sirven las "Notas y pendientes"?',
     answer: `En la **Agenda** podés anotar recordatorios **clínicos** o **administrativos** (por ejemplo, "Llamar a la prepaga de Rossi"), marcarlos como **urgentes** y tacharlos cuando los resolvés.`,
-    video: { id: 'V-R13', title: 'Notas y pendientes' },
   },
   {
     id: 'R14',
     audience: 'profesional',
     question: '¿Cómo veo y gestiono a mis pacientes?',
     answer: `En **Pacientes** está el listado de quienes se atendieron con vos: datos de contacto, cobertura y el chat. Si a un paciente le falta algún dato (por ejemplo, para emitirle una receta), la app te avisa qué campos completar.`,
-    video: { id: 'V-R14', title: 'Tus pacientes' },
   },
   {
     id: 'R15',
@@ -344,7 +321,6 @@ La emisión de recetas electrónicas **todavía no está habilitada**: estamos t
 - **Clínico**: pensado para psiquiatras. Todo lo anterior más el módulo de recetas electrónicas oficiales.
 
 Los dos se pueden pagar **mensual** o **anual** (con 2 meses sin cargo). Los precios vigentes los ves en la pantalla de planes.`,
-    video: { id: 'V-R15', title: 'Planes y precios' },
   },
   {
     id: 'R16',
@@ -359,7 +335,6 @@ Los dos se pueden pagar **mensual** o **anual** (con 2 meses sin cargo). Los pre
     answer: `Cuando tu perfil está listo, la app te muestra los planes. Elegís el plan y el ciclo (**mensual o anual**) y pagás con **Mercado Pago**. El débito se renueva automáticamente.
 
 Apenas Mercado Pago confirma el pago, tu perfil queda visible.`,
-    video: { id: 'V-R17', title: 'Contratar tu suscripción' },
   },
   {
     id: 'R18',
@@ -368,7 +343,6 @@ Apenas Mercado Pago confirma el pago, tu perfil queda visible.`,
     answer: `En **Configuración → Suscripción**, con **"Cancelar renovación automática"**. No se te vuelve a cobrar y **mantenés el acceso hasta el fin del período que ya pagaste**: la fecha aparece en pantalla y te llega por mail.
 
 Si Mercado Pago no confirma la cancelación, la app te avisa y no se cancela nada, para que no te sigan debitando sin saberlo.`,
-    video: { id: 'V-R18', title: 'Cancelar la renovación automática' },
   },
   {
     id: 'R19',
@@ -377,7 +351,6 @@ Si Mercado Pago no confirma la cancelación, la app te avisa y no se cancela nad
     answer: `Si la suscripción venció o se canceló, al entrar vas a ver la pantalla para **volver al buscador**. Elegís plan y ciclo, pagás, y el perfil vuelve a ser visible apenas Mercado Pago confirma.
 
 Tu agenda y tus pacientes se conservan.`,
-    video: { id: 'V-R19', title: 'Volver al buscador si tu perfil está oculto' },
   },
   {
     id: 'R20',
@@ -398,6 +371,5 @@ Si cancelás vos, o el paciente cancela con más de 48 hs, el reembolso sale de 
     audience: 'profesional',
     question: '¿Cómo contacto a soporte?',
     answer: `Desde **"Soporte"** (arriba a la derecha en tu panel), abriendo un ticket. La respuesta te llega en la misma sección y por email.`,
-    video: { id: 'V-P21', title: 'Contactar a soporte' },
   },
 ]
