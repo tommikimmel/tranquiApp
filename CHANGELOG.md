@@ -6,6 +6,14 @@ Todos los cambios relevantes de Tranqui App. Formato basado en
 
 ## [Sin publicar]
 
+### Modo mantenimiento
+
+- `npm run mantenimiento -- on ["mensaje"] | off | estado`: mientras está activo, el sitio muestra
+  solo una página de mantenimiento (503), aunque el backend esté apagado. El estado vive fuera de
+  `/app`, así que un deploy no lo cambia.
+- Acceso de administrador con un link de un solo uso por mantenimiento, para ver el sitio real
+  mientras el resto ve el aviso.
+
 ### Entorno local
 
 - `npm run local` levanta la app completa en local (`docker-compose.local.yml`): base propia,
