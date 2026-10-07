@@ -16,8 +16,8 @@ Todos los cambios relevantes de Tranqui App. Formato basado en
   centro de ayuda y bugs conocidos. Se migró el contenido de `.agent/` (ADRs, etapas, diseño de
   base, especificación del MVP, guías técnicas).
 - Plantilla de Pull Request.
-- Repositorio: quedan solo `main` y `develop` (más `whatsapp-bot`, pendiente de decisión); se
-  borraron las ramas viejas ya integradas.
+- Repositorio: quedan solo `main` y `develop`. Se borraron las ramas viejas ya integradas y la
+  rama `whatsapp-bot` (bot de WhatsApp, implementación a futuro).
 
 ## [v1.0.0] - 2026-10-07
 

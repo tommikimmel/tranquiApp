@@ -12,7 +12,7 @@ requieren aprobación explícita antes de ejecutarse.
 | # | Tarea | Tipo | Rama | Estado |
 |---|---|---|---|---|
 | 0 | Eliminar la carpeta `investigacion/` (fuera del repo) | chore | — | hecha |
-| 1 | Alinear `develop` con `main` y borrar las ramas viejas | chore | — | hecha (pendiente: decidir qué hacer con `whatsapp-bot`) |
+| 1 | Alinear `develop` con `main` y borrar las ramas viejas | chore | — | hecha (también se borró `whatsapp-bot`, con respaldo local en un bundle fuera del repo) |
 | 2 | Documentación: `AGENTS.md`, `CLAUDE.md`, `docs/`, `CHANGELOG.md`, plantilla de PR | docs | `docs/docs-guias-ia-y-flujo` | en revisión |
 | 3 | Entorno local de pruebas: perfil `local`, datos de demo realistas, mails en Mailpit, sin login de Google | feature | `feature/full-entorno-local` | pendiente |
 | 4 | Modo mantenimiento con flag (página única mientras está activo) | feature | `feature/infra-modo-mantenimiento` | pendiente |

@@ -13,7 +13,7 @@
 | `tranqui-frontend` | nginx que sirve el build de React (`frontend/nginx.conf`) |
 | `tranqui-backend` | Spring Boot |
 | `tranqui-db` | PostgreSQL 15 con volumen persistente |
-| `tranqui-bot`, `tranqui-bot-worker`, `wsp-db`, `wsp-redis` | Bot de WhatsApp (proyecto aparte, rama `whatsapp-bot`) |
+| `tranqui-bot`, `tranqui-bot-worker`, `wsp-db`, `wsp-redis` | Bot de WhatsApp (proyecto aparte, fuera de este repositorio; implementación a futuro) |
 
 ## Configuración
 
