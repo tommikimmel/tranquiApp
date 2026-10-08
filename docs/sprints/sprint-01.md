@@ -17,8 +17,8 @@ requieren aprobación explícita antes de ejecutarse.
 | 3 | Entorno local de pruebas: perfil `local`, datos de demo realistas, mails en Mailpit, sin login de Google | feature | `feature/full-entorno-local` | hecha, PR #2, v1.1.0 ([spec](../specs/2026-10-07-entorno-local.md)) |
 | 4 | Modo mantenimiento con flag (página única mientras está activo) | feature | `feature/infra-modo-mantenimiento` | hecha, PR #3, v1.1.0 ([spec](../specs/2026-10-07-modo-mantenimiento.md)) |
 | 4b | Mail de novedades al terminar el mantenimiento (Broadcasts de Resend) | feature | `feature/full-mail-novedades` | hecha, PR #5, v1.1.0 ([spec](../specs/2026-10-07-mail-novedades.md)) |
-| 5 | GitHub Actions (CI en PRs, deploy al taggear `main`) y secretos fuera del repo, deploy por clave SSH | chore | `chore/infra-github-actions` | hecha, PR #6, v1.1.0 ([spec](../specs/2026-10-07-github-actions.md)); primer deploy automático el 2026-10-07; falta apagar el login SSH por contraseña |
-| 6 | Revisar secretos en el historial (gitleaks), rotar los expuestos y hacer público el repo con ramas protegidas | chore | — | historial revisado; spec en borrador ([spec](../specs/2026-10-07-secretos-y-repo-publico.md)) |
+| 5 | GitHub Actions (CI en PRs, deploy al taggear `main`) y secretos fuera del repo, deploy por clave SSH | chore | `chore/infra-github-actions` | hecha, PR #6, v1.1.0 ([spec](../specs/2026-10-07-github-actions.md)); primer deploy automático el 2026-10-07 |
+| 6 | Revisar secretos en el historial (gitleaks), rotar los expuestos y hacer público el repo con ramas protegidas | chore | — | hecha el 2026-10-08 ([spec](../specs/2026-10-07-secretos-y-repo-publico.md)); falta rotar el token de QBI2 |
 | 7 | Limpieza de la base de producción: borrar todo menos el admin y el catálogo de planes, cancelando antes los débitos de Mercado Pago de los profesionales de prueba | chore | `chore/infra-limpieza-produccion` | hecha el 2026-10-08, PR #10 ([spec](../specs/2026-10-07-limpieza-produccion.md)) |
 
 ## Después de este sprint
