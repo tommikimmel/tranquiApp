@@ -20,7 +20,7 @@ cancelarlo en Mercado Pago antes (mismo motivo que `MercadoPagoService.cancelarS
 Tablas (esquema actual):
 
 - **Se conservan:** `plans`, `features`, `plan_features`, `flyway_schema_history` y, de `usuario`,
-  solo `admin@tranqui.com`.
+  solo `admin@tranquisalud.com`.
 - **Se vacían:** `disponibilidad`, `google_calendar_evento_externo`, `informe_clinico`,
   `invoice_sequences`, `invoices`, `mensaje`, `notificacion`, `novedades_envio`, `pago`, `receta`,
   `seguimiento_diario`, `solicitud_documento`, `subscription_events`, `subscription_payments`,
@@ -41,7 +41,7 @@ Un script `scripts/vps/limpieza-produccion.sh`, que corre en el VPS, con dos mod
      alguno falla, se detiene sin borrar nada.
   2. Para el backend (`docker compose -p app stop tranqui-backend`), así nada escribe en el medio.
   3. En **una sola transacción**: `TRUNCATE ... RESTART IDENTITY CASCADE` de todas las tablas que
-     no están en la lista de conservadas, y `DELETE FROM usuario WHERE email <> 'admin@tranqui.com'`.
+     no están en la lista de conservadas, y `DELETE FROM usuario WHERE email <> 'admin@tranquisalud.com'`.
      Antes de confirmar, comprueba que quede exactamente un usuario y que `plans` siga con filas;
      si no, `ROLLBACK`.
   4. Levanta el backend y espera `/api/health`.
@@ -57,7 +57,7 @@ tablas sin tocar y no cancela los débitos de Mercado Pago de forma ordenada.
 
 - [ ] El inventario se revisa con el dueño antes de ejecutar.
 - [ ] Ningún preapproval de prueba queda activo en Mercado Pago.
-- [ ] Solo queda `admin@tranqui.com` en `usuario`; `plans`, `features` y `plan_features` sin cambios.
+- [ ] Solo queda `admin@tranquisalud.com` en `usuario`; `plans`, `features` y `plan_features` sin cambios.
 - [ ] El admin entra y ve el panel vacío; un registro nuevo de paciente y de profesional funciona.
 
 ## Riesgos e impacto
@@ -71,6 +71,6 @@ tablas sin tocar y no cancela los débitos de Mercado Pago de forma ordenada.
 
 ## Preguntas abiertas
 
-- Ninguna: el alcance quedó definido por el dueño el 2026-10-07.
+- En producción hay dos cuentas con rol ADMIN: `admin@tranquisalud.com` (la que se usa) y `admin@tranqui.com` (la que crea `DataInitializer` si no existe). ¿Se conserva también `admin@tranqui.com`? Si se borra, `DataInitializer` la vuelve a crear al arrancar con `ADMIN_INITIAL_PASSWORD`, salvo que se cambie ese comportamiento.
 
 ## Resultado (completar al cerrar)
