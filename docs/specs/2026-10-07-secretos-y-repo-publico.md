@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-07
 - **Tipo:** chore
 - **Sprint:** sprint-01 (tarea 6)
-- **Estado:** borrador
+- **Estado:** implementada (2026-10-08), salvo la rotación del token de QBI2
 - **Rama / PR:** `docs/docs-specs-secretos-y-limpieza` (solo la spec; la tarea no cambia código)
 
 ## Entendimiento del problema
@@ -44,7 +44,6 @@ neutraliza es cambiarlo.
    - exigir los checks del CI: `Backend (tests)`, `Frontend (typecheck, tests y build)` y
      `Lint (solo lo que cambia el PR)`;
    - bloquear force push y borrado de la rama.
-   Para `main`, además, solo squash merge desde `develop` o `hotfix/*` (ver `docs/flujo/git.md`).
 5. **Repetir la revisión** con gitleaks justo antes del cambio de visibilidad, por si entró algo nuevo.
 
 ## Criterios de aceptación
@@ -57,9 +56,6 @@ neutraliza es cambiarlo.
 
 ## Riesgos e impacto
 
-- **Decisión del dueño (2026-10-07): por ahora no se cambia la contraseña de root.** Mientras siga
-  siendo la misma que está en el historial, el repo **no** puede pasar a público: cualquiera
-  tendría acceso root al VPS. El paso 3 queda bloqueado hasta rotarla.
 - Si el JWT es de un servicio en uso por producción, regenerarlo exige actualizar
   `/srv/tranqui/.env` y reiniciar el backend en el mismo momento.
 - El repo público expone la estructura de la app; no expone datos ni claves si se cumplen los
@@ -67,6 +63,19 @@ neutraliza es cambiarlo.
 
 ## Preguntas abiertas
 
-- ¿De qué servicio es el JWT de la línea 61 de `.env.template`? (lo responde el dueño)
+- Resuelta: el JWT es `QBI2_RECIPE_TOKEN`, del entorno de homologación (`QBI2_RECIPE_ENV=hml`) de recetas electrónicas. El dueño lo rota con QBI2; el nuevo va solo en `/srv/tranqui/.env`.
 
 ## Resultado (completar al cerrar)
+
+Ejecutada el 2026-10-08:
+
+- Contraseña de root cambiada por el dueño (guardada solo en su gestor de contraseñas).
+- SSH solo con clave: `/etc/ssh/sshd_config.d/00-tranqui.conf` (`PasswordAuthentication no`,
+  `KbdInteractiveAuthentication no`, `PermitRootLogin prohibit-password`); va antes que
+  `50-cloud-init.conf`, que seguía en `yes`. Verificado: con clave entra, con contraseña
+  `Permission denied (publickey)`. Claves autorizadas: dueño, GitHub Actions y un colaborador.
+- gitleaks repetido sobre todo el historial: sin hallazgos nuevos.
+- Repo público.
+- Ruleset "main y develop protegidas": PR obligatorio (0 aprobaciones), los 3 checks del CI,
+  sin force push ni borrado. Verificado: un push directo a `develop` es rechazado (GH013).
+- Pendiente: rotar `QBI2_RECIPE_TOKEN` con QBI2 (está en el historial; es de homologación).
