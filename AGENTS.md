@@ -108,6 +108,9 @@ ajenos sin preguntarle al usuario.
   `frontend/src/utils/profilePhoto.ts` (400 px, JPEG) antes de guardarse.
 - **Centro de ayuda:** preguntas en `frontend/src/constants/helpFaq.ts`, videos y subtítulos en
   `frontend/public/videos/`. Ver [docs/centro-de-ayuda.md](docs/centro-de-ayuda.md).
+- **Modo mantenimiento:** `npm run mantenimiento -- on|off|estado` (ver
+  [docs/entornos/produccion.md](docs/entornos/produccion.md)). Toca producción: solo con aprobación
+  explícita del usuario para esa acción.
 - **Errores conocidos** pendientes de arreglar: [docs/bugs-conocidos.md](docs/bugs-conocidos.md).
 
 ---

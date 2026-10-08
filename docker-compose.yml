@@ -86,6 +86,10 @@ services:
     restart: always
     ports:
       - "127.0.0.1:3000:80"
+    volumes:
+      # Modo mantenimiento: carpeta del host fuera de /app (un deploy no la borra). Ver
+      # frontend/nginx.conf y docs/entornos/produccion.md. Docker la crea vacía si no existe.
+      - /srv/tranqui/mantenimiento:/etc/nginx/mantenimiento:ro
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tranqui-frontend.entrypoints=websecure"

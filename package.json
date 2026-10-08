@@ -6,6 +6,7 @@
   "scripts": {
     "deploy": "node deploy.js",
     "test": "echo \"Error: no test specified\" && exit 1",
+    "mantenimiento": "node scripts/mantenimiento.mjs",
     "local": "node scripts/local.mjs up",
     "local:down": "node scripts/local.mjs down",
     "local:reset": "node scripts/local.mjs reset",

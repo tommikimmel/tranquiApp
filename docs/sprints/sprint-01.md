@@ -14,8 +14,8 @@ requieren aprobación explícita antes de ejecutarse.
 | 0 | Eliminar la carpeta `investigacion/` (fuera del repo) | chore | — | hecha |
 | 1 | Alinear `develop` con `main` y borrar las ramas viejas | chore | — | hecha (también se borró `whatsapp-bot`, con respaldo local en un bundle fuera del repo) |
 | 2 | Documentación: `AGENTS.md`, `CLAUDE.md`, `docs/`, `CHANGELOG.md`, plantilla de PR | docs | `docs/docs-guias-ia-y-flujo` | hecha (PR #1) |
-| 3 | Entorno local de pruebas: perfil `local`, datos de demo realistas, mails en Mailpit, sin login de Google | feature | `feature/full-entorno-local` | en revisión ([spec](../specs/2026-10-07-entorno-local.md)) |
-| 4 | Modo mantenimiento con flag (página única mientras está activo) | feature | `feature/infra-modo-mantenimiento` | pendiente |
+| 3 | Entorno local de pruebas: perfil `local`, datos de demo realistas, mails en Mailpit, sin login de Google | feature | `feature/full-entorno-local` | en revisión, PR #2 ([spec](../specs/2026-10-07-entorno-local.md)) |
+| 4 | Modo mantenimiento con flag (página única mientras está activo) | feature | `feature/infra-modo-mantenimiento` | en revisión, PR #3 ([spec](../specs/2026-10-07-modo-mantenimiento.md)) |
 | 5 | GitHub Actions (CI en PRs, deploy al taggear `main`) y secretos fuera del repo, deploy por clave SSH | chore | `chore/infra-github-actions` | pendiente |
 | 6 | Revisar secretos en el historial (gitleaks), rotar los expuestos y hacer público el repo con ramas protegidas | chore | — | pendiente |
 | 7 | Limpieza de la base de producción: borrar todo menos el admin y el catálogo de planes, cancelando antes los débitos de Mercado Pago de los profesionales de prueba | chore | — | pendiente |
