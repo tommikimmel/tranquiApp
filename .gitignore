@@ -1,5 +1,6 @@
 .env
 .env*.local
+.env.vps
 .DS_Store
 .idea/
 .vscode/
