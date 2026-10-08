@@ -514,6 +514,28 @@ public class AuthController {
                 userDetails.getUsername(), dto.isEmailHabilitado()));
     }
 
+    // Suscripción a las novedades (mail masivo al terminar un mantenimiento). Sirve para pacientes
+    // y profesionales. Ver NovedadesService.
+    @GetMapping("/mi-cuenta/novedades")
+    public ResponseEntity<?> obtenerSuscripcionNovedades(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(java.util.Map.of("recibir", accountService.recibeNovedades(userDetails.getUsername())));
+    }
+
+    @PutMapping("/mi-cuenta/novedades")
+    public ResponseEntity<?> actualizarSuscripcionNovedades(
+            @RequestBody java.util.Map<String, Boolean> body,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        boolean recibir = Boolean.TRUE.equals(body.get("recibir"));
+        accountService.cambiarSuscripcionNovedades(userDetails.getUsername(), recibir);
+        return ResponseEntity.ok(java.util.Map.of("recibir", recibir));
+    }
+
     @PostMapping("/mi-cuenta/password")
     public ResponseEntity<?> cambiarPassword(
             @RequestBody com.tranqui.app.model.dto.CambiarPasswordDto dto,

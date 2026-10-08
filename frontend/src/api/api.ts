@@ -162,6 +162,17 @@ export const api = {
   actualizarMiCuenta: (data: any) => apiFetch('/auth/mi-cuenta', { method: 'PUT', body: data }),
   actualizarPreferenciasNotificacion: (data: { emailHabilitado: boolean }) =>
     apiFetch('/auth/mi-cuenta/notificaciones', { method: 'PUT', body: data as any }),
+
+  // Mail de novedades (Broadcasts de Resend): pacientes y profesionales.
+  obtenerSuscripcionNovedades: (): Promise<{ recibir: boolean }> =>
+    apiFetch('/auth/mi-cuenta/novedades'),
+
+  actualizarSuscripcionNovedades: (recibir: boolean): Promise<{ recibir: boolean }> =>
+    apiFetch('/auth/mi-cuenta/novedades', {
+      method: 'PUT',
+      body: JSON.stringify({ recibir }),
+      headers: { 'Content-Type': 'application/json' },
+    }),
   cambiarPassword: (data: { currentPassword?: string; newPassword: string }) =>
     apiFetch('/auth/mi-cuenta/password', { method: 'POST', body: data as any }),
   eliminarCuenta: (data?: { password?: string }) =>
@@ -231,11 +242,15 @@ export const api = {
   desconectarMercadoPago: () =>
     apiFetch('/medicos/mercadopago/disconnect', { method: 'POST' }),
 
-  getGoogleCalendarStatus: (): Promise<{ connected: boolean }> =>
+  getGoogleCalendarStatus: (): Promise<{ connected: boolean; simulated?: boolean }> =>
     apiFetch('/medicos/google-calendar/status'),
 
   getGoogleCalendarConnectUrl: (): Promise<{ url: string }> =>
     apiFetch('/medicos/google-calendar/connect'),
+
+  // Solo entorno local (perfil "local" del backend): marca Calendar como vinculado sin OAuth.
+  simularConexionGoogleCalendar: () =>
+    apiFetch('/medicos/google-calendar/connect-simulado', { method: 'POST' }),
 
   desconectarGoogleCalendar: () =>
     apiFetch('/medicos/google-calendar/disconnect', { method: 'POST' }),

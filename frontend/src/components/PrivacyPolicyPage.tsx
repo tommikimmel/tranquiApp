@@ -247,8 +247,12 @@ export default function PrivacyPolicyPage({ currentUser }: { currentUser?: any }
                 datos de tarjeta ni de cuenta bancaria.
               </li>
               <li>
-                <strong>Resend:</strong> envía los emails transaccionales (verificación de cuenta,
-                recuperación de contraseña).
+                <strong>Resend:</strong> envía los emails de la app (verificación de cuenta,
+                recuperación de contraseña, confirmaciones y recordatorios de turnos). Además guarda
+                tu nombre, email y tipo de cuenta (paciente o profesional) para enviarte las
+                novedades de Tranqui App. Podés darte de baja de las novedades con el link que
+                figura en cada mail o desde Mi Cuenta, y al eliminar tu cuenta borramos también ese
+                contacto.
               </li>
               <li>
                 <strong>Google:</strong> ver sección 9.

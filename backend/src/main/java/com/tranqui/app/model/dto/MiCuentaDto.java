@@ -39,4 +39,5 @@ public class MiCuentaDto {
 
     private boolean tienePassword; // false si la cuenta se creó/usa solo con Google
     private boolean notificacionesEmailHabilitadas;
+    private boolean recibirNovedades;
 }
