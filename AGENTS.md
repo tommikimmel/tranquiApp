@@ -82,6 +82,14 @@ Contexto técnico ampliado: [docs/arquitectura/contexto.md](docs/arquitectura/co
 | Tests | `./mvnw test` |
 | Empaquetar | `./mvnw -DskipTests package` |
 
+### CI y deploy
+
+- Cada PR a `develop` o `main` corre el CI (`.github/workflows/ci.yml`): tests del backend, typecheck,
+  tests y build del frontend, y lint de los archivos que cambia el PR.
+- El deploy a producción es automático al crear el tag `vX.Y.Z` en `main`
+  (`.github/workflows/deploy.yml`). Nunca lo dispares sin aprobación explícita. Ver
+  [docs/flujo/releases.md](docs/flujo/releases.md).
+
 ### Entorno local completo (desde la raíz)
 
 | Qué | Comando |

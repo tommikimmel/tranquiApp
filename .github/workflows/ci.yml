@@ -1,0 +1,76 @@
+# CI: tests del backend y del frontend en cada PR a develop o main. También lo reutiliza el
+# workflow de deploy (workflow_call) para no desplegar nada que no pase los tests.
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Tests
+        run: ./mvnw -B -q test
+
+  frontend:
+    name: Frontend (typecheck, tests y build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        run: npx tsc -b
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  lint:
+    name: Lint (solo lo que cambia el PR)
+    # Hay avisos de lint previos en el código; este paso solo falla si el PR agrega errores nuevos
+    # en los archivos que toca (ver scripts/ci/lint-cambios.mjs).
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: frontend
+      - name: Lint de los archivos modificados
+        run: node scripts/ci/lint-cambios.mjs "origin/${{ github.base_ref }}"
