@@ -18,7 +18,7 @@ requieren aprobación explícita antes de ejecutarse.
 | 4 | Modo mantenimiento con flag (página única mientras está activo) | feature | `feature/infra-modo-mantenimiento` | pendiente |
 | 5 | GitHub Actions (CI en PRs, deploy al taggear `main`) y secretos fuera del repo, deploy por clave SSH | chore | `chore/infra-github-actions` | pendiente |
 | 6 | Revisar secretos en el historial (gitleaks), rotar los expuestos y hacer público el repo con ramas protegidas | chore | — | revisión de historial hecha; spec en borrador ([spec](../specs/2026-10-07-secretos-y-repo-publico.md)) |
-| 7 | Limpieza de la base de producción: borrar todo menos el admin y el catálogo de planes, cancelando antes los débitos de Mercado Pago de los profesionales de prueba | chore | — | spec en borrador ([spec](../specs/2026-10-07-limpieza-produccion.md)) |
+| 7 | Limpieza de la base de producción: borrar todo menos el admin y el catálogo de planes, cancelando antes los débitos de Mercado Pago de los profesionales de prueba | chore | — | spec aprobada ([spec](../specs/2026-10-07-limpieza-produccion.md)) |
 
 ## Decisiones tomadas
 

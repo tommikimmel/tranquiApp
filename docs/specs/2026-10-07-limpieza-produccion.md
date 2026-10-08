@@ -3,8 +3,8 @@
 - **Fecha:** 2026-10-07
 - **Tipo:** chore
 - **Sprint:** sprint-01 (tarea 7)
-- **Estado:** borrador
-- **Rama / PR:** `docs/docs-specs-secretos-y-limpieza` (spec); el script va en una rama aparte una vez aprobada
+- **Estado:** aprobada (2026-10-07)
+- **Rama / PR:** `docs/docs-specs-secretos-y-limpieza` (spec); script en `chore/infra-limpieza-produccion`
 
 ## Entendimiento del problema
 
@@ -71,6 +71,6 @@ tablas sin tocar y no cancela los débitos de Mercado Pago de forma ordenada.
 
 ## Preguntas abiertas
 
-- En producción hay dos cuentas con rol ADMIN: `admin@tranquisalud.com` (la que se usa) y `admin@tranqui.com` (la que crea `DataInitializer` si no existe). ¿Se conserva también `admin@tranqui.com`? Si se borra, `DataInitializer` la vuelve a crear al arrancar con `ADMIN_INITIAL_PASSWORD`, salvo que se cambie ese comportamiento.
+- Resuelta: en producción hay dos cuentas ADMIN, `admin@tranquisalud.com` (la que se usa) y `admin@tranqui.com`. Se conserva solo la primera. `DataInitializer` no recrea `admin@tranqui.com` porque `ADMIN_INITIAL_PASSWORD` no está en el `.env` de producción.
 
 ## Resultado (completar al cerrar)
