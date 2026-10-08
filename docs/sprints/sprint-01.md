@@ -21,6 +21,11 @@ requieren aprobación explícita antes de ejecutarse.
 | 6 | Revisar secretos en el historial (gitleaks), rotar los expuestos y hacer público el repo con ramas protegidas | chore | — | pendiente |
 | 7 | Limpieza de la base de producción: borrar todo menos el admin y el catálogo de planes, cancelando antes los débitos de Mercado Pago de los profesionales de prueba | chore | — | pendiente |
 
+## Después de este sprint
+
+La migración a microservicios empieza después del lanzamiento, en sprints propios: una fase por
+sprint según `docs/arquitectura/microservicios.md` (fase 0: plataforma y observabilidad).
+
 ## Decisiones tomadas
 
 - Se trabaja en local; no hay entorno remoto de staging.
