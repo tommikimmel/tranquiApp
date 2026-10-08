@@ -24,6 +24,9 @@ public class AccountService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private com.tranqui.app.service.novedades.NovedadesService novedadesService;
+
     @Transactional(readOnly = true)
     public MiCuentaDto obtenerMiCuenta(String email) {
         Usuario u = usuarioRepository.findByEmail(email)
@@ -82,6 +85,20 @@ public class AccountService {
     }
 
     @Transactional
+    public boolean recibeNovedades(String email) {
+        Usuario u = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+        return novedadesService.recibeNovedades(u);
+    }
+
+    @Transactional
+    public void cambiarSuscripcionNovedades(String email, boolean recibir) {
+        Usuario u = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+        novedadesService.cambiarSuscripcion(u, recibir);
+    }
+
+    @Transactional
     public void cambiarPassword(String email, String currentPassword, String newPassword) {
         Usuario u = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
@@ -114,6 +131,22 @@ public class AccountService {
         if (u.getPassword() != null) {
             if (password == null || !passwordEncoder.matches(password, u.getPassword())) {
                 throw new IllegalArgumentException("La contraseña ingresada es incorrecta.");
+            }
+        }
+
+        // El contacto de novedades en Resend se borra recién cuando la eliminación quedó confirmada.
+        final String emailOriginal = u.getEmail();
+        if (novedadesService != null) {
+            if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+                org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                        new org.springframework.transaction.support.TransactionSynchronization() {
+                            @Override
+                            public void afterCommit() {
+                                novedadesService.eliminarContacto(emailOriginal);
+                            }
+                        });
+            } else {
+                novedadesService.eliminarContacto(emailOriginal);
             }
         }
 
@@ -175,6 +208,7 @@ public class AccountService {
                 .domicilioPais(u.getDomicilioPais())
                 .tienePassword(u.getPassword() != null)
                 .notificacionesEmailHabilitadas(u.isNotificacionesEmailHabilitadas())
+                .recibirNovedades(u.isRecibirNovedades())
                 .build();
     }
 }

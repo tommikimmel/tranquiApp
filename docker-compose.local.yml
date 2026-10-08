@@ -46,6 +46,8 @@ services:
       APP_PUBLIC_URL: http://localhost:8081
       FRONTEND_URL: http://localhost:5173
       DEMO_DATA: "true"
+      # Token del endpoint interno de novedades (solo para probar en local).
+      NOVEDADES_TOKEN: local-novedades-token
     ports:
       - "127.0.0.1:8081:8080"
     depends_on:

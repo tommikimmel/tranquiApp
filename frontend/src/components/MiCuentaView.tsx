@@ -152,6 +152,8 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
   // Notificaciones state
   const [notifEmail, setNotifEmail] = useState(true)
   const [savingNotif, setSavingNotif] = useState(false)
+  const [novedades, setNovedades] = useState(true)
+  const [savingNovedades, setSavingNovedades] = useState(false)
 
   // Privacidad state
   const [solicitandoCopiaDatos, setSolicitandoCopiaDatos] = useState(false)
@@ -181,6 +183,7 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
         setObraSocial(data.obraSocial || '')
         setNumAfiliado(data.numAfiliado || '')
         setNotifEmail(data.notificacionesEmailHabilitadas !== false)
+        setNovedades(data.recibirNovedades !== false)
       })
       .catch((err) => {
         console.error('Error al cargar Mi Cuenta:', err)
@@ -274,6 +277,27 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
       showAlert(err.message || 'No pudimos guardar tu preferencia.', 'error')
     } finally {
       setSavingNotif(false)
+    }
+  }
+
+  // El estado real vive en Resend (incluye bajas hechas desde el link del mail de novedades).
+  useEffect(() => {
+    if (activeTab !== 'notificaciones') return
+    api.obtenerSuscripcionNovedades()
+      .then((r) => setNovedades(r.recibir !== false))
+      .catch(() => { /* se queda con el valor de Mi Cuenta */ })
+  }, [activeTab])
+
+  const handleToggleNovedades = async (value: boolean) => {
+    setNovedades(value)
+    setSavingNovedades(true)
+    try {
+      await api.actualizarSuscripcionNovedades(value)
+    } catch (err) {
+      setNovedades(!value)
+      showAlert(err instanceof Error && err.message ? err.message : 'No pudimos guardar tu preferencia.', 'error')
+    } finally {
+      setSavingNovedades(false)
     }
   }
 
@@ -650,6 +674,23 @@ export default function MiCuentaView({ onLogout, onUserUpdated }: {
                       </div>
                       <label className="toggle">
                         <input type="checkbox" checked={notifEmail} disabled={savingNotif} onChange={(e) => handleToggleNotifEmail(e.target.checked)} />
+                        <span className="toggle__track" />
+                      </label>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ width: '34px', height: '34px', borderRadius: 'var(--radius-sm)', background: 'var(--neutral-100)', color: 'var(--color-primary-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <MCIcon.Bell size={16} />
+                        </span>
+                        <div>
+                          <strong style={{ fontSize: 'var(--text-sm)' }}>Novedades de Tranqui</strong>
+                          <p style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>
+                            Un mail breve cuando sumamos mejoras a la app. Podés darte de baja cuando quieras.
+                          </p>
+                        </div>
+                      </div>
+                      <label className="toggle">
+                        <input type="checkbox" checked={novedades} disabled={savingNovedades} onChange={(e) => handleToggleNovedades(e.target.checked)} aria-label="Recibir novedades de Tranqui" />
                         <span className="toggle__track" />
                       </label>
                     </div>

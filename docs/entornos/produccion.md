@@ -64,5 +64,8 @@ ve el aviso. El token es nuevo en cada mantenimiento y se borra al apagarlo. No 
   Para una tarea de base de datos, además de prender el mantenimiento hay que frenar el backend.
 - El script se conecta por SSH con las mismas credenciales que el deploy (ver `secretos.md`).
 
+**Mail de novedades:** al prender con `--novedades archivo.md`, al apagar se manda a todos los
+usuarios un mail con lo que cambió (Broadcasts de Resend). Ver [docs/novedades.md](../novedades.md).
+
 **Regla:** ningún agente de IA prende ni apaga el mantenimiento sin aprobación explícita del dueño
 para esa acción puntual.

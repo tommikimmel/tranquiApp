@@ -11,6 +11,7 @@ cifrado. `.env` está en `.gitignore`; `.env.template` lista los nombres con val
 | Clave SSH privada para el deploy | Secreto de GitHub Actions `VPS_SSH_KEY` | El dueño, en GitHub: Settings → Secrets and variables → Actions (se puede reemplazar, no leer) |
 | Host y usuario del VPS | Secretos `VPS_HOST` y `VPS_USER` | Igual que el anterior |
 | Variables de producción (base, Mercado Pago, Resend, cifrado, Google) | Archivo `.env` **solo en el VPS** | El dueño, por SSH, editando ese archivo; después redeploy |
+| `NOVEDADES_TOKEN` (endpoint interno del mail de novedades) | Archivo `.env` del VPS | El dueño, por SSH; generarlo con `openssl rand -hex 32` |
 | Contraseña de root del VPS | Solo en el gestor de contraseñas del dueño | El dueño. No se usa en el CI ni en scripts |
 
 ## Estado actual y pendientes (2026-10-07)

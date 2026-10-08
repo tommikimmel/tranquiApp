@@ -117,6 +117,42 @@ public class ResendEmailService {
                 "</td></tr></table></div>";
     }
 
+    // ================================================================================
+    // NOVEDADES — mail masivo al terminar un mantenimiento (ver NovedadesService)
+    // ================================================================================
+
+    /**
+     * HTML del mail de novedades con la plantilla común. urlBaja es el link de baja: en los
+     * Broadcasts de Resend, "{{{RESEND_UNSUBSCRIBE_URL}}}" (lo reemplaza Resend por contacto); en
+     * los envíos individuales (prueba, entorno local), la sección de Mi Cuenta.
+     */
+    public String htmlNovedades(String titulo, List<String> items, String urlBaja) {
+        StringBuilder lista = new StringBuilder("<ul style=\"margin:0 0 8px;padding-left:20px;\">");
+        for (String item : items) {
+            lista.append("<li style=\"margin:0 0 8px;\">").append(escaparHtml(item)).append("</li>");
+        }
+        lista.append("</ul>");
+        String cuerpo = "<p>Terminamos una actualización de Tranqui App. Esto es lo nuevo:</p>" + lista +
+                "<p style=\"font-size:13px;color:" + COLOR_MUTED + ";margin-top:24px;\">" +
+                "Recibís este mail porque tenés una cuenta en Tranqui App. Si no querés recibir más novedades, " +
+                "<a href=\"" + urlBaja + "\" style=\"color:" + COLOR_MUTED + ";\">date de baja acá</a>. " +
+                "Vas a seguir recibiendo los mails de tus turnos.</p>";
+        return plantilla("Novedades", TONO_INFO, escaparHtml(titulo), cuerpo, "Ir a Tranqui App", frontendUrl);
+    }
+
+    /** Envío individual de un HTML ya armado (prueba de novedades y envío en el entorno local). */
+    public void enviarHtml(String toEmail, String asunto, String html) {
+        enviarCorreo(toEmail, asunto, html);
+    }
+
+    public String urlMiCuenta() {
+        return frontendUrl + "/mi-cuenta";
+    }
+
+    private static String escaparHtml(String texto) {
+        return texto == null ? "" : texto.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    }
+
     // Caja destacada centrada — usada para códigos de verificación y contraseñas temporales.
     private String cajaDestacada(String valor) {
         return "<div style=\"background:" + COLOR_PANEL + ";border:1px solid " + COLOR_BORDER + ";border-radius:10px;" +

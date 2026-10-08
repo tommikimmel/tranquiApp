@@ -6,6 +6,15 @@ Todos los cambios relevantes de Tranqui App. Formato basado en
 
 ## [Sin publicar]
 
+### Mail de novedades
+
+- Al apagar el mantenimiento se manda a todos los usuarios un mail con lo que cambió (Broadcasts de
+  Resend: no consume el cupo de los mails de la app). Un solo texto dividido en "Para todos",
+  "Pacientes" y "Profesionales"; vista previa, prueba solo para administradores e idempotencia.
+- Link de baja en cada mail (Ley 25.326) e interruptor "Novedades de Tranqui" en Mi Cuenta y en
+  Configuración del profesional. Al eliminar una cuenta se borra su contacto en Resend.
+- Política de Privacidad actualizada.
+
 ### Modo mantenimiento
 
 - `npm run mantenimiento -- on ["mensaje"] | off | estado`: mientras está activo, el sitio muestra
