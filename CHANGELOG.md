@@ -47,6 +47,7 @@ Todos los cambios relevantes de Tranqui App. Formato basado en
   ~45 turnos, pagos, chats, documentos, notificaciones y tickets. Solo con el perfil `local`.
 - Login con Google oculto en local (`VITE_GOOGLE_LOGIN=false`) y vinculación simulada de Google
   Calendar (solo con el perfil `local`).
+
 ### Arquitectura
 
 - Plan de migración a microservicios por fases (`docs/arquitectura/microservicios.md`) y ADR 009:
