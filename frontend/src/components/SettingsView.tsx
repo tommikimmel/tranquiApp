@@ -263,6 +263,27 @@ export default function SettingsView({
 
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
+  // Novedades de Tranqui (Broadcasts de Resend). El estado real vive en Resend.
+  const [novedades, setNovedades] = useState(true)
+  const [savingNovedades, setSavingNovedades] = useState(false)
+  useEffect(() => {
+    if (activeTab !== 'notificaciones') return
+    api.obtenerSuscripcionNovedades()
+      .then((r) => setNovedades(r.recibir !== false))
+      .catch(() => { /* se queda con el valor por defecto */ })
+  }, [activeTab])
+  const handleToggleNovedades = async (value: boolean) => {
+    setNovedades(value)
+    setSavingNovedades(true)
+    try {
+      await api.actualizarSuscripcionNovedades(value)
+    } catch (err) {
+      setNovedades(!value)
+      showAlert(err instanceof Error && err.message ? err.message : 'No pudimos guardar tu preferencia.', 'error')
+    } finally {
+      setSavingNovedades(false)
+    }
+  }
 
   useEffect(() => {
     if (initialTab) {
@@ -1353,6 +1374,16 @@ export default function SettingsView({
           <h2 className="card__title">Notificaciones</h2>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+            <label className="toggle">
+              <input type="checkbox" checked={novedades} disabled={savingNovedades} onChange={(e) => handleToggleNovedades(e.target.checked)} aria-label="Recibir novedades de Tranqui" />
+              <span className="toggle__track" />
+            </label>
+            <div>
+              <div style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--font-weight-medium)' }}>Novedades de Tranqui</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>Un mail breve cuando sumamos mejoras a la app. Podés darte de baja cuando quieras.</div>
+            </div>
+          </div>
           {[
             { id: 'notif-new-booking', label: 'Nueva reserva', desc: 'Te avisamos por email cuando un paciente agenda.' },
             { id: 'notif-cancel', label: 'Cancelaciones', desc: 'Notificación cuando un paciente cancela o reprograma.' },

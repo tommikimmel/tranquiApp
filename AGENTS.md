@@ -108,6 +108,9 @@ ajenos sin preguntarle al usuario.
   `frontend/src/utils/profilePhoto.ts` (400 px, JPEG) antes de guardarse.
 - **Centro de ayuda:** preguntas en `frontend/src/constants/helpFaq.ts`, videos y subtítulos en
   `frontend/public/videos/`. Ver [docs/centro-de-ayuda.md](docs/centro-de-ayuda.md).
+- **Mail de novedades:** se carga al prender el mantenimiento (`--novedades archivo.md`) y se envía
+  al apagarlo. Ver [docs/novedades.md](docs/novedades.md). Manda mails reales a todos los usuarios:
+  solo con aprobación explícita.
 - **Modo mantenimiento:** `npm run mantenimiento -- on|off|estado` (ver
   [docs/entornos/produccion.md](docs/entornos/produccion.md)). Toca producción: solo con aprobación
   explícita del usuario para esa acción.

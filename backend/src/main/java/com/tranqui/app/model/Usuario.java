@@ -384,6 +384,17 @@ public class Usuario {
         return notificacionesEmailHabilitadas == null || notificacionesEmailHabilitadas;
     }
 
+    // Copia local del estado de suscripción a las novedades (Broadcasts de Resend). La fuente de
+    // verdad es el contacto en Resend: la baja también se puede hacer desde el link del mail, y
+    // NovedadesService la trae a esta columna antes de cada envío. Ver docs/novedades.md.
+    @Builder.Default
+    @Column(name = "recibir_novedades")
+    private Boolean recibirNovedades = true;
+
+    public boolean isRecibirNovedades() {
+        return recibirNovedades == null || recibirNovedades;
+    }
+
     // ── Professional Profile, Matrícula & Datos Fiscales (Plan Suscripciones) ──
     @Column(name = "profession", length = 30)
     private String profession; // psiquiatra | psicologo | otro

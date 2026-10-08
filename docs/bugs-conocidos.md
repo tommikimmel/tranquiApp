@@ -28,3 +28,11 @@ Errores detectados y todavía sin arreglar. Al arreglar uno, se saca de esta lis
 - **Qué pasa:** se muestran aunque el plan del profesional no incluye recetas (y la emisión de
   recetas está deshabilitada en general).
 - **Arreglo probable:** ocultarlas con el mismo criterio que el menú lateral (`canUseRecetas`).
+
+## 4. Los interruptores de notificaciones del profesional son decorativos
+
+- **Dónde:** `frontend/src/components/SettingsView.tsx`, Configuración, Notificaciones ("Nueva
+  reserva", "Cancelaciones", "Recordatorio de sesión").
+- **Qué pasa:** son `defaultChecked` sin estado ni llamada al backend: cambiarlos no guarda nada ni
+  afecta qué mails recibe el profesional. (El interruptor "Novedades de Tranqui" sí funciona.)
+- **Arreglo probable:** conectarlos a preferencias reales en el backend, o sacarlos hasta que existan.

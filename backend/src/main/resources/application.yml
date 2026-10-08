@@ -82,6 +82,13 @@ site:
 mail:
   transport: ${MAIL_TRANSPORT:resend}
 
+# Novedades: mail masivo al terminar un mantenimiento (Broadcasts de Resend). El token protege el
+# endpoint interno que dispara el envío; solo vive en el .env del VPS. Ver docs/novedades.md.
+novedades:
+  token: ${NOVEDADES_TOKEN:}
+  segmento-pacientes: Tranqui App - Pacientes
+  segmento-profesionales: Tranqui App - Profesionales
+
 resend:
   api-key: ${RESEND_API_KEY:}
   from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}

@@ -39,6 +39,7 @@ Punto de partida para personas y agentes de IA. Las reglas de trabajo están en
 | Documento | Contenido |
 |---|---|
 | [centro-de-ayuda.md](centro-de-ayuda.md) | FAQ y videos explicativos |
+| [novedades.md](novedades.md) | Mail de novedades al terminar un mantenimiento (Broadcasts de Resend) |
 | [bugs-conocidos.md](bugs-conocidos.md) | Errores detectados pendientes de arreglar |
 
 > Los documentos de `etapas/`, `adr/`, `producto/` y `guias-tecnicas/` se escribieron durante el
