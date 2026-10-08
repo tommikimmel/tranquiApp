@@ -20,6 +20,9 @@ services:
       retries: 5
 
   tranqui-backend:
+    # Producción: imagen publicada por GitHub Actions al crear el tag (ver docs/flujo/releases.md).
+    # build: queda para el deploy manual de emergencia (node deploy.js --compilar).
+    image: ghcr.io/tommikimmel/tranqui-backend:${TRANQUI_VERSION:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -80,6 +83,7 @@ services:
       - tranqui-network
 
   tranqui-frontend:
+    image: ghcr.io/tommikimmel/tranqui-frontend:${TRANQUI_VERSION:-latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile

@@ -6,6 +6,18 @@ Todos los cambios relevantes de Tranqui App. Formato basado en
 
 ## [Sin publicar]
 
+### CI y deploy
+
+- CI en cada PR a `develop` y `main`: tests del backend, typecheck, tests y build del frontend, y lint
+  incremental (solo falla si el PR agrega problemas).
+- Deploy automático al crear el tag `vX.Y.Z` en `main`: imágenes en GHCR, el VPS solo las baja,
+  verificación del sitio y la API, y vuelta automática a la versión anterior si falla.
+- Las variables de producción viven en `/srv/tranqui/.env` del VPS; ningún deploy sube un `.env`.
+- Deploy y scripts por clave SSH con verificación del servidor; sin contraseñas en el repo.
+  `deploy.js` queda como deploy manual de emergencia.
+- Botón "Mantenimiento" en GitHub Actions (el link de administrador no se muestra en los logs:
+  `npm run mantenimiento -- acceso`).
+
 ### Mail de novedades
 
 - Al apagar el mantenimiento se manda a todos los usuarios un mail con lo que cambió (Broadcasts de

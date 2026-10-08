@@ -15,13 +15,17 @@
 // Al prender también se genera un link de acceso de administrador para ver el sitio real mientras
 // el resto ve el aviso; deja de servir al apagar.
 //
-// Credenciales del VPS: VPS_HOST, VPS_USER y VPS_PRIVATE_KEY_PATH (o VPS_PASSWORD) por variables de
-// entorno. Mientras el deploy siga usando los valores por defecto de deploy.js, se leen de ahí para
-// no duplicarlos en otro archivo (ver docs/entornos/secretos.md).
+//   npm run mantenimiento -- acceso                          vuelve a mostrar el link de administrador
+//
+// Credenciales del VPS (ver docs/entornos/secretos.md): VPS_HOST, VPS_USER, VPS_PRIVATE_KEY_PATH y
+// VPS_HOST_FINGERPRINT, por variables de entorno o en el archivo .env.vps de la raíz (ignorado por git).
+// Desde GitHub Actions el link de administrador no se imprime (los logs pueden ser públicos):
+// se obtiene después con `npm run mantenimiento -- acceso` desde tu máquina.
 
 import { createRequire } from 'node:module'
 import { randomBytes } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -33,7 +37,8 @@ const DIR = '/srv/tranqui/mantenimiento'
 const CONTENEDOR = 'tranqui-frontend'
 // El backend publica 127.0.0.1:8081 en el VPS; el endpoint de novedades rechaza lo que pasa por Traefik.
 const API_INTERNA = 'http://127.0.0.1:8081/api/internal/novedades'
-const ENV_VPS = '/app/.env'
+const ENV_VPS = '/srv/tranqui/.env'
+const EN_ACTIONS = process.env.GITHUB_ACTIONS === 'true'
 
 // ---------------------------------------------------------------------------------------------
 // Novedades: formato del archivo
@@ -101,17 +106,33 @@ function idEnvio() {
 // SSH
 // ---------------------------------------------------------------------------------------------
 
-function configSsh() {
-  const deploy = readFileSync(path.join(ROOT, 'deploy.js'), 'utf8')
-  const porDefecto = clave => (new RegExp(`${clave}:\\s*process\\.env\\.\\w+\\s*\\|\\|\\s*'([^']*)'`).exec(deploy) || [])[1]
-  const cfg = {
-    host: process.env.VPS_HOST || porDefecto('host'),
-    port: Number(process.env.VPS_PORT || 22),
-    username: process.env.VPS_USER || porDefecto('username'),
-    readyTimeout: 20000,
+// Variables de .env.vps (KEY=valor por línea), si existe; las variables de entorno tienen prioridad.
+function leerEnvVps() {
+  const archivo = path.join(ROOT, '.env.vps')
+  if (!existsSync(archivo)) return {}
+  const vars = {}
+  for (const linea of readFileSync(archivo, 'utf8').split(/\r?\n/)) {
+    const m = /^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/.exec(linea)
+    if (m) vars[m[1]] = m[2].replace(/^["']|["']$/g, '')
   }
-  if (process.env.VPS_PRIVATE_KEY_PATH) cfg.privateKey = readFileSync(process.env.VPS_PRIVATE_KEY_PATH)
-  else cfg.password = process.env.VPS_PASSWORD || porDefecto('password')
+  return vars
+}
+
+function configSsh() {
+  const archivo = leerEnvVps()
+  const v = k => process.env[k] || archivo[k]
+  const host = v('VPS_HOST'), username = v('VPS_USER') || 'root', clave = v('VPS_PRIVATE_KEY_PATH')
+  if (!host || !clave) {
+    throw new Error('Faltan VPS_HOST y VPS_PRIVATE_KEY_PATH (variables de entorno o archivo .env.vps). Ver docs/entornos/secretos.md.')
+  }
+  const cfg = { host, port: Number(v('VPS_PORT') || 22), username, privateKey: readFileSync(clave.replace(/^~/, process.env.HOME)), readyTimeout: 20000 }
+  // Verifica que el servidor sea el nuestro (huella SHA256 de su clave, como la muestra ssh-keygen -l).
+  const huella = v('VPS_HOST_FINGERPRINT')
+  if (huella) {
+    cfg.hostVerifier = clave => `SHA256:${createHash('sha256').update(clave).digest('base64').replace(/=+$/, '')}` === huella.trim()
+  } else {
+    console.warn('Aviso: sin VPS_HOST_FINGERPRINT no se verifica la identidad del servidor.')
+  }
   return cfg
 }
 
@@ -185,8 +206,24 @@ async function on(mensaje, archivoNovedades) {
   console.log(novedades
     ? `Novedades "${novedades.id}" guardadas: se envían al apagar el mantenimiento.`
     : 'Sin novedades: al apagar no se manda ningún mail.')
+  if (EN_ACTIONS) {
+    console.log('\nEl link de acceso de administrador no se muestra en GitHub Actions. Obtenelo desde tu máquina con: npm run mantenimiento -- acceso')
+  } else {
+    mostrarAcceso(token)
+  }
+}
+
+function mostrarAcceso(token) {
   console.log(`\nAcceso de administrador (abrilo en tu navegador para ver el sitio real):\n  ${SITIO}/__acceso-mantenimiento?token=${token}\n`)
   console.log('No compartas este link. Deja de servir al apagar el mantenimiento.')
+}
+
+async function acceso() {
+  if (EN_ACTIONS) throw new Error('El link de acceso no se muestra en GitHub Actions: corré este comando desde tu máquina.')
+  const conf = await ssh(`cat ${DIR}/token.conf 2>/dev/null || true`)
+  const m = /"([0-9a-f]+)"/.exec(conf)
+  if (!m) return console.log('El modo mantenimiento no está activo (no hay token de acceso).')
+  mostrarAcceso(m[1])
 }
 
 async function off() {
@@ -269,12 +306,13 @@ try {
     await on(args.join(' ').trim(), archivo)
   } else if (cmd === 'off') await off()
   else if (cmd === 'estado') await estado()
+  else if (cmd === 'acceso') await acceso()
   else if (cmd === 'novedades-vista') vistaPrevia(leerNovedades(args[0]))
   else if (cmd === 'novedades-prueba') await novedadesPrueba(args[0])
   else if (cmd === 'novedades-reintentar') await enviarNovedadesGuardadas()
   else if (cmd === 'novedades-estado') await novedadesEstado(args[0])
   else {
-    console.error('Uso: npm run mantenimiento -- on ["mensaje"] [--novedades archivo.md] | off | estado |\n' +
+    console.error('Uso: npm run mantenimiento -- on ["mensaje"] [--novedades archivo.md] | off | estado | acceso |\n' +
       '     novedades-vista archivo.md | novedades-prueba archivo.md | novedades-reintentar | novedades-estado [id]')
     process.exit(1)
   }

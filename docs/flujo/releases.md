@@ -22,13 +22,32 @@ Pasar `develop` a `main` **es** publicar una versión nueva de la app y requiere
 
 ## Deploy
 
-- **Hoy (2026-10-07):** manual, con `node deploy.js` desde la raíz del repo en `main` y con el
-  árbol limpio. Empaqueta lo commiteado, lo sube al VPS y reconstruye los contenedores.
-- **Planificado:** GitHub Actions despliega automáticamente al crear el tag `v*` en `main`, por
-  SSH con clave. Cuando esté, este documento se actualiza.
+**Automático con el tag.** Al crear el tag `vX.Y.Z` sobre `main` (desde GitHub: Releases, "Draft a
+new release", tag nuevo `vX.Y.Z` con target `main`), GitHub Actions (`.github/workflows/deploy.yml`):
+
+1. Verifica que el tag esté en `main`.
+2. Corre los tests (backend y frontend).
+3. Construye las imágenes y las publica en GHCR (`ghcr.io/tommikimmel/tranqui-backend:vX.Y.Z` y
+   `tranqui-frontend:vX.Y.Z`).
+4. Por SSH, el VPS baja las imágenes y recrea los contenedores (`scripts/vps/deploy-remoto.sh`), sin
+   compilar nada.
+5. Verifica que respondan `https://tranquisalud.com` y `/api/health`. Si no, **vuelve sola a la
+   versión anterior** y el workflow queda en rojo.
+
+La versión desplegada queda en `/srv/tranqui/version-actual` y el historial en
+`/srv/tranqui/deploys.log`.
+
+**Manual de emergencia** (solo si Actions no está disponible), desde tu máquina con `.env.vps`
+configurado (ver `docs/entornos/secretos.md`):
+
+| Comando | Qué hace |
+|---|---|
+| `node deploy.js vX.Y.Z` | Mismo camino que Actions con una versión ya publicada en GHCR |
+| `node deploy.js --compilar` | Compila en el VPS el commit actual (le saca CPU a producción mientras compila) |
 
 ## Si algo sale mal
 
-Volver a la versión anterior: checkout del tag anterior y redeploy. Si la versión nueva incluía
+El deploy vuelve solo a la versión anterior si la nueva no responde. Para volver a mano a una
+versión ya publicada: `node deploy.js vX.Y.Z` con la versión anterior. Si la versión nueva incluía
 una migración de base de datos, evaluar antes si la versión anterior es compatible con el esquema
 nuevo (Flyway no revierte migraciones solo).

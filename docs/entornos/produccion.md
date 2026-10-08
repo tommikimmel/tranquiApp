@@ -17,9 +17,20 @@
 
 ## Configuración
 
-- Variables en un `.env` (nombres en `.env.template`). Hoy `deploy.js` sube el `.env` de la
-  máquina que despliega y fuerza `SEED_TEST_ACCOUNTS=false`. Está planificado que el `.env` viva
-  solo en el VPS (sprint 01, tarea 5).
+- Variables de producción en **`/srv/tranqui/.env`** del VPS (nombres en `.env.template`). Se edita
+  por SSH; ningún deploy la sube ni la pisa. El deploy se cancela si tiene `SEED_TEST_ACCOUNTS=true`.
+- Estructura en el VPS:
+
+  | Ruta | Qué es |
+  |---|---|
+  | `/srv/tranqui/.env` | Variables de producción |
+  | `/srv/tranqui/docker-compose.yml` | Copiado por cada deploy |
+  | `/srv/tranqui/deploy-remoto.sh` | Script de deploy (copiado por cada deploy) |
+  | `/srv/tranqui/version-actual`, `deploys.log` | Versión desplegada e historial |
+  | `/srv/tranqui/mantenimiento/` | Flag y archivos del modo mantenimiento |
+
+- **Proyecto de Docker `app`:** todos los comandos usan `docker compose -p app`. De ese nombre depende
+  el volumen de la base (`app_pgdata`); cambiarlo crearía una base nueva y vacía.
 - Perfil de Spring: `prod` por defecto (`SPRING_PROFILES_ACTIVE`).
 - Mercado Pago en modo real (no sandbox): cobros y débitos son reales.
 - Recetas (QBI2) y facturación (ARCA) deshabilitadas.
