@@ -7,6 +7,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAlert } from '../context/AlertContext'
 import { OBRAS_SOCIALES } from '../constants/obrasSociales'
 import ChoosePlanView from './ChoosePlanView'
+import { GOOGLE_LOGIN_ENABLED } from '../constants/features'
 
 interface LoginPageProps {
   onLoginSuccess: (user: any) => void
@@ -229,7 +230,7 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
   // redraws it on its own when the div reappears, so this must re-run on every switch back to
   // "Iniciar Sesión", not just once on the component's first mount.
   useEffect(() => {
-    if (activeTab !== 'login') return
+    if (activeTab !== 'login' || !GOOGLE_LOGIN_ENABLED) return
 
     const scriptId = 'google-gsi-client'
     const renderGoogleButton = () => {
@@ -771,19 +772,23 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
               {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </button>
 
-            <div style={{ display: 'flex', alignItems: 'center', margin: 'var(--space-2) 0' }}>
-              <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }} />
-              <span style={{ padding: '0 var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>o ingresar con</span>
-              <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }} />
-            </div>
+            {GOOGLE_LOGIN_ENABLED && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', margin: 'var(--space-2) 0' }}>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }} />
+                  <span style={{ padding: '0 var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)' }}>o ingresar con</span>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border)' }} />
+                </div>
 
-            <div id="google-signin-btn" style={{ display: 'flex', justifyContent: 'center' }} />
-            <p style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textAlign: 'center', margin: 'var(--space-2) 0 0' }}>
-              Al continuar con Google, aceptás nuestra{' '}
-              <a href="/privacidad" target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)' }}>
-                Política de Privacidad
-              </a>.
-            </p>
+                <div id="google-signin-btn" style={{ display: 'flex', justifyContent: 'center' }} />
+                <p style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textAlign: 'center', margin: 'var(--space-2) 0 0' }}>
+                  Al continuar con Google, aceptás nuestra{' '}
+                  <a href="/privacidad" target="_blank" rel="noreferrer" style={{ color: 'var(--color-primary)' }}>
+                    Política de Privacidad
+                  </a>.
+                </p>
+              </>
+            )}
           </form>
         )}
 

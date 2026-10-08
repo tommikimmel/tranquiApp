@@ -1,0 +1,67 @@
+# Botón para prender/apagar el modo mantenimiento desde GitHub (Actions → Mantenimiento → Run workflow),
+# también desde el celular. Usa el mismo script que `npm run mantenimiento` (ver docs/entornos/produccion.md).
+name: Mantenimiento
+
+on:
+  workflow_dispatch:
+    inputs:
+      accion:
+        description: Qué hacer
+        type: choice
+        options: [estado, on, off, novedades-prueba, novedades-estado]
+        default: estado
+      mensaje:
+        description: Mensaje extra en la página de mantenimiento (solo para "on")
+        type: string
+        required: false
+      novedades:
+        description: Archivo de novedades del repo, ej. docs/novedades/2026-10-mejoras.md (para "on" o "novedades-prueba")
+        type: string
+        required: false
+
+concurrency:
+  group: mantenimiento
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mantenimiento:
+    name: Mantenimiento (${{ inputs.accion }})
+    runs-on: ubuntu-latest
+    environment: produccion
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - name: Clave SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+      - name: Ejecutar
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PRIVATE_KEY_PATH: /home/runner/.ssh/deploy
+          VPS_HOST_FINGERPRINT: ${{ secrets.VPS_HOST_FINGERPRINT }}
+          ACCION: ${{ inputs.accion }}
+          MENSAJE: ${{ inputs.mensaje }}
+          NOVEDADES: ${{ inputs.novedades }}
+        run: |
+          case "$ACCION" in
+            on)
+              if [ -n "$NOVEDADES" ]; then node scripts/mantenimiento.mjs on "$MENSAJE" --novedades "$NOVEDADES"
+              else node scripts/mantenimiento.mjs on "$MENSAJE"; fi ;;
+            novedades-prueba) node scripts/mantenimiento.mjs novedades-prueba "$NOVEDADES" ;;
+            *) node scripts/mantenimiento.mjs "$ACCION" ;;
+          esac
+      - name: Borrar la clave del runner
+        if: always()
+        run: rm -f ~/.ssh/deploy

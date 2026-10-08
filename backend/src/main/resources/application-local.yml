@@ -1,0 +1,42 @@
+# Perfil "local": entorno de desarrollo levantado con docker-compose.local.yml (npm run local).
+# Todas las integraciones externas quedan apagadas o simuladas, así nada de lo que se haga en local
+# genera cobros, mails reales ni llamadas a Google. Ver docs/entornos/local.md.
+
+spring:
+  mail:
+    host: ${SPRING_MAIL_HOST:mailpit}
+    port: ${SPRING_MAIL_PORT:1025}
+
+mail:
+  transport: smtp
+
+mercadopago:
+  enabled: false
+  sandbox: true
+
+payment:
+  simulation:
+    enabled: true
+
+google:
+  calendar:
+    enabled: false
+    watch:
+      enabled: false
+
+qbi2:
+  recipe:
+    enabled: false
+
+arca:
+  enabled: false
+
+resend:
+  api-key: ""
+  from-email: soporte@tranqui.local
+
+app:
+  seed-test-accounts: true
+  admin-initial-password: admin123
+  demo-data: ${DEMO_DATA:true}
+  local-simulations: true

@@ -6,6 +6,57 @@ Todos los cambios relevantes de Tranqui App. Formato basado en
 
 ## [Sin publicar]
 
+## [v1.1.0] - 2026-10-07
+
+### CI y deploy
+
+- CI en cada PR a `develop` y `main`: tests del backend, typecheck, tests y build del frontend, y lint
+  incremental (solo falla si el PR agrega problemas).
+- Deploy automático al crear el tag `vX.Y.Z` en `main`: imágenes en GHCR, el VPS solo las baja,
+  verificación del sitio y la API, y vuelta automática a la versión anterior si falla.
+- Las variables de producción viven en `/srv/tranqui/.env` del VPS; ningún deploy sube un `.env`.
+- Deploy y scripts por clave SSH con verificación del servidor; sin contraseñas en el repo.
+  `deploy.js` queda como deploy manual de emergencia.
+- Botón "Mantenimiento" en GitHub Actions (el link de administrador no se muestra en los logs:
+  `npm run mantenimiento -- acceso`).
+
+### Mail de novedades
+
+- Al apagar el mantenimiento se manda a todos los usuarios un mail con lo que cambió (Broadcasts de
+  Resend: no consume el cupo de los mails de la app). Un solo texto dividido en "Para todos",
+  "Pacientes" y "Profesionales"; vista previa, prueba solo para administradores e idempotencia.
+- Link de baja en cada mail (Ley 25.326) e interruptor "Novedades de Tranqui" en Mi Cuenta y en
+  Configuración del profesional. Al eliminar una cuenta se borra su contacto en Resend.
+- Política de Privacidad actualizada.
+
+### Modo mantenimiento
+
+- `npm run mantenimiento -- on ["mensaje"] | off | estado`: mientras está activo, el sitio muestra
+  solo una página de mantenimiento (503), aunque el backend esté apagado. El estado vive fuera de
+  `/app`, así que un deploy no lo cambia.
+- Acceso de administrador con un link de un solo uso por mantenimiento, para ver el sitio real
+  mientras el resto ve el aviso.
+
+### Entorno local
+
+- `npm run local` levanta la app completa en local (`docker-compose.local.yml`): base propia,
+  backend con perfil `local`, frontend con Vite y Mailpit para ver los mails. Antes de cada
+  rebuild verifica los puertos y pregunta antes de frenar lo que los ocupe. También
+  `local:down`, `local:reset` y `local:logs`.
+- Perfil `local` del backend: Mercado Pago, Google Calendar, QBI2 y ARCA apagados o simulados;
+  mails por SMTP a Mailpit (en producción se sigue usando Resend).
+- Datos de demo realistas (`LocalDemoSeeder`): 5 profesionales de distinto tipo, 8 pacientes,
+  ~45 turnos, pagos, chats, documentos, notificaciones y tickets. Solo con el perfil `local`.
+- Login con Google oculto en local (`VITE_GOOGLE_LOGIN=false`) y vinculación simulada de Google
+  Calendar (solo con el perfil `local`).
+
+### Arquitectura
+
+- Plan de migración a microservicios por fases (`docs/arquitectura/microservicios.md`) y ADR 009:
+  8 servicios, API Gateway con rate limiting, healthcheck y service discovery (Consul), eventos por
+  push con RabbitMQ, outbox, idempotencia, presupuesto de recursos para 8 GB y 2 núcleos, y
+  observabilidad en el panel de administrador. La app sale a producción con el monolito.
+
 ### Documentación y flujo de trabajo
 
 - `AGENTS.md` y `CLAUDE.md` con las reglas para agentes de IA: SDD obligatorio antes de tocar

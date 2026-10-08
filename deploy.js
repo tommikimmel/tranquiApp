@@ -1,180 +1,156 @@
+// Deploy MANUAL de emergencia. El deploy normal es automático: GitHub Actions al crear un tag
+// vX.Y.Z en main (ver docs/flujo/releases.md). Usá esto solo si Actions no está disponible.
+//
+//   node deploy.js vX.Y.Z     mismo camino que Actions: el VPS baja las imágenes de esa versión de
+//                             GHCR, recrea los contenedores, verifica y vuelve atrás si falla
+//                             (scripts/vps/deploy-remoto.sh). La versión tiene que estar publicada.
+//   node deploy.js --compilar compila las imágenes en el VPS a partir del commit actual (más lento
+//                             y le saca CPU a producción mientras compila). Solo si GHCR no anda.
+//
+// Credenciales: VPS_HOST, VPS_USER, VPS_PRIVATE_KEY_PATH y VPS_HOST_FINGERPRINT por variables de
+// entorno o en .env.vps (ignorado por git). Ver docs/entornos/secretos.md. No hay contraseñas acá.
+// Las variables de producción viven en /srv/tranqui/.env del VPS: este script no sube ningún .env.
+
 const { Client } = require('ssh2');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
 const { execSync } = require('child_process');
 
-const config = {
-  host: process.env.VPS_HOST || '177.7.37.92',
-  port: parseInt(process.env.VPS_PORT || '22', 10),
-  username: process.env.VPS_USER || 'root',
-  password: process.env.VPS_PASSWORD || 'AVH&lwJ-wLnu7669'
-};
-
-if (process.env.VPS_PRIVATE_KEY_PATH) {
-  config.privateKey = fs.readFileSync(process.env.VPS_PRIVATE_KEY_PATH);
-  delete config.password;
+function leerEnvVps() {
+  const archivo = path.join(__dirname, '.env.vps');
+  if (!fs.existsSync(archivo)) return {};
+  const vars = {};
+  for (const linea of fs.readFileSync(archivo, 'utf8').split(/\r?\n/)) {
+    const m = /^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/.exec(linea);
+    if (m) vars[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  }
+  return vars;
 }
 
-const os = require('os');
-
-// Fuera del repo: el tarball es un artefacto temporal, no algo que tenga que vivir junto al código.
-const localFilePath = path.join(os.tmpdir(), 'tranqui-project.tar.gz');
-const remoteFilePath = '/root/project.tar.gz';
-
-// Se despliega lo que está commiteado, no la carpeta tal cual: así producción siempre
-// corresponde a un commit concreto (antes llegó a correr un WIP que no estaba en git).
-// `node deploy.js --allow-dirty` permite desplegar igual con cambios sin commitear (solo los
-// archivos trackeados viajan, con su contenido actual en disco).
-const allowDirty = process.argv.includes('--allow-dirty');
-const pendientes = execSync('git status --porcelain', { cwd: __dirname }).toString().trim();
-if (pendientes && !allowDirty) {
-  console.error('Hay cambios sin commitear — commiteá antes de desplegar (o usá --allow-dirty):\n' + pendientes);
-  process.exit(1);
+function configSsh() {
+  const archivo = leerEnvVps();
+  const v = k => process.env[k] || archivo[k];
+  const host = v('VPS_HOST');
+  const clave = v('VPS_PRIVATE_KEY_PATH');
+  if (!host || !clave) {
+    console.error('Faltan VPS_HOST y VPS_PRIVATE_KEY_PATH (variables de entorno o .env.vps). Ver docs/entornos/secretos.md.');
+    process.exit(1);
+  }
+  const cfg = {
+    host,
+    port: Number(v('VPS_PORT') || 22),
+    username: v('VPS_USER') || 'root',
+    privateKey: fs.readFileSync(clave.replace(/^~/, os.homedir())),
+    readyTimeout: 20000,
+  };
+  const huella = v('VPS_HOST_FINGERPRINT');
+  if (huella) {
+    cfg.hostVerifier = k => `SHA256:${crypto.createHash('sha256').update(k).digest('base64').replace(/=+$/, '')}` === huella.trim();
+  } else {
+    console.warn('Aviso: sin VPS_HOST_FINGERPRINT no se verifica la identidad del servidor.');
+  }
+  return cfg;
 }
-const commit = execSync('git rev-parse --short HEAD', { cwd: __dirname }).toString().trim();
-console.log(`Empaquetando el commit ${commit}${pendientes ? ' (con cambios locales, --allow-dirty)' : ''}...`);
-// Archivos de git (trackeados + nuevos no ignorados, que con el árbol limpio no hay) dentro de
-// las carpetas que necesita el servidor, más el .env (que está en .gitignore a propósito y es la
-// fuente de los secretos de producción). Respetar .gitignore deja afuera node_modules, target,
-// dist, etc. sin tener que listarlos.
-const archivos = execSync(
-  'git ls-files -z --cached --others --exclude-standard -- .env.template .gitignore README.md backend devops docker-compose.yml frontend',
-  { cwd: __dirname }
-).toString().split('\0').filter((f) => f && fs.existsSync(path.join(__dirname, f)));
-archivos.push('.env');
-const listaPath = path.join(os.tmpdir(), 'tranqui-deploy-files.txt');
-fs.writeFileSync(listaPath, archivos.join('\n') + '\n');
-let tarCmd = 'tar';
-try {
-  execSync('tar --force-local --version', { stdio: 'ignore' });
-  tarCmd = 'tar --force-local';
-} catch (_) {}
-execSync(`${tarCmd} -czf "${localFilePath}" -T "${listaPath}"`, { cwd: __dirname, stdio: 'inherit' });
-console.log(`Paquete listo: ${localFilePath}`);
 
-console.log('Connecting to VPS SSH server...');
-const conn = new Client();
+// Ejecuta comandos en orden por SSH; corta en el primero que falla.
+function ejecutar(conn, comandos) {
+  return new Promise((resolve, reject) => {
+    let i = 0;
+    const siguiente = () => {
+      if (i >= comandos.length) return resolve();
+      console.log(`\n--- [${i + 1}/${comandos.length}] ---`);
+      conn.exec(comandos[i], (err, stream) => {
+        if (err) return reject(err);
+        stream.on('data', d => process.stdout.write(d.toString()));
+        stream.stderr.on('data', d => process.stderr.write(d.toString()));
+        stream.on('close', code => {
+          if (code !== 0) return reject(new Error(`El paso ${i + 1} falló (código ${code}).`));
+          i++;
+          siguiente();
+        });
+      });
+    };
+    siguiente();
+  });
+}
 
-conn.on('ready', () => {
-  console.log('SSH connection established successfully!');
-  
-  console.log('Uploading project.tar.gz via SFTP...');
-  conn.sftp((err, sftp) => {
-    if (err) {
-      console.error('SFTP error:', err);
-      conn.end();
-      return;
-    }
-    
-    sftp.fastPut(localFilePath, remoteFilePath, {}, (uploadErr) => {
-      if (uploadErr) {
-        console.error('File upload failed:', uploadErr);
-        conn.end();
-        return;
+function subir(conn, archivos) {
+  return new Promise((resolve, reject) => {
+    conn.sftp((err, sftp) => {
+      if (err) return reject(err);
+      let pendientes = archivos.length;
+      for (const [local, remoto] of archivos) {
+        sftp.fastPut(local, remoto, {}, e => {
+          if (e) return reject(e);
+          if (--pendientes === 0) resolve();
+        });
       }
-      console.log('Uploaded project.tar.gz to VPS successfully!');
-      
-      console.log('Starting remote installation commands...');
-      const commands = [
-        // 1. Install Docker if not present
-        `if ! command -v docker &> /dev/null; then
-          echo "=== Installing Docker ==="
-          apt-get update
-          apt-get install -y docker.io docker-compose-v2
-          systemctl start docker
-          systemctl enable docker
-        fi`,
-        
-        // 2. Ensure Nginx on the host is stopped and disabled so Traefik has ports 80/443
-        `echo "=== Stopping Nginx on host (relying on Traefik) ==="
-        systemctl stop nginx || true
-        systemctl disable nginx || true`,
-        
-        // 3. Wipe /app before extracting instead of extracting on top of it. `tar -xzf` only
-        // overwrites files that are actually present in the archive — anything left over from
-        // an earlier deploy (e.g. a frontend/node_modules built from a Windows-tarred archive
-        // at some point, with broken executable bits) would otherwise keep piling up and get
-        // picked up by `COPY . .` in the Dockerfile, clobbering the fresh `npm install` output.
-        `echo "=== Extracting project archive ==="
-        rm -rf /app
-        mkdir -p /app
-        tar -xzf /root/project.tar.gz -C /app`,
-        
-        // 4. Update environment variables for production
-        `echo "=== Configuring .env file ==="
-        sed -i 's|APP_PUBLIC_URL=.*|APP_PUBLIC_URL=https://tranquisalud.com|g' /app/.env
-        sed -i 's|FRONTEND_URL=.*|FRONTEND_URL=https://tranquisalud.com|g' /app/.env
-        # Nunca sembrar cuentas de prueba (password admin123 conocida) en producción, aunque el
-        # .env local que viaja en el tarball lo tenga en true.
-        sed -i '/^SEED_TEST_ACCOUNTS=/d' /app/.env
-        echo 'SEED_TEST_ACCOUNTS=false' >> /app/.env`,
-        
-        // 5. Rebuild images with --no-cache. Plain `docker compose up --build` reuses cached
-        // layers whenever the copied files hash the same as before, which can silently keep
-        // reusing a stale `npm install` layer (e.g. one built at some point from a Windows-tarred
-        // node_modules with broken executable bits — that's how `tsc: Permission denied` shows
-        // up even though the current tarball never ships node_modules at all).
-        `echo "=== Rebuilding images (no cache) ==="
-        cd /app
-        docker compose build --no-cache`,
-
-        // 6. Start the Docker services (Traefik will read labels and automatically configure SSL)
-        `echo "=== Launching Docker Containers ==="
-        cd /app
-        docker compose down --remove-orphans || true
-        docker rm -f tranqui-db tranqui-backend tranqui-frontend 2>/dev/null || true
-        docker compose up -d --force-recreate`,
-        
-        // 6. Verify running containers
-        `echo "=== Verification ==="
-        docker ps`
-      ];
-      
-      executeRemoteCommands(conn, commands);
     });
   });
-}).connect(config);
-
-function executeRemoteCommands(conn, commands) {
-  let index = 0;
-  
-  function next() {
-    if (index >= commands.length) {
-      console.log('Deployment completed successfully!');
-      conn.end();
-      return;
-    }
-    
-    const cmd = commands[index];
-    console.log(`Executing command [${index + 1}/${commands.length}]...`);
-    
-    conn.exec(cmd, (execErr, stream) => {
-      if (execErr) {
-        console.error(`Command execution failed: ${cmd}`, execErr);
-        conn.end();
-        return;
-      }
-      
-      stream.on('close', (code, signal) => {
-        if (code !== 0) {
-          // Stop instead of continuing to the next step — e.g. if the image build fails, the
-          // next steps would tear down the working containers (`docker compose down`) and bring
-          // up whatever image happens to exist (stale or none), silently leaving prod in a worse
-          // state than before while printing "Deployment completed successfully!" at the end.
-          console.error(`Command [${index + 1}/${commands.length}] failed with exit code ${code} — aborting deploy.`);
-          process.exitCode = 1;
-          conn.end();
-          return;
-        }
-        index++;
-        next();
-      }).on('data', (data) => {
-        process.stdout.write(data.toString());
-      }).stderr.on('data', (data) => {
-        process.stderr.write(data.toString());
-      });
-    });
-  }
-  
-  next();
 }
+
+async function main() {
+  const args = process.argv.slice(2);
+  const compilar = args.includes('--compilar');
+  const version = args.find(a => /^v\d+\.\d+\.\d+$/.test(a));
+  if (!compilar && !version) {
+    console.error('Uso: node deploy.js vX.Y.Z   |   node deploy.js --compilar');
+    process.exit(1);
+  }
+
+  const pendientes = execSync('git status --porcelain --untracked-files=no', { cwd: __dirname }).toString().trim();
+  if (pendientes) {
+    console.error('Hay cambios sin commitear en archivos del repo: commiteá antes de desplegar.\n' + pendientes);
+    process.exit(1);
+  }
+  const commit = execSync('git rev-parse --short HEAD', { cwd: __dirname }).toString().trim();
+
+  const conn = new Client();
+  await new Promise((resolve, reject) => conn.on('ready', resolve).on('error', reject).connect(configSsh()));
+  console.log('Conectado al VPS.');
+
+  try {
+    await ejecutar(conn, ['mkdir -p /srv/tranqui']);
+    await subir(conn, [
+      [path.join(__dirname, 'docker-compose.yml'), '/srv/tranqui/docker-compose.yml'],
+      [path.join(__dirname, 'scripts/vps/deploy-remoto.sh'), '/srv/tranqui/deploy-remoto.sh'],
+    ]);
+
+    if (!compilar) {
+      console.log(`Desplegando ${version} desde GHCR...`);
+      await ejecutar(conn, [`bash /srv/tranqui/deploy-remoto.sh ${version}`]);
+    } else {
+      // Compila en el VPS el commit actual. La imagen queda etiquetada como si fuera de GHCR con la
+      // versión "local-<commit>", así docker compose la usa sin bajar nada.
+      const etiqueta = `local-${commit}`;
+      console.log(`Empaquetando el commit ${commit} para compilar en el VPS...`);
+      const lista = execSync('git ls-files -z -- backend frontend', { cwd: __dirname }).toString().split('\0').filter(Boolean);
+      const listaPath = path.join(os.tmpdir(), 'tranqui-deploy-files.txt');
+      const tarPath = path.join(os.tmpdir(), 'tranqui-project.tar.gz');
+      fs.writeFileSync(listaPath, lista.join('\n') + '\n');
+      const forceLocal = process.platform === 'win32' ? '--force-local ' : '';
+      execSync(`tar ${forceLocal}-czf "${tarPath}" -T "${listaPath}"`, { cwd: __dirname, stdio: 'inherit' });
+      await subir(conn, [[tarPath, '/root/tranqui-codigo.tar.gz']]);
+      await ejecutar(conn, [
+        'rm -rf /srv/tranqui/codigo && mkdir -p /srv/tranqui/codigo && tar -xzf /root/tranqui-codigo.tar.gz -C /srv/tranqui/codigo',
+        `docker build -t ghcr.io/tommikimmel/tranqui-backend:${etiqueta} /srv/tranqui/codigo/backend`,
+        `docker build -t ghcr.io/tommikimmel/tranqui-frontend:${etiqueta} /srv/tranqui/codigo/frontend`,
+        // deploy-remoto.sh hace pull: con imágenes locales que no existen en GHCR el pull falla,
+        // así que en este modo se levanta directo y se verifica igual.
+        `cd /srv/tranqui && TRANQUI_VERSION=${etiqueta} docker compose -p app --env-file /srv/tranqui/.env -f docker-compose.yml up -d --remove-orphans`,
+        'for i in $(seq 1 36); do curl -fsS -o /dev/null --max-time 10 https://tranquisalud.com/ && curl -fsS -o /dev/null --max-time 10 https://tranquisalud.com/api/health && exit 0; sleep 5; done; echo "No respondió: revisar con docker compose -p app logs" >&2; exit 1',
+        `echo ${etiqueta} > /srv/tranqui/version-actual && echo "$(date -Iseconds) ${etiqueta} ok (compilado en el VPS)" >> /srv/tranqui/deploys.log`,
+      ]);
+    }
+    console.log('\nDeploy terminado y verificado.');
+  } finally {
+    conn.end();
+  }
+}
+
+main().catch(e => {
+  console.error('\nError:', e.message);
+  process.exit(1);
+});

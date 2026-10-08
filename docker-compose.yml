@@ -20,6 +20,9 @@ services:
       retries: 5
 
   tranqui-backend:
+    # Producción: imagen publicada por GitHub Actions al crear el tag (ver docs/flujo/releases.md).
+    # build: queda para el deploy manual de emergencia (node deploy.js --compilar).
+    image: ghcr.io/tommikimmel/tranqui-backend:${TRANQUI_VERSION:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -54,6 +57,7 @@ services:
       PAYMENT_SIMULATION_ENABLED: ${PAYMENT_SIMULATION_ENABLED:-false}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-onboarding@resend.dev}
+      NOVEDADES_TOKEN: ${NOVEDADES_TOKEN:-}
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:8081}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       QBI2_RECIPE_ENABLED: ${QBI2_RECIPE_ENABLED:-false}
@@ -79,6 +83,7 @@ services:
       - tranqui-network
 
   tranqui-frontend:
+    image: ghcr.io/tommikimmel/tranqui-frontend:${TRANQUI_VERSION:-latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -86,6 +91,10 @@ services:
     restart: always
     ports:
       - "127.0.0.1:3000:80"
+    volumes:
+      # Modo mantenimiento: carpeta del host fuera de /app (un deploy no la borra). Ver
+      # frontend/nginx.conf y docs/entornos/produccion.md. Docker la crea vacía si no existe.
+      - /srv/tranqui/mantenimiento:/etc/nginx/mantenimiento:ro
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tranqui-frontend.entrypoints=websecure"

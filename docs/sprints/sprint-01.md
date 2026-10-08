@@ -13,12 +13,18 @@ requieren aprobación explícita antes de ejecutarse.
 |---|---|---|---|---|
 | 0 | Eliminar la carpeta `investigacion/` (fuera del repo) | chore | — | hecha |
 | 1 | Alinear `develop` con `main` y borrar las ramas viejas | chore | — | hecha (también se borró `whatsapp-bot`, con respaldo local en un bundle fuera del repo) |
-| 2 | Documentación: `AGENTS.md`, `CLAUDE.md`, `docs/`, `CHANGELOG.md`, plantilla de PR | docs | `docs/docs-guias-ia-y-flujo` | en revisión |
-| 3 | Entorno local de pruebas: perfil `local`, datos de demo realistas, mails en Mailpit, sin login de Google | feature | `feature/full-entorno-local` | pendiente |
-| 4 | Modo mantenimiento con flag (página única mientras está activo) | feature | `feature/infra-modo-mantenimiento` | pendiente |
-| 5 | GitHub Actions (CI en PRs, deploy al taggear `main`) y secretos fuera del repo, deploy por clave SSH | chore | `chore/infra-github-actions` | pendiente |
-| 6 | Revisar secretos en el historial (gitleaks), rotar los expuestos y hacer público el repo con ramas protegidas | chore | — | revisión de historial hecha; spec en borrador ([spec](../specs/2026-10-07-secretos-y-repo-publico.md)) |
-| 7 | Limpieza de la base de producción: borrar todo menos el admin y el catálogo de planes, cancelando antes los débitos de Mercado Pago de los profesionales de prueba | chore | — | spec aprobada ([spec](../specs/2026-10-07-limpieza-produccion.md)) |
+| 2 | Documentación: `AGENTS.md`, `CLAUDE.md`, `docs/`, `CHANGELOG.md`, plantilla de PR | docs | `docs/docs-guias-ia-y-flujo` | hecha (PR #1) |
+| 3 | Entorno local de pruebas: perfil `local`, datos de demo realistas, mails en Mailpit, sin login de Google | feature | `feature/full-entorno-local` | hecha, PR #2, v1.1.0 ([spec](../specs/2026-10-07-entorno-local.md)) |
+| 4 | Modo mantenimiento con flag (página única mientras está activo) | feature | `feature/infra-modo-mantenimiento` | hecha, PR #3, v1.1.0 ([spec](../specs/2026-10-07-modo-mantenimiento.md)) |
+| 4b | Mail de novedades al terminar el mantenimiento (Broadcasts de Resend) | feature | `feature/full-mail-novedades` | hecha, PR #5, v1.1.0 ([spec](../specs/2026-10-07-mail-novedades.md)) |
+| 5 | GitHub Actions (CI en PRs, deploy al taggear `main`) y secretos fuera del repo, deploy por clave SSH | chore | `chore/infra-github-actions` | hecha, PR #6, v1.1.0 ([spec](../specs/2026-10-07-github-actions.md)); primer deploy automático el 2026-10-07; falta apagar el login SSH por contraseña |
+| 6 | Revisar secretos en el historial (gitleaks), rotar los expuestos y hacer público el repo con ramas protegidas | chore | — | historial revisado; spec en borrador ([spec](../specs/2026-10-07-secretos-y-repo-publico.md)) |
+| 7 | Limpieza de la base de producción: borrar todo menos el admin y el catálogo de planes, cancelando antes los débitos de Mercado Pago de los profesionales de prueba | chore | `chore/infra-limpieza-produccion` | spec aprobada ([spec](../specs/2026-10-07-limpieza-produccion.md)); script listo, sin ejecutar |
+
+## Después de este sprint
+
+La migración a microservicios empieza después del lanzamiento, en sprints propios: una fase por
+sprint según `docs/arquitectura/microservicios.md` (fase 0: plataforma y observabilidad).
 
 ## Decisiones tomadas
 
