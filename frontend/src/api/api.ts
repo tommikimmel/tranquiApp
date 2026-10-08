@@ -231,11 +231,15 @@ export const api = {
   desconectarMercadoPago: () =>
     apiFetch('/medicos/mercadopago/disconnect', { method: 'POST' }),
 
-  getGoogleCalendarStatus: (): Promise<{ connected: boolean }> =>
+  getGoogleCalendarStatus: (): Promise<{ connected: boolean; simulated?: boolean }> =>
     apiFetch('/medicos/google-calendar/status'),
 
   getGoogleCalendarConnectUrl: (): Promise<{ url: string }> =>
     apiFetch('/medicos/google-calendar/connect'),
+
+  // Solo entorno local (perfil "local" del backend): marca Calendar como vinculado sin OAuth.
+  simularConexionGoogleCalendar: () =>
+    apiFetch('/medicos/google-calendar/connect-simulado', { method: 'POST' }),
 
   desconectarGoogleCalendar: () =>
     apiFetch('/medicos/google-calendar/disconnect', { method: 'POST' }),

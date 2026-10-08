@@ -1,0 +1,74 @@
+# Entorno local de desarrollo (ver docs/entornos/local.md). Se levanta con `npm run local`, que
+# antes verifica que los puertos estén libres.
+#
+# A propósito NO lee el .env: todos los valores son ficticios y las integraciones externas
+# (Mercado Pago, Google, Resend, QBI2, ARCA) quedan apagadas o simuladas por el perfil "local" del
+# backend (backend/src/main/resources/application-local.yml). Nada de lo que se haga acá genera
+# cobros, mails reales ni llamadas a Google.
+name: tranqui-local
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: tranqui_local
+      POSTGRES_USER: tranqui
+      POSTGRES_PASSWORD: tranqui-local
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - tranqui-local-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tranqui -d tranqui_local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "127.0.0.1:8025:8025"   # bandeja web
+      - "127.0.0.1:1025:1025"   # SMTP
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/tranqui_local
+      SPRING_DATASOURCE_USERNAME: tranqui
+      SPRING_DATASOURCE_PASSWORD: tranqui-local
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: "1025"
+      # Clave de cifrado solo para datos locales (32 caracteres). Nunca se usa en producción.
+      ENCRYPTION_KEY: local-dev-encryption-key-32chars
+      APP_PUBLIC_URL: http://localhost:8081
+      FRONTEND_URL: http://localhost:5173
+      DEMO_DATA: "true"
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 5173 --strictPort"
+    environment:
+      VITE_GOOGLE_LOGIN: "false"
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - ./frontend:/app
+      # node_modules del contenedor separado del de la máquina (binarios de Linux).
+      - tranqui-local-node-modules:/app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  tranqui-local-db:
+  tranqui-local-node-modules:

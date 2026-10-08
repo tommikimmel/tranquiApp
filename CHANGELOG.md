@@ -6,6 +6,19 @@ Todos los cambios relevantes de Tranqui App. Formato basado en
 
 ## [Sin publicar]
 
+### Entorno local
+
+- `npm run local` levanta la app completa en local (`docker-compose.local.yml`): base propia,
+  backend con perfil `local`, frontend con Vite y Mailpit para ver los mails. Antes de cada
+  rebuild verifica los puertos y pregunta antes de frenar lo que los ocupe. También
+  `local:down`, `local:reset` y `local:logs`.
+- Perfil `local` del backend: Mercado Pago, Google Calendar, QBI2 y ARCA apagados o simulados;
+  mails por SMTP a Mailpit (en producción se sigue usando Resend).
+- Datos de demo realistas (`LocalDemoSeeder`): 5 profesionales de distinto tipo, 8 pacientes,
+  ~45 turnos, pagos, chats, documentos, notificaciones y tickets. Solo con el perfil `local`.
+- Login con Google oculto en local (`VITE_GOOGLE_LOGIN=false`) y vinculación simulada de Google
+  Calendar (solo con el perfil `local`).
+
 ### Documentación y flujo de trabajo
 
 - `AGENTS.md` y `CLAUDE.md` con las reglas para agentes de IA: SDD obligatorio antes de tocar
