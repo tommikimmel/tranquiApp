@@ -57,6 +57,9 @@ neutraliza es cambiarlo.
 
 ## Riesgos e impacto
 
+- **Decisión del dueño (2026-10-07): por ahora no se cambia la contraseña de root.** Mientras siga
+  siendo la misma que está en el historial, el repo **no** puede pasar a público: cualquiera
+  tendría acceso root al VPS. El paso 3 queda bloqueado hasta rotarla.
 - Si el JWT es de un servicio en uso por producción, regenerarlo exige actualizar
   `/srv/tranqui/.env` y reiniciar el backend en el mismo momento.
 - El repo público expone la estructura de la app; no expone datos ni claves si se cumplen los

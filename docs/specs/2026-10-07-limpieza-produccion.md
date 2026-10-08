@@ -74,3 +74,10 @@ tablas sin tocar y no cancela los débitos de Mercado Pago de forma ordenada.
 - Resuelta: en producción hay dos cuentas ADMIN, `admin@tranquisalud.com` (la que se usa) y `admin@tranqui.com`. Se conserva solo la primera. `DataInitializer` no recrea `admin@tranqui.com` porque `ADMIN_INITIAL_PASSWORD` no está en el `.env` de producción.
 
 ## Resultado (completar al cerrar)
+
+Ejecutada el 2026-10-08 (02:31 UTC) con el modo mantenimiento activo, script
+`scripts/vps/limpieza-produccion.sh` (PR #10). Inventario previo: 14 usuarios, 4 suscripciones,
+3 turnos, 2 débitos en Mercado Pago (uno `authorized`, uno `pending`). Resultado: los dos débitos
+figuran `cancelled` en Mercado Pago; queda solo `admin@tranquisalud.com`; `plans` (3), `features`
+(6) y `plan_features` (17) intactas; el resto de las tablas en 0; backend arriba y login del admin
+verificado. Pendiente: que el dueño pruebe un registro nuevo de paciente y de profesional.
