@@ -6,6 +6,8 @@ Todos los cambios relevantes de Tranqui App. Formato basado en
 
 ## [Sin publicar]
 
+## [v1.1.0] - 2026-10-07
+
 ### CI y deploy
 
 - CI en cada PR a `develop` y `main`: tests del backend, typecheck, tests y build del frontend, y lint
