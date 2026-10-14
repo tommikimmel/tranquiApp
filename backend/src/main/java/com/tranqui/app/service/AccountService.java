@@ -27,6 +27,9 @@ public class AccountService {
     @Autowired
     private com.tranqui.app.service.novedades.NovedadesService novedadesService;
 
+    @Autowired
+    private com.tranqui.app.eventos.OutboxPublisher outboxPublisher;
+
     @Transactional(readOnly = true)
     public MiCuentaDto obtenerMiCuenta(String email) {
         Usuario u = usuarioRepository.findByEmail(email)
@@ -72,6 +75,21 @@ public class AccountService {
         u.setFotoUrl(dto.getFotoUrl());
 
         usuarioRepository.save(u);
+        if (outboxPublisher != null) {
+            outboxPublisher.publicar(
+                    com.tranqui.eventos.Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1,
+                    "usuario",
+                    String.valueOf(u.getId()),
+                    u.getAggregateVersion(),
+                    new com.tranqui.eventos.data.UsuarioActualizadoData(
+                            u.getId(),
+                            u.getEmail(),
+                            u.getNombre(),
+                            u.getApellido(),
+                            u.getTelefono()
+                    )
+            );
+        }
         return construirDto(u);
     }
 
@@ -180,6 +198,18 @@ public class AccountService {
         u.setAnonimizadoEn(LocalDateTime.now());
 
         usuarioRepository.save(u);
+        if (outboxPublisher != null) {
+            outboxPublisher.publicar(
+                    com.tranqui.eventos.Topicos.IDENTIDAD_USUARIO_ELIMINADO_V1,
+                    "usuario",
+                    String.valueOf(u.getId()),
+                    u.getAggregateVersion(),
+                    new com.tranqui.eventos.data.UsuarioEliminadoData(
+                            u.getId(),
+                            "solicitud_usuario"
+                    )
+            );
+        }
     }
 
     private MiCuentaDto construirDto(Usuario u) {

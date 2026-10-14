@@ -19,6 +19,14 @@ public class Disponibilidad {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Builder.Default
+    @Column(name = "version")
+    private Integer version = 0;
+
+    public int getAggregateVersion() {
+        return version != null && version > 0 ? version : 1;
+    }
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "medico_id", nullable = false)
     private Usuario medico;
@@ -40,4 +48,11 @@ public class Disponibilidad {
     @Enumerated(EnumType.STRING)
     @Column(name = "modalidad", length = 20)
     private Modalidad modalidad;
+
+    @PrePersist
+    protected void onCreate() {
+        if (version == null) {
+            version = 0;
+        }
+    }
 }

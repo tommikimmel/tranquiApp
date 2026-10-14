@@ -5,11 +5,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.util.EncryptionUtil;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.CuentaMpDesvinculadaData;
+import com.tranqui.eventos.data.CuentaMpVinculadaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -42,6 +47,9 @@ public class MercadoPagoOAuthService {
 
     @Autowired
     private EncryptionUtil encryptionUtil;
+
+    @Autowired(required = false)
+    private OutboxPublisher outboxPublisher;
 
     @Value("${mercadopago.client-id:}")
     private String clientId;
@@ -98,6 +106,7 @@ public class MercadoPagoOAuthService {
      * Exchanges the authorization code for an access/refresh token pair and
      * persists it (encrypted) on the given medico.
      */
+    @Transactional
     public Usuario procesarCallback(Long medicoId, String code) throws Exception {
         Usuario medico = usuarioRepository.findById(medicoId)
                 .orElseThrow(() -> new IllegalArgumentException("Médico no encontrado: " + medicoId));
@@ -111,7 +120,18 @@ public class MercadoPagoOAuthService {
         );
 
         aplicarTokenResponse(medico, tokenResponse);
-        return usuarioRepository.save(medico);
+        medico = usuarioRepository.save(medico);
+
+        if (outboxPublisher != null) {
+            outboxPublisher.publicar(
+                    Topicos.PAGOS_CUENTA_MP_VINCULADA_V1,
+                    String.valueOf(medico.getId()),
+                    medico.getAggregateVersion(),
+                    new CuentaMpVinculadaData(medico.getId(), medico.getMpUserId())
+            );
+        }
+
+        return medico;
     }
 
     private JsonNode requestToken(String formBody) throws Exception {
@@ -185,12 +205,22 @@ public class MercadoPagoOAuthService {
         }
     }
 
+    @Transactional
     public void desvincular(Usuario medico) {
         medico.setMpAccessTokenEncrypted(null);
         medico.setMpRefreshTokenEncrypted(null);
         medico.setMpTokenExpiresAt(null);
         medico.setMpUserId(null);
-        usuarioRepository.save(medico);
+        medico = usuarioRepository.save(medico);
+
+        if (outboxPublisher != null) {
+            outboxPublisher.publicar(
+                    Topicos.PAGOS_CUENTA_MP_DESVINCULADA_V1,
+                    String.valueOf(medico.getId()),
+                    medico.getAggregateVersion(),
+                    new CuentaMpDesvinculadaData(medico.getId())
+            );
+        }
     }
 
     /**
@@ -199,12 +229,22 @@ public class MercadoPagoOAuthService {
      * without real credentials. Only meant to be called while mercadopago.enabled=false;
      * callers are responsible for that guard (see MedicoController).
      */
+    @Transactional
     public void simularConexionDev(Usuario medico) throws Exception {
         medico.setMpAccessTokenEncrypted(encryptionUtil.encrypt("TEST-dev-mock-access-token-" + medico.getId()));
         medico.setMpRefreshTokenEncrypted(encryptionUtil.encrypt("TEST-dev-mock-refresh-token-" + medico.getId()));
         medico.setMpTokenExpiresAt(LocalDateTime.now().plusMonths(6));
         medico.setMpUserId("999999999");
-        usuarioRepository.save(medico);
+        medico = usuarioRepository.save(medico);
+
+        if (outboxPublisher != null) {
+            outboxPublisher.publicar(
+                    Topicos.PAGOS_CUENTA_MP_VINCULADA_V1,
+                    String.valueOf(medico.getId()),
+                    medico.getAggregateVersion(),
+                    new CuentaMpVinculadaData(medico.getId(), medico.getMpUserId())
+            );
+        }
     }
 
     private String signState(Long medicoId) {

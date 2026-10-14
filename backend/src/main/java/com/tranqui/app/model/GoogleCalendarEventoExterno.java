@@ -24,6 +24,14 @@ public class GoogleCalendarEventoExterno {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Builder.Default
+    @Column(name = "version")
+    private Integer version = 0;
+
+    public int getAggregateVersion() {
+        return version != null && version > 0 ? version : 1;
+    }
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "medico_id", nullable = false)
     private Usuario medico;
@@ -52,4 +60,11 @@ public class GoogleCalendarEventoExterno {
 
     @Column(name = "ultima_actualizacion", nullable = false)
     private LocalDateTime ultimaActualizacion;
+
+    @PrePersist
+    protected void onCreate() {
+        if (version == null) {
+            version = 0;
+        }
+    }
 }

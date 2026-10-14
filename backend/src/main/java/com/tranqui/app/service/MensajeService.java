@@ -6,6 +6,9 @@ import com.tranqui.app.model.dto.CanalPrioritarioDto;
 import com.tranqui.app.model.dto.MensajeDto;
 import com.tranqui.app.repository.MensajeRepository;
 import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.MensajeEnviadoData;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -26,6 +29,9 @@ public class MensajeService {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
+    @Autowired(required = false)
+    private OutboxPublisher outboxPublisher;
+
     @Transactional
     public Mensaje guardarMensaje(MensajeDto dto, String remitenteEmail) {
         Usuario remitente = usuarioRepository.findByEmail(remitenteEmail)
@@ -40,7 +46,27 @@ public class MensajeService {
                 .contenido(dto.getContenido())
                 .build();
 
-        return mensajeRepository.save(mensaje);
+        mensaje = mensajeRepository.save(mensaje);
+
+        if (outboxPublisher != null) {
+            Long uMin = Math.min(remitente.getId(), destinatario.getId());
+            Long uMax = Math.max(remitente.getId(), destinatario.getId());
+            Long conversacionId = (uMin * 31) + uMax;
+            outboxPublisher.publicar(
+                    Topicos.CHAT_MENSAJE_ENVIADO_V1,
+                    String.valueOf(mensaje.getId()),
+                    mensaje.getAggregateVersion(),
+                    new MensajeEnviadoData(
+                            mensaje.getId(),
+                            conversacionId,
+                            remitente.getId(),
+                            destinatario.getId(),
+                            java.time.OffsetDateTime.now()
+                    )
+            );
+        }
+
+        return mensaje;
     }
 
     @Transactional(readOnly = true)

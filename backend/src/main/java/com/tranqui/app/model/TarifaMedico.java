@@ -19,6 +19,14 @@ public class TarifaMedico {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Builder.Default
+    @Column(name = "version")
+    private Integer version = 0;
+
+    public int getAggregateVersion() {
+        return version != null && version > 0 ? version : 1;
+    }
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "medico_id", nullable = false)
     private Usuario medico;
@@ -76,4 +84,11 @@ public class TarifaMedico {
     @Builder.Default
     @Column(name = "es_receta", columnDefinition = "boolean not null default false")
     private boolean esReceta = false;
+
+    @PrePersist
+    protected void onCreate() {
+        if (version == null) {
+            version = 0;
+        }
+    }
 }

@@ -18,6 +18,14 @@ public class Pago {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Builder.Default
+    @Column(name = "version")
+    private Integer version = 0;
+
+    public int getAggregateVersion() {
+        return version != null && version > 0 ? version : 1;
+    }
+
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "turno_id")
     private Turno turno;
@@ -37,4 +45,14 @@ public class Pago {
 
     @Column(name = "fecha_pago", nullable = false)
     private LocalDateTime fechaPago;
+
+    @PrePersist
+    protected void onCreate() {
+        if (version == null) {
+            version = 0;
+        }
+        if (fechaPago == null) {
+            fechaPago = LocalDateTime.now();
+        }
+    }
 }

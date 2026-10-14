@@ -7,6 +7,7 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.repository.UsuarioRepository;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,9 @@ import java.util.Collections;
 
 @Service
 public class GoogleAuthService {
+
+    @Autowired
+    private com.tranqui.app.eventos.OutboxPublisher outboxPublisher;
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -64,6 +68,7 @@ public class GoogleAuthService {
         return null;
     }
 
+    @Transactional
     public Usuario getOrCreateUsuario(GoogleIdToken.Payload payload) {
         // Must match the trim().toLowerCase() normalization AuthController.register/login use,
         // otherwise a Google sign-in for "John@Gmail.com" and a password registration for
@@ -87,7 +92,23 @@ public class GoogleAuthService {
                             .emailVerificado(true)
                             .perfilCompleto(false)
                             .build();
-                    return usuarioRepository.save(nuevo);
+                    nuevo = usuarioRepository.save(nuevo);
+                    if (outboxPublisher != null) {
+                        outboxPublisher.publicar(
+                                com.tranqui.eventos.Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1,
+                                "usuario",
+                                String.valueOf(nuevo.getId()),
+                                nuevo.getAggregateVersion(),
+                                new com.tranqui.eventos.data.UsuarioRegistradoData(
+                                        nuevo.getId(),
+                                        nuevo.getEmail(),
+                                        nuevo.getNombre(),
+                                        nuevo.getApellido(),
+                                        nuevo.getRol() != null ? nuevo.getRol().name() : null
+                                )
+                        );
+                    }
+                    return nuevo;
                 });
     }
 }

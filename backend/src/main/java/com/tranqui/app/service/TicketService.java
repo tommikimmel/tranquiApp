@@ -39,6 +39,9 @@ public class TicketService {
     @Autowired
     private ResendEmailService resendEmailService;
 
+    @Autowired
+    private com.tranqui.app.eventos.OutboxPublisher outboxPublisher;
+
     @Transactional
     public TicketDetalleDto crearTicket(String creadorEmail, String asunto, String mensaje) {
         if (asunto == null || asunto.trim().isEmpty()) {
@@ -170,6 +173,22 @@ public class TicketService {
                         ticket.getCreador().getNombre(),
                         ticket.getAsunto(),
                         contenido.trim());
+            }
+
+            if (outboxPublisher != null) {
+                outboxPublisher.publicar(
+                        com.tranqui.eventos.Topicos.IDENTIDAD_TICKET_RESPONDIDO_V1,
+                        "ticket",
+                        String.valueOf(ticket.getId()),
+                        ticket.getAggregateVersion(),
+                        new com.tranqui.eventos.data.TicketRespondidoData(
+                                ticket.getId(),
+                                ticket.getCreador().getId(),
+                                ticket.getCreador().getEmail(),
+                                ticket.getAsunto(),
+                                contenido.trim()
+                        )
+                );
             }
         } else {
             // El creador escribió — si el ticket ya estaba resuelto, un mensaje nuevo significa

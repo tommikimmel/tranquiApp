@@ -21,6 +21,14 @@ public class Subscription {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Builder.Default
+    @Column(name = "version")
+    private Integer version = 0;
+
+    public int getAggregateVersion() {
+        return version != null && version > 0 ? version : 1;
+    }
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "professional_id", nullable = false)
     private Usuario professional;
@@ -88,6 +96,7 @@ public class Subscription {
 
     @PrePersist
     protected void onCreate() {
+        if (version == null) version = 0;
         if (createdAt == null) createdAt = LocalDateTime.now();
         if (updatedAt == null) updatedAt = LocalDateTime.now();
     }

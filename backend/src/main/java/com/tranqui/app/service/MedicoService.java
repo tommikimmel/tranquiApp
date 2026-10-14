@@ -18,6 +18,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.ProfesionalActualizadoData;
+import com.tranqui.eventos.data.TarifaActualizadaData;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.DayOfWeek;
@@ -41,21 +46,24 @@ public class MedicoService {
     @Autowired
     private SubscriptionService subscriptionService;
 
+    @Autowired(required = false)
+    private OutboxPublisher outboxPublisher;
+
     // Same flag MedicoController/MercadoPagoService use to know whether MP is really wired up
-    // (real deployments) vs. simulated (local/dev) — verification only requires a connected MP
+    // (real deployments) vs. simulated (local/dev) � verification only requires a connected MP
     // account when the integration is actually live, so local dev/tests aren't blocked forever.
     @Value("${mercadopago.enabled:false}")
     private boolean mercadoPagoEnabled;
 
     private static final long MAX_FOTO_BYTES = 3L * 1024 * 1024; // 3MB decoded
 
-    // Fallback values for médicos who haven't configured their agenda settings yet —
+    // Fallback values for médicos who haven't configured their agenda settings yet �
     // 45 matches the historical hardcoded turno duration, 10 matches the mockup's default.
     private static final int DEFAULT_DURACION_TURNO_MINUTOS = 45;
     private static final int DEFAULT_INTERVALO_ENTRE_TURNOS_MINUTOS = 0;
 
     // "osde" replaces the old generic "obra_social" default as the seed for NEW médicos with no
-    // tariffs yet — a specific obra social ("OSDE") instead of a generic "any obra social"
+    // tariffs yet � a specific obra social ("OSDE") instead of a generic "any obra social"
     // service, matching the new per-servicio obraSocial model. Médicos who already have an
     // "obra_social" row persisted keep it untouched; TurnoService.reservarTurno still treats
     // "obra_social"/"osde" as synonyms so both keep working.
@@ -63,9 +71,9 @@ public class MedicoService {
             new MedicoDto.TarifaDto("particular", "Consulta particular", new BigDecimal("60000"), true, false, null, null, null, true, false),
             new MedicoDto.TarifaDto("sobreturno", "Sobreturno", new BigDecimal("90000"), true, false, null, null, null, true, false),
             new MedicoDto.TarifaDto("osde", "Obra Social OSDE", new BigDecimal("10500"), true, true, "OSDE", null, null, true, false),
-            // These three are pure document services — no consultorio, no videollamada — so they
+            // These three are pure document services � no consultorio, no videollamada � so they
             // don't reserve a slot on the médico's agenda. See TarifaMedico.requiereAgenda. Only
-            // "receta-fuera" is also flagged esReceta — see TarifaMedico.esReceta.
+            // "receta-fuera" is also flagged esReceta � see TarifaMedico.esReceta.
             new MedicoDto.TarifaDto("receta-fuera", "Receta fuera de turno", new BigDecimal("45000"), true, false, null, null, null, false, true),
             new MedicoDto.TarifaDto("certificado", "Certificado", new BigDecimal("55000"), true, false, null, null, null, false, false),
             new MedicoDto.TarifaDto("informe-apto", "Informe / Apto médico", new BigDecimal("165000"), true, false, null, null, null, false, false)
@@ -73,15 +81,15 @@ public class MedicoService {
 
     // NOT readOnly: construirMedicoDto self-heals by persisting DEFAULT_TARIFFS the first time a
     // médico has zero TarifaMedico rows (e.g. right after they clear isMedicoVerificado but before
-    // ever opening "Honorarios y servicios") — under readOnly=true that INSERT throws (Postgres
+    // ever opening "Honorarios y servicios") � under readOnly=true that INSERT throws (Postgres
     // rejects writes in a read-only transaction) and takes down the entire public listing with a
     // 500, not just that one médico's card.
     @Transactional
     public List<MedicoDto> obtenerMedicosActivos() {
         // Filter by role at the DB level (was findAll() + Java-side filtering, scanning every
-        // usuario row — patients included — on every public homepage load).
+        // usuario row � patients included � on every public homepage load).
         // Perfil completo + verificado por admin (isMedicoVerificado) Y suscripción activa
-        // (isAccessAllowed) — un profesional sin pago al día deja de listarse públicamente aunque
+        // (isAccessAllowed) � un profesional sin pago al día deja de listarse públicamente aunque
         // su perfil esté impecable. Chequeos separados a propósito: isMedicoVerificado también
         // alimenta MedicoDto.verificado (el banner de "completá tu perfil" del propio profesional),
         // que es un concepto distinto de si está al día con el pago.
@@ -151,7 +159,7 @@ public class MedicoService {
         medico.setTipoDocumento(dto.getTipoDocumento());
         medico.setNumeroDocumento(dto.getNumeroDocumento());
         // AddressMapPicker's Nominatim autocomplete used to store the full display_name for an
-        // Argentine address — every administrative level it knows about (barrio, pedanía,
+        // Argentine address � every administrative level it knows about (barrio, pedanía,
         // municipio, departamento, provincia twice, CP, país), 150+ characters of noise that
         // prints on the QBI2 prescription PDF. The picker builds a short "Calle Altura, Localidad"
         // now, but validate here too since this DTO can be hit directly, not just through the UI.
@@ -220,7 +228,7 @@ public class MedicoService {
 
         // QBI2 rechaza con QBI235 "EL CAMPO MEDICO IDREFEPS NO CUMPLE EL RANGO MÍNIMO O MÁXIMO DE
         // CARACTERES" cualquier valor que no sea el código numérico de 12 dígitos que SISA asigna
-        // en el Registro Federal de Profesionales de la Salud — pero ese rechazo solo aparecía al
+        // en el Registro Federal de Profesionales de la Salud � pero ese rechazo solo aparecía al
         // emitir una receta, mucho después de guardar el perfil. Validamos acá para que el error
         // se vea de inmediato, en el momento en que el médico carga el dato.
         String refepsTrim = dto.getCodigoRefeps() != null ? dto.getCodigoRefeps().trim() : null;
@@ -232,7 +240,7 @@ public class MedicoService {
 
         // sello_linea1/2 son varchar(40) y sello_linea3 varchar(25) en la base. El frontend
         // autogenera un valor por defecto para linea1 ("Dr. {nombre} {apellido}") que puede superar
-        // 40 caracteres para médicos con nombres largos — sin este chequeo, guardar el perfil
+        // 40 caracteres para médicos con nombres largos � sin este chequeo, guardar el perfil
         // rompía con un PSQLException "value too long for type character varying(40)" sin capturar,
         // que Spring convierte en un 500 pelado sin ningún mensaje útil para el médico.
         if (dto.getSelloLinea1() != null && dto.getSelloLinea1().length() > 40) {
@@ -259,14 +267,15 @@ public class MedicoService {
             medico.setPacientesAtiende(String.join(",", dto.getPacientesAtiende()));
         }
 
-        usuarioRepository.save(medico);
+        medico = usuarioRepository.save(medico);
+        publicarProfesionalActualizado(medico);
 
         if (dto.getTariffs() != null) {
             Set<String> submittedIds = dto.getTariffs().stream()
                     .map(MedicoDto.TarifaDto::getId)
                     .collect(Collectors.toSet());
 
-            // Un psicólogo (plan sin recetas_electronicas) no puede tener turnos de tipo receta —
+            // Un psicólogo (plan sin recetas_electronicas) no puede tener turnos de tipo receta �
             // se fuerza acá server-side, no solo en el selector del frontend, para que no se pueda
             // saltear llamando a la API directo. Mismo gate que RecetaService/SubscriptionService
             // usan para emitir una receta real.
@@ -275,7 +284,7 @@ public class MedicoService {
             for (MedicoDto.TarifaDto tDto : dto.getTariffs()) {
                 // A service "requiere obra social" if it has a specific obra social assigned
                 // (the new per-servicio model), or is one of the legacy generic ids, or the
-                // médico explicitly flagged it — enforced server-side too, not just in the UI,
+                // médico explicitly flagged it � enforced server-side too, not just in the UI,
                 // so it can't be bypassed by calling the API directly.
                 boolean esServicioObraSocial = "obra_social".equals(tDto.getId()) || "osde".equals(tDto.getId());
                 String obraSocialTrim = tDto.getObraSocial() != null ? tDto.getObraSocial().trim() : null;
@@ -294,7 +303,7 @@ public class MedicoService {
                     tarifa.setPrecioOnline(tDto.getPrecioOnline());
                     tarifa.setPrecioPresencial(tDto.getPrecioPresencial());
                     tarifa.setRequiereAgenda(tDto.isRequiereAgenda());
-                    // Only meaningful when requiereAgenda is false — a servicio that requires
+                    // Only meaningful when requiereAgenda is false � a servicio that requires
                     // agenda is never a "receta fuera de turno" candidate to begin with.
                     tarifa.setEsReceta(tDto.isRequiereAgenda() ? false : (tDto.isEsReceta() && puedeRecetar));
                 } else {
@@ -312,11 +321,24 @@ public class MedicoService {
                             .esReceta(tDto.isRequiereAgenda() ? false : (tDto.isEsReceta() && puedeRecetar))
                             .build();
                 }
-                tarifaRepository.save(tarifa);
+                tarifa = tarifaRepository.save(tarifa);
+                if (outboxPublisher != null) {
+                    outboxPublisher.publicar(
+                            Topicos.PROFESIONALES_TARIFA_ACTUALIZADA_V1,
+                            String.valueOf(tarifa.getId()),
+                            tarifa.getAggregateVersion(),
+                            new TarifaActualizadaData(
+                                    medico.getId(),
+                                    tarifa.getId(),
+                                    tarifa.getPrecio(),
+                                    "ARS"
+                            )
+                    );
+                }
             }
 
             // Any tariff the médico had before that isn't in this submission was removed via
-            // the "eliminar" action on the frontend — delete it so it doesn't reappear on the
+            // the "eliminar" action on the frontend � delete it so it doesn't reappear on the
             // next profile load.
             List<TarifaMedico> tarifasAEliminar = tarifaRepository.findByMedicoId(medico.getId()).stream()
                     .filter(t -> !submittedIds.contains(t.getServicioId()))
@@ -337,7 +359,7 @@ public class MedicoService {
         // If doctor has no tariffs in DB, initialize them with defaults
         if (tarifasDb.isEmpty()) {
             tarifasDb = new ArrayList<>();
-            // Un psicólogo no debe arrancar con el default "Receta fuera de turno" habilitado —
+            // Un psicólogo no debe arrancar con el default "Receta fuera de turno" habilitado �
             // su plan no incluye recetas_electronicas. Mismo gate que actualizarPerfil.
             boolean puedeRecetar = subscriptionService.hasFeature(m.getId(), "recetas_electronicas");
             for (MedicoDto.TarifaDto def : DEFAULT_TARIFFS) {
@@ -486,7 +508,7 @@ public class MedicoService {
 
     /**
      * Updates only the médico's agenda settings (turno duration + gap between bookable
-     * slots) without touching the rest of the profile — keeps this independent from
+     * slots) without touching the rest of the profile � keeps this independent from
      * actualizarPerfil, which does a full-replace of every profile field.
      */
     @Transactional
@@ -507,8 +529,31 @@ public class MedicoService {
             medico.setIntervaloEntreTurnosMinutos(intervaloEntreTurnosMinutos);
         }
 
-        usuarioRepository.save(medico);
+        medico = usuarioRepository.save(medico);
+        publicarProfesionalActualizado(medico);
         return construirMedicoDto(medico);
+    }
+
+    private void publicarProfesionalActualizado(Usuario medico) {
+        if (outboxPublisher != null) {
+            List<String> modalidades = new ArrayList<>();
+            if (medico.isOfreceOnline()) modalidades.add("ONLINE");
+            if (medico.isOfrecePresencial()) modalidades.add("PRESENCIAL");
+            outboxPublisher.publicar(
+                    Topicos.PROFESIONALES_PROFESIONAL_ACTUALIZADO_V1,
+                    String.valueOf(medico.getId()),
+                    medico.getAggregateVersion(),
+                    new ProfesionalActualizadoData(
+                            medico.getId(),
+                            medico.getNombre(),
+                            medico.getApellido(),
+                            medico.getSpecialty(),
+                            medico.getFotoUrl(),
+                            modalidades,
+                            medico.getDuracionTurnoMinutos() != null ? medico.getDuracionTurnoMinutos() : DEFAULT_DURACION_TURNO_MINUTOS
+                    )
+            );
+        }
     }
 
     @Transactional(readOnly = true)
@@ -519,7 +564,7 @@ public class MedicoService {
         LocalDate hoy = LocalDate.now();
 
         // Every metric on the dashboard's stat cards used to be hardcoded to its own fixed
-        // window (sessions=today, earnings=this week, no-shows=this month) — the médico now
+        // window (sessions=today, earnings=this week, no-shows=this month) � the médico now
         // picks one shared window (Diario/Semanal/Mensual) and all four cards + their "vs
         // período anterior" comparison follow it.
         LocalDate currentStart;
@@ -558,7 +603,7 @@ public class MedicoService {
                 break;
         }
 
-        // Bounded to [previousStart, currentEnd] — used to load the médico's ENTIRE turno
+        // Bounded to [previousStart, currentEnd] � used to load the médico's ENTIRE turno
         // history on every dashboard refresh, which grows unbounded with account age. The one
         // metric that genuinely needs full history (has this patient EVER been seen before this
         // period, for "new patients") is computed separately below via a lightweight aggregate
@@ -637,7 +682,7 @@ public class MedicoService {
         int activePatients = activePatientIds.size();
 
         // "New patient" needs each patient's true first-ever appointment date across the médico's
-        // whole history, which the date-bounded `turnos` list above no longer contains — resolved
+        // whole history, which the date-bounded `turnos` list above no longer contains � resolved
         // with a lightweight grouped aggregate (2 columns per patient) instead of loading every
         // Turno entity ever created for this médico just to find a MIN(fecha).
         Map<Long, LocalDate> firstAppointmentDate = turnoRepository.findPrimeraFechaPorPaciente(medico.getId(), EstadoTurno.CANCELADO).stream()
@@ -701,7 +746,7 @@ public class MedicoService {
                 && u.getEmail() != null && !u.getEmail().trim().isEmpty()
                 && u.getTipoDocumento() != null && !u.getTipoDocumento().trim().isEmpty()
                 && u.getNumeroDocumento() != null
-                // Only required for professionals who actually offer in-person consultations —
+                // Only required for professionals who actually offer in-person consultations �
                 // an online-only médico has no consultorio to report. Mirrors the frontend's
                 // getMissingRequirements() in App.tsx, which was fixed for this same reason.
                 && (!u.isOfrecePresencial() || (u.getDomicilioAtencion() != null && !u.getDomicilioAtencion().trim().isEmpty()))
@@ -718,11 +763,11 @@ public class MedicoService {
                 && u.getTags() != null && !u.getTags().trim().isEmpty()
                 && (u.isOfreceOnline() || u.isOfrecePresencial())
                 // "[]" is what the frontend sends when the "Presencia y Experiencia" list is
-                // empty — a non-blank string that isn't real content, so it slipped past the old
+                // empty � a non-blank string that isn't real content, so it slipped past the old
                 // isBlank()-only check.
                 && u.getExperiencia() != null && !u.getExperiencia().trim().isEmpty() && !"[]".equals(u.getExperiencia().trim())
                 // Without Mercado Pago conectado, the médico can't actually get paid for a
-                // particular consultation — only enforced once the integration is really live
+                // particular consultation � only enforced once the integration is really live
                 // (mercadopago.enabled=true), so local/dev/test environments aren't blocked.
                 && (!mercadoPagoEnabled || u.getMpAccessTokenEncrypted() != null)
                 && Boolean.TRUE.equals(u.getVerificadoAdmin());

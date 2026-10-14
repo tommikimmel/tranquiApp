@@ -44,6 +44,24 @@ public class OutboxPublisher {
     }
 
     /**
+     * Sobrecarga de conveniencia que infiere el aggregateType a partir del tópico (<dominio>.<entidad>.<evento>.v<n>).
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public <T> EventEnvelope<T> publicar(String topico, String aggregateId, int aggregateVersion, T data) {
+        return publicar(topico, extraerEntidad(topico), aggregateId, aggregateVersion, data, null);
+    }
+
+    private static String extraerEntidad(String topico) {
+        if (topico != null) {
+            String[] parts = topico.split("\\.");
+            if (parts.length >= 2) {
+                return parts[1];
+            }
+        }
+        return "desconocido";
+    }
+
+    /**
      * Sobrecarga de publicación permitiendo especificar causationId.
      */
     @Transactional(propagation = Propagation.MANDATORY)

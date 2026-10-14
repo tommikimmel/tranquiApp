@@ -19,6 +19,14 @@ public class Usuario {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Builder.Default
+    @Column(name = "version")
+    private Integer version = 0;
+
+    public int getAggregateVersion() {
+        return version != null && version > 0 ? version : 1;
+    }
+
     @Column(name = "nombre", nullable = false, length = 100)
     private String nombre;
 
@@ -471,6 +479,9 @@ public class Usuario {
 
     @PrePersist
     protected void onCreate() {
+        if (version == null) {
+            version = 0;
+        }
         if (fechaRegistro == null) {
             fechaRegistro = LocalDateTime.now();
         }

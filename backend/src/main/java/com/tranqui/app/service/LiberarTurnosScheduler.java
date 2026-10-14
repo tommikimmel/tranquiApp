@@ -3,6 +3,9 @@ package com.tranqui.app.service;
 import com.tranqui.app.model.EstadoTurno;
 import com.tranqui.app.model.Turno;
 import com.tranqui.app.repository.TurnoRepository;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.TurnoExpiradoData;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -16,6 +19,9 @@ public class LiberarTurnosScheduler {
     @Autowired
     private TurnoRepository turnoRepository;
 
+    @Autowired(required = false)
+    private OutboxPublisher outboxPublisher;
+
     @Scheduled(fixedRate = 60000) // Every minute
     @Transactional
     public void liberarTurnosExpirados() {
@@ -27,6 +33,19 @@ public class LiberarTurnosScheduler {
         for (Turno turno : turnosExpirados) {
             turno.setEstado(EstadoTurno.CANCELADO);
             turnoRepository.save(turno);
+
+            if (outboxPublisher != null) {
+                outboxPublisher.publicar(
+                        Topicos.TURNOS_TURNO_EXPIRADO_V1,
+                        String.valueOf(turno.getId()),
+                        turno.getAggregateVersion(),
+                        new TurnoExpiradoData(
+                                turno.getId(),
+                                turno.getPaciente() != null ? turno.getPaciente().getId() : null,
+                                turno.getMedico() != null ? turno.getMedico().getId() : null
+                        )
+                );
+            }
         }
     }
 }
