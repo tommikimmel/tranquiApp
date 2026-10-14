@@ -1,5 +1,6 @@
 package com.tranqui.gateway.filter;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -11,10 +12,17 @@ import reactor.core.publisher.Mono;
 
 /**
  * Filtro global que garantiza que cualquier respuesta 429 (Too Many Requests)
- * contenga el encabezado Retry-After si no fue establecido previamente por el RateLimiter.
+ * contenga el encabezado Retry-After si no fue establecido previamente por el RateLimiter
+ * y registre la métrica de rechazo 429 en Micrometer.
  */
 @Component
 public class RetryAfterGlobalFilter implements GlobalFilter, Ordered {
+
+    private final MeterRegistry meterRegistry;
+
+    public RetryAfterGlobalFilter(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -22,6 +30,9 @@ public class RetryAfterGlobalFilter implements GlobalFilter, Ordered {
             if (HttpStatus.TOO_MANY_REQUESTS.equals(exchange.getResponse().getStatusCode())) {
                 if (!exchange.getResponse().getHeaders().containsKey(HttpHeaders.RETRY_AFTER)) {
                     exchange.getResponse().getHeaders().set(HttpHeaders.RETRY_AFTER, "60");
+                }
+                if (meterRegistry != null) {
+                    meterRegistry.counter("gateway.requests.429").increment();
                 }
             }
             return Mono.empty();

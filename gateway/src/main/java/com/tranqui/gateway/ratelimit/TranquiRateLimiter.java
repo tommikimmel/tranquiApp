@@ -144,6 +144,10 @@ public class TranquiRateLimiter extends AbstractRateLimiter<TranquiRateLimiter.C
                     if (!allowed) {
                         if (retryAfter <= 0) retryAfter = 60;
                         headers.put(RETRY_AFTER_HEADER, String.valueOf(retryAfter));
+                        if (meterRegistry != null) {
+                            meterRegistry.counter("gateway.ratelimit.rejected", "route", routeId != null ? routeId : "unknown").increment();
+                            meterRegistry.counter("gateway.requests.429", "route", routeId != null ? routeId : "unknown").increment();
+                        }
                     }
 
                     return new RateLimiter.Response(allowed, headers);

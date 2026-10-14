@@ -95,6 +95,8 @@ public class RateLimiterTest {
 
     @Test
     void testRateLimitSuperadoRetorna429ConRetryAfter() {
+        double rechazosIniciales = meterRegistry.counter("gateway.requests.429").count();
+
         // Simular respuesta de Redis indicando límite superado: allowed=0, tokens=0, retryAfter=45
         List<Long> redisResult = Arrays.asList(0L, 0L, 45L);
         when(mockRedisTemplate.execute(any(RedisScript.class), anyList(), anyList()))
@@ -105,6 +107,9 @@ public class RateLimiterTest {
                 .expectStatus().isEqualTo(429)
                 .expectHeader().valueEquals("Retry-After", "45")
                 .expectHeader().valueEquals("X-RateLimit-Remaining", "0");
+
+        double rechazosFinales = meterRegistry.counter("gateway.requests.429").count();
+        assertThat(rechazosFinales).isGreaterThan(rechazosIniciales);
     }
 
     @Test

@@ -126,6 +126,7 @@ services:
       TRANQUI_SERVICES_MONOLITO_URI: http://backend:8080
       SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
       JWT_SECRET: local-dev-encryption-key-32chars
+      VICTORIAMETRICS_URL: http://victoriametrics:8428
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -135,7 +136,51 @@ services:
         condition: service_healthy
       consul:
         condition: service_healthy
+      victoriametrics:
+        condition: service_healthy
     mem_limit: 288m
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.101.0
+    command:
+      - "-promscrape.config=/etc/victoriametrics/scrape.yml"
+      - "-retentionPeriod=15d"
+      - "-storageDataPath=/victoria-metrics-data"
+    ports:
+      - "127.0.0.1:8428:8428"
+    volumes:
+      - ./infra/victoriametrics/scrape.yml:/etc/victoriametrics/scrape.yml:ro
+      - tranqui-local-vm-data:/victoria-metrics-data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8428/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    mem_limit: 96m
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    profiles:
+      - monitoring
+      - full
+    ports:
+      - "127.0.0.1:9100:9100"
+    mem_limit: 32m
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    profiles:
+      - monitoring
+      - full
+    ports:
+      - "127.0.0.1:8083:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    mem_limit: 64m
 
   frontend:
     image: node:22-alpine
@@ -156,3 +201,4 @@ services:
 volumes:
   tranqui-local-db:
   tranqui-local-node-modules:
+  tranqui-local-vm-data:

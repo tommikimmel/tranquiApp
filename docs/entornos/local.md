@@ -40,8 +40,9 @@ terminal interactiva, aborta y lista los puertos ocupados.
 | RabbitMQ (AMQP) | `localhost:5672` | Broker de mensajería (intercambios `tranqui.eventos`, `tranqui.reintentos`, `tranqui.dlx`) |
 | Consul | http://localhost:8500 | Service discovery: catálogo, registro de servicios y healthchecks |
 | Redis | `localhost:6379` | Almacenamiento en memoria para contadores de rate limiting del gateway |
+| VictoriaMetrics | http://127.0.0.1:8428 | Base de métricas y series temporales (PromQL, retención 15d) |
 
-### Infraestructura de microservicios
+### Infraestructura de microservicios y observabilidad
 
 A partir de la Fase 0 ([Plan de migración a microservicios](../arquitectura/microservicios.md)), el
 entorno local incluye la infraestructura de soporte para la arquitectura distribuida:
@@ -56,9 +57,20 @@ entorno local incluye la infraestructura de soporte para la arquitectura distrib
 - **Redis (`redis:7-alpine`):** base en memoria sin persistencia en disco (`--save ""` y
   `--appendonly no`) con tope de memoria chico (`maxmemory 64mb`, política `allkeys-lru`), usada
   para los contadores de token bucket del rate limiter del gateway.
-
-El backend todavía no depende directamente de estos servicios (eso se integra en T4 con el
-patrón Outbox y el relay).
+- **VictoriaMetrics (`victoriametrics/victoria-metrics:v1.101.0`):** almacenamiento y motor PromQL de
+  métricas locales con retención de 15 días (`-retentionPeriod=15d`) y límite de memoria de 96 MB.
+  Scrapea cada 15 segundos los endpoints Prometheus de Gateway, Backend, RabbitMQ y exportadores del sistema.
+- **node-exporter y cAdvisor (perfiles `monitoring` / `full`):**
+  Métricas de hardware del host (CPU, memoria, disco) y métricas por contenedor Docker. En entornos locales
+  de desarrollo (particularmente en Windows con Docker Desktop / WSL2), node-exporter y cAdvisor pueden tener
+  limitaciones para montar el sistema de archivos raíz (`/proc`, `/sys`) o el socket de Docker. Por ello,
+  ambos servicios se encuentran agrupados bajo los perfiles `monitoring` y `full` de Docker Compose. Para
+  iniciarlos manualmente se puede usar:
+  ```bash
+  docker compose -f docker-compose.local.yml --profile monitoring up -d
+  ```
+  Si no están activos, el panel de administración en el frontend muestra normalmente el estado de salud,
+  latencia, tráfico, outbox y RabbitMQ, manejando el estado vacío de los gráficos de contenedores sin errores.
 
 El entorno está definido en `docker-compose.local.yml` y **no lee el `.env`**: usa valores
 ficticios propios. La configuración del backend está en

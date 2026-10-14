@@ -18,6 +18,8 @@ spring:
         health-check-interval: 10s
         register-health-check: true
     gateway:
+      metrics:
+        enabled: true
       httpclient:
         connect-timeout: 2000
         response-timeout: 10s
@@ -533,6 +535,8 @@ tranqui:
       uri: ${tranqui.services.monolito.uri}
   jwt:
     service-secret: ${SERVICE_JWT_KEY:local-service-jwt-secret-key-32chars}
+  victoriametrics:
+    url: ${VICTORIAMETRICS_URL:http://localhost:8428}
 
 jwt:
   secret: ${JWT_SECRET:}
@@ -543,10 +547,22 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,prometheus,info
+        include: health,prometheus,info,metrics
   endpoint:
     health:
       show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        spring.cloud.gateway.requests: true
+        http.server.requests: true
+      percentiles:
+        spring.cloud.gateway.requests: 0.5, 0.95, 0.99
+        http.server.requests: 0.5, 0.95, 0.99
 
 resilience4j.circuitbreaker:
   configs:
