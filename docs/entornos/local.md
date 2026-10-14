@@ -21,11 +21,11 @@ La primera vez tarda unos minutos (compila el backend e instala las dependencias
 
 ### Verificación de puertos
 
-Antes de cada rebuild, `npm run local` revisa los puertos 5433, 8081, 5173, 8025 y 1025. Si alguno
-está ocupado por algo que no es este entorno (un contenedor de otro proyecto o un proceso), te
-muestra qué es y **te pregunta si puede frenarlo** (`docker stop` para contenedores, que no borra
-sus datos). Si respondés que no, aborta sin tocar nada. Sin una terminal interactiva, aborta y
-lista los puertos ocupados.
+Antes de cada rebuild, `npm run local` revisa los puertos 5433, 8081, 5173, 8025, 1025, 5672,
+15672, 8500 y 6379. Si alguno está ocupado por algo que no es este entorno (un contenedor de otro
+proyecto o un proceso), te muestra qué es y **te pregunta si puede frenarlo** (`docker stop` para
+contenedores, que no borra sus datos). Si respondés que no, aborta sin tocar nada. Sin una
+terminal interactiva, aborta y lista los puertos ocupados.
 
 ## Servicios
 
@@ -35,6 +35,29 @@ lista los puertos ocupados.
 | Backend | http://localhost:8081 | Spring Boot con el perfil `local` |
 | Mails | http://localhost:8025 | Mailpit: acá llegan todos los mails que manda la app |
 | Base | `localhost:5433` | PostgreSQL (`tranqui` / `tranqui-local`, base `tranqui_local`) |
+| RabbitMQ (panel) | http://localhost:15672 | Panel web de RabbitMQ (`tranqui` / `tranqui-local`) |
+| RabbitMQ (AMQP) | `localhost:5672` | Broker de mensajería (intercambios `tranqui.eventos`, `tranqui.reintentos`, `tranqui.dlx`) |
+| Consul | http://localhost:8500 | Service discovery: catálogo, registro de servicios y healthchecks |
+| Redis | `localhost:6379` | Almacenamiento en memoria para contadores de rate limiting del gateway |
+
+### Infraestructura de microservicios
+
+A partir de la Fase 0 ([Plan de migración a microservicios](../arquitectura/microservicios.md)), el
+entorno local incluye la infraestructura de soporte para la arquitectura distribuida:
+
+- **RabbitMQ (`rabbitmq:3.13-management-alpine`):** broker de eventos asincrónicos por *push*.
+  Configurado en `infra/rabbitmq/rabbitmq.conf` con `vm_memory_high_watermark.relative = 0.6`
+  (límite de 256 MB de RAM), plugins `rabbitmq_management` y `rabbitmq_prometheus` habilitados,
+  política de colas *lazy* por defecto (`lazy-queues`), y los tres exchanges durables definidos
+  en la topología: `tranqui.eventos` (topic), `tranqui.reintentos` (direct) y `tranqui.dlx` (direct).
+- **Consul (`hashicorp/consul:1.19`):** nodo servidor de desarrollo para registro y descubrimiento
+  de servicios (`infra/consul/consul.json`), con UI habilitada en el puerto 8500 y sin ACLs en local.
+- **Redis (`redis:7-alpine`):** base en memoria sin persistencia en disco (`--save ""` y
+  `--appendonly no`) con tope de memoria chico (`maxmemory 64mb`, política `allkeys-lru`), usada
+  para los contadores de token bucket del rate limiter del gateway.
+
+El backend todavía no depende directamente de estos servicios (eso se integra en T4 con el
+patrón Outbox y el relay).
 
 El entorno está definido en `docker-compose.local.yml` y **no lee el `.env`**: usa valores
 ficticios propios. La configuración del backend está en
