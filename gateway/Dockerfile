@@ -9,6 +9,7 @@ COPY libs/eventos/pom.xml libs/eventos/
 COPY backend/pom.xml backend/
 COPY gateway/pom.xml gateway/
 
+
 # Copiar código fuente de librerías y del gateway
 COPY libs/comun/src libs/comun/src
 COPY libs/eventos/src libs/eventos/src

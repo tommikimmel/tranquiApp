@@ -45,6 +45,9 @@ jobs:
     strategy:
       matrix:
         include:
+          - servicio: gateway
+            context: .
+            file: ./gateway/Dockerfile
           - servicio: backend
             context: .
             file: ./backend/Dockerfile
@@ -95,7 +98,8 @@ jobs:
           DESTINO: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
         run: |
           ssh -i ~/.ssh/deploy "$DESTINO" 'mkdir -p /srv/tranqui'
-          scp -i ~/.ssh/deploy docker-compose.yml scripts/vps/deploy-remoto.sh "$DESTINO":/srv/tranqui/
+          scp -i ~/.ssh/deploy -r docker-compose.yml scripts/vps/deploy-remoto.sh infra "$DESTINO":/srv/tranqui/
+
       - name: Desplegar y verificar
         env:
           DESTINO: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}

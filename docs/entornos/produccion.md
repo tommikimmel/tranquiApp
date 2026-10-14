@@ -1,39 +1,146 @@
 # Producción
 
 - **Dominio:** https://tranquisalud.com
-- **Servidor:** un VPS con Docker. Los datos de acceso no se documentan acá (ver
+- **Servidor:** un VPS con Docker (8 GB de RAM, 2 núcleos). Los datos de acceso no se documentan acá (ver
   [secretos.md](secretos.md)).
-- **Proxy y TLS:** Traefik, compartido con otros servicios del VPS. Enruta `/api` y `/ws-tranqui`
-  al backend y el resto al frontend.
+- **Proxy y TLS:** Traefik, compartido con otros servicios del VPS. A partir de la Fase 0 de microservicios,
+  enruta `/api` y `/ws-tranqui` hacia el **API Gateway** (`gateway:8080`) y el resto al frontend (`tranqui-frontend:80`).
+- **Aislamiento interno:** el monolito (`tranqui-backend`) y los servicios de soporte no publican puertos en el
+  host ni tienen labels de Traefik; viven exclusivamente en la red interna de Docker (`tranqui-network`).
 
-## Contenedores
+## Contenedores y recursos (Fase 0)
 
-| Contenedor | Qué es |
-|---|---|
-| `tranqui-frontend` | nginx que sirve el build de React (`frontend/nginx.conf`) |
-| `tranqui-backend` | Spring Boot |
-| `tranqui-db` | PostgreSQL 15 con volumen persistente |
-| `tranqui-bot`, `tranqui-bot-worker`, `wsp-db`, `wsp-redis` | Bot de WhatsApp (proyecto aparte, fuera de este repositorio; implementación a futuro) |
+Todos los contenedores tienen límites de memoria (`mem_limit`) y CPU (`cpus`) fijados conforme a la sección 9
+del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md`):
 
-## Configuración
+| Contenedor | Servicio Compose | Qué es / Rol | `mem_limit` | `cpus` |
+|---|---|---|---|---|
+| `tranqui-frontend` | `tranqui-frontend` | nginx que sirve el build de React (`frontend/nginx.conf`) | 64 MB | 0.5 |
+| `tranqui-gateway` | `gateway` | Spring Cloud Gateway (ruteo, auth de servicio, rate limiting, métricas) | 288 MB | 1.0 |
+| `tranqui-backend` | `tranqui-backend` | Monolito Spring Boot (JVM afinada, transactional outbox + relay) | 512 MB | 0.5 |
+| `tranqui-db` | `tranqui-db` | PostgreSQL 15 con volumen persistente (`app_pgdata`) | 512 MB | 0.5 |
+| `tranqui-rabbitmq` | `rabbitmq` | RabbitMQ 3.13 con topología de eventos (`tranqui.eventos`, colas lazy) | 256 MB | 0.5 |
+| `tranqui-consul` | `consul` | Consul 1.19 (service discovery y catálogo de salud) | 64 MB | 0.5 |
+| `tranqui-redis` | `redis` | Redis 7 (almacenamiento de token bucket para rate limiting) | 64 MB | 0.5 |
+| `tranqui-victoriametrics` | `victoriametrics` | VictoriaMetrics single-node (retención 15d de métricas Prometheus) | 96 MB | 0.5 |
+| `tranqui-cadvisor` | `cadvisor` | cAdvisor v0.49.1 (métricas de uso de CPU/RAM por contenedor) | 64 MB | 0.3 |
+| `tranqui-node-exporter` | `node-exporter` | Prometheus Node Exporter v1.8.2 (métricas del host VPS) | 32 MB | 0.2 |
+| `tranqui-bot`, `tranqui-bot-worker`, `wsp-db`, `wsp-redis` | — | Bot de WhatsApp (proyecto aparte, fuera de este repositorio) | ~70 MB | — |
 
-- Variables de producción en **`/srv/tranqui/.env`** del VPS (nombres en `.env.template`). Se edita
+### Presupuesto de memoria (RAM)
+
+- **Total suma `mem_limit` Docker Compose (Fase 0):** `64 + 288 + 512 + 512 + 256 + 64 + 64 + 96 + 64 + 32 = 1.952 MB` (~1,95 GB).
+- **Traefik y bot de WhatsApp:** ~112 MB.
+- **Sistema operativo y buffers mínimos:** ~1 GB.
+- **Consumo proyectado total en VPS:** **~3,1 GB**, ampliamente dentro del techo presupuestado de **~4,8 GB**
+  de la sección 9.1 para la Fase 0, reservando ~3 GB de margen libre para picos y caché de disco de PostgreSQL.
+
+### Afinación de JVM (backend y gateway)
+
+Tanto el backend monolítico como el gateway configuran flags estrictos de JVM (`JAVA_TOOL_OPTIONS` y Dockerfiles)
+según la sección 9.2:
+`-XX:+UseSerialGC -XX:MaxRAMPercentage=65 -Xss256k -XX:ReservedCodeCacheSize=48m -XX:MaxMetaspaceSize=96m -Duser.timezone=America/Argentina/Buenos_Aires`.
+
+## Configuración y variables de entorno
+
+- Variables de producción en **`/srv/tranqui/.env`** del VPS (nombres y valores de ejemplo en `.env.template`). Se edita
   por SSH; ningún deploy la sube ni la pisa. El deploy se cancela si tiene `SEED_TEST_ACCOUNTS=true`.
 - Estructura en el VPS:
 
   | Ruta | Qué es |
   |---|---|
-  | `/srv/tranqui/.env` | Variables de producción |
+  | `/srv/tranqui/.env` | Variables de producción (secretos reales, nunca en git) |
   | `/srv/tranqui/docker-compose.yml` | Copiado por cada deploy |
   | `/srv/tranqui/deploy-remoto.sh` | Script de deploy (copiado por cada deploy) |
+  | `/srv/tranqui/infra/` | Configuraciones de Consul, RabbitMQ y VictoriaMetrics |
   | `/srv/tranqui/version-actual`, `deploys.log` | Versión desplegada e historial |
   | `/srv/tranqui/mantenimiento/` | Flag y archivos del modo mantenimiento |
 
 - **Proyecto de Docker `app`:** todos los comandos usan `docker compose -p app`. De ese nombre depende
   el volumen de la base (`app_pgdata`); cambiarlo crearía una base nueva y vacía.
-- Perfil de Spring: `prod` por defecto (`SPRING_PROFILES_ACTIVE`).
-- Mercado Pago en modo real (no sandbox): cobros y débitos son reales.
-- Recetas (QBI2) y facturación (ARCA) deshabilitadas.
+
+### Variables nuevas a cargar en `/srv/tranqui/.env`
+
+Al incorporar la Fase 0, deben agregarse estas variables al archivo `/srv/tranqui/.env`:
+
+```bash
+# Clave HMAC-SHA256 para firma y validación de tokens entre servicios (mínimo 32 caracteres)
+SERVICE_JWT_KEY=clave-secreta-de-servicio-de-al-menos-32-caracteres
+
+# Clave secreta para JWT de usuarios en el gateway (generalmente igual a ENCRYPTION_KEY)
+JWT_SECRET=misma-clave-de-cifrado-o-jwt-secret-de-32-chars
+
+# Credenciales de RabbitMQ para publicación y consumo de eventos
+RABBITMQ_USER=tranqui
+RABBITMQ_PASSWORD=password-aleatoria-fuerte-generada-para-rabbitmq
+RABBITMQ_VHOST=/
+
+# URL del monolito para derivación interna desde el API Gateway
+TRANQUI_SERVICES_MONOLITO_URI=http://tranqui-backend:8080
+
+# Habilitación del relay transaccional de outbox hacia RabbitMQ
+EVENTOS_RELAY_ENABLED=true
+EVENTOS_RELAY_BACKUP_POLL_MS=30000
+```
+
+## Orden de primer arranque (Arranque escalonado)
+
+Para evitar picos excesivos de CPU al arrancar múltiples servicios sobre los 2 núcleos del VPS, `docker-compose.yml`
+define dependencias escalonadas con `condition: service_healthy`:
+
+1. **Infraestructura base:** arrancan `tranqui-db`, `rabbitmq`, `consul`, `redis`, `victoriametrics`, `cadvisor` y `node-exporter`.
+2. **Monolito (`tranqui-backend`):** espera a que `tranqui-db` y `rabbitmq` pasen sus healthchecks (`service_healthy`).
+3. **API Gateway (`gateway`):** espera a que `tranqui-backend`, `consul`, `redis` y `victoriametrics` pasen sus healthchecks (`service_healthy`).
+4. **Frontend (`tranqui-frontend`):** arranca recién cuando `gateway` está saludable.
+
+### Pasos para el primer arranque manual en el VPS
+
+1. Cargar las variables nuevas en `/srv/tranqui/.env`.
+2. Asegurar que `/srv/tranqui/infra` esté sincronizado.
+3. Descargar las imágenes publicadas:
+   ```bash
+   cd /srv/tranqui
+   TRANQUI_VERSION=vX.Y.Z docker compose -p app --env-file /srv/tranqui/.env pull tranqui-backend tranqui-frontend gateway
+   ```
+4. Levantar los contenedores:
+   ```bash
+   TRANQUI_VERSION=vX.Y.Z docker compose -p app --env-file /srv/tranqui/.env up -d --remove-orphans
+   ```
+5. Verificar estado y salud:
+   ```bash
+   docker compose -p app ps
+   curl -fsS https://tranquisalud.com/api/health
+   ```
+
+## VUELTA ATRÁS (Rollback a Monolito directo)
+
+Si el API Gateway o algún servicio de infraestructura auxiliar presenta problemas en producción, la arquitectura
+permite **volver atrás al monolito directo de forma inmediata** sin apagar la base de datos ni redeployar imágenes:
+
+1. Editar `/srv/tranqui/docker-compose.yml` en el VPS.
+2. Quitar o comentar los labels de Traefik en el servicio `gateway`:
+   ```yaml
+   # labels:
+   #   - "traefik.enable=true"
+   #   - "traefik.http.routers.tranqui-gateway.entrypoints=websecure"
+   #   - "traefik.http.routers.tranqui-gateway.rule=Host(`tranquisalud.com`) && (PathPrefix(`/api`) || PathPrefix(`/ws-tranqui`))"
+   #   - "traefik.http.routers.tranqui-gateway.tls.certresolver=letsencrypt"
+   #   - "traefik.http.services.tranqui-gateway.loadbalancer.server.port=8080"
+   ```
+3. Restaurar los labels de Traefik en el servicio `tranqui-backend`:
+   ```yaml
+   labels:
+     - "traefik.enable=true"
+     - "traefik.http.routers.tranqui-backend.entrypoints=websecure"
+     - "traefik.http.routers.tranqui-backend.rule=Host(`tranquisalud.com`) && (PathPrefix(`/api`) || PathPrefix(`/ws-tranqui`))"
+     - "traefik.http.routers.tranqui-backend.tls.certresolver=letsencrypt"
+     - "traefik.http.services.tranqui-backend.loadbalancer.server.port=8080"
+   ```
+4. Aplicar el cambio de configuración:
+   ```bash
+   docker compose -p app --env-file /srv/tranqui/.env up -d tranqui-backend gateway
+   ```
+5. Traefik detecta la reconfiguración dinámicamente en segundos y vuelve a enviar todo el tráfico de `/api` y `/ws-tranqui` directamente al monolito.
 
 ## Base de datos
 
@@ -71,7 +178,7 @@ ve el aviso. El token es nuevo en cada mantenimiento y se borra al apagarlo. No 
   token del acceso de administrador). nginx (`frontend/nginx.conf`) revisa el flag en cada pedido.
 - La página es `frontend/public/mantenimiento/index.html`, autocontenida (no depende de React ni
   del backend).
-- Solo cubre el sitio: la API (`/api`, que Traefik enruta directo al backend) sigue respondiendo.
+- Solo cubre el sitio: la API (`/api`, que Traefik enruta al gateway/backend) sigue respondiendo.
   Para una tarea de base de datos, además de prender el mantenimiento hay que frenar el backend.
 - El script se conecta por SSH con las mismas credenciales que el deploy (ver `secretos.md`).
 
