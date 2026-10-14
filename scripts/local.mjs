@@ -21,6 +21,7 @@ const COMPOSE = ['compose', '-f', path.join(ROOT, 'docker-compose.local.yml')]
 const PROJECT = 'tranqui-local'
 const PORTS = [
   { port: 5433, what: 'base de datos' },
+  { port: 8080, what: 'gateway' },
   { port: 8081, what: 'backend' },
   { port: 5173, what: 'frontend' },
   { port: 8025, what: 'Mailpit (bandeja web)' },
@@ -138,6 +139,7 @@ async function up() {
 Entorno local levantándose (la primera vez tarda unos minutos: compila el backend e instala el frontend).
 
   App:       http://localhost:5173
+  Gateway:   http://localhost:8080
   Backend:   http://localhost:8081
   Mails:     http://localhost:8025
   Base:      localhost:5433 (tranqui / tranqui-local)

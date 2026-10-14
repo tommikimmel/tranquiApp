@@ -1,0 +1,24 @@
+server:
+  port: 0
+
+spring:
+  cloud:
+    consul:
+      enabled: false
+      discovery:
+        enabled: false
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 63799 # Puerto no existente por defecto para verificar fail-open cuando no hay redis
+
+management:
+  server:
+    port: 0
+
+tranqui:
+  services:
+    monolito:
+      uri: http://localhost:8089
+  jwt:
+    service-secret: test-service-jwt-secret-key-32chars

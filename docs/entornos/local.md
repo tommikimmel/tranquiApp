@@ -21,7 +21,7 @@ La primera vez tarda unos minutos (compila el backend e instala las dependencias
 
 ### Verificación de puertos
 
-Antes de cada rebuild, `npm run local` revisa los puertos 5433, 8081, 5173, 8025, 1025, 5672,
+Antes de cada rebuild, `npm run local` revisa los puertos 5433, 8080, 8081, 5173, 8025, 1025, 5672,
 15672, 8500 y 6379. Si alguno está ocupado por algo que no es este entorno (un contenedor de otro
 proyecto o un proceso), te muestra qué es y **te pregunta si puede frenarlo** (`docker stop` para
 contenedores, que no borra sus datos). Si respondés que no, aborta sin tocar nada. Sin una
@@ -32,7 +32,8 @@ terminal interactiva, aborta y lista los puertos ocupados.
 | Servicio | URL | Qué es |
 |---|---|---|
 | App | http://localhost:5173 | Frontend con Vite en modo desarrollo (recarga en caliente al editar `frontend/src`) |
-| Backend | http://localhost:8081 | Spring Boot con el perfil `local` |
+| Gateway | http://localhost:8080 | Spring Cloud Gateway: punto de entrada unificado para frontend y clientes |
+| Backend | http://localhost:8081 | Spring Boot con el perfil `local` (accesible directamente o vía Gateway) |
 | Mails | http://localhost:8025 | Mailpit: acá llegan todos los mails que manda la app |
 | Base | `localhost:5433` | PostgreSQL (`tranqui` / `tranqui-local`, base `tranqui_local`) |
 | RabbitMQ (panel) | http://localhost:15672 | Panel web de RabbitMQ (`tranqui` / `tranqui-local`) |

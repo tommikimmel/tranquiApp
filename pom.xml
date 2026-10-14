@@ -17,6 +17,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<spring-boot.version>3.5.15</spring-boot.version>
+		<spring-cloud.version>2025.0.1</spring-cloud.version>
 		<jjwt.version>0.11.5</jjwt.version>
 	</properties>
 
@@ -24,6 +25,7 @@
 		<module>libs/comun</module>
 		<module>libs/eventos</module>
 		<module>backend</module>
+		<module>gateway</module>
 	</modules>
 
 	<dependencyManagement>
@@ -37,6 +39,15 @@
 				<scope>import</scope>
 			</dependency>
 
+			<!-- Spring Cloud Dependencies BOM -->
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+
 			<!-- Módulos propios de la plataforma -->
 			<dependency>
 				<groupId>com.tranqui</groupId>
@@ -46,6 +57,11 @@
 			<dependency>
 				<groupId>com.tranqui</groupId>
 				<artifactId>eventos</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.tranqui</groupId>
+				<artifactId>gateway</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 
@@ -87,6 +103,11 @@
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-surefire-plugin</artifactId>
 					<version>3.2.5</version>
+				</plugin>
+				<plugin>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-maven-plugin</artifactId>
+					<version>${spring-boot.version}</version>
 				</plugin>
 			</plugins>
 		</pluginManagement>

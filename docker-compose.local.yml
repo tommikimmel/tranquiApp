@@ -104,12 +104,37 @@ services:
       mailpit:
         condition: service_started
 
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      TRANQUI_SERVICES_MONOLITO_URI: http://backend:8080
+      SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
+      JWT_SECRET: local-dev-encryption-key-32chars
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    mem_limit: 288m
+
   frontend:
     image: node:22-alpine
     working_dir: /app
     command: sh -c "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 5173 --strictPort"
     environment:
       VITE_GOOGLE_LOGIN: "false"
+      VITE_API_URL: "http://localhost:8080"
     ports:
       - "127.0.0.1:5173:5173"
     volumes:
@@ -117,7 +142,7 @@ services:
       # node_modules del contenedor separado del de la máquina (binarios de Linux).
       - tranqui-local-node-modules:/app/node_modules
     depends_on:
-      - backend
+      - gateway
 
 volumes:
   tranqui-local-db:
