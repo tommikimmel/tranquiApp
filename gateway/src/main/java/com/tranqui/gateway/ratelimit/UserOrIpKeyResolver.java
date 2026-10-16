@@ -1,98 +1,48 @@
 package com.tranqui.gateway.ratelimit;
 
+import com.tranqui.gateway.security.RealIpResolver;
+import com.tranqui.gateway.security.UserJwtVerifier;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.ratelimit.KeyResolver;
 import org.springframework.context.annotation.Primary;
-import org.springframework.http.HttpCookie;
-import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
-import java.security.Key;
+import java.util.Optional;
 
 /**
  * KeyResolver para el Rate Limiter (sección 4.3 del plan).
- * Extrae el identificador de usuario del JWT (cookie SESSION-TOKEN o header Authorization)
- * y si no está autenticado, recurre a la dirección IP del cliente.
+ * Extrae el identificador de usuario del JWT (cookie SESSION-TOKEN o header Authorization Bearer)
+ * a través de UserJwtVerifier; si no está autenticado, recurre a la dirección IP real del cliente
+ * mediante RealIpResolver.
  */
 @Component("userOrIpKeyResolver")
 @Primary
 public class UserOrIpKeyResolver implements KeyResolver {
 
-    public static final String SESSION_COOKIE_NAME = "SESSION-TOKEN";
-    private final Key signingKey;
+    private final UserJwtVerifier userJwtVerifier;
+    private final RealIpResolver realIpResolver;
 
-    public UserOrIpKeyResolver(@Value("${jwt.secret:defaultsecretkeymustbe32byteslongforhs256algorithm!}") String secret) {
-        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
-        this.signingKey = Keys.hmacShaKeyFor(bytes);
+    public UserOrIpKeyResolver(UserJwtVerifier userJwtVerifier, RealIpResolver realIpResolver) {
+        this.userJwtVerifier = userJwtVerifier;
+        this.realIpResolver = realIpResolver;
     }
 
     @Override
     public Mono<String> resolve(ServerWebExchange exchange) {
-        String token = extractToken(exchange);
-        if (token != null) {
-            String userId = extractUserIdentifier(token);
-            if (userId != null && !userId.trim().isEmpty()) {
-                return Mono.just("user:" + userId.trim());
+        Optional<Claims> claimsOpt = userJwtVerifier.verify(exchange);
+        if (claimsOpt.isPresent()) {
+            Optional<String> userIdOpt = userJwtVerifier.extractUserIdentifier(claimsOpt.get());
+            if (userIdOpt.isPresent()) {
+                return Mono.just("user:" + userIdOpt.get());
             }
         }
 
-        return Mono.just("ip:" + extractClientIp(exchange));
+        return Mono.just("ip:" + realIpResolver.extractClientIp(exchange));
     }
 
-    private String extractToken(ServerWebExchange exchange) {
-        // 1. Revisar cookie SESSION-TOKEN
-        HttpCookie sessionCookie = exchange.getRequest().getCookies().getFirst(SESSION_COOKIE_NAME);
-        if (sessionCookie != null && sessionCookie.getValue() != null && !sessionCookie.getValue().trim().isEmpty()) {
-            return sessionCookie.getValue().trim();
-        }
-
-        // 2. Revisar header Authorization: Bearer <token>
-        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            return authHeader.substring(7).trim();
-        }
-
-        return null;
-    }
-
-    private String extractUserIdentifier(String token) {
-        try {
-            Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(signingKey)
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody();
-
-            Object idClaim = claims.get("userId");
-            if (idClaim == null) {
-                idClaim = claims.get("id");
-            }
-            if (idClaim == null) {
-                idClaim = claims.get("usuarioId");
-            }
-
-            if (idClaim != null) {
-                return String.valueOf(idClaim);
-            }
-
-            return claims.getSubject();
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    public static String extractClientIp(ServerWebExchange exchange) {
-        InetSocketAddress remoteAddress = exchange.getRequest().getRemoteAddress();
-        if (remoteAddress != null && remoteAddress.getAddress() != null) {
-            return remoteAddress.getAddress().getHostAddress();
-        }
-        return "127.0.0.1";
+    public String extractClientIp(ServerWebExchange exchange) {
+        return realIpResolver.extractClientIp(exchange);
     }
 }

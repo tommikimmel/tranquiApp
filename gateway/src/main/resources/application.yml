@@ -502,6 +502,12 @@ spring:
                 key-resolver: "#{@userOrIpKeyResolver}"
 
 tranqui:
+  gateway:
+    trusted-proxies:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+      - 127.0.0.1/32
   services:
     monolito:
       uri: ${TRANQUI_SERVICES_MONOLITO_URI:http://localhost:8081}
@@ -529,7 +535,7 @@ tranqui:
     service-secret: ${SERVICE_JWT_KEY:local-service-jwt-secret-key-32chars}
 
 jwt:
-  secret: ${JWT_SECRET:defaultsecretkeymustbe32byteslongforhs256algorithm!}
+  secret: ${JWT_SECRET:}
 
 management:
   server:

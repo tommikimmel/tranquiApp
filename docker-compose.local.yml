@@ -91,6 +91,8 @@ services:
       SPRING_MAIL_PORT: "1025"
       # Clave de cifrado solo para datos locales (32 caracteres). Nunca se usa en producción.
       ENCRYPTION_KEY: local-dev-encryption-key-32chars
+      # Clave JWT compartida con el gateway para el entorno local.
+      JWT_SECRET: local-dev-encryption-key-32chars
       APP_PUBLIC_URL: http://localhost:8081
       FRONTEND_URL: http://localhost:5173
       DEMO_DATA: "true"

@@ -6,6 +6,7 @@ WORKDIR /app
 COPY pom.xml .
 COPY libs/comun/pom.xml libs/comun/
 COPY libs/eventos/pom.xml libs/eventos/
+COPY backend/pom.xml backend/
 COPY gateway/pom.xml gateway/
 
 # Copiar código fuente de librerías y del gateway

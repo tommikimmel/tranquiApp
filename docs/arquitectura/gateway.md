@@ -44,9 +44,9 @@ Configuradas en `gateway/src/main/resources/application.yml` (y sobreescritas po
 Implementado en `TranquiRateLimiter` mediante un script Lua ejecutado atómicamente en Redis con el algoritmo de token bucket:
 
 - **Resolución de clave (`KeyResolver`):**
-  - Si la petición incluye un token Bearer JWT con reclamo `sub` o `id`, se limita por usuario autenticado (`user:<id>`).
-  - Si la petición es anónima o no incluye token válido, se limita por dirección IP de origen (`ip:<address>`).
-  - Para rutas `/internal/**`, se utiliza la cabecera del servicio emisor (`service:<nombre>`).
+  - **Verificación de usuario (`UserJwtVerifier`):** Extrae el token de autenticación desde la cookie `SESSION-TOKEN` o el encabezado `Authorization: Bearer <token>`. Valida la firma HMAC-SHA256 con `jwt.secret` y la fecha de expiración. Extrae el identificador de usuario (`userId`, `id`, `usuarioId` o `sub`) para limitar por cuenta (`user:<id>`). Sin defaults hardcodeados en el código: en perfiles distintos a local/test, la ausencia de la variable `JWT_SECRET` impide el arranque del gateway con un mensaje de error explícito.
+  - **Resolución de IP real (`RealIpResolver`):** Utiliza la propiedad `tranqui.gateway.trusted-proxies` (redes privadas por defecto: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` y `127.0.0.1/32`). Si la IP remota es un proxy confiable (ej. Traefik) y existe encabezado `X-Forwarded-For`, se selecciona la IP más a la derecha que NO sea un proxy confiable. Si la IP remota no es confiable, se ignora cualquier cabecera `X-Forwarded-For` para evitar suplantaciones (spoofing) y se utiliza la IP remota directa. Se aplica en `UserOrIpKeyResolver` (anónimos) y en `IpKeyResolver` (login, registro y webhooks de Mercado Pago).
+  - **Rutas internas:** Para `/internal/**`, se limita por la cabecera del servicio emisor (`service:<nombre>`).
 - **Respuesta 429 Too Many Requests:**
   - Cuando se agotan las fichas disponibles en la ventana, la respuesta HTTP 429 incluye obligatoriamente la cabecera `Retry-After: <segundos>`, indicando al cliente cuánto debe esperar antes de reintentar.
   - Se adjuntan cabeceras estándar de tasa: `X-RateLimit-Remaining: 0`.
