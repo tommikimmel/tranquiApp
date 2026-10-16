@@ -84,7 +84,7 @@ class OutboxRelayIntegrationTest {
 
         @Bean
         public Binding testBinding(Queue testQueue, TopicExchange exchangeEventos) {
-            return BindingBuilder.bind(testQueue).to(exchangeEventos).with("#");
+            return BindingBuilder.bind(testQueue).to(exchangeEventos).with("turnos.#");
         }
     }
 
@@ -112,6 +112,12 @@ class OutboxRelayIntegrationTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired
+    private io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
+    @Autowired
+    private javax.sql.DataSource dataSource;
+
     private final ObjectMapper objectMapper = EventObjectMapperFactory.create();
 
     @BeforeEach
@@ -120,7 +126,7 @@ class OutboxRelayIntegrationTest {
             rabbitAdmin.declareQueue(new Queue(TEST_QUEUE, true, false, false));
             rabbitAdmin.declareBinding(BindingBuilder.bind(new Queue(TEST_QUEUE, true, false, false))
                     .to(new TopicExchange(RabbitMQConstantes.EXCHANGE_EVENTOS, true, false))
-                    .with("#"));
+                    .with("turnos.#"));
             rabbitAdmin.purgeQueue(TEST_QUEUE, true);
         } catch (Exception ignored) {
         }
@@ -241,7 +247,7 @@ class OutboxRelayIntegrationTest {
         admin.declareQueue(q);
         TopicExchange ex = new TopicExchange(RabbitMQConstantes.EXCHANGE_EVENTOS, true, false);
         admin.declareExchange(ex);
-        admin.declareBinding(BindingBuilder.bind(q).to(ex).with("#"));
+        admin.declareBinding(BindingBuilder.bind(q).to(ex).with("turnos.#"));
 
         // Reintentar relay
         outboxRelay.trigger();
@@ -276,5 +282,80 @@ class OutboxRelayIntegrationTest {
         boolean segundaVez = inboxHelper.procesar(eventId, consumidor, () -> segundaEjecucion.set(true));
         assertThat(segundaVez).isFalse();
         assertThat(segundaEjecucion.get()).isFalse();
+    }
+
+    @Test
+    @Order(5)
+    void eventoSinColaEnlazada_seMarcaPublicado_registraMetricaSinRuta() throws Exception {
+        String topicoSinCola = "identidad.usuario.registrado.v1";
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        UUID[] eventIdHolder = new UUID[1];
+
+        tx.executeWithoutResult(status -> {
+            EventEnvelope<String> envelope = outboxPublisher.publicar(
+                    topicoSinCola,
+                    "usuario",
+                    "usr-100",
+                    1,
+                    "datos-registro"
+            );
+            eventIdHolder[0] = envelope.eventId();
+        });
+
+        UUID eventId = eventIdHolder[0];
+        assertThat(eventId).isNotNull();
+
+        // Esperar que el relay procese el evento y verifique published_at no nulo
+        await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
+            Optional<OutboxRecord> record = outboxRepository.findByEventId(eventId);
+            assertThat(record).isPresent();
+            assertThat(record.get().getPublishedAt()).isNotNull();
+            assertThat(record.get().getLastError()).isNull();
+        });
+
+        // Verificar métrica Micrometer outbox.eventos.sin_ruta = 1 con tag topico
+        await().atMost(5, TimeUnit.SECONDS).untilAsserted(() -> {
+            var counter = meterRegistry.find("outbox.eventos.sin_ruta")
+                    .tag("topico", topicoSinCola)
+                    .counter();
+            assertThat(counter).isNotNull();
+            assertThat(counter.count()).isEqualTo(1.0);
+        });
+
+        // Verificar que ninguna cola recibió el mensaje (era unrouted)
+        Object recibido = rabbitTemplate.receiveAndConvert(TEST_QUEUE, 1000);
+        assertThat(recibido).isNull();
+
+        // Verificar que la outbox no quedó bloqueada publicando un evento con ruta posterior
+        UUID[] segundoEventIdHolder = new UUID[1];
+        tx.executeWithoutResult(status -> {
+            EventEnvelope<String> envelope = outboxPublisher.publicar(
+                    "turnos.turno.confirmado.v1",
+                    "turno",
+                    "7002",
+                    1,
+                    "datos-posterior"
+            );
+            segundoEventIdHolder[0] = envelope.eventId();
+        });
+
+        await().atMost(10, TimeUnit.SECONDS).untilAsserted(() -> {
+            Optional<OutboxRecord> record = outboxRepository.findByEventId(segundoEventIdHolder[0]);
+            assertThat(record).isPresent();
+            assertThat(record.get().getPublishedAt()).isNotNull();
+        });
+
+        Object segundoRecibido = rabbitTemplate.receiveAndConvert(TEST_QUEUE, 5000);
+        assertThat(segundoRecibido).isNotNull();
+    }
+
+    @Test
+    @Order(6)
+    void conexionListenDedicada_noOcupaConexionDelPoolHikari() {
+        if (dataSource instanceof com.zaxxer.hikari.HikariDataSource hikariDs) {
+            // El loop LISTEN de OutboxRelay usa una conexión dedicada fuera del pool Hikari,
+            // por lo que cuando no hay transacciones activas el pool Hikari tiene 0 conexiones activas.
+            assertThat(hikariDs.getHikariPoolMXBean().getActiveConnections()).isZero();
+        }
     }
 }

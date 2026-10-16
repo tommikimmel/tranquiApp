@@ -1,15 +1,21 @@
 package com.tranqui.app.eventos;
 
 import com.tranqui.eventos.RabbitMQConstantes;
+import com.zaxxer.hikari.HikariDataSource;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.postgresql.PGConnection;
 import org.postgresql.PGNotification;
+import org.postgresql.ds.PGSimpleDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -21,6 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import javax.sql.DataSource;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.Statement;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -32,9 +39,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Componente Relay para la tabla outbox (sección 6.1 de docs/arquitectura/microservicios.md).
  *
- * Escucha notificaciones en tiempo real vía PostgreSQL LISTEN 'outbox', ejecuta barridos
+ * Escucha notificaciones en tiempo real vía PostgreSQL LISTEN 'outbox' con una conexión
+ * dedicada fuera del pool de Hikari (PGSimpleDataSource/DriverManager), ejecuta barridos
  * de respaldo periódicos cada 30 segundos, publica eventos a RabbitMQ con publisher confirms
- * y mandatory routing, y marca published_at únicamente ante confirmación exitosa del broker.
+ * y mandatory routing, maneja devoluciones por falta de ruta sin bloquear la outbox registrando
+ * métricas, y marca published_at ante confirmación del broker.
  */
 @Component
 @ConditionalOnProperty(prefix = "eventos.relay", name = "enabled", havingValue = "true")
@@ -47,28 +56,44 @@ public class OutboxRelay implements DisposableBean {
     private final OutboxRepository outboxRepository;
     private final RabbitTemplate rabbitTemplate;
     private final TransactionTemplate transactionTemplate;
+    private final MeterRegistry meterRegistry;
+    private final DataSourceProperties dataSourceProperties;
 
-    private final AtomicBoolean running = new AtomicBoolean(false);
+    private final AtomicBoolean running = new AtomicBoolean(true);
+    private final AtomicBoolean started = new AtomicBoolean(false);
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
     private final BlockingQueue<Boolean> triggerQueue = new LinkedBlockingQueue<>(10);
 
     private Thread listenerThread;
     private Thread workerThread;
+    private volatile Connection dedicatedConnection;
 
+    @Autowired
     public OutboxRelay(DataSource dataSource,
                        OutboxRepository outboxRepository,
                        RabbitTemplate rabbitTemplate,
-                       PlatformTransactionManager transactionManager) {
+                       PlatformTransactionManager transactionManager,
+                       MeterRegistry meterRegistry,
+                       @Autowired(required = false) DataSourceProperties dataSourceProperties) {
         this.dataSource = dataSource;
         this.outboxRepository = outboxRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.meterRegistry = meterRegistry != null ? meterRegistry : new SimpleMeterRegistry();
+        this.dataSourceProperties = dataSourceProperties;
+    }
+
+    public OutboxRelay(DataSource dataSource,
+                       OutboxRepository outboxRepository,
+                       RabbitTemplate rabbitTemplate,
+                       PlatformTransactionManager transactionManager) {
+        this(dataSource, outboxRepository, rabbitTemplate, transactionManager, new SimpleMeterRegistry(), null);
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public synchronized void start() {
-        if (running.compareAndSet(false, true)) {
+        if (started.compareAndSet(false, true)) {
             log.info("Iniciando OutboxRelay de mensajería...");
 
             workerThread = new Thread(this::runWorkerLoop, "outbox-relay-worker");
@@ -92,7 +117,7 @@ public class OutboxRelay implements DisposableBean {
      */
     @Scheduled(fixedDelayString = "${eventos.relay.backup-poll-ms:30000}", initialDelay = 10000)
     public void barridoDeRespaldo() {
-        if (!running.get()) {
+        if (!started.get() || !running.get()) {
             return;
         }
         log.debug("Ejecutando barrido de respaldo cada 30s de la outbox...");
@@ -198,18 +223,105 @@ public class OutboxRelay implements DisposableBean {
             String reason = (confirm != null && confirm.getReason() != null) ? confirm.getReason() : "Broker no confirmó recepción";
             throw new IllegalStateException("Confirmación de broker negativa para " + record.getEventId() + ": " + reason);
         }
+
+        if (correlationData.getReturned() != null) {
+            log.warn("Mensaje sin ruta en RabbitMQ para tópico '{}' y eventId '{}': sin cola enlazada en el broker (replyCode={}, replyText='{}')",
+                record.getTopic(),
+                record.getEventId(),
+                correlationData.getReturned().getReplyCode(),
+                correlationData.getReturned().getReplyText());
+            meterRegistry.counter("outbox.eventos.sin_ruta", "topico", record.getTopic()).increment();
+        }
+    }
+
+    private String resolveJdbcUrl() {
+        if (dataSourceProperties != null && dataSourceProperties.getUrl() != null && !dataSourceProperties.getUrl().isBlank()) {
+            return dataSourceProperties.getUrl();
+        }
+        if (dataSource instanceof HikariDataSource hikariDs) {
+            return hikariDs.getJdbcUrl();
+        }
+        try {
+            if (dataSource.isWrapperFor(HikariDataSource.class)) {
+                return dataSource.unwrap(HikariDataSource.class).getJdbcUrl();
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private String resolveUsername() {
+        if (dataSourceProperties != null && dataSourceProperties.getUsername() != null && !dataSourceProperties.getUsername().isBlank()) {
+            return dataSourceProperties.getUsername();
+        }
+        if (dataSource instanceof HikariDataSource hikariDs) {
+            return hikariDs.getUsername();
+        }
+        try {
+            if (dataSource.isWrapperFor(HikariDataSource.class)) {
+                return dataSource.unwrap(HikariDataSource.class).getUsername();
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private String resolvePassword() {
+        if (dataSourceProperties != null && dataSourceProperties.getPassword() != null) {
+            return dataSourceProperties.getPassword();
+        }
+        if (dataSource instanceof HikariDataSource hikariDs) {
+            return hikariDs.getPassword();
+        }
+        try {
+            if (dataSource.isWrapperFor(HikariDataSource.class)) {
+                return dataSource.unwrap(HikariDataSource.class).getPassword();
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    Connection abrirConexionDedicada() throws Exception {
+        String url = resolveJdbcUrl();
+        String user = resolveUsername();
+        String pass = resolvePassword();
+
+        if (url != null && !url.isBlank()) {
+            if (url.startsWith("jdbc:postgresql:")) {
+                PGSimpleDataSource pgDs = new PGSimpleDataSource();
+                pgDs.setUrl(url);
+                if (user != null && !user.isBlank()) {
+                    pgDs.setUser(user);
+                }
+                if (pass != null) {
+                    pgDs.setPassword(pass);
+                }
+                log.debug("Abriendo conexión dedicada PostgreSQL fuera del pool Hikari para LISTEN 'outbox'");
+                return pgDs.getConnection();
+            }
+            log.debug("Abriendo conexión dedicada JDBC fuera del pool Hikari para LISTEN 'outbox' en {}", url);
+            if (user != null) {
+                return DriverManager.getConnection(url, user, pass);
+            } else {
+                return DriverManager.getConnection(url);
+            }
+        }
+        log.warn("No se pudo determinar la URL de conexión dedicada fuera del pool; usando DataSource del pool Hikari como fallback.");
+        return dataSource.getConnection();
     }
 
     private void runListenLoop() {
         long backoffSegundos = 1;
         while (running.get()) {
-            try (Connection conn = dataSource.getConnection()) {
+            try (Connection conn = abrirConexionDedicada()) {
+                this.dedicatedConnection = conn;
                 if (conn.isWrapperFor(PGConnection.class)) {
                     PGConnection pgConn = conn.unwrap(PGConnection.class);
                     try (Statement stmt = conn.createStatement()) {
                         stmt.execute("LISTEN outbox");
                     }
-                    log.info("Relay conectado exitosamente a PostgreSQL LISTEN 'outbox'");
+                    log.info("Relay conectado exitosamente a PostgreSQL LISTEN 'outbox' con conexión dedicada fuera del pool");
                     backoffSegundos = 1;
                     trigger();
 
@@ -221,13 +333,13 @@ public class OutboxRelay implements DisposableBean {
                     }
                 } else {
                     log.info("Conexión de base de datos no soporta PGConnection. Relay operará por sondeo periódico.");
-                    while (running.get()) {
+                    while (running.get() && !conn.isClosed()) {
                         Thread.sleep(5000);
                     }
                 }
             } catch (Exception e) {
                 if (running.get()) {
-                    log.warn("Error en conexión LISTEN de outbox (reconectando en {}s): {}", backoffSegundos, e.getMessage());
+                    log.warn("Error en conexión LISTEN dedicada de outbox (reconectando en {}s): {}", backoffSegundos, e.getMessage());
                     try {
                         Thread.sleep(backoffSegundos * 1000L);
                     } catch (InterruptedException ie) {
@@ -236,6 +348,8 @@ public class OutboxRelay implements DisposableBean {
                     }
                     backoffSegundos = Math.min(backoffSegundos * 2, 30);
                 }
+            } finally {
+                this.dedicatedConnection = null;
             }
         }
     }
@@ -244,6 +358,13 @@ public class OutboxRelay implements DisposableBean {
     public void destroy() {
         log.info("Deteniendo OutboxRelay...");
         running.set(false);
+        Connection conn = this.dedicatedConnection;
+        if (conn != null) {
+            try {
+                conn.close();
+            } catch (Exception ignored) {
+            }
+        }
         if (listenerThread != null) {
             listenerThread.interrupt();
         }
