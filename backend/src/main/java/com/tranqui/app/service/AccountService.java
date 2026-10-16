@@ -3,6 +3,10 @@ package com.tranqui.app.service;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.model.dto.MiCuentaDto;
 import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.UsuarioActualizadoData;
+import com.tranqui.eventos.data.UsuarioEliminadoData;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,7 +32,7 @@ public class AccountService {
     private com.tranqui.app.service.novedades.NovedadesService novedadesService;
 
     @Autowired
-    private com.tranqui.app.eventos.OutboxPublisher outboxPublisher;
+    private OutboxPublisher outboxPublisher;
 
     @Transactional(readOnly = true)
     public MiCuentaDto obtenerMiCuenta(String email) {
@@ -74,22 +78,19 @@ public class AccountService {
         }
         u.setFotoUrl(dto.getFotoUrl());
 
-        usuarioRepository.save(u);
-        if (outboxPublisher != null) {
-            outboxPublisher.publicar(
-                    com.tranqui.eventos.Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1,
-                    "usuario",
-                    String.valueOf(u.getId()),
-                    u.getAggregateVersion(),
-                    new com.tranqui.eventos.data.UsuarioActualizadoData(
-                            u.getId(),
-                            u.getEmail(),
-                            u.getNombre(),
-                            u.getApellido(),
-                            u.getTelefono()
-                    )
-            );
-        }
+        usuarioRepository.saveAndFlush(u);
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1,
+                String.valueOf(u.getId()),
+                u.getAggregateVersion(),
+                new UsuarioActualizadoData(
+                        u.getId(),
+                        u.getEmail(),
+                        u.getNombre(),
+                        u.getApellido(),
+                        u.getTelefono()
+                )
+        );
         return construirDto(u);
     }
 
@@ -197,19 +198,16 @@ public class AccountService {
         u.setCuentaEliminada(true);
         u.setAnonimizadoEn(LocalDateTime.now());
 
-        usuarioRepository.save(u);
-        if (outboxPublisher != null) {
-            outboxPublisher.publicar(
-                    com.tranqui.eventos.Topicos.IDENTIDAD_USUARIO_ELIMINADO_V1,
-                    "usuario",
-                    String.valueOf(u.getId()),
-                    u.getAggregateVersion(),
-                    new com.tranqui.eventos.data.UsuarioEliminadoData(
-                            u.getId(),
-                            "solicitud_usuario"
-                    )
-            );
-        }
+        usuarioRepository.saveAndFlush(u);
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_USUARIO_ELIMINADO_V1,
+                String.valueOf(u.getId()),
+                u.getAggregateVersion(),
+                new UsuarioEliminadoData(
+                        u.getId(),
+                        "solicitud_usuario"
+                )
+        );
     }
 
     private MiCuentaDto construirDto(Usuario u) {

@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -42,7 +43,7 @@ public class GoogleCalendarSyncService {
     @Value("${google.calendar.enabled:false}")
     private boolean isEnabled;
 
-    @Autowired(required = false)
+    @Autowired
     private OutboxPublisher outboxPublisher;
 
     @Autowired
@@ -208,10 +209,10 @@ public class GoogleCalendarSyncService {
                     if (linkNuevo) {
                         turno.setTelemedicinaUrl(meetUrl);
                     }
-                    turnoRepository.save(turno);
+                    turno = turnoRepository.saveAndFlush(turno);
                     log.info("Turno ID {} exportado con éxito a Google Calendar (Event ID: {})", turno.getId(), turno.getGoogleEventId());
 
-                    if (outboxPublisher != null && meetUrl != null && !meetUrl.isBlank()) {
+                    if (meetUrl != null && !meetUrl.isBlank()) {
                         outboxPublisher.publicar(
                                 Topicos.CALENDARIO_MEET_CREADO_V1,
                                 String.valueOf(turno.getId()),
@@ -243,7 +244,7 @@ public class GoogleCalendarSyncService {
     }
 
     private void aplicarCambio(Usuario medico, Event googleEvent) {
-        // Events the app itself created (turnos) live in Turno.googleEventId already �
+        // Events the app itself created (turnos) live in Turno.googleEventId already —
         // never cache them a second time as an "external" event.
         if (turnoRepository.existsByMedicoIdAndGoogleEventId(medico.getId(), googleEvent.getId())) {
             eventoExternoRepository.deleteByGoogleEventId(googleEvent.getId());
@@ -275,24 +276,22 @@ public class GoogleCalendarSyncService {
         evento.setEstado(googleEvent.getStatus());
         evento.setUltimaActualizacion(LocalDateTime.now());
 
-        evento = eventoExternoRepository.save(evento);
+        evento = eventoExternoRepository.saveAndFlush(evento);
 
-        if (outboxPublisher != null) {
-            java.time.OffsetDateTime offsetInicio = inicio.atZone(ZONA).toOffsetDateTime();
-            java.time.OffsetDateTime offsetFin = fin.atZone(ZONA).toOffsetDateTime();
-            outboxPublisher.publicar(
-                    Topicos.CALENDARIO_HORARIO_BLOQUEADO_V1,
-                    String.valueOf(evento.getId()),
-                    evento.getAggregateVersion(),
-                    new HorarioBloqueadoData(
-                            medico.getId(),
-                            googleEvent.getId(),
-                            offsetInicio,
-                            offsetFin,
-                            evento.getTitulo()
-                    )
-            );
-        }
+        OffsetDateTime offsetInicio = inicio.atZone(ZONA).toOffsetDateTime();
+        OffsetDateTime offsetFin = fin.atZone(ZONA).toOffsetDateTime();
+        outboxPublisher.publicar(
+                Topicos.CALENDARIO_HORARIO_BLOQUEADO_V1,
+                String.valueOf(evento.getId()),
+                evento.getAggregateVersion(),
+                new HorarioBloqueadoData(
+                        medico.getId(),
+                        googleEvent.getId(),
+                        offsetInicio,
+                        offsetFin,
+                        evento.getTitulo()
+                )
+        );
     }
 
     private LocalDateTime aLocalDateTime(EventDateTime eventDateTime) {

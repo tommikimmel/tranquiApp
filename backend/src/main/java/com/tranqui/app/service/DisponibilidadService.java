@@ -30,7 +30,7 @@ public class DisponibilidadService {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
-    @Autowired(required = false)
+    @Autowired
     private OutboxPublisher outboxPublisher;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
@@ -104,14 +104,14 @@ public class DisponibilidadService {
                         .modalidad(modalidad)
                         .build())
                 .collect(Collectors.toList());
-        List<Disponibilidad> guardadas = disponibilidadRepository.saveAll(nuevas);
+        List<Disponibilidad> guardadas = disponibilidadRepository.saveAllAndFlush(nuevas);
         publicarDisponibilidades(medico.getId(), guardadas);
 
         return defaults;
     }
 
     private void publicarDisponibilidades(Long medicoId, List<Disponibilidad> guardadas) {
-        if (outboxPublisher != null && guardadas != null) {
+        if (guardadas != null) {
             for (Disponibilidad d : guardadas) {
                 outboxPublisher.publicar(
                         Topicos.PROFESIONALES_DISPONIBILIDAD_ACTUALIZADA_V1,

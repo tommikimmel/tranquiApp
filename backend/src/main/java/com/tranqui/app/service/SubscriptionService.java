@@ -24,7 +24,7 @@ public class SubscriptionService {
 
     private static final Logger log = LoggerFactory.getLogger(SubscriptionService.class);
 
-    @Autowired(required = false)
+    @Autowired
     private OutboxPublisher outboxPublisher;
 
     @Autowired
@@ -808,8 +808,13 @@ public class SubscriptionService {
                 .build();
         eventRepository.save(event);
 
-        if (outboxPublisher != null && previousStatus != null && newStatus != null && !previousStatus.equals(newStatus)) {
-            subscriptionRepository.findById(subscriptionId).ifPresent(sub -> {
+        if (previousStatus != null && newStatus != null && !previousStatus.equals(newStatus)) {
+            subscriptionRepository.findById(subscriptionId).ifPresent(subEntity -> {
+                Subscription sub = subEntity;
+                Subscription guardado = subscriptionRepository.saveAndFlush(sub);
+                if (guardado != null) {
+                    sub = guardado;
+                }
                 java.time.LocalDate vencimiento = sub.getCurrentPeriodEnd() != null ? sub.getCurrentPeriodEnd().toLocalDate() : null;
                 Long profId = sub.getProfessional() != null ? sub.getProfessional().getId() : null;
                 outboxPublisher.publicar(

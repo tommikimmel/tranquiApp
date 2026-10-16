@@ -27,7 +27,7 @@ import java.util.Map;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
-    @Autowired(required = false)
+    @Autowired
     private OutboxPublisher outboxPublisher;
 
     @Autowired
@@ -86,16 +86,14 @@ public class AdminController {
         usuario.setVerificadoAdmin(true);
         usuario.setLicenseVerifiedAt(java.time.LocalDateTime.now());
         usuario.setLicenseVerifiedBy(auth != null ? auth.getName() : "admin");
-        usuarioRepository.save(usuario);
+        usuarioRepository.saveAndFlush(usuario);
 
-        if (outboxPublisher != null) {
-            outboxPublisher.publicar(
-                    Topicos.PROFESIONALES_PROFESIONAL_VISIBILIDAD_CAMBIADA_V1,
-                    String.valueOf(usuario.getId()),
-                    usuario.getAggregateVersion(),
-                    new ProfesionalVisibilidadCambiadaData(usuario.getId(), true, "Verificado por admin")
-            );
-        }
+        outboxPublisher.publicar(
+                Topicos.PROFESIONALES_PROFESIONAL_VISIBILIDAD_CAMBIADA_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new ProfesionalVisibilidadCambiadaData(usuario.getId(), true, "Verificado por admin")
+        );
 
         // Actualizar estado en la m�quina de estados de suscripci�n (�6)
         if (subscriptionRepository != null) {
@@ -125,16 +123,13 @@ public class AdminController {
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Usuario no encontrado"));
 
         usuario.setVerificadoAdmin(false);
-        usuarioRepository.save(usuario);
-
-        if (outboxPublisher != null) {
+        usuarioRepository.saveAndFlush(usuario);
             outboxPublisher.publicar(
                     Topicos.PROFESIONALES_PROFESIONAL_VISIBILIDAD_CAMBIADA_V1,
                     String.valueOf(usuario.getId()),
                     usuario.getAggregateVersion(),
                     new ProfesionalVisibilidadCambiadaData(usuario.getId(), false, "Verificaci�n rechazada por admin")
             );
-        }
 
         if (subscriptionRepository != null) {
             subscriptionRepository.findByProfessionalId(usuario.getId()).ifPresent(sub -> {

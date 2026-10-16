@@ -7,6 +7,9 @@ import com.tranqui.app.model.dto.TicketResumenDto;
 import com.tranqui.app.repository.TicketMensajeRepository;
 import com.tranqui.app.repository.TicketRepository;
 import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.TicketRespondidoData;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
@@ -40,7 +43,7 @@ public class TicketService {
     private ResendEmailService resendEmailService;
 
     @Autowired
-    private com.tranqui.app.eventos.OutboxPublisher outboxPublisher;
+    private OutboxPublisher outboxPublisher;
 
     @Transactional
     public TicketDetalleDto crearTicket(String creadorEmail, String asunto, String mensaje) {
@@ -162,7 +165,10 @@ public class TicketService {
             // automáticamente, eso solo lo hace el cambio de estado explícito del admin.
             ticket.setEstado(TicketEstado.ACTIVO);
             ticket.setFechaActualizacion(java.time.LocalDateTime.now());
-            ticketRepository.save(ticket);
+            Ticket ticketGuardado = ticketRepository.saveAndFlush(ticket);
+            if (ticketGuardado != null) {
+                ticket = ticketGuardado;
+            }
 
             notificacionService.crearNotificacion(ticket.getCreador(), "Respondieron tu ticket",
                     "Soporte respondió: \"" + ticket.getAsunto() + "\"", "TICKET_RESPUESTA");
@@ -175,21 +181,19 @@ public class TicketService {
                         contenido.trim());
             }
 
-            if (outboxPublisher != null) {
-                outboxPublisher.publicar(
-                        com.tranqui.eventos.Topicos.IDENTIDAD_TICKET_RESPONDIDO_V1,
-                        "ticket",
-                        String.valueOf(ticket.getId()),
-                        ticket.getAggregateVersion(),
-                        new com.tranqui.eventos.data.TicketRespondidoData(
-                                ticket.getId(),
-                                ticket.getCreador().getId(),
-                                ticket.getCreador().getEmail(),
-                                ticket.getAsunto(),
-                                contenido.trim()
-                        )
-                );
-            }
+            outboxPublisher.publicar(
+                    Topicos.IDENTIDAD_TICKET_RESPONDIDO_V1,
+                    "ticket",
+                    String.valueOf(ticket.getId()),
+                    ticket.getAggregateVersion(),
+                    new TicketRespondidoData(
+                            ticket.getId(),
+                            ticket.getCreador().getId(),
+                            ticket.getCreador().getEmail(),
+                            ticket.getAsunto(),
+                            contenido.trim()
+                    )
+            );
         } else {
             // El creador escribió — si el ticket ya estaba resuelto, un mensaje nuevo significa
             // que necesita atención de nuevo.

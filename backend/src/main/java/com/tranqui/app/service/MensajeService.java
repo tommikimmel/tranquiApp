@@ -29,7 +29,7 @@ public class MensajeService {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
-    @Autowired(required = false)
+    @Autowired
     private OutboxPublisher outboxPublisher;
 
     @Transactional
@@ -48,23 +48,21 @@ public class MensajeService {
 
         mensaje = mensajeRepository.save(mensaje);
 
-        if (outboxPublisher != null) {
-            Long uMin = Math.min(remitente.getId(), destinatario.getId());
-            Long uMax = Math.max(remitente.getId(), destinatario.getId());
-            Long conversacionId = (uMin * 31) + uMax;
-            outboxPublisher.publicar(
-                    Topicos.CHAT_MENSAJE_ENVIADO_V1,
-                    String.valueOf(mensaje.getId()),
-                    mensaje.getAggregateVersion(),
-                    new MensajeEnviadoData(
-                            mensaje.getId(),
-                            conversacionId,
-                            remitente.getId(),
-                            destinatario.getId(),
-                            java.time.OffsetDateTime.now()
-                    )
-            );
-        }
+        Long uMin = Math.min(remitente.getId(), destinatario.getId());
+        Long uMax = Math.max(remitente.getId(), destinatario.getId());
+        Long conversacionId = (uMin * 31) + uMax;
+        outboxPublisher.publicar(
+                Topicos.CHAT_MENSAJE_ENVIADO_V1,
+                String.valueOf(mensaje.getId()),
+                mensaje.getAggregateVersion(),
+                new MensajeEnviadoData(
+                        mensaje.getId(),
+                        conversacionId,
+                        remitente.getId(),
+                        destinatario.getId(),
+                        java.time.OffsetDateTime.now()
+                )
+        );
 
         return mensaje;
     }

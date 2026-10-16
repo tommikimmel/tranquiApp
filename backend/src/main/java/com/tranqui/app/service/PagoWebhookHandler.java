@@ -26,7 +26,7 @@ public class PagoWebhookHandler {
 
     private static final Logger log = LoggerFactory.getLogger(PagoWebhookHandler.class);
 
-    @Autowired(required = false)
+    @Autowired
     private OutboxPublisher outboxPublisher;
 
     @Autowired
@@ -108,7 +108,10 @@ public class PagoWebhookHandler {
                 turno.setTelemedicinaUrl(meetUrl);
             }
         }
-        turnoRepository.save(turno);
+        Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+        if (turnoGuardado != null) {
+            turno = turnoGuardado;
+        }
 
         // Registrar el Pago
         Pago pago = Pago.builder()
@@ -122,34 +125,33 @@ public class PagoWebhookHandler {
         Long pagoId = (pagoGuardado != null && pagoGuardado.getId() != null) ? pagoGuardado.getId() : (pago.getId() != null ? pago.getId() : turno.getId());
         int pagoVersion = pagoGuardado != null ? pagoGuardado.getAggregateVersion() : pago.getAggregateVersion();
 
-        if (outboxPublisher != null) {
-            outboxPublisher.publicar(
-                    Topicos.PAGOS_PAGO_APROBADO_V1,
-                    String.valueOf(pagoId),
-                    pagoVersion,
-                    new PagoAprobadoData(
-                            pagoId,
-                            turno.getId(),
-                            transactionId,
-                            pago.getMonto(),
-                            "mercadopago"
-                    )
-            );
+        outboxPublisher.publicar(
+                Topicos.PAGOS_PAGO_APROBADO_V1,
+                String.valueOf(pagoId),
+                pagoVersion,
+                new PagoAprobadoData(
+                        pagoId,
+                        turno.getId(),
+                        transactionId,
+                        pago.getMonto(),
+                        "mercadopago"
+                )
+        );
 
-            outboxPublisher.publicar(
-                    Topicos.TURNOS_TURNO_CONFIRMADO_V1,
-                    String.valueOf(turno.getId()),
-                    turno.getAggregateVersion(),
-                    new TurnoConfirmadoData(
-                            turno.getId(),
-                            turno.getPaciente().getId(),
-                            turno.getMedico().getId(),
-                            turno.getFecha(),
-                            turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00",
-                            turno.getModalidad() != null ? turno.getModalidad().name() : "ONLINE",
-                            turno.getPrecio()
-                    )
-            );
+        outboxPublisher.publicar(
+                Topicos.TURNOS_TURNO_CONFIRMADO_V1,
+                String.valueOf(turno.getId()),
+                turno.getAggregateVersion(),
+                new TurnoConfirmadoData(
+                        turno.getId(),
+                        turno.getPaciente().getId(),
+                        turno.getMedico().getId(),
+                        turno.getFecha(),
+                        turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00",
+                        turno.getModalidad() != null ? turno.getModalidad().name() : "ONLINE",
+                        turno.getPrecio()
+                )
+        );
 
             if (turno.getTelemedicinaUrl() != null && !turno.getTelemedicinaUrl().isBlank()) {
                 outboxPublisher.publicar(
@@ -178,7 +180,6 @@ public class PagoWebhookHandler {
                         )
                 );
             }
-        }
 
         log.info("Pago aprobado para turno ID: {}.", turnoId);
 
@@ -292,18 +293,16 @@ public class PagoWebhookHandler {
         Long pagoId = (pagoGuardado != null && pagoGuardado.getId() != null) ? pagoGuardado.getId() : (pago.getId() != null ? pago.getId() : turno.getId());
         int pagoVersion = pagoGuardado != null ? pagoGuardado.getAggregateVersion() : pago.getAggregateVersion();
 
-        if (outboxPublisher != null) {
-            outboxPublisher.publicar(
-                    Topicos.PAGOS_PAGO_RECHAZADO_V1,
-                    String.valueOf(pagoId),
-                    pagoVersion,
-                    new PagoRechazadoData(
-                            pagoId,
-                            turno.getId(),
-                            transactionId,
-                            motivo != null ? motivo : "Pago rechazado"
-                    )
-            );
-        }
+        outboxPublisher.publicar(
+                Topicos.PAGOS_PAGO_RECHAZADO_V1,
+                String.valueOf(pagoId),
+                pagoVersion,
+                new PagoRechazadoData(
+                        pagoId,
+                        turno.getId(),
+                        transactionId,
+                        motivo != null ? motivo : "Pago rechazado"
+                )
+        );
     }
 }

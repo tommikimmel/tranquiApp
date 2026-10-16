@@ -46,7 +46,7 @@ public class MedicoService {
     @Autowired
     private SubscriptionService subscriptionService;
 
-    @Autowired(required = false)
+    @Autowired
     private OutboxPublisher outboxPublisher;
 
     // Same flag MedicoController/MercadoPagoService use to know whether MP is really wired up
@@ -321,20 +321,18 @@ public class MedicoService {
                             .esReceta(tDto.isRequiereAgenda() ? false : (tDto.isEsReceta() && puedeRecetar))
                             .build();
                 }
-                tarifa = tarifaRepository.save(tarifa);
-                if (outboxPublisher != null) {
-                    outboxPublisher.publicar(
-                            Topicos.PROFESIONALES_TARIFA_ACTUALIZADA_V1,
-                            String.valueOf(tarifa.getId()),
-                            tarifa.getAggregateVersion(),
-                            new TarifaActualizadaData(
-                                    medico.getId(),
-                                    tarifa.getId(),
-                                    tarifa.getPrecio(),
-                                    "ARS"
-                            )
-                    );
-                }
+                tarifa = tarifaRepository.saveAndFlush(tarifa);
+                outboxPublisher.publicar(
+                        Topicos.PROFESIONALES_TARIFA_ACTUALIZADA_V1,
+                        String.valueOf(tarifa.getId()),
+                        tarifa.getAggregateVersion(),
+                        new TarifaActualizadaData(
+                                medico.getId(),
+                                tarifa.getId(),
+                                tarifa.getPrecio(),
+                                "ARS"
+                        )
+                );
             }
 
             // Any tariff the médico had before that isn't in this submission was removed via
@@ -529,31 +527,29 @@ public class MedicoService {
             medico.setIntervaloEntreTurnosMinutos(intervaloEntreTurnosMinutos);
         }
 
-        medico = usuarioRepository.save(medico);
+        medico = usuarioRepository.saveAndFlush(medico);
         publicarProfesionalActualizado(medico);
         return construirMedicoDto(medico);
     }
 
     private void publicarProfesionalActualizado(Usuario medico) {
-        if (outboxPublisher != null) {
-            List<String> modalidades = new ArrayList<>();
-            if (medico.isOfreceOnline()) modalidades.add("ONLINE");
-            if (medico.isOfrecePresencial()) modalidades.add("PRESENCIAL");
-            outboxPublisher.publicar(
-                    Topicos.PROFESIONALES_PROFESIONAL_ACTUALIZADO_V1,
-                    String.valueOf(medico.getId()),
-                    medico.getAggregateVersion(),
-                    new ProfesionalActualizadoData(
-                            medico.getId(),
-                            medico.getNombre(),
-                            medico.getApellido(),
-                            medico.getSpecialty(),
-                            medico.getFotoUrl(),
-                            modalidades,
-                            medico.getDuracionTurnoMinutos() != null ? medico.getDuracionTurnoMinutos() : DEFAULT_DURACION_TURNO_MINUTOS
-                    )
-            );
-        }
+        List<String> modalidades = new ArrayList<>();
+        if (medico.isOfreceOnline()) modalidades.add("ONLINE");
+        if (medico.isOfrecePresencial()) modalidades.add("PRESENCIAL");
+        outboxPublisher.publicar(
+                Topicos.PROFESIONALES_PROFESIONAL_ACTUALIZADO_V1,
+                String.valueOf(medico.getId()),
+                medico.getAggregateVersion(),
+                new ProfesionalActualizadoData(
+                        medico.getId(),
+                        medico.getNombre(),
+                        medico.getApellido(),
+                        medico.getSpecialty(),
+                        medico.getFotoUrl(),
+                        modalidades,
+                        medico.getDuracionTurnoMinutos() != null ? medico.getDuracionTurnoMinutos() : DEFAULT_DURACION_TURNO_MINUTOS
+                )
+        );
     }
 
     @Transactional(readOnly = true)

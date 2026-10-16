@@ -10,6 +10,7 @@ import com.tranqui.app.model.Usuario;
 import com.tranqui.app.eventos.OutboxPublisher;
 import com.tranqui.eventos.Topicos;
 import com.tranqui.eventos.data.ReembolsoRealizadoData;
+import com.tranqui.app.repository.PagoRepository;
 import com.tranqui.app.util.EncryptionUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,8 +25,11 @@ public class ReembolsoService {
 
     private static final Logger log = LoggerFactory.getLogger(ReembolsoService.class);
 
-    @Autowired(required = false)
+    @Autowired
     private OutboxPublisher outboxPublisher;
+
+    @Autowired(required = false)
+    private PagoRepository pagoRepository;
 
     @Autowired
     private EncryptionUtil encryptionUtil;
@@ -97,20 +101,24 @@ public class ReembolsoService {
         if (turno.getPago() != null) {
             Pago pago = turno.getPago();
             pago.setEstado(EstadoPago.REEMBOLSADO);
-            if (outboxPublisher != null) {
-                outboxPublisher.publicar(
-                        Topicos.PAGOS_REEMBOLSO_REALIZADO_V1,
-                        String.valueOf(pago.getId()),
-                        pago.getAggregateVersion(),
-                        new ReembolsoRealizadoData(
-                                pago.getId(),
-                                pago.getId(),
-                                turno.getId(),
-                                pago.getMonto(),
-                                saltarPolitica48h ? "Cancelado por profesional" : "Cancelación con anticipación > 48hs"
-                        )
-                );
+            if (pagoRepository != null) {
+                Pago guardado = pagoRepository.saveAndFlush(pago);
+                if (guardado != null) {
+                    pago = guardado;
+                }
             }
+            outboxPublisher.publicar(
+                    Topicos.PAGOS_REEMBOLSO_REALIZADO_V1,
+                    String.valueOf(pago.getId()),
+                    pago.getAggregateVersion(),
+                    new ReembolsoRealizadoData(
+                            pago.getId(),
+                            pago.getId(),
+                            turno.getId(),
+                            pago.getMonto(),
+                            saltarPolitica48h ? "Cancelado por profesional" : "Cancelación con anticipación > 48hs"
+                    )
+            );
         }
         return true;
     }

@@ -16,6 +16,8 @@ public interface OutboxRepository extends JpaRepository<OutboxRecord, Long> {
 
     Optional<OutboxRecord> findByEventId(UUID eventId);
 
+    List<OutboxRecord> findByAggregateIdOrderByIdAsc(String aggregateId);
+
     @Query(value = "SELECT * FROM outbox WHERE published_at IS NULL ORDER BY id ASC LIMIT :limit FOR UPDATE SKIP LOCKED", nativeQuery = true)
     List<OutboxRecord> findPendientesConLock(@Param("limit") int limit);
 

@@ -19,7 +19,7 @@ public class LiberarTurnosScheduler {
     @Autowired
     private TurnoRepository turnoRepository;
 
-    @Autowired(required = false)
+    @Autowired
     private OutboxPublisher outboxPublisher;
 
     @Scheduled(fixedRate = 60000) // Every minute
@@ -32,20 +32,21 @@ public class LiberarTurnosScheduler {
 
         for (Turno turno : turnosExpirados) {
             turno.setEstado(EstadoTurno.CANCELADO);
-            turnoRepository.save(turno);
-
-            if (outboxPublisher != null) {
-                outboxPublisher.publicar(
-                        Topicos.TURNOS_TURNO_EXPIRADO_V1,
-                        String.valueOf(turno.getId()),
-                        turno.getAggregateVersion(),
-                        new TurnoExpiradoData(
-                                turno.getId(),
-                                turno.getPaciente() != null ? turno.getPaciente().getId() : null,
-                                turno.getMedico() != null ? turno.getMedico().getId() : null
-                        )
-                );
+            Turno guardado = turnoRepository.saveAndFlush(turno);
+            if (guardado != null) {
+                turno = guardado;
             }
+
+            outboxPublisher.publicar(
+                    Topicos.TURNOS_TURNO_EXPIRADO_V1,
+                    String.valueOf(turno.getId()),
+                    turno.getAggregateVersion(),
+                    new TurnoExpiradoData(
+                            turno.getId(),
+                            turno.getPaciente() != null ? turno.getPaciente().getId() : null,
+                            turno.getMedico() != null ? turno.getMedico().getId() : null
+                    )
+            );
         }
     }
 }

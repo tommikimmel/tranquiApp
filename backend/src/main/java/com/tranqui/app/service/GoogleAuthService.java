@@ -11,6 +11,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.UsuarioRegistradoData;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.Collections;
@@ -19,7 +22,7 @@ import java.util.Collections;
 public class GoogleAuthService {
 
     @Autowired
-    private com.tranqui.app.eventos.OutboxPublisher outboxPublisher;
+    private OutboxPublisher outboxPublisher;
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -93,21 +96,19 @@ public class GoogleAuthService {
                             .perfilCompleto(false)
                             .build();
                     nuevo = usuarioRepository.save(nuevo);
-                    if (outboxPublisher != null) {
-                        outboxPublisher.publicar(
-                                com.tranqui.eventos.Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1,
-                                "usuario",
-                                String.valueOf(nuevo.getId()),
-                                nuevo.getAggregateVersion(),
-                                new com.tranqui.eventos.data.UsuarioRegistradoData(
-                                        nuevo.getId(),
-                                        nuevo.getEmail(),
-                                        nuevo.getNombre(),
-                                        nuevo.getApellido(),
-                                        nuevo.getRol() != null ? nuevo.getRol().name() : null
-                                )
-                        );
-                    }
+                    outboxPublisher.publicar(
+                            Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1,
+                            "usuario",
+                            String.valueOf(nuevo.getId()),
+                            nuevo.getAggregateVersion(),
+                            new UsuarioRegistradoData(
+                                    nuevo.getId(),
+                                    nuevo.getEmail(),
+                                    nuevo.getNombre(),
+                                    nuevo.getApellido(),
+                                    nuevo.getRol() != null ? nuevo.getRol().name() : null
+                            )
+                    );
                     return nuevo;
                 });
     }

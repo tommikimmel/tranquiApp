@@ -6,7 +6,10 @@ import com.tranqui.app.model.Modalidad;
 import com.tranqui.app.model.TipoTurno;
 import com.tranqui.app.model.Turno;
 import com.tranqui.app.model.Usuario;
+import com.tranqui.app.repository.DisponibilidadRepository;
+import com.tranqui.app.repository.TarifaMedicoRepository;
 import com.tranqui.app.repository.TurnoRepository;
+import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.eventos.OutboxPublisher;
 import com.tranqui.eventos.Topicos;
 import com.tranqui.eventos.data.DocumentoSolicitadoData;
@@ -21,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -29,7 +33,7 @@ import java.util.stream.Collectors;
 @Service
 public class TurnoService {
 
-    @Autowired(required = false)
+    @Autowired
     private OutboxPublisher outboxPublisher;
 
     @Autowired
@@ -42,13 +46,13 @@ public class TurnoService {
     private AgendaService agendaService;
 
     @Autowired
-    private com.tranqui.app.repository.DisponibilidadRepository disponibilidadRepository;
+    private DisponibilidadRepository disponibilidadRepository;
 
     @Autowired
-    private com.tranqui.app.repository.UsuarioRepository usuarioRepository;
+    private UsuarioRepository usuarioRepository;
 
     @Autowired
-    private com.tranqui.app.repository.TarifaMedicoRepository tarifaRepository;
+    private TarifaMedicoRepository tarifaRepository;
 
     @Autowired
     private MercadoPagoService mercadoPagoService;
@@ -460,37 +464,35 @@ public class TurnoService {
             throw new RuntimeException("Error al conectar con la pasarela de Mercado Pago: " + e.getMessage(), e);
         }
 
-        if (outboxPublisher != null) {
-            java.time.OffsetDateTime expiracion = java.time.OffsetDateTime.now().plusMinutes(5);
+        OffsetDateTime expiracion = OffsetDateTime.now().plusMinutes(5);
+        outboxPublisher.publicar(
+                Topicos.TURNOS_TURNO_RESERVADO_V1,
+                String.valueOf(turno.getId()),
+                turno.getAggregateVersion(),
+                new TurnoReservadoData(
+                        turno.getId(),
+                        turno.getPaciente().getId(),
+                        turno.getMedico().getId(),
+                        turno.getFecha(),
+                        turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00",
+                        turno.getPrecio(),
+                        expiracion
+                )
+        );
+
+        if (!turno.isOcupaAgenda() || esReceta(turno)) {
             outboxPublisher.publicar(
-                    Topicos.TURNOS_TURNO_RESERVADO_V1,
+                    Topicos.TURNOS_DOCUMENTO_SOLICITADO_V1,
                     String.valueOf(turno.getId()),
                     turno.getAggregateVersion(),
-                    new TurnoReservadoData(
+                    new DocumentoSolicitadoData(
                             turno.getId(),
                             turno.getPaciente().getId(),
                             turno.getMedico().getId(),
-                            turno.getFecha(),
-                            turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00",
-                            turno.getPrecio(),
-                            expiracion
+                            turno.getServicioId() != null ? turno.getServicioId() : "documento",
+                            turno.getTipo() != null ? turno.getTipo().name() : "DOCUMENTO"
                     )
             );
-
-            if (!turno.isOcupaAgenda() || esReceta(turno)) {
-                outboxPublisher.publicar(
-                        Topicos.TURNOS_DOCUMENTO_SOLICITADO_V1,
-                        String.valueOf(turno.getId()),
-                        turno.getAggregateVersion(),
-                        new DocumentoSolicitadoData(
-                                turno.getId(),
-                                turno.getPaciente().getId(),
-                                turno.getMedico().getId(),
-                                turno.getServicioId() != null ? turno.getServicioId() : "documento",
-                                turno.getTipo() != null ? turno.getTipo().name() : "DOCUMENTO"
-                        )
-                );
-            }
         }
 
         return com.tranqui.app.model.dto.TurnoResponseDto.builder()
@@ -524,36 +526,37 @@ public class TurnoService {
             }
         }
 
-        turno = turnoRepository.save(turno);
+        Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+        if (turnoGuardado != null) {
+            turno = turnoGuardado;
+        }
 
-        if (outboxPublisher != null) {
+        outboxPublisher.publicar(
+                Topicos.TURNOS_TURNO_CONFIRMADO_V1,
+                String.valueOf(turno.getId()),
+                turno.getAggregateVersion(),
+                new TurnoConfirmadoData(
+                        turno.getId(),
+                        turno.getPaciente().getId(),
+                        turno.getMedico().getId(),
+                        turno.getFecha(),
+                        turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00",
+                        turno.getModalidad() != null ? turno.getModalidad().name() : "ONLINE",
+                        turno.getPrecio()
+                )
+        );
+
+        if (turno.getTelemedicinaUrl() != null && !turno.getTelemedicinaUrl().isBlank()) {
             outboxPublisher.publicar(
-                    Topicos.TURNOS_TURNO_CONFIRMADO_V1,
+                    Topicos.CALENDARIO_MEET_CREADO_V1,
                     String.valueOf(turno.getId()),
                     turno.getAggregateVersion(),
-                    new TurnoConfirmadoData(
+                    new MeetCreadoData(
                             turno.getId(),
-                            turno.getPaciente().getId(),
-                            turno.getMedico().getId(),
-                            turno.getFecha(),
-                            turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00",
-                            turno.getModalidad() != null ? turno.getModalidad().name() : "ONLINE",
-                            turno.getPrecio()
+                            turno.getTelemedicinaUrl(),
+                            turno.getGoogleEventId()
                     )
             );
-
-            if (turno.getTelemedicinaUrl() != null && !turno.getTelemedicinaUrl().isBlank()) {
-                outboxPublisher.publicar(
-                        Topicos.CALENDARIO_MEET_CREADO_V1,
-                        String.valueOf(turno.getId()),
-                        turno.getAggregateVersion(),
-                        new MeetCreadoData(
-                                turno.getId(),
-                                turno.getTelemedicinaUrl(),
-                                turno.getGoogleEventId()
-                        )
-                );
-            }
         }
 
         Usuario paciente = turno.getPaciente();
@@ -820,23 +823,24 @@ public class TurnoService {
             }
         }
 
-        turno = turnoRepository.save(turno);
-
-        if (outboxPublisher != null) {
-            outboxPublisher.publicar(
-                    Topicos.TURNOS_TURNO_CANCELADO_V1,
-                    String.valueOf(turno.getId()),
-                    turno.getAggregateVersion(),
-                    new TurnoCanceladoData(
-                            turno.getId(),
-                            turno.getPaciente().getId(),
-                            turno.getMedico().getId(),
-                            profesionalCancela ? "PROFESIONAL" : "PACIENTE",
-                            "Cancelado por usuario",
-                            resultadoReembolso == ResendEmailService.ResultadoReembolso.REEMBOLSADO
-                    )
-            );
+        Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+        if (turnoGuardado != null) {
+            turno = turnoGuardado;
         }
+
+        outboxPublisher.publicar(
+                Topicos.TURNOS_TURNO_CANCELADO_V1,
+                String.valueOf(turno.getId()),
+                turno.getAggregateVersion(),
+                new TurnoCanceladoData(
+                        turno.getId(),
+                        turno.getPaciente().getId(),
+                        turno.getMedico().getId(),
+                        profesionalCancela ? "PROFESIONAL" : "PACIENTE",
+                        "Cancelado por usuario",
+                        resultadoReembolso == ResendEmailService.ResultadoReembolso.REEMBOLSADO
+                )
+        );
 
         // Notify Doctor
         String tituloMed = "Turno cancelado";
@@ -1016,24 +1020,25 @@ public class TurnoService {
         turno.setConfirmacionAsistenciaEmailEnviado(false);
         turno.setAsistenciaConfirmadaPaciente(false);
         turno.setTokenConfirmacionAsistencia(null);
-        turno = turnoRepository.save(turno);
-
-        if (outboxPublisher != null) {
-            outboxPublisher.publicar(
-                    Topicos.TURNOS_TURNO_REPROGRAMADO_V1,
-                    String.valueOf(turno.getId()),
-                    turno.getAggregateVersion(),
-                    new TurnoReprogramadoData(
-                            turno.getId(),
-                            turno.getPaciente().getId(),
-                            turno.getMedico().getId(),
-                            fechaAnterior,
-                            horaInicioAnterior != null ? horaInicioAnterior.toString() : "",
-                            nuevaFecha,
-                            nuevaHoraInicio.toString()
-                    )
-            );
+        Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+        if (turnoGuardado != null) {
+            turno = turnoGuardado;
         }
+
+        outboxPublisher.publicar(
+                Topicos.TURNOS_TURNO_REPROGRAMADO_V1,
+                String.valueOf(turno.getId()),
+                turno.getAggregateVersion(),
+                new TurnoReprogramadoData(
+                        turno.getId(),
+                        turno.getPaciente().getId(),
+                        turno.getMedico().getId(),
+                        fechaAnterior,
+                        horaInicioAnterior != null ? horaInicioAnterior.toString() : "",
+                        nuevaFecha,
+                        nuevaHoraInicio.toString()
+                )
+        );
 
         try {
             calendarService.actualizarEventoReunion(turno);
@@ -1097,22 +1102,23 @@ public class TurnoService {
                 String token = java.util.UUID.randomUUID().toString();
                 turno.setTokenConfirmacionAsistencia(token);
                 turno.setConfirmacionAsistenciaEmailEnviado(true);
-                turno = turnoRepository.save(turno);
-
-                if (outboxPublisher != null) {
-                    outboxPublisher.publicar(
-                            Topicos.TURNOS_RECORDATORIO_PROGRAMADO_V1,
-                            String.valueOf(turno.getId()),
-                            turno.getAggregateVersion(),
-                            new TurnoRecordatorioData(
-                                    turno.getId(),
-                                    turno.getPaciente().getId(),
-                                    turno.getMedico().getId(),
-                                    turno.getFecha(),
-                                    turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00"
-                            )
-                    );
+                Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+                if (turnoGuardado != null) {
+                    turno = turnoGuardado;
                 }
+
+                outboxPublisher.publicar(
+                        Topicos.TURNOS_RECORDATORIO_PROGRAMADO_V1,
+                        String.valueOf(turno.getId()),
+                        turno.getAggregateVersion(),
+                        new TurnoRecordatorioData(
+                                turno.getId(),
+                                turno.getPaciente().getId(),
+                                turno.getMedico().getId(),
+                                turno.getFecha(),
+                                turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00"
+                        )
+                );
 
                 String confirmarUrl = publicUrl + "/api/turnos/" + turno.getId() + "/confirmar-asistencia?token=" + token;
                 String noAsistiraUrl = publicUrl + "/api/turnos/" + turno.getId() + "/no-asistira?token=" + token;

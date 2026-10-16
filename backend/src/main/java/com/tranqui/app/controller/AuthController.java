@@ -22,6 +22,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.transaction.annotation.Transactional;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.CodigoVerificacionGeneradoData;
+import com.tranqui.eventos.data.UsuarioRegistradoData;
 import com.tranqui.app.repository.UsuarioRepository;
 import jakarta.persistence.EntityNotFoundException;
 
@@ -30,7 +34,7 @@ import jakarta.persistence.EntityNotFoundException;
 public class AuthController {
 
     @Autowired
-    private com.tranqui.app.eventos.OutboxPublisher outboxPublisher;
+    private OutboxPublisher outboxPublisher;
 
     @Autowired
     private GoogleAuthService googleAuthService;
@@ -215,33 +219,29 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El email ya está registrado");
         }
 
-        if (outboxPublisher != null) {
-            outboxPublisher.publicar(
-                    com.tranqui.eventos.Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1,
-                    "usuario",
-                    String.valueOf(usuario.getId()),
-                    usuario.getAggregateVersion(),
-                    new com.tranqui.eventos.data.UsuarioRegistradoData(
-                            usuario.getId(),
-                            usuario.getEmail(),
-                            usuario.getNombre(),
-                            usuario.getApellido(),
-                            usuario.getRol() != null ? usuario.getRol().name() : null
-                    )
-            );
-            outboxPublisher.publicar(
-                    com.tranqui.eventos.Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
-                    "usuario",
-                    String.valueOf(usuario.getId()),
-                    usuario.getAggregateVersion(),
-                    new com.tranqui.eventos.data.CodigoVerificacionGeneradoData(
-                            usuario.getId(),
-                            usuario.getEmail(),
-                            codigoVerificacion,
-                            "REGISTRO"
-                    )
-            );
-        }
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new UsuarioRegistradoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        usuario.getNombre(),
+                        usuario.getApellido(),
+                        usuario.getRol() != null ? usuario.getRol().name() : null
+                )
+        );
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new CodigoVerificacionGeneradoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        codigoVerificacion,
+                        "REGISTRO"
+                )
+        );
 
         resendEmailService.enviarCodigoVerificacion(usuario.getEmail(), usuario.getNombre(), codigoVerificacion);
 
@@ -300,22 +300,19 @@ public class AuthController {
         String nuevoCodigo = String.format("%06d", new java.util.Random().nextInt(1000000));
         usuario.setCodigoVerificacion(nuevoCodigo);
         usuario.setCodigoVerificacionExpiresAt(java.time.LocalDateTime.now().plusMinutes(15));
-        usuarioRepository.save(usuario);
+        usuarioRepository.saveAndFlush(usuario);
 
-        if (outboxPublisher != null) {
-            outboxPublisher.publicar(
-                    com.tranqui.eventos.Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
-                    "usuario",
-                    String.valueOf(usuario.getId()),
-                    usuario.getAggregateVersion(),
-                    new com.tranqui.eventos.data.CodigoVerificacionGeneradoData(
-                            usuario.getId(),
-                            usuario.getEmail(),
-                            nuevoCodigo,
-                            "EMAIL_VERIFICATION"
-                    )
-            );
-        }
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new CodigoVerificacionGeneradoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        nuevoCodigo,
+                        "EMAIL_VERIFICATION"
+                )
+        );
 
         resendEmailService.enviarCodigoVerificacion(usuario.getEmail(), usuario.getNombre(), nuevoCodigo);
         return ResponseEntity.ok("Código reenviado a tu correo.");
@@ -335,22 +332,19 @@ public class AuthController {
         String resetCode = String.format("%06d", new java.util.Random().nextInt(1000000));
         usuario.setResetPasswordCode(resetCode);
         usuario.setResetPasswordExpiresAt(java.time.LocalDateTime.now().plusMinutes(15));
-        usuarioRepository.save(usuario);
+        usuarioRepository.saveAndFlush(usuario);
 
-        if (outboxPublisher != null) {
-            outboxPublisher.publicar(
-                    com.tranqui.eventos.Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
-                    "usuario",
-                    String.valueOf(usuario.getId()),
-                    usuario.getAggregateVersion(),
-                    new com.tranqui.eventos.data.CodigoVerificacionGeneradoData(
-                            usuario.getId(),
-                            usuario.getEmail(),
-                            resetCode,
-                            "PASSWORD_RESET"
-                    )
-            );
-        }
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new CodigoVerificacionGeneradoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        resetCode,
+                        "PASSWORD_RESET"
+                )
+        );
 
         resendEmailService.enviarCodigoRecuperacion(usuario.getEmail(), usuario.getNombre(), resetCode);
         return ResponseEntity.ok("Si el correo está registrado, recibirás las instrucciones en tu bandeja de entrada.");

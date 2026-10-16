@@ -48,7 +48,7 @@ public class MercadoPagoOAuthService {
     @Autowired
     private EncryptionUtil encryptionUtil;
 
-    @Autowired(required = false)
+    @Autowired
     private OutboxPublisher outboxPublisher;
 
     @Value("${mercadopago.client-id:}")
@@ -120,16 +120,14 @@ public class MercadoPagoOAuthService {
         );
 
         aplicarTokenResponse(medico, tokenResponse);
-        medico = usuarioRepository.save(medico);
+        medico = usuarioRepository.saveAndFlush(medico);
 
-        if (outboxPublisher != null) {
-            outboxPublisher.publicar(
-                    Topicos.PAGOS_CUENTA_MP_VINCULADA_V1,
-                    String.valueOf(medico.getId()),
-                    medico.getAggregateVersion(),
-                    new CuentaMpVinculadaData(medico.getId(), medico.getMpUserId())
-            );
-        }
+        outboxPublisher.publicar(
+                Topicos.PAGOS_CUENTA_MP_VINCULADA_V1,
+                String.valueOf(medico.getId()),
+                medico.getAggregateVersion(),
+                new CuentaMpVinculadaData(medico.getId(), medico.getMpUserId())
+        );
 
         return medico;
     }
@@ -211,16 +209,14 @@ public class MercadoPagoOAuthService {
         medico.setMpRefreshTokenEncrypted(null);
         medico.setMpTokenExpiresAt(null);
         medico.setMpUserId(null);
-        medico = usuarioRepository.save(medico);
+        medico = usuarioRepository.saveAndFlush(medico);
 
-        if (outboxPublisher != null) {
-            outboxPublisher.publicar(
-                    Topicos.PAGOS_CUENTA_MP_DESVINCULADA_V1,
-                    String.valueOf(medico.getId()),
-                    medico.getAggregateVersion(),
-                    new CuentaMpDesvinculadaData(medico.getId())
-            );
-        }
+        outboxPublisher.publicar(
+                Topicos.PAGOS_CUENTA_MP_DESVINCULADA_V1,
+                String.valueOf(medico.getId()),
+                medico.getAggregateVersion(),
+                new CuentaMpDesvinculadaData(medico.getId())
+        );
     }
 
     /**
@@ -235,16 +231,14 @@ public class MercadoPagoOAuthService {
         medico.setMpRefreshTokenEncrypted(encryptionUtil.encrypt("TEST-dev-mock-refresh-token-" + medico.getId()));
         medico.setMpTokenExpiresAt(LocalDateTime.now().plusMonths(6));
         medico.setMpUserId("999999999");
-        medico = usuarioRepository.save(medico);
+        medico = usuarioRepository.saveAndFlush(medico);
 
-        if (outboxPublisher != null) {
-            outboxPublisher.publicar(
-                    Topicos.PAGOS_CUENTA_MP_VINCULADA_V1,
-                    String.valueOf(medico.getId()),
-                    medico.getAggregateVersion(),
-                    new CuentaMpVinculadaData(medico.getId(), medico.getMpUserId())
-            );
-        }
+        outboxPublisher.publicar(
+                Topicos.PAGOS_CUENTA_MP_VINCULADA_V1,
+                String.valueOf(medico.getId()),
+                medico.getAggregateVersion(),
+                new CuentaMpVinculadaData(medico.getId(), medico.getMpUserId())
+        );
     }
 
     private String signState(Long medicoId) {

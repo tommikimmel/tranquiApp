@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
+import com.tranqui.app.eventos.OutboxPublisher;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -35,6 +36,7 @@ class PagoWebhookHandlerTest {
     @Mock private GoogleCalendarService calendarService;
     @Mock private NotificacionService notificacionService;
     @Mock private ResendEmailService resendEmailService;
+    @Mock private OutboxPublisher outboxPublisher;
 
     @InjectMocks
     private PagoWebhookHandler handler;
@@ -98,7 +100,7 @@ class PagoWebhookHandlerTest {
 
         assertEquals(EstadoTurno.CONFIRMADO, turno.getEstado());
         assertEquals("https://meet.google.com/xyz", turno.getTelemedicinaUrl());
-        verify(turnoRepository).save(turno);
+        verify(turnoRepository).saveAndFlush(turno);
 
         ArgumentCaptor<Pago> pagoCaptor = ArgumentCaptor.forClass(Pago.class);
         verify(pagoRepository).save(pagoCaptor.capture());
