@@ -58,7 +58,7 @@ entorno local incluye la infraestructura de soporte para la arquitectura distrib
   `--appendonly no`) con tope de memoria chico (`maxmemory 64mb`, política `allkeys-lru`), usada
   para los contadores de token bucket del rate limiter del gateway.
 - **VictoriaMetrics (`victoriametrics/victoria-metrics:v1.101.0`):** almacenamiento y motor PromQL de
-  métricas locales con retención de 15 días (`-retentionPeriod=15d`) y límite de memoria de 96 MB.
+  métricas locales con retención de 15 días (`-retentionPeriod=15d`) y límite de memoria de 192 MB con `-memory.allowedPercent=30` (con 96 MB lo mataba el OOM).
   Scrapea cada 15 segundos los endpoints Prometheus de Gateway, Backend, RabbitMQ y exportadores del sistema.
 - **node-exporter y cAdvisor (perfiles `monitoring` / `full`):**
   Métricas de hardware del host (CPU, memoria, disco) y métricas por contenedor Docker. En entornos locales

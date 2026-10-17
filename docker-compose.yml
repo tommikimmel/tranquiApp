@@ -92,10 +92,12 @@ services:
       - "-promscrape.config=/etc/victoriametrics/scrape.yml"
       - "-retentionPeriod=15d"
       - "-storageDataPath=/victoria-metrics-data"
+      - "-memory.allowedPercent=30"
     volumes:
       - ./infra/victoriametrics/scrape.yml:/etc/victoriametrics/scrape.yml:ro
       - vmdata:/victoria-metrics-data
-    mem_limit: 96m
+    # Con 96m el OOM lo mataba al arrancar; con 192m y caches al 30% queda en ~150-160 MB.
+    mem_limit: 192m
     cpus: 0.5
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8428/health || exit 1"]
@@ -112,6 +114,17 @@ services:
     image: prom/node-exporter:v1.8.2
     container_name: tranqui-node-exporter
     restart: always
+    # Monta /proc, /sys y / del host para medir el VPS y no el contenedor.
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+|var/lib/containerd/.+)($$|/)"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    pid: host
     mem_limit: 32m
     cpus: 0.2
     networks:
@@ -161,6 +174,8 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       # Sin default: con una clave conocida cualquiera podría descifrar los tokens guardados.
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Falta ENCRYPTION_KEY en .env}
+      # Firma los JWT de usuario; el gateway los valida con la misma clave. Sin default.
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: "5672"
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-tranqui}
@@ -235,7 +250,7 @@ services:
       SPRING_DATA_REDIS_PORT: "6379"
       TRANQUI_SERVICES_MONOLITO_URI: ${TRANQUI_SERVICES_MONOLITO_URI:-http://tranqui-backend:8080}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
-      JWT_SECRET: ${JWT_SECRET:-${ENCRYPTION_KEY}}
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
       VICTORIAMETRICS_URL: http://victoriametrics:8428
     labels:
       - "traefik.enable=true"

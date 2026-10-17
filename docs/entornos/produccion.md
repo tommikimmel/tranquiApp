@@ -22,17 +22,17 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 | `tranqui-rabbitmq` | `rabbitmq` | RabbitMQ 3.13 con topología de eventos (`tranqui.eventos`, colas lazy) | 256 MB | 0.5 |
 | `tranqui-consul` | `consul` | Consul 1.19 (service discovery y catálogo de salud) | 64 MB | 0.5 |
 | `tranqui-redis` | `redis` | Redis 7 (almacenamiento de token bucket para rate limiting) | 64 MB | 0.5 |
-| `tranqui-victoriametrics` | `victoriametrics` | VictoriaMetrics single-node (retención 15d de métricas Prometheus) | 96 MB | 0.5 |
+| `tranqui-victoriametrics` | `victoriametrics` | VictoriaMetrics single-node (retención 15d de métricas Prometheus, cachés al 30%) | 192 MB | 0.5 |
 | `tranqui-cadvisor` | `cadvisor` | cAdvisor v0.49.1 (métricas de uso de CPU/RAM por contenedor) | 64 MB | 0.3 |
 | `tranqui-node-exporter` | `node-exporter` | Prometheus Node Exporter v1.8.2 (métricas del host VPS) | 32 MB | 0.2 |
 | `tranqui-bot`, `tranqui-bot-worker`, `wsp-db`, `wsp-redis` | — | Bot de WhatsApp (proyecto aparte, fuera de este repositorio) | ~70 MB | — |
 
 ### Presupuesto de memoria (RAM)
 
-- **Total suma `mem_limit` Docker Compose (Fase 0):** `64 + 288 + 512 + 512 + 256 + 64 + 64 + 96 + 64 + 32 = 1.952 MB` (~1,95 GB).
+- **Total suma `mem_limit` Docker Compose (Fase 0):** `64 + 288 + 512 + 512 + 256 + 64 + 64 + 192 + 64 + 32 = 2.048 MB` (~2,05 GB).
 - **Traefik y bot de WhatsApp:** ~112 MB.
 - **Sistema operativo y buffers mínimos:** ~1 GB.
-- **Consumo proyectado total en VPS:** **~3,1 GB**, ampliamente dentro del techo presupuestado de **~4,8 GB**
+- **Consumo proyectado total en VPS:** **~3,2 GB**, ampliamente dentro del techo presupuestado de **~4,8 GB**
   de la sección 9.1 para la Fase 0, reservando ~3 GB de margen libre para picos y caché de disco de PostgreSQL.
 
 ### Afinación de JVM (backend y gateway)
@@ -67,8 +67,8 @@ Al incorporar la Fase 0, deben agregarse estas variables al archivo `/srv/tranqu
 # Clave HMAC-SHA256 para firma y validación de tokens entre servicios (mínimo 32 caracteres)
 SERVICE_JWT_KEY=clave-secreta-de-servicio-de-al-menos-32-caracteres
 
-# Clave secreta para JWT de usuarios en el gateway (generalmente igual a ENCRYPTION_KEY)
-JWT_SECRET=misma-clave-de-cifrado-o-jwt-secret-de-32-chars
+# Clave de firma de los JWT de usuario (backend y gateway). Ver "Clave JWT".
+JWT_SECRET=cambiar-por-una-clave-aleatoria-de-al-menos-32-bytes
 
 # Credenciales de RabbitMQ para publicación y consumo de eventos
 RABBITMQ_USER=tranqui
@@ -83,6 +83,21 @@ EVENTOS_RELAY_ENABLED=true
 EVENTOS_RELAY_BACKUP_POLL_MS=30000
 ```
 
+### Clave JWT
+
+`JWT_SECRET` firma los tokens de sesión de los usuarios. La usan el backend (que los firma) y el
+gateway (que los valida), así que tiene que ser **la misma variable para los dos**. Es obligatoria:
+si falta en `/srv/tranqui/.env`, `docker compose` corta con `Falta JWT_SECRET en .env` y no levanta nada.
+
+- **Generarla** en el VPS y pegarla en `/srv/tranqui/.env` (nunca en el repo):
+  ```bash
+  openssl rand -base64 48
+  ```
+- **Al cargarla por primera vez se invalidan todas las sesiones abiertas:** los tokens firmados con
+  la clave anterior dejan de valer y todos los usuarios tienen que volver a iniciar sesión. Conviene
+  hacerlo en un horario de poco uso. Lo mismo pasa cada vez que se rota.
+- No reutilizar `ENCRYPTION_KEY` ni `SERVICE_JWT_KEY`: cada clave tiene un uso distinto.
+
 ## Orden de primer arranque (Arranque escalonado)
 
 Para evitar picos excesivos de CPU al arrancar múltiples servicios sobre los 2 núcleos del VPS, `docker-compose.yml`
@@ -95,7 +110,8 @@ define dependencias escalonadas con `condition: service_healthy`:
 
 ### Pasos para el primer arranque manual en el VPS
 
-1. Cargar las variables nuevas en `/srv/tranqui/.env`.
+1. Cargar las variables nuevas en `/srv/tranqui/.env`, incluida `JWT_SECRET` generada con
+   `openssl rand -base64 48` (ver [Clave JWT](#clave-jwt): cierra las sesiones abiertas).
 2. Asegurar que `/srv/tranqui/infra` esté sincronizado.
 3. Descargar las imágenes publicadas:
    ```bash
