@@ -10,6 +10,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -33,7 +34,8 @@ public class AdminObservabilidadTest {
     @Autowired
     private WebTestClient webTestClient;
 
-    private static final String SECRET = "defaultsecretkeymustbe32byteslongforhs256algorithm!";
+    @Value("${jwt.secret}")
+    private String secret;
 
     @BeforeAll
     static void startWireMock() {
@@ -56,7 +58,7 @@ public class AdminObservabilidadTest {
     }
 
     private String crearToken(String rol) {
-        Key key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        Key key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         return Jwts.builder()
                 .setSubject("admin@tranqui.com")
                 .claim("rol", rol)

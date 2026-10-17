@@ -13,8 +13,8 @@ Se ubica delante del monolito (y de los futuros microservicios) para centralizar
 3. **Control de tasa (Rate Limiting):** Algoritmo token bucket implementado sobre Redis para prevenir abusos y ataques de denegación de servicio.
 4. **Protección de endpoints internos (`/internal/**`):** Bloqueo con 404 ante tráfico perimetral con cabeceras `X-Forwarded-*` y verificación de firma criptográfica mediante JWT de servicio (`ServiceJwt`).
 5. **Resiliencia perimetral:** Circuit Breakers basados en Resilience4j con respuestas de contingencia (fallback 503 JSON) estandarizadas, timeouts estrictos y reintentos automáticos para operaciones seguras (GET).
-6. **Manejo de CORS sin duplicación:** El backend monolito continúa gestionando sus políticas CORS; el Gateway utiliza el filtro `DedupeResponseHeader` (`RETAIN_FIRST`) para evitar encabezados CORS duplicados en las respuestas al navegador.
-7. **Monitoreo y Salud:** Endpoint público `/health` que expone estado binario (`UP` / `DOWN`) sin filtrar detalles internos. El Actuator de Spring Boot y las métricas Prometheus se exponen únicamente en el puerto de gestión interna (8082).
+6. **Manejo de CORS sin duplicación:** El Gateway no deriva los preflight `OPTIONS`: los responde con `spring.cloud.gateway.server.webflux.globalcors`, que replica la política del monolito (`SecurityConfig.corsConfigurationSource`) y que `CorsConfig` aplica también a los controladores propios del Gateway (`/health`, `/api/admin/**`). En las respuestas derivadas, el filtro `DedupeResponseHeader` (`RETAIN_FIRST`) evita encabezados CORS duplicados con los que agrega el monolito. En producción el frontend y `/api` comparten dominio, así que CORS solo actúa en local (frontend en `:5173`, Gateway en `:8080`).
+7. **Monitoreo y Salud:** Endpoint público `/health` que expone estado binario (`UP` / `DOWN`) sin filtrar detalles internos. El Actuator de Spring Boot y las métricas Prometheus se exponen únicamente en el puerto de gestión interna (8082), igual que en el monolito; el chequeo de Consul usa `/actuator/health` en ese puerto.
 
 ---
 

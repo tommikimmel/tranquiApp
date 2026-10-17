@@ -1,6 +1,5 @@
 global:
   scrape_interval: 15s
-  evaluation_interval: 15s
 
 scrape_configs:
   - job_name: 'gateway'
@@ -13,7 +12,7 @@ scrape_configs:
   - job_name: 'backend'
     metrics_path: '/actuator/prometheus'
     static_configs:
-      - targets: ['backend:8080']
+      - targets: ['backend:8082']
         labels:
           servicio: 'backend'
 

@@ -40,6 +40,10 @@ spring:
       mandatory: true
 
 management:
+  # Actuator en un puerto propio que no se publica fuera de la red de Docker: lo usa
+  # VictoriaMetrics para leer /actuator/prometheus (igual que el gateway).
+  server:
+    port: 8082
   endpoints:
     web:
       exposure:

@@ -14,10 +14,11 @@ spring:
         enabled: true
         service-name: gateway
         instance-id: ${spring.application.name}:${random.value}
-        health-check-path: /health
         health-check-interval: 10s
 
 tranqui:
+  jwt:
+    service-secret: ${SERVICE_JWT_KEY:local-service-jwt-secret-key-32chars}
   services:
     monolito:
       uri: http://backend:8080

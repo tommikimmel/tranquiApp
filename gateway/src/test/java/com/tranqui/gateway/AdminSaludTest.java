@@ -5,6 +5,7 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.ResponseCookie;
@@ -25,10 +26,11 @@ public class AdminSaludTest {
     @Autowired
     private WebTestClient webTestClient;
 
-    private static final String SECRET = "defaultsecretkeymustbe32byteslongforhs256algorithm!";
+    @Value("${jwt.secret}")
+    private String secret;
 
     private String crearToken(String rol) {
-        Key key = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+        Key key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         return Jwts.builder()
                 .setSubject("test@tranqui.com")
                 .claim("rol", rol)

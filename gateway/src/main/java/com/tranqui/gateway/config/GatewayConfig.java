@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
 public class GatewayConfig {
 
     @Bean
-    public ServiceJwt serviceJwt(@Value("${tranqui.jwt.service-secret:${SERVICE_JWT_KEY:local-service-jwt-secret-key-32chars}}") String serviceSecret) {
+    public ServiceJwt serviceJwt(@Value("${tranqui.jwt.service-secret}") String serviceSecret) {
         return new ServiceJwt(serviceSecret);
     }
 }

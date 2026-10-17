@@ -146,6 +146,7 @@ services:
       - "-promscrape.config=/etc/victoriametrics/scrape.yml"
       - "-retentionPeriod=15d"
       - "-storageDataPath=/victoria-metrics-data"
+      - "-memory.allowedPercent=30"
     ports:
       - "127.0.0.1:8428:8428"
     volumes:
@@ -157,7 +158,8 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
-    mem_limit: 96m
+    # Con 96m lo mataba el OOM al sumar las metricas del backend (runtime de Go + caches).
+    mem_limit: 192m
 
   node-exporter:
     image: prom/node-exporter:v1.8.2

@@ -14,7 +14,9 @@ spring:
         enabled: ${CONSUL_DISCOVERY_ENABLED:true}
         service-name: gateway
         instance-id: ${spring.application.name}:${random.value}
-        health-check-path: /health
+        # Con management en otro puerto (8082), Consul chequea ese puerto: ahi la salud esta en
+        # /actuator/health (el /health publico vive en el puerto 8080).
+        health-check-path: /actuator/health
         health-check-interval: 10s
         register-health-check: true
     gateway:
@@ -23,6 +25,19 @@ spring:
       httpclient:
         connect-timeout: 2000
         response-timeout: 10s
+      # El gateway no deriva los preflight OPTIONS: los responde el mismo con esta politica, que
+      # replica la del monolito (SecurityConfig.corsConfigurationSource). DedupeResponseHeader
+      # saca los encabezados CORS que vuelven duplicados del monolito en las demas respuestas.
+      # Desde Spring Cloud Gateway 4.3 la clave va bajo server.webflux (la vieja se ignora).
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowed-origin-patterns: "*"
+                allowed-methods: GET,POST,PUT,DELETE,OPTIONS,PATCH
+                allowed-headers: "*"
+                allow-credentials: true
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Access-Control-Allow-Headers Access-Control-Allow-Methods, RETAIN_FIRST
       routes:
@@ -534,7 +549,7 @@ tranqui:
     internal:
       uri: ${tranqui.services.monolito.uri}
   jwt:
-    service-secret: ${SERVICE_JWT_KEY:local-service-jwt-secret-key-32chars}
+    service-secret: ${SERVICE_JWT_KEY:}
   victoriametrics:
     url: ${VICTORIAMETRICS_URL:http://localhost:8428}
 
