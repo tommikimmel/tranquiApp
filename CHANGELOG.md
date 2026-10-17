@@ -6,6 +6,14 @@ Todos los cambios relevantes de Tranqui App. Formato basado en
 
 ## [Sin publicar]
 
+### Infraestructura y arquitectura
+
+- **Maven multimódulo:** agregador raíz `tranqui-parent` con gestión centralizada de dependencias (BOM de Spring Boot 3.5.15) y Maven wrapper en la raíz.
+- **Librería común (`libs/comun`):** filtro servlet para `X-Correlation-Id` con propagación a MDC y cabeceras HTTP, formato estándar de error JSON (`ErrorResponse`) y autoconfiguración Spring Boot.
+- **Librería de eventos (`libs/eventos`):** sobre común `EventEnvelope<T>`, catálogo de tópicos tipado (`Topicos`), 25 records de payload para los eventos de la sección 5.4, constantes de topología RabbitMQ (`tranqui.eventos`, `tranqui.reintentos`, `tranqui.dlx`), y componente `ServiceJwt` para autenticación HMAC de llamadas internas (sección 4.2).
+- **Backend y Docker:** dependencias internas agregadas en `backend/pom.xml`, `backend/Dockerfile` adaptado para compilar desde la raíz del repositorio (`-pl backend -am`), Compose local y producción actualizados, y workflows de CI/deploy adaptados al multimodulo.
+- **Spec Fase 0:** documento `docs/specs/2026-10-14-fase-0-plataforma.md` resumiendo las 7 tareas de la plataforma de microservicios.
+
 ## [v1.1.0] - 2026-10-07
 
 ### CI y deploy
