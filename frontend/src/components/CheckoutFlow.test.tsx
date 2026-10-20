@@ -18,6 +18,7 @@ vi.mock('../api/api', () => ({
     abandonarReservaPendiente: vi.fn(),
     getMisTurnos: vi.fn(),
   },
+  getBackendOrigin: () => 'http://localhost:8080',
 }))
 
 // Every hour of the day, so "Hoy" always keeps at least one slot regardless of what time the

@@ -1,0 +1,105 @@
+spring:
+  application:
+    name: notificaciones
+  # Sección 6.7: al apagarse termina lo que está procesando, hasta 20 s.
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/notificaciones}
+    username: ${SPRING_DATASOURCE_USERNAME:notificaciones}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    hikari:
+      # Sección 9.2: pools chicos.
+      maximum-pool-size: 5
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:tranqui}
+    password: ${SPRING_RABBITMQ_PASSWORD:}
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/}
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      discovery:
+        enabled: ${CONSUL_DISCOVERY_ENABLED:true}
+        service-name: notificaciones
+        instance-id: ${spring.application.name}:${random.value}
+        # El actuator vive en el puerto de management (8082): ahí está /actuator/health.
+        health-check-path: /actuator/health
+        health-check-interval: 10s
+        health-check-critical-timeout: 1m
+        tags: version=${TRANQUI_VERSION:dev}
+
+server:
+  port: 8080
+  tomcat:
+    threads:
+      max: 50
+  shutdown: graceful
+
+management:
+  server:
+    port: 8082
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+      group:
+        readiness:
+          include: readinessState,db,rabbit
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      servicio: notificaciones
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+# Consumo de eventos (libs/eventos): cola notificaciones.eventos y sus reintentos y DLQ.
+eventos:
+  consumo:
+    servicio: notificaciones
+
+jwt:
+  # Misma clave que identidad (hoy el monolito) usa para firmar los JWT de usuario. Sin default.
+  secret: ${JWT_SECRET:}
+
+tranqui:
+  gateway:
+    # Las consultas internas (carga inicial de contactos, enlaces de asistencia) pasan por el
+    # gateway (sección 4.2), nunca directo a otro servicio.
+    url: ${TRANQUI_GATEWAY_URL:http://gateway:8080}
+  jwt:
+    service-secret: ${SERVICE_JWT_KEY:}
+
+resend:
+  api-key: ${RESEND_API_KEY:}
+  from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}
+
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+
+mail:
+  # "resend" (producción) o "smtp" (local con Mailpit).
+  transport: ${MAIL_TRANSPORT:resend}
+
+logging:
+  level:
+    root: INFO
