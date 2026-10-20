@@ -1,5 +1,6 @@
 package com.tranqui.app.service;
 
+import com.tranqui.app.service.AvisoSuscripcionPublisher;
 import com.tranqui.app.model.*;
 import com.tranqui.app.repository.InvoiceRepository;
 import com.tranqui.app.repository.SubscriptionPaymentRepository;
@@ -41,6 +42,9 @@ class SubscriptionReconciliationSchedulerUnitTest {
 
     @Mock
     private com.tranqui.app.repository.UsuarioRepository usuarioRepository;
+
+    @Mock
+    private AvisoSuscripcionPublisher avisoSuscripcionPublisher;
 
     @InjectMocks
     private SubscriptionReconciliationScheduler scheduler;
