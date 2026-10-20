@@ -44,7 +44,19 @@ jobs:
       packages: write
     strategy:
       matrix:
-        servicio: [backend, frontend]
+        include:
+          - servicio: gateway
+            context: .
+            file: ./gateway/Dockerfile
+          - servicio: notificaciones
+            context: .
+            file: ./services/notificaciones/Dockerfile
+          - servicio: backend
+            context: .
+            file: ./backend/Dockerfile
+          - servicio: frontend
+            context: ./frontend
+            file: ./frontend/Dockerfile
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -55,7 +67,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
         with:
-          context: ./${{ matrix.servicio }}
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           push: true
           tags: |
             ghcr.io/tommikimmel/tranqui-${{ matrix.servicio }}:${{ github.ref_name }}
@@ -88,7 +101,8 @@ jobs:
           DESTINO: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
         run: |
           ssh -i ~/.ssh/deploy "$DESTINO" 'mkdir -p /srv/tranqui'
-          scp -i ~/.ssh/deploy docker-compose.yml scripts/vps/deploy-remoto.sh "$DESTINO":/srv/tranqui/
+          scp -i ~/.ssh/deploy -r docker-compose.yml scripts/vps/deploy-remoto.sh infra "$DESTINO":/srv/tranqui/
+
       - name: Desplegar y verificar
         env:
           DESTINO: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
