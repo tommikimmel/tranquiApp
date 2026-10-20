@@ -17,10 +17,14 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
+import com.tranqui.app.eventos.OutboxPublisher;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SubscriptionServiceUnitTest {
+
+    @Mock
+    private OutboxPublisher outboxPublisher;
 
     @Mock
     private SubscriptionRepository subscriptionRepository;
