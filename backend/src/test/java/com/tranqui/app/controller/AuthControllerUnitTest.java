@@ -45,6 +45,7 @@ class AuthControllerUnitTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private ResendEmailService resendEmailService;
     @Mock private com.tranqui.app.service.AccountService accountService;
+    @Mock private com.tranqui.app.eventos.OutboxPublisher outboxPublisher;
 
     @InjectMocks
     private AuthController authController;
