@@ -4,6 +4,7 @@ import com.tranqui.app.model.*;
 import com.tranqui.app.repository.*;
 import com.tranqui.app.eventos.OutboxPublisher;
 import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.SuscripcionAvisoData;
 import com.tranqui.eventos.data.SuscripcionCambioEstadoData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +51,9 @@ public class SubscriptionService {
 
     @Autowired
     private ResendEmailService resendEmailService;
+
+    @Autowired
+    private AvisoSuscripcionPublisher avisoSuscripcionPublisher;
 
     @Autowired
     private MercadoPagoService mercadoPagoService;
@@ -455,6 +459,9 @@ public class SubscriptionService {
         // 7. Mail de pago confirmado al profesional � mismo criterio que la facturación: un alta
         // de cortesía no es un pago real, así que no corresponde el mail de "pago confirmado".
         if (!"COURTESY".equalsIgnoreCase(method)) {
+            avisoSuscripcionPublisher.publicar(subscription, SuscripcionAvisoData.PAGO_CONFIRMADO, payment.getAmountArs(),
+                    start, end, null,
+                    receiptReference != null && !receiptReference.isBlank() ? receiptReference : "Pago Manual " + method, null);
             try {
                 resendEmailService.enviarConfirmacionPagoSuscripcion(
                         prof.getEmail(),
@@ -615,6 +622,8 @@ public class SubscriptionService {
 
         if ("APPROVED".equalsIgnoreCase(payment.getStatus())) {
             emitirFacturaTrasCommit(payment.getId(), "pago MP");
+            avisoSuscripcionPublisher.publicar(sub, SuscripcionAvisoData.PAGO_CONFIRMADO, payment.getAmountArs(),
+                    sub.getCurrentPeriodStart(), sub.getCurrentPeriodEnd(), null, payment.getReceiptReference(), null);
             try {
                 resendEmailService.enviarConfirmacionPagoSuscripcion(
                         sub.getProfessional().getEmail(),
@@ -630,6 +639,8 @@ public class SubscriptionService {
             }
         } else {
             // Pago rechazado
+            avisoSuscripcionPublisher.publicar(sub, SuscripcionAvisoData.PAGO_FALLIDO, payment.getAmountArs(),
+                    sub.getGraceUntil(), null, null, null, null);
             try {
                 resendEmailService.enviarAvisoPagoFallidoSuscripcion(
                         sub.getProfessional().getEmail(),
@@ -670,6 +681,8 @@ public class SubscriptionService {
             if (sub.getCurrentPeriodEnd() != null && sub.getCurrentPeriodEnd().isAfter(LocalDateTime.now())) {
                 sub.setStatus(SubscriptionStatus.ACTIVE);
             }
+            avisoSuscripcionPublisher.publicar(sub, SuscripcionAvisoData.CANCELACION_CONFIRMADA, null,
+                    sub.getCurrentPeriodEnd(), null, null, null, null);
             try {
                 resendEmailService.enviarConfirmacionCancelacionSuscripcion(
                         sub.getProfessional().getEmail(),
@@ -764,6 +777,8 @@ public class SubscriptionService {
                 "Renovación cancelada por el profesional. Acceso habilitado hasta: " + sub.getCurrentPeriodEnd());
 
         // 3. Enviar email de confirmación de cancelación
+        avisoSuscripcionPublisher.publicar(sub, SuscripcionAvisoData.CANCELACION_CONFIRMADA, null,
+                sub.getCurrentPeriodEnd(), null, null, null, null);
         try {
             resendEmailService.enviarConfirmacionCancelacionSuscripcion(
                     sub.getProfessional().getEmail(),

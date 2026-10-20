@@ -130,3 +130,25 @@ la campanita; servicio apagado y vuelto a prender; DLQ forzada.
 3. Un PR a `develop` por tarea. Sin deploy ni release: la Fase 1 se verifica en local.
 
 ## Resultado (completar al cerrar)
+
+### N1 — consumo de eventos (PR #19)
+Implementado como en la spec. Consumidor, topología, reintentos, DLQ, inbox y descarte por versión
+en `libs/eventos` (paquete `consumo`), con tests de integración contra PostgreSQL y RabbitMQ reales.
+
+### N2 — catálogo ampliado
+Desvíos respecto de la spec, encontrados al cablear cada punto del monolito:
+
+- **Receta emitida queda con envío directo** (no se crea `profesionales.receta.emitida.v1`): el mail
+  lleva el link al PDF de la receta y el número de recetario, que son datos de salud (sección 5.3).
+  Se suma a los envíos directos que quedan en el monolito. Hoy no sale nunca: QBI2 está deshabilitado.
+- **Enlaces de "confirmar asistencia":** llevan un token de un solo uso, que no viaja en
+  `turnos.recordatorio.programado.v1`. Notificaciones los pide por una ruta interna de consulta del
+  monolito (`/internal/monolito/turnos/{id}/enlaces-asistencia`, en N4).
+- **Dos tópicos más de los previstos:** `identidad.ticket.mensaje-recibido.v1` (el usuario responde
+  en su ticket; aviso a los admins) y `profesionales.historia-clinica.actualizada.v1` (avisos en la
+  app de seguimientos e informes, sin contenido clínico).
+- **`origen` en `TurnoConfirmado`:** el pago aprobado y la validación de OSDE mandan avisos
+  distintos (OSDE: solo el mail al paciente, sin monto); el campo permite replicarlo exacto.
+- **Eventos que antes no se publicaban:** el cambio de la preferencia de mails y los cambios de rol
+  desde el panel ahora publican `identidad.usuario.actualizado.v1`, porque la copia de contactos de
+  notificaciones los necesita.

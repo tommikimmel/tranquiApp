@@ -239,7 +239,8 @@ public class AuthController {
                         usuario.getId(),
                         usuario.getEmail(),
                         codigoVerificacion,
-                        "REGISTRO"
+                        "REGISTRO",
+                        usuario.getNombre()
                 )
         );
 
@@ -310,7 +311,8 @@ public class AuthController {
                         usuario.getId(),
                         usuario.getEmail(),
                         nuevoCodigo,
-                        "EMAIL_VERIFICATION"
+                        "EMAIL_VERIFICATION",
+                        usuario.getNombre()
                 )
         );
 
@@ -342,7 +344,8 @@ public class AuthController {
                         usuario.getId(),
                         usuario.getEmail(),
                         resetCode,
-                        "PASSWORD_RESET"
+                        "PASSWORD_RESET",
+                        usuario.getNombre()
                 )
         );
 

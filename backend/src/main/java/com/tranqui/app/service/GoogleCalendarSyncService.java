@@ -220,7 +220,12 @@ public class GoogleCalendarSyncService {
                                 new MeetCreadoData(
                                         turno.getId(),
                                         meetUrl,
-                                        turno.getGoogleEventId()
+                                        turno.getGoogleEventId(),
+                                        turno.getPaciente() != null ? turno.getPaciente().getId() : null,
+                                        medico.getId(),
+                                        turno.getFecha(),
+                                        turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : null,
+                                        linkNuevo
                                 )
                         );
                     }

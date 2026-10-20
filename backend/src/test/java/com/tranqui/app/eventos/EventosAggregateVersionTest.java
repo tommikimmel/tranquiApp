@@ -8,6 +8,7 @@ import com.tranqui.app.repository.TurnoRepository;
 import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.service.TurnoService;
 import com.tranqui.eventos.EventObjectMapperFactory;
+import com.tranqui.eventos.Topicos;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -160,7 +161,11 @@ class EventosAggregateVersionTest {
         });
 
         // 4. Verificar aggregateVersions de los eventos de Usuario
-        List<OutboxRecord> records = outboxRepository.findByAggregateIdOrderByIdAsc(String.valueOf(usuarioId));
+        // Cada actualización publica también identidad.usuario.actualizado.v1 con la misma versión
+        // (es el mismo cambio): se comparan los eventos de visibilidad, uno por actualización.
+        List<OutboxRecord> records = outboxRepository.findByAggregateIdOrderByIdAsc(String.valueOf(usuarioId)).stream()
+                .filter(r -> Topicos.PROFESIONALES_PROFESIONAL_VISIBILIDAD_CAMBIADA_V1.equals(r.getTopic()))
+                .toList();
         assertThat(records).hasSizeGreaterThanOrEqualTo(2);
 
         List<Integer> versiones = new ArrayList<>();

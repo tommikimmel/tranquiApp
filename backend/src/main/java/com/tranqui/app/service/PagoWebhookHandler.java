@@ -149,7 +149,13 @@ public class PagoWebhookHandler {
                         turno.getFecha(),
                         turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00",
                         turno.getModalidad() != null ? turno.getModalidad().name() : "ONLINE",
-                        turno.getPrecio()
+                        turno.getPrecio(),
+                        turno.isOcupaAgenda(),
+                        turno.isOcupaAgenda() ? resolverTipoTurnoLabel(turno) : null,
+                        turno.isOcupaAgenda() ? null : resolverTipoDocumentoLabel(turno),
+                        turno.getModalidad() == com.tranqui.app.model.Modalidad.ONLINE ? null : turno.getMedico().getDomicilioAtencion(),
+                        turno.getTelemedicinaUrl(),
+                        TurnoConfirmadoData.ORIGEN_PAGO
                 )
         );
 

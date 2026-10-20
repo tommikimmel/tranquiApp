@@ -22,12 +22,15 @@ public final class Topicos {
     public static final String IDENTIDAD_USUARIO_ELIMINADO_V1 = "identidad.usuario.eliminado.v1";
     public static final String IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1 = "identidad.codigo-verificacion.generado.v1";
     public static final String IDENTIDAD_TICKET_RESPONDIDO_V1 = "identidad.ticket.respondido.v1";
+    public static final String IDENTIDAD_TICKET_CREADO_V1 = "identidad.ticket.creado.v1";
+    public static final String IDENTIDAD_TICKET_MENSAJE_RECIBIDO_V1 = "identidad.ticket.mensaje-recibido.v1";
 
     // ==================== Profesionales ====================
     public static final String PROFESIONALES_PROFESIONAL_ACTUALIZADO_V1 = "profesionales.profesional.actualizado.v1";
     public static final String PROFESIONALES_PROFESIONAL_VISIBILIDAD_CAMBIADA_V1 = "profesionales.profesional.visibilidad-cambiada.v1";
     public static final String PROFESIONALES_TARIFA_ACTUALIZADA_V1 = "profesionales.tarifa.actualizada.v1";
     public static final String PROFESIONALES_DISPONIBILIDAD_ACTUALIZADA_V1 = "profesionales.disponibilidad.actualizada.v1";
+    public static final String PROFESIONALES_HISTORIA_CLINICA_ACTUALIZADA_V1 = "profesionales.historia-clinica.actualizada.v1";
 
     // ==================== Turnos ====================
     public static final String TURNOS_TURNO_RESERVADO_V1 = "turnos.turno.reservado.v1";
@@ -37,6 +40,8 @@ public final class Topicos {
     public static final String TURNOS_TURNO_EXPIRADO_V1 = "turnos.turno.expirado.v1";
     public static final String TURNOS_RECORDATORIO_PROGRAMADO_V1 = "turnos.recordatorio.programado.v1";
     public static final String TURNOS_DOCUMENTO_SOLICITADO_V1 = "turnos.documento.solicitado.v1";
+    public static final String TURNOS_DOCUMENTO_ENVIADO_V1 = "turnos.documento.enviado.v1";
+    public static final String TURNOS_ASISTENCIA_CONFIRMADA_V1 = "turnos.asistencia.confirmada.v1";
 
     // ==================== Pagos ====================
     public static final String PAGOS_PAGO_APROBADO_V1 = "pagos.pago.aprobado.v1";
@@ -47,6 +52,7 @@ public final class Topicos {
 
     // ==================== Suscripciones ====================
     public static final String SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1 = "suscripciones.suscripcion.cambio-estado.v1";
+    public static final String SUSCRIPCIONES_AVISO_PROGRAMADO_V1 = "suscripciones.aviso.programado.v1";
 
     // ==================== Calendario ====================
     public static final String CALENDARIO_MEET_CREADO_V1 = "calendario.meet.creado.v1";
@@ -56,7 +62,7 @@ public final class Topicos {
     public static final String CHAT_MENSAJE_ENVIADO_V1 = "chat.mensaje.enviado.v1";
 
     /**
-     * Lista inmutable de todos los tópicos del catálogo de la sección 5.4.
+     * Lista inmutable de todos los tópicos del catálogo de la sección 5.4, más los agregados en la Fase 1 (notificaciones).
      */
     public static final List<String> TODOS_LOS_TOPICOS = List.of(
         IDENTIDAD_USUARIO_REGISTRADO_V1,
@@ -64,10 +70,13 @@ public final class Topicos {
         IDENTIDAD_USUARIO_ELIMINADO_V1,
         IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
         IDENTIDAD_TICKET_RESPONDIDO_V1,
+        IDENTIDAD_TICKET_CREADO_V1,
+        IDENTIDAD_TICKET_MENSAJE_RECIBIDO_V1,
         PROFESIONALES_PROFESIONAL_ACTUALIZADO_V1,
         PROFESIONALES_PROFESIONAL_VISIBILIDAD_CAMBIADA_V1,
         PROFESIONALES_TARIFA_ACTUALIZADA_V1,
         PROFESIONALES_DISPONIBILIDAD_ACTUALIZADA_V1,
+        PROFESIONALES_HISTORIA_CLINICA_ACTUALIZADA_V1,
         TURNOS_TURNO_RESERVADO_V1,
         TURNOS_TURNO_CONFIRMADO_V1,
         TURNOS_TURNO_CANCELADO_V1,
@@ -75,12 +84,15 @@ public final class Topicos {
         TURNOS_TURNO_EXPIRADO_V1,
         TURNOS_RECORDATORIO_PROGRAMADO_V1,
         TURNOS_DOCUMENTO_SOLICITADO_V1,
+        TURNOS_DOCUMENTO_ENVIADO_V1,
+        TURNOS_ASISTENCIA_CONFIRMADA_V1,
         PAGOS_PAGO_APROBADO_V1,
         PAGOS_PAGO_RECHAZADO_V1,
         PAGOS_REEMBOLSO_REALIZADO_V1,
         PAGOS_CUENTA_MP_VINCULADA_V1,
         PAGOS_CUENTA_MP_DESVINCULADA_V1,
         SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1,
+        SUSCRIPCIONES_AVISO_PROGRAMADO_V1,
         CALENDARIO_MEET_CREADO_V1,
         CALENDARIO_HORARIO_BLOQUEADO_V1,
         CHAT_MENSAJE_ENVIADO_V1
