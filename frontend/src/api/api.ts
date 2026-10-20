@@ -1,9 +1,12 @@
-// Same http(s)://host[:8081] derivation the WebSocket connections (App.tsx, useChat.ts) also
+// Same http(s)://host[:8080] derivation the WebSocket connections (App.tsx, useChat.ts) also
 // need — kept in one place instead of copy-pasted per call site so the two can't drift.
 export function getBackendOrigin(): string {
+  if (import.meta.env?.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
   return window.location.protocol === 'https:'
     ? `https://${window.location.host}`
-    : `http://${window.location.hostname}:8081`;
+    : `http://${window.location.hostname}:8080`;
 }
 
 const API_BASE = `${getBackendOrigin()}/api`;

@@ -11,3 +11,6 @@ spring:
     hibernate:
       ddl-auto: create-drop
 
+jwt:
+  secret: test-jwt-secret-key-must-be-at-least-32-chars-long!
+

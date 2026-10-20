@@ -30,10 +30,58 @@ services:
       - "127.0.0.1:8025:8025"   # bandeja web
       - "127.0.0.1:1025:1025"   # SMTP
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: tranqui
+      RABBITMQ_DEFAULT_PASS: tranqui-local
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "127.0.0.1:15672:15672"   # UI de administración
+      - "127.0.0.1:5672:5672"     # AMQP
+    volumes:
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    mem_limit: 256m
+
+  consul:
+    image: hashicorp/consul:1.19
+    command: ["agent", "-dev", "-client=0.0.0.0", "-config-dir=/consul/config"]
+    ports:
+      - "127.0.0.1:8500:8500"     # UI y API de catálogo
+    volumes:
+      - ./infra/consul:/consul/config
+    healthcheck:
+      test: ["CMD", "consul", "info"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    mem_limit: 64m
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    mem_limit: 64m
+
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       SPRING_PROFILES_ACTIVE: local
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/tranqui_local
@@ -43,11 +91,18 @@ services:
       SPRING_MAIL_PORT: "1025"
       # Clave de cifrado solo para datos locales (32 caracteres). Nunca se usa en producción.
       ENCRYPTION_KEY: local-dev-encryption-key-32chars
+      # Clave JWT compartida con el gateway para el entorno local.
+      JWT_SECRET: local-dev-encryption-key-32chars
       APP_PUBLIC_URL: http://localhost:8081
       FRONTEND_URL: http://localhost:5173
       DEMO_DATA: "true"
       # Token del endpoint interno de novedades (solo para probar en local).
       NOVEDADES_TOKEN: local-novedades-token
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: tranqui
+      SPRING_RABBITMQ_PASSWORD: tranqui-local
+      SPRING_RABBITMQ_VIRTUAL_HOST: /
     ports:
       - "127.0.0.1:8081:8080"
     depends_on:
@@ -55,6 +110,32 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      TRANQUI_SERVICES_MONOLITO_URI: http://backend:8080
+      SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
+      JWT_SECRET: local-dev-encryption-key-32chars
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    mem_limit: 288m
 
   frontend:
     image: node:22-alpine
@@ -62,6 +143,7 @@ services:
     command: sh -c "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 5173 --strictPort"
     environment:
       VITE_GOOGLE_LOGIN: "false"
+      VITE_API_URL: "http://localhost:8080"
     ports:
       - "127.0.0.1:5173:5173"
     volumes:
@@ -69,7 +151,7 @@ services:
       # node_modules del contenedor separado del de la máquina (binarios de Linux).
       - tranqui-local-node-modules:/app/node_modules
     depends_on:
-      - backend
+      - gateway
 
 volumes:
   tranqui-local-db:
