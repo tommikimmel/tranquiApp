@@ -20,7 +20,7 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 | `tranqui-backend` | `tranqui-backend` | Monolito Spring Boot (JVM afinada, transactional outbox + relay) | 512 MB | 0.5 |
 | `tranqui-db` | `tranqui-db` | PostgreSQL 15 con volumen persistente (`app_pgdata`) | 512 MB | 0.5 |
 | `tranqui-rabbitmq` | `rabbitmq` | RabbitMQ 3.13 con topología de eventos (`tranqui.eventos`, colas lazy) | 256 MB | 0.5 |
-| `tranqui-consul` | `consul` | Consul 1.19 (service discovery y catálogo de salud) | 64 MB | 0.5 |
+| `tranqui-consul` | `consul` | Consul 1.19 (service discovery y catálogo de salud) | 128 MB | 0.5 |
 | `tranqui-redis` | `redis` | Redis 7 (almacenamiento de token bucket para rate limiting) | 64 MB | 0.5 |
 | `tranqui-victoriametrics` | `victoriametrics` | VictoriaMetrics single-node (retención 15d de métricas Prometheus, cachés al 30%) | 192 MB | 0.5 |
 | `tranqui-cadvisor` | `cadvisor` | cAdvisor v0.49.1 (métricas de uso de CPU/RAM por contenedor) | 64 MB | 0.3 |
@@ -31,7 +31,7 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 
 ### Presupuesto de memoria (RAM)
 
-- **Total suma `mem_limit` Docker Compose (Fase 1):** `64 + 288 + 512 + 512 + 256 + 64 + 64 + 192 + 64 + 32 + 224 = 2.272 MB` (~2,27 GB; `db-servicios` corre unos segundos al arrancar y no suma).
+- **Total suma `mem_limit` Docker Compose (Fase 1):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 224 = 2.336 MB` (~2,34 GB; `db-servicios` corre unos segundos al arrancar y no suma).
 - **Traefik y bot de WhatsApp:** ~112 MB.
 - **Sistema operativo y buffers mínimos:** ~1 GB.
 - **Consumo proyectado total en VPS:** **~3,4 GB**, ampliamente dentro del techo presupuestado de **~4,8 GB**
@@ -151,10 +151,18 @@ empieza a consumir `notificaciones.eventos`. Para comparar las dos bases (solo l
 node scripts/fase1-comparar-notificaciones.mjs --proyecto app --contenedor tranqui-db   --usuario <DB_USER> --base tranqui_app
 ```
 
-**Vuelta atrás de la Fase 1** (sin tocar datos): en `/srv/tranqui/.env` poner
-`NOTIFICACIONES_ENVIO_DIRECTO=true` y `TRANQUI_SERVICES_NOTIFICACIONES_URI=http://tranqui-backend:8080`, y
-aplicar con `docker compose -p app up -d tranqui-backend gateway`. El monolito vuelve a mandar los
-mails y a crear las notificaciones; los eventos siguen acumulándose en la cola del servicio.
+**Vuelta atrás de la Fase 1** (sin tocar datos):
+
+1. En `/srv/tranqui/.env`: `NOTIFICACIONES_ENVIO_DIRECTO=true` y
+   `TRANQUI_SERVICES_NOTIFICACIONES_URI=http://tranqui-backend:8080`.
+2. Frenar el servicio **antes** de aplicar, o los mails salen dos veces (del monolito y del servicio):
+   `docker compose -p app stop notificaciones`.
+3. Aplicar: `docker compose -p app up -d tranqui-backend gateway`. El monolito vuelve a mandar los
+   mails y a crear las notificaciones; los eventos se acumulan en `notificaciones.eventos`.
+
+**Volver al servicio después de una vuelta atrás:** esos eventos acumulados ya los atendió el
+monolito. Vaciar la cola antes de prenderlo (panel de RabbitMQ, cola `notificaciones.eventos`,
+"Purge"), volver las dos variables a su valor y `docker compose -p app up -d`.
 
 ## VUELTA ATRÁS (Rollback a Monolito directo)
 

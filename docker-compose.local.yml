@@ -61,10 +61,14 @@ services:
     healthcheck:
       test: ["CMD", "consul", "info"]
       interval: 5s
-      timeout: 3s
+      timeout: 5s
       retries: 5
-      start_period: 5s
-    mem_limit: 64m
+      # Arranca lento cuando se levanta todo junto: con 5 s de gracia se marcaba unhealthy antes de
+      # terminar de iniciar y frenaba al gateway y a los servicios.
+      start_period: 30s
+    # Con 64m se quedaba sin memoria (60 de 64 MB, CPU al 375 % y sin responder) al registrar
+    # el gateway y el servicio de notificaciones (Fase 1).
+    mem_limit: 128m
 
   redis:
     image: redis:7-alpine

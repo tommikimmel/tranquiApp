@@ -10,6 +10,7 @@
 //
 // Compara: usuarios del monolito contra la copia de contactos, y notificaciones de las últimas 24 h
 // (las que copia la carga inicial). Sale con código 1 si hay diferencias.
+// Las fechas de las notificaciones se guardan en hora de Argentina sin zona; now() de la base es UTC.
 import { execFileSync } from 'node:child_process';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pares, arg, i, todos) => {
@@ -35,8 +36,8 @@ const filas = [
     consulta(base, 'SELECT count(*) FROM usuario WHERE notificaciones_email_habilitadas = false'),
     consulta('notificaciones', 'SELECT count(*) FROM contacto WHERE email_habilitado = false')],
   ['Notificaciones de las últimas 24 h',
-    consulta(base, "SELECT count(*) FROM notificacion WHERE fecha_creacion > now() - interval '24 hours'"),
-    consulta('notificaciones', "SELECT count(*) FROM notificacion WHERE fecha_creacion > now() - interval '24 hours'")],
+    consulta(base, "SELECT count(*) FROM notificacion WHERE fecha_creacion > (now() AT TIME ZONE 'America/Argentina/Buenos_Aires') - interval '24 hours'"),
+    consulta('notificaciones', "SELECT count(*) FROM notificacion WHERE fecha_creacion > (now() AT TIME ZONE 'America/Argentina/Buenos_Aires') - interval '24 hours'")],
 ];
 
 let diferencias = 0;

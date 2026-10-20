@@ -54,14 +54,17 @@ services:
     volumes:
       - ./infra/consul:/consul/config:ro
       - consul_data:/consul/data
-    mem_limit: 64m
+    # Con 64m se quedaba sin memoria (CPU al 375 % y sin responder) al registrar gateway y servicios
+    # (medido en local en la Fase 1).
+    mem_limit: 128m
     cpus: 0.5
     healthcheck:
       test: ["CMD", "consul", "info"]
       interval: 5s
-      timeout: 3s
+      timeout: 5s
       retries: 5
-      start_period: 5s
+      # Arranca lento cuando se levanta todo junto: con 5 s de gracia se marcaba unhealthy.
+      start_period: 30s
     networks:
       tranqui-network:
         aliases:
