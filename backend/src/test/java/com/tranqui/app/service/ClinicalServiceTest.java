@@ -1,5 +1,6 @@
 package com.tranqui.app.service;
 
+import com.tranqui.app.eventos.OutboxPublisher;
 import com.tranqui.app.model.*;
 import com.tranqui.app.model.dto.PacienteDto;
 import com.tranqui.app.repository.*;
@@ -31,6 +32,9 @@ class ClinicalServiceTest {
     @Mock private InformeClinicoRepository informeClinicoRepository;
     @Mock private NotificacionService notificacionService;
     @Mock private MensajeRepository mensajeRepository;
+
+    @Mock
+    private OutboxPublisher outboxPublisher;
 
     @InjectMocks
     private ClinicalService clinicalService;
@@ -244,6 +248,28 @@ class ClinicalServiceTest {
         assertEquals(LocalDate.now(), saved.getFecha());
         verify(notificacionService).crearNotificacion(eq(medico), anyString(), anyString(), eq("INFORME"));
         verify(notificacionService).crearNotificacion(eq(paciente), anyString(), anyString(), eq("INFORME"));
+    }
+
+    @Test
+    void guardarInforme_publicaHistoriaClinicaSinContenidoClinico() {
+        Usuario medico = medico("dra@mail.com");
+        Usuario paciente = paciente(5L, "Ana");
+        when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico));
+        when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
+        when(informeClinicoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        clinicalService.guardarInforme("dra@mail.com", 5L, "GENERAL", "plan secreto", "contenido secreto", "archivo.pdf");
+
+        org.mockito.ArgumentCaptor<com.tranqui.eventos.data.HistoriaClinicaActualizadaData> captor =
+                org.mockito.ArgumentCaptor.forClass(com.tranqui.eventos.data.HistoriaClinicaActualizadaData.class);
+        verify(outboxPublisher).publicar(eq(com.tranqui.eventos.Topicos.PROFESIONALES_HISTORIA_CLINICA_ACTUALIZADA_V1),
+                eq("informe"), anyString(), eq(1), captor.capture());
+        com.tranqui.eventos.data.HistoriaClinicaActualizadaData data = captor.getValue();
+        assertEquals(5L, data.pacienteId());
+        assertEquals("INFORME", data.tipo());
+        assertEquals("PROFESIONAL", data.cargadoPor());
+        assertEquals("GENERAL", data.tipoInforme());
+        assertFalse(data.toString().contains("secreto"));
     }
 
     // ── obtenerSeguimientosPaciente / obtenerInformesPaciente ───────

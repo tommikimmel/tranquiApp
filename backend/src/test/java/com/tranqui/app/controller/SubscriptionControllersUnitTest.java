@@ -57,6 +57,9 @@ class SubscriptionControllersUnitTest {
     @Mock
     private UserDetails userDetails;
 
+    @Mock
+    private com.tranqui.app.service.AvisoSuscripcionPublisher avisoSuscripcionPublisher;
+
     @InjectMocks
     private SubscriptionController subscriptionController;
 
