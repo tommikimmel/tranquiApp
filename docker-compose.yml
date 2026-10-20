@@ -1,10 +1,11 @@
-version: '3.8'
-
 services:
+
   tranqui-db:
     image: postgres:15-alpine
     container_name: tranqui-db
     restart: always
+    mem_limit: 512m
+    cpus: 0.5
     environment:
       POSTGRES_DB: ${DB_NAME:-tranqui_app}
       POSTGRES_USER: ${DB_USER:-tomaskimmel}
@@ -19,31 +20,172 @@ services:
       timeout: 5s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: tranqui-rabbitmq
+    restart: always
+    mem_limit: 256m
+    cpus: 0.5
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-tranqui}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD en .env}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      tranqui-network:
+        aliases:
+          - tranqui-rabbitmq
+
+  consul:
+    image: hashicorp/consul:1.19
+    container_name: tranqui-consul
+    restart: always
+    command: ["agent", "-server", "-bootstrap-expect=1", "-client=0.0.0.0", "-bind=0.0.0.0", "-data-dir=/consul/data", "-config-dir=/consul/config"]
+    volumes:
+      - ./infra/consul:/consul/config:ro
+      - consul_data:/consul/data
+    # Con 64m se quedaba sin memoria (CPU al 375 % y sin responder) al registrar gateway y servicios
+    # (medido en local en la Fase 1).
+    mem_limit: 128m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "consul", "info"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      # Arranca lento cuando se levanta todo junto: con 5 s de gracia se marcaba unhealthy.
+      start_period: 30s
+    networks:
+      tranqui-network:
+        aliases:
+          - tranqui-consul
+
+  redis:
+    image: redis:7-alpine
+    container_name: tranqui-redis
+    restart: always
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    mem_limit: 64m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      tranqui-network:
+        aliases:
+          - tranqui-redis
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.101.0
+    container_name: tranqui-victoriametrics
+    restart: always
+    command:
+      - "-promscrape.config=/etc/victoriametrics/scrape.yml"
+      - "-retentionPeriod=15d"
+      - "-storageDataPath=/victoria-metrics-data"
+      - "-memory.allowedPercent=30"
+    volumes:
+      - ./infra/victoriametrics/scrape.yml:/etc/victoriametrics/scrape.yml:ro
+      - vmdata:/victoria-metrics-data
+    # Con 96m el OOM lo mataba al arrancar; con 192m y caches al 30% queda en ~150-160 MB.
+    mem_limit: 192m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8428/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      tranqui-network:
+        aliases:
+          - tranqui-victoriametrics
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: tranqui-node-exporter
+    restart: always
+    # Monta /proc, /sys y / del host para medir el VPS y no el contenedor.
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+|var/lib/containerd/.+)($$|/)"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    pid: host
+    mem_limit: 32m
+    cpus: 0.2
+    networks:
+      tranqui-network:
+        aliases:
+          - tranqui-node-exporter
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: tranqui-cadvisor
+    restart: always
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    mem_limit: 64m
+    cpus: 0.3
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      tranqui-network:
+        aliases:
+          - tranqui-cadvisor
+
   tranqui-backend:
     # Producción: imagen publicada por GitHub Actions al crear el tag (ver docs/flujo/releases.md).
     # build: queda para el deploy manual de emergencia (node deploy.js --compilar).
     image: ghcr.io/tommikimmel/tranqui-backend:${TRANQUI_VERSION:-latest}
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: tranqui-backend
     restart: always
-    ports:
-      - "127.0.0.1:8081:8080"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.tranqui-backend.entrypoints=websecure"
-      - "traefik.http.routers.tranqui-backend.rule=Host(`tranquisalud.com`) && (PathPrefix(`/api`) || PathPrefix(`/ws-tranqui`))"
-      - "traefik.http.routers.tranqui-backend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.tranqui-backend.loadbalancer.server.port=8080"
+    mem_limit: 512m
+    cpus: 0.5
     environment:
       TZ: America/Argentina/Buenos_Aires
+      JAVA_TOOL_OPTIONS: "-XX:+UseSerialGC -XX:MaxRAMPercentage=65 -Xss256k -XX:ReservedCodeCacheSize=48m -XX:MaxMetaspaceSize=96m"
       SPRING_DATASOURCE_URL: jdbc:postgresql://tranqui-db:5432/${DB_NAME:-tranqui_app}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-tomaskimmel}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       # Sin default: con una clave conocida cualquiera podría descifrar los tokens guardados.
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Falta ENCRYPTION_KEY en .env}
+      # Firma los JWT de usuario; el gateway los valida con la misma clave. Sin default.
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-tranqui}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD en .env}
+      SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/}
+      EVENTOS_RELAY_ENABLED: ${EVENTOS_RELAY_ENABLED:-true}
+      EVENTOS_RELAY_BACKUP_POLL_MS: ${EVENTOS_RELAY_BACKUP_POLL_MS:-30000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-224301140079-2pa672f7sqcner9nut04j0g99md88n3p.apps.googleusercontent.com}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_CALENDAR_ENABLED: ${GOOGLE_CALENDAR_ENABLED:-false}
@@ -76,11 +218,212 @@ services:
       ARCA_CERT_CONTENT: ${ARCA_CERT_CONTENT:-}
       ARCA_KEY_CONTENT: ${ARCA_KEY_CONTENT:-}
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: ${LOG_LEVEL_SECURITY:-INFO}
+      # Fase 1: los mails y avisos con evento los manda el servicio de notificaciones.
+      # "true" vuelve al envío directo desde el monolito (vuelta atrás, junto con la ruta del gateway).
+      NOTIFICACIONES_ENVIO_DIRECTO: ${NOTIFICACIONES_ENVIO_DIRECTO:-false}
+      # Rutas /internal/** que consultan otros servicios (sección 4.2).
+      SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
+      # Fase 2: el resumen de chat de la lista de pacientes se pide al servicio por el gateway.
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      tranqui-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      tranqui-network:
+        aliases:
+          - backend
+
+  gateway:
+    image: ghcr.io/tommikimmel/tranqui-gateway:${TRANQUI_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    container_name: tranqui-gateway
+    restart: always
+    mem_limit: 288m
+    cpus: 1.0
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+      JAVA_TOOL_OPTIONS: "-XX:+UseSerialGC -XX:MaxRAMPercentage=65 -Xss256k -XX:ReservedCodeCacheSize=48m -XX:MaxMetaspaceSize=96m"
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      TRANQUI_SERVICES_MONOLITO_URI: ${TRANQUI_SERVICES_MONOLITO_URI:-http://tranqui-backend:8080}
+      # Fase 1: /api/notificaciones y /ws-notificaciones al servicio. Vuelta atrás: en el .env,
+      # TRANQUI_SERVICES_NOTIFICACIONES_URI=http://tranqui-backend:8080 (y el envío directo en true).
+      TRANQUI_SERVICES_NOTIFICACIONES_URI: ${TRANQUI_SERVICES_NOTIFICACIONES_URI:-lb://notificaciones}
+      # Fase 2: /api/chat, /ws-tranqui y /internal/chat al servicio. Vuelta atrás: en el .env,
+      # TRANQUI_SERVICES_CHAT_URI=http://tranqui-backend:8080 (ver docs/entornos/produccion.md).
+      TRANQUI_SERVICES_CHAT_URI: ${TRANQUI_SERVICES_CHAT_URI:-lb://chat}
+      SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      VICTORIAMETRICS_URL: http://victoriametrics:8428
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tranqui-gateway.entrypoints=websecure"
+      - "traefik.http.routers.tranqui-gateway.rule=Host(`tranquisalud.com`) && (PathPrefix(`/api`) || PathPrefix(`/ws-tranqui`))"
+      - "traefik.http.routers.tranqui-gateway.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tranqui-gateway.loadbalancer.server.port=8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      tranqui-backend:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      victoriametrics:
+        condition: service_healthy
+    networks:
+      tranqui-network:
+        aliases:
+          - tranqui-gateway
+
+  # Crea la base y el usuario de cada servicio en la misma instancia de PostgreSQL (sección 3).
+  # Corre en cada arranque y termina; es idempotente, así sirve con el volumen app_pgdata existente.
+  db-servicios:
+    image: postgres:15-alpine
+    container_name: tranqui-db-servicios
+    entrypoint: ["sh", "/infra/crear-bases-servicios.sh"]
+    environment:
+      PGHOST: tranqui-db
+      PGUSER: ${DB_USER:-tomaskimmel}
+      PGPASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
+      PGDATABASE: ${DB_NAME:-tranqui_app}
+      SERVICIOS: notificaciones chat
+      DB_PASSWORD_NOTIFICACIONES: ${NOTIFICACIONES_DB_PASSWORD:?Falta NOTIFICACIONES_DB_PASSWORD en .env}
+      DB_PASSWORD_CHAT: ${CHAT_DB_PASSWORD:?Falta CHAT_DB_PASSWORD en .env}
+    volumes:
+      - ./infra/postgres:/infra:ro
+    mem_limit: 32m
+    cpus: 0.2
+    restart: "no"
     depends_on:
       tranqui-db:
         condition: service_healthy
     networks:
       - tranqui-network
+
+  # Fase 1: mails y notificaciones dentro de la app a partir de eventos. Sin puertos publicados
+  # ni labels de Traefik: el tráfico le llega por el gateway (sección 3).
+  notificaciones:
+    image: ghcr.io/tommikimmel/tranqui-notificaciones:${TRANQUI_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: services/notificaciones/Dockerfile
+    container_name: tranqui-notificaciones
+    restart: always
+    mem_limit: 224m
+    cpus: 0.5
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+      JAVA_TOOL_OPTIONS: "-XX:+UseSerialGC -XX:MaxRAMPercentage=65 -Xss256k -XX:ReservedCodeCacheSize=48m -XX:MaxMetaspaceSize=96m -XX:TieredStopAtLevel=1"
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://tranqui-db:5432/notificaciones
+      SPRING_DATASOURCE_USERNAME: notificaciones
+      SPRING_DATASOURCE_PASSWORD: ${NOTIFICACIONES_DB_PASSWORD:?Falta NOTIFICACIONES_DB_PASSWORD en .env}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-tranqui}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD en .env}
+      SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/}
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+      TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-onboarding@resend.dev}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      MAIL_TRANSPORT: resend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    # Arranque escalonado (sección 9.3): después del gateway, así no compite por CPU con él.
+    depends_on:
+      db-servicios:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    networks:
+      tranqui-network:
+        aliases:
+          - tranqui-notificaciones
+
+  # Fase 2: chat en tiempo real (STOMP en /ws-tranqui) y su historial. Sin puertos ni Traefik.
+  chat:
+    image: ghcr.io/tommikimmel/tranqui-chat:${TRANQUI_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: services/chat/Dockerfile
+    container_name: tranqui-chat
+    restart: always
+    mem_limit: 224m
+    cpus: 0.5
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+      JAVA_TOOL_OPTIONS: "-XX:+UseSerialGC -XX:MaxRAMPercentage=65 -Xss256k -XX:ReservedCodeCacheSize=48m -XX:MaxMetaspaceSize=96m -XX:TieredStopAtLevel=1"
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://tranqui-db:5432/chat
+      SPRING_DATASOURCE_USERNAME: chat
+      SPRING_DATASOURCE_PASSWORD: ${CHAT_DB_PASSWORD:?Falta CHAT_DB_PASSWORD en .env}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-tranqui}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD en .env}
+      SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/}
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+      TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    # Arranque escalonado (sección 9.3): después del gateway, así no compite por CPU con él.
+    depends_on:
+      db-servicios:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+      # Uno detrás del otro: dos JVM arrancando juntas en 2 núcleos tardan más que en fila.
+      notificaciones:
+        condition: service_healthy
+    networks:
+      tranqui-network:
+        aliases:
+          - tranqui-chat
 
   tranqui-frontend:
     image: ghcr.io/tommikimmel/tranqui-frontend:${TRANQUI_VERSION:-latest}
@@ -89,6 +432,8 @@ services:
       dockerfile: Dockerfile
     container_name: tranqui-frontend
     restart: always
+    mem_limit: 64m
+    cpus: 0.5
     ports:
       - "127.0.0.1:3000:80"
     volumes:
@@ -104,10 +449,17 @@ services:
     networks:
       - tranqui-network
     depends_on:
-      - tranqui-backend
+      gateway:
+        condition: service_healthy
 
 volumes:
   pgdata:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  consul_data:
+    driver: local
+  vmdata:
     driver: local
 
 networks:

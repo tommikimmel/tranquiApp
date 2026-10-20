@@ -112,10 +112,15 @@ async function main() {
   console.log('Conectado al VPS.');
 
   try {
-    await ejecutar(conn, ['mkdir -p /srv/tranqui']);
+    await ejecutar(conn, ['mkdir -p /srv/tranqui/infra/consul /srv/tranqui/infra/rabbitmq /srv/tranqui/infra/victoriametrics']);
     await subir(conn, [
       [path.join(__dirname, 'docker-compose.yml'), '/srv/tranqui/docker-compose.yml'],
       [path.join(__dirname, 'scripts/vps/deploy-remoto.sh'), '/srv/tranqui/deploy-remoto.sh'],
+      [path.join(__dirname, 'infra/consul/consul.json'), '/srv/tranqui/infra/consul/consul.json'],
+      [path.join(__dirname, 'infra/rabbitmq/rabbitmq.conf'), '/srv/tranqui/infra/rabbitmq/rabbitmq.conf'],
+      [path.join(__dirname, 'infra/rabbitmq/definitions.json'), '/srv/tranqui/infra/rabbitmq/definitions.json'],
+      [path.join(__dirname, 'infra/rabbitmq/enabled_plugins'), '/srv/tranqui/infra/rabbitmq/enabled_plugins'],
+      [path.join(__dirname, 'infra/victoriametrics/scrape.yml'), '/srv/tranqui/infra/victoriametrics/scrape.yml'],
     ]);
 
     if (!compilar) {
@@ -126,7 +131,7 @@ async function main() {
       // versión "local-<commit>", así docker compose la usa sin bajar nada.
       const etiqueta = `local-${commit}`;
       console.log(`Empaquetando el commit ${commit} para compilar en el VPS...`);
-      const lista = execSync('git ls-files -z -- backend frontend', { cwd: __dirname }).toString().split('\0').filter(Boolean);
+      const lista = execSync('git ls-files -z -- pom.xml mvnw mvnw.cmd .mvn libs backend frontend gateway services infra', { cwd: __dirname }).toString().split('\0').filter(Boolean);
       const listaPath = path.join(os.tmpdir(), 'tranqui-deploy-files.txt');
       const tarPath = path.join(os.tmpdir(), 'tranqui-project.tar.gz');
       fs.writeFileSync(listaPath, lista.join('\n') + '\n');
@@ -135,8 +140,12 @@ async function main() {
       await subir(conn, [[tarPath, '/root/tranqui-codigo.tar.gz']]);
       await ejecutar(conn, [
         'rm -rf /srv/tranqui/codigo && mkdir -p /srv/tranqui/codigo && tar -xzf /root/tranqui-codigo.tar.gz -C /srv/tranqui/codigo',
-        `docker build -t ghcr.io/tommikimmel/tranqui-backend:${etiqueta} /srv/tranqui/codigo/backend`,
+        `docker build -f /srv/tranqui/codigo/backend/Dockerfile -t ghcr.io/tommikimmel/tranqui-backend:${etiqueta} /srv/tranqui/codigo`,
+        `docker build -f /srv/tranqui/codigo/gateway/Dockerfile -t ghcr.io/tommikimmel/tranqui-gateway:${etiqueta} /srv/tranqui/codigo`,
+        `docker build -f /srv/tranqui/codigo/services/notificaciones/Dockerfile -t ghcr.io/tommikimmel/tranqui-notificaciones:${etiqueta} /srv/tranqui/codigo`,
+        `docker build -f /srv/tranqui/codigo/services/chat/Dockerfile -t ghcr.io/tommikimmel/tranqui-chat:${etiqueta} /srv/tranqui/codigo`,
         `docker build -t ghcr.io/tommikimmel/tranqui-frontend:${etiqueta} /srv/tranqui/codigo/frontend`,
+        'cp -r /srv/tranqui/codigo/infra /srv/tranqui/',
         // deploy-remoto.sh hace pull: con imágenes locales que no existen en GHCR el pull falla,
         // así que en este modo se levanta directo y se verifica igual.
         `cd /srv/tranqui && TRANQUI_VERSION=${etiqueta} docker compose -p app --env-file /srv/tranqui/.env -f docker-compose.yml up -d --remove-orphans`,

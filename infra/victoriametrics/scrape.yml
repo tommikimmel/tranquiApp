@@ -1,0 +1,52 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'gateway'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['gateway:8082']
+        labels:
+          servicio: 'gateway'
+
+  - job_name: 'backend'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['backend:8082']
+        labels:
+          servicio: 'backend'
+
+  - job_name: 'notificaciones'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['notificaciones:8082']
+        labels:
+          servicio: 'notificaciones'
+
+  - job_name: 'chat'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['chat:8082']
+        labels:
+          servicio: 'chat'
+
+  - job_name: 'rabbitmq'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['rabbitmq:15692']
+        labels:
+          servicio: 'rabbitmq'
+
+  - job_name: 'node-exporter'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          servicio: 'vps'
+
+  - job_name: 'cadvisor'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          servicio: 'contenedores'
