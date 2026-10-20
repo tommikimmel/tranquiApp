@@ -25,17 +25,17 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 | `tranqui-victoriametrics` | `victoriametrics` | VictoriaMetrics single-node (retención 15d de métricas Prometheus, cachés al 30%) | 192 MB | 0.5 |
 | `tranqui-cadvisor` | `cadvisor` | cAdvisor v0.49.1 (métricas de uso de CPU/RAM por contenedor) | 64 MB | 0.3 |
 | `tranqui-node-exporter` | `node-exporter` | Prometheus Node Exporter v1.8.2 (métricas del host VPS) | 32 MB | 0.2 |
-| `tranqui-notificaciones` | `notificaciones` | Servicio de notificaciones (Fase 1): mails y avisos en la app a partir de eventos, base propia `notificaciones` | 224 MB | 0.5 |
-| `tranqui-chat` | `chat` | Servicio de chat (Fase 2): mensajería en vivo por `/ws-tranqui` e historial, base propia `chat` | 224 MB | 0.5 |
+| `tranqui-notificaciones` | `notificaciones` | Servicio de notificaciones (Fase 1): mails y avisos en la app a partir de eventos, base propia `notificaciones` | 288 MB | 0.5 |
+| `tranqui-chat` | `chat` | Servicio de chat (Fase 2): mensajería en vivo por `/ws-tranqui` e historial, base propia `chat` | 288 MB | 0.5 |
 | `tranqui-db-servicios` | `db-servicios` | Contenedor de una sola ejecución: crea la base y el usuario de cada servicio (`infra/postgres/crear-bases-servicios.sh`) y termina | 32 MB | 0.2 |
 | `tranqui-bot`, `tranqui-bot-worker`, `wsp-db`, `wsp-redis` | — | Bot de WhatsApp (proyecto aparte, fuera de este repositorio) | ~70 MB | — |
 
 ### Presupuesto de memoria (RAM)
 
-- **Total suma `mem_limit` Docker Compose (Fase 2):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 224 + 224 = 2.560 MB` (~2,56 GB; `db-servicios` corre unos segundos al arrancar y no suma).
+- **Total suma `mem_limit` Docker Compose (Fase 2):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 288 + 288 = 2.688 MB` (~2,69 GB; `db-servicios` corre unos segundos al arrancar y no suma).
 - **Traefik y bot de WhatsApp:** ~112 MB.
 - **Sistema operativo y buffers mínimos:** ~1 GB.
-- **Consumo proyectado total en VPS:** **~3,7 GB**, ampliamente dentro del techo presupuestado de **~4,8 GB**
+- **Consumo proyectado total en VPS:** **~3,8 GB**, ampliamente dentro del techo presupuestado de **~4,8 GB**
   de la sección 9.1 para la Fase 0, reservando ~3 GB de margen libre para picos y caché de disco de PostgreSQL.
 
 ### Afinación de JVM (backend y gateway)
@@ -43,6 +43,16 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 Tanto el backend monolítico como el gateway configuran flags estrictos de JVM (`JAVA_TOOL_OPTIONS` y Dockerfiles)
 según la sección 9.2:
 `-XX:+UseSerialGC -XX:MaxRAMPercentage=65 -Xss256k -XX:ReservedCodeCacheSize=48m -XX:MaxMetaspaceSize=96m -Duser.timezone=America/Argentina/Buenos_Aires`.
+
+### Afinación de JVM (servicios chicos: notificaciones y chat)
+
+`-XX:+UseSerialGC -XX:MinRAMPercentage=30 -XX:MaxRAMPercentage=30 -Xss256k -XX:ReservedCodeCacheSize=32m -XX:MaxMetaspaceSize=128m -XX:TieredStopAtLevel=1`,
+con `mem_limit` de 288 MB. Medido en la Fase 2 (con Native Memory Tracking): lo que no es heap (clases
+~94 MB, tabla de símbolos ~23, código ~15, CDS de la JDK ~10, hilos) suma ~165-175 MB fijos, y con
+SerialGC el heap crece hasta su máximo (~86 MB; el vivo usa ~55). El proceso queda en ~245 MB. Con
+224 MB llegaba al tope del contenedor y vivía del swap; con 96 MB de metaspace (usa ~92) quedaba al
+borde de un `OutOfMemoryError`. Con menos de ~250 MB la JVM toma `MinRAMPercentage` (50 % por
+defecto) e ignora `MaxRAMPercentage`, por eso se fijan los dos.
 
 ## Configuración y variables de entorno
 

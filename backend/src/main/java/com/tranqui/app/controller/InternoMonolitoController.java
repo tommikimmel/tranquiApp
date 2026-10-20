@@ -101,7 +101,9 @@ public class InternoMonolitoController {
     public record MensajeDto(Long id, Long remitenteId, Long destinatarioId, String contenido, boolean leido,
                              LocalDateTime fechaEnvio) {}
 
-    public record TurnoConfirmadoDto(Long turnoId, Long pacienteId, Long profesionalId, java.time.LocalDate fecha,
+    // La fecha va como texto ISO (yyyy-MM-dd): el monolito serializa LocalDate como dd/MM/yyyy para la
+    // interfaz (DateConfig), y las rutas internas son un contrato entre servicios.
+    public record TurnoConfirmadoDto(Long turnoId, Long pacienteId, Long profesionalId, String fecha,
                                      String horaInicio) {}
 
     /** Fase 2: carga inicial de los mensajes del servicio de chat, por id y conservando los ids. */
@@ -125,7 +127,7 @@ public class InternoMonolitoController {
     public List<TurnoConfirmadoDto> turnosConfirmados() {
         return turnoRepository.findByEstadoAndFechaGreaterThanEqualOrderByIdAsc(EstadoTurno.CONFIRMADO,
                         java.time.LocalDate.now()).stream()
-                .map(t -> new TurnoConfirmadoDto(t.getId(), t.getPaciente().getId(), t.getMedico().getId(), t.getFecha(),
+                .map(t -> new TurnoConfirmadoDto(t.getId(), t.getPaciente().getId(), t.getMedico().getId(), t.getFecha().toString(),
                         t.getHoraInicio() != null ? t.getHoraInicio().toString() : null))
                 .toList();
     }

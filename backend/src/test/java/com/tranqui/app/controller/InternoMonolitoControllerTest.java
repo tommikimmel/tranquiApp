@@ -132,6 +132,7 @@ class InternoMonolitoControllerTest {
 
         assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(respuesta.getBody()).contains("\"turnoId\":" + futuro.getId()).contains("\"horaInicio\":\"11:00\"")
+                .contains("\"fecha\":\"" + futuro.getFecha() + "\"")
                 .doesNotContain("\"turnoId\":" + pasado.getId() + ",");
     }
 
