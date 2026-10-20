@@ -6,6 +6,17 @@ Todos los cambios relevantes de Tranqui App. Formato basado en
 
 ## [Sin publicar]
 
+### Infraestructura y arquitectura
+
+- **Maven multimódulo:** agregador raíz `tranqui-parent` con gestión centralizada de dependencias (BOM de Spring Boot 3.5.15) y Maven wrapper en la raíz.
+- **Librería común (`libs/comun`):** filtro servlet para `X-Correlation-Id` con propagación a MDC y cabeceras HTTP, formato estándar de error JSON (`ErrorResponse`) y autoconfiguración Spring Boot.
+- **Librería de eventos (`libs/eventos`):** sobre común `EventEnvelope<T>`, catálogo de tópicos tipado (`Topicos`), 25 records de payload para los eventos de la sección 5.4, constantes de topología RabbitMQ (`tranqui.eventos`, `tranqui.reintentos`, `tranqui.dlx`), y componente `ServiceJwt` para autenticación HMAC de llamadas internas (sección 4.2).
+- **Backend y Docker:** dependencias internas agregadas en `backend/pom.xml`, `backend/Dockerfile` adaptado para compilar desde la raíz del repositorio (`-pl backend -am`), Compose local y producción actualizados, y workflows de CI/deploy adaptados al multimodulo.
+- **Infraestructura local de microservicios (T2):** servicios RabbitMQ 3.13 (`rabbitmq:3.13-management-alpine`), Consul 1.19 (`hashicorp/consul:1.19`) y Redis 7 (`redis:7-alpine`) en `docker-compose.local.yml` con healthchecks, límites de memoria (256m RabbitMQ, 64m Consul, 64m Redis), configuración en `infra/rabbitmq/` y `infra/consul/`, verificación de puertos en `scripts/local.mjs` y test de contrato de topología en `libs/eventos`.
+- **API Gateway (T3):** módulo `gateway` con Spring Cloud Gateway WebFlux (Spring Boot 3.5.15, Spring Cloud 2025.0.1), Java 17 y Dockerfile multicapa. Enrutamiento perimetral unificado (`/api/**`, `/ws-tranqui/**`), registro en Consul, rate limiting distribuido con Redis (límites tabla 4.3, respuesta 429 con `Retry-After`, política fail-open ante caídas de Redis), propagación de `X-Correlation-Id`, timeouts diferenciados, reintentos GET con backoff, Circuit Breakers Resilience4j con fallback 503 JSON, seguridad de endpoints `/internal/**` (bloqueo 404 a `X-Forwarded-*` y validación de `ServiceJwt`), healthcheck público y métricas Actuator en puerto interno 8082. Servicio configurado en `docker-compose.local.yml` en puerto 8080 con redirección de frontend.
+- **Correcciones API Gateway (F3):** componente unificado `UserJwtVerifier` para extracción y validación criptográfica de tokens de usuario (cookie `SESSION-TOKEN` o `Authorization: Bearer`), resolución de IP real con `RealIpResolver` y lista CIDR `tranqui.gateway.trusted-proxies` para rate limiting correcto tras proxies confiables (Traefik) con descarte de `X-Forwarded-For` no confiable, eliminación de defaults hardcodeados de `jwt.secret` en código de gateway y backend monolito con fallo explícito al arrancar si falta `JWT_SECRET`, y alineación de `JWT_SECRET` en `docker-compose.local.yml`.
+- **Spec Fase 0:** documento `docs/specs/2026-10-14-fase-0-plataforma.md` resumiendo las 7 tareas de la plataforma de microservicios y `docs/arquitectura/gateway.md` con la arquitectura del API Gateway.
+
 ## [v1.1.0] - 2026-10-07
 
 ### CI y deploy
