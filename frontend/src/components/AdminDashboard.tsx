@@ -6,6 +6,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { getInitials } from '../hooks/usePatients'
 import AdminTicketsView from './AdminTicketsView'
 import AdminSubscriptionsView from './AdminSubscriptionsView'
+import AdminObservabilidadView from './AdminObservabilidadView'
 
 function IconVideoCall({ size = 13 }: { size?: number }) {
   return (
@@ -444,7 +445,7 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<'TODOS' | User['rol']>('TODOS')
-  const [activeSection, setActiveSection] = useState<'pending' | 'subscriptions' | 'users' | 'tickets'>('subscriptions')
+  const [activeSection, setActiveSection] = useState<'pending' | 'subscriptions' | 'users' | 'tickets' | 'observabilidad'>('subscriptions')
   const [detailUser, setDetailUser] = useState<User | null>(null)
   const [resettingPasswordFor, setResettingPasswordFor] = useState<number | null>(null)
   const [generatedPassword, setGeneratedPassword] = useState<{ email: string; password: string } | null>(null)
@@ -627,6 +628,12 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
             }
             label="Tickets de Soporte"
           />
+          <SidebarNavItem
+            active={activeSection === 'observabilidad'}
+            onClick={() => setActiveSection('observabilidad')}
+            icon={<Icon.Activity size={17} />}
+            label="Observabilidad"
+          />
         </aside>
 
         {/* Main Content Area */}
@@ -752,6 +759,9 @@ export default function AdminDashboard({ currentUser, onLogout }: AdminDashboard
 
         {/* ── SECTION: TICKETS DE SOPORTE ── */}
         {activeSection === 'tickets' && <AdminTicketsView />}
+
+        {/* ── SECTION: OBSERVABILIDAD DE LA PLATAFORMA ── */}
+        {activeSection === 'observabilidad' && <AdminObservabilidadView onLogout={onLogout} />}
 
         {/* ── SECTION 2: TODOS LOS USUARIOS ── */}
         {activeSection === 'users' && (
