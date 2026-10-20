@@ -1,5 +1,6 @@
 package com.tranqui.app.eventos;
 
+import com.tranqui.eventos.consumo.InboxHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,5 +1,6 @@
 package com.tranqui.app.eventos;
 
+import com.tranqui.eventos.consumo.InboxHelper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tranqui.eventos.EventEnvelope;
