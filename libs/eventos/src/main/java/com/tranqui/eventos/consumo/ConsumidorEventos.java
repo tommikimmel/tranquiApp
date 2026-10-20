@@ -88,8 +88,25 @@ public class ConsumidorEventos implements ChannelAwareMessageListener {
             if (manejadores.isEmpty()) {
                 log.debug("Evento {} sin handlers en '{}', se confirma sin procesar", topico, servicio);
             }
+            // Corren todos los handlers aunque uno falle: un mail caído no demora los demás avisos.
+            // Si alguno falló, el evento se reintenta y el inbox saltea los que ya terminaron.
+            RuntimeException fallaReintentable = null;
+            EventoInvalidoException fallaInvalida = null;
             for (ManejadorEvento<?> manejador : manejadores) {
-                procesar(manejador, raiz);
+                try {
+                    procesar(manejador, raiz);
+                } catch (EventoInvalidoException e) {
+                    fallaInvalida = e;
+                } catch (RuntimeException e) {
+                    log.warn("Falló el handler '{}' con el evento {}: {}", manejador.consumidor(), topico, e.toString());
+                    fallaReintentable = e;
+                }
+            }
+            if (fallaReintentable != null) {
+                throw fallaReintentable;
+            }
+            if (fallaInvalida != null) {
+                throw fallaInvalida;
             }
             canal.basicAck(tag, false);
             contar(topico, "ok");

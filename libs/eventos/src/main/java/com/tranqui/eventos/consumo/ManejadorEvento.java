@@ -41,4 +41,30 @@ public interface ManejadorEvento<T> {
     default boolean descartarVersionesViejas() {
         return false;
     }
+
+    /** Handler de un solo tópico a partir de una lambda, para declararlo como {@code @Bean}. */
+    static <T> ManejadorEvento<T> de(String consumidor, String topico, Class<T> tipoData,
+                                     java.util.function.Consumer<EventEnvelope<T>> accion) {
+        return new Simple<>(consumidor, Set.of(topico), tipoData, accion, false);
+    }
+
+    /** Como {@link #de}, pero descartando eventos con versión vieja (copias locales, sección 6.4). */
+    static <T> ManejadorEvento<T> conVersion(String consumidor, String topico, Class<T> tipoData,
+                                             java.util.function.Consumer<EventEnvelope<T>> accion) {
+        return new Simple<>(consumidor, Set.of(topico), tipoData, accion, true);
+    }
+
+    record Simple<T>(String consumidor, Set<String> topicos, Class<T> tipoData,
+                     java.util.function.Consumer<EventEnvelope<T>> accion, boolean porVersion)
+            implements ManejadorEvento<T> {
+        @Override
+        public void manejar(EventEnvelope<T> evento) {
+            accion.accept(evento);
+        }
+
+        @Override
+        public boolean descartarVersionesViejas() {
+            return porVersion;
+        }
+    }
 }

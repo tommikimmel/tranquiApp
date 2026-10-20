@@ -26,6 +26,7 @@
 		<module>libs/eventos</module>
 		<module>backend</module>
 		<module>gateway</module>
+		<module>services/notificaciones</module>
 	</modules>
 
 	<dependencyManagement>
@@ -57,6 +58,11 @@
 			<dependency>
 				<groupId>com.tranqui</groupId>
 				<artifactId>eventos</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.tranqui</groupId>
+				<artifactId>notificaciones</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>

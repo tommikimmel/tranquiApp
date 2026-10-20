@@ -152,3 +152,15 @@ Desvíos respecto de la spec, encontrados al cablear cada punto del monolito:
 - **Eventos que antes no se publicaban:** el cambio de la preferencia de mails y los cambios de rol
   desde el panel ahora publican `identidad.usuario.actualizado.v1`, porque la copia de contactos de
   notificaciones los necesita.
+
+### N3 — servicio de notificaciones
+- Módulo `services/notificaciones`. Un handler (consumidor) por cada mail o aviso: si uno falla, el
+  reintento no repite los que ya salieron (el inbox los reconoce por consumidor).
+- **Mejora en `libs/eventos` encontrada al probar:** el consumidor corría los handlers de un evento
+  en secuencia y cortaba en el primero que fallaba, así que un mail caído demoraba 10 s los demás
+  avisos. Ahora corre todos y recién después decide si reintenta.
+- **Avisos en vivo que siguen en el monolito:** "nuevo mensaje" del chat y la aprobación de un pago
+  de concepto no se guardan como notificación; solo se empujan por `/ws-tranqui`. El frontend
+  mantiene esa suscripción y suma `/ws-notificaciones` (N5).
+- El listado `GET /api/notificaciones` conserva los roles de hoy (paciente y profesional): los
+  administradores reciben sus avisos de tickets solo en vivo, como en el monolito.
