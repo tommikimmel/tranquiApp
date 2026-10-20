@@ -71,6 +71,25 @@ class InternoMonolitoControllerTest {
                 .doesNotContain("password");
     }
 
+    @Autowired private com.tranqui.app.repository.NotificacionRepository notificacionRepository;
+
+    @Test
+    void notificacionesVigentes_soloLasDeLasUltimas24Horas() {
+        Usuario u = usuarioRepository.save(Usuario.builder().nombre("Lía")
+                .email("vig." + System.nanoTime() + "@mail.com").rol(Rol.PACIENTE).build());
+        String marca = "vigente-" + System.nanoTime();
+        notificacionRepository.save(com.tranqui.app.model.Notificacion.builder().usuario(u).titulo(marca)
+                .mensaje("m").tipo("TURNO_CONFIRMADO").leido(true).fechaCreacion(java.time.LocalDateTime.now().minusHours(2)).build());
+        notificacionRepository.save(com.tranqui.app.model.Notificacion.builder().usuario(u).titulo("vieja-" + marca)
+                .mensaje("m").tipo("TURNO_CONFIRMADO").fechaCreacion(java.time.LocalDateTime.now().minusHours(30)).build());
+
+        ResponseEntity<String> respuesta = get("/internal/monolito/notificaciones-vigentes", tokenServicio());
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(respuesta.getBody()).contains("\"titulo\":\"" + marca + "\"").contains("\"usuarioId\":" + u.getId())
+                .contains("\"leido\":true").doesNotContain("vieja-" + marca);
+    }
+
     @Test
     void enlacesDeAsistencia_soloSiElTurnoTieneToken() {
         Usuario paciente = usuarioRepository.save(Usuario.builder().nombre("Lía")

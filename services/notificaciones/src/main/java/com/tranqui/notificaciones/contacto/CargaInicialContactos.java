@@ -1,6 +1,8 @@
 package com.tranqui.notificaciones.contacto;
 
 import com.tranqui.notificaciones.interno.ClienteInterno;
+import com.tranqui.notificaciones.notificacion.Notificacion;
+import com.tranqui.notificaciones.notificacion.NotificacionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,12 +26,15 @@ public class CargaInicialContactos {
 
     private final ContactoService contactos;
     private final ClienteInterno interno;
+    private final NotificacionRepository notificaciones;
     private final boolean habilitada;
 
     public CargaInicialContactos(ContactoService contactos, ClienteInterno interno,
+                                 NotificacionRepository notificaciones,
                                  @Value("${notificaciones.carga-inicial.habilitada:true}") boolean habilitada) {
         this.contactos = contactos;
         this.interno = interno;
+        this.notificaciones = notificaciones;
         this.habilitada = habilitada;
     }
 
@@ -45,13 +50,18 @@ public class CargaInicialContactos {
 
     void cargarConReintentos() {
         long esperaMs = 2_000;
+        Boolean primerArranque = null;
         while (!Thread.currentThread().isInterrupted()) {
             try {
-                if (contactos.cantidad() > 0) {
+                if (primerArranque == null) {
+                    primerArranque = contactos.cantidad() == 0;
+                }
+                if (!primerArranque) {
                     return;
                 }
-                int total = cargar();
-                log.info("Carga inicial de contactos terminada: {} usuarios", total);
+                int total = contactos.cantidad() == 0 ? cargar() : 0;
+                int vigentes = notificaciones.count() == 0 ? copiarNotificacionesVigentes() : 0;
+                log.info("Carga inicial terminada: {} contactos y {} notificaciones vigentes", total, vigentes);
                 return;
             } catch (RuntimeException e) {
                 log.warn("Carga inicial de contactos fallida; se reintenta en {} ms: {}", esperaMs, e.getMessage());
@@ -64,6 +74,20 @@ public class CargaInicialContactos {
                 esperaMs = Math.min(esperaMs * 2, 60_000);
             }
         }
+    }
+
+    /**
+     * Notificaciones de las últimas 24 horas del monolito, para que la campanita no quede vacía al
+     * pasar al servicio. Solo en el primer arranque (copia de contactos vacía): después las crea el
+     * servicio y las del monolito se borran solas a las 24 horas.
+     */
+    int copiarNotificacionesVigentes() {
+        List<ClienteInterno.NotificacionInterna> vigentes = interno.notificacionesVigentes();
+        for (ClienteInterno.NotificacionInterna n : vigentes) {
+            notificaciones.save(Notificacion.copia(n.usuarioId(), n.titulo(), n.mensaje(), n.leido(), n.tipo(),
+                    n.fechaCreacion()));
+        }
+        return vigentes.size();
     }
 
     /** Copia todas las páginas. Es idempotente: un usuario que ya estaba se actualiza. */

@@ -180,3 +180,12 @@ Desvíos respecto de la spec, encontrados al cablear cada punto del monolito:
   derivando al monolito y el compose la pone en `lb://notificaciones`. Vuelta atrás: sacar la variable.
 - El frontend se conecta a los dos endpoints con el mismo canal, porque los avisos de chat y de
   pagos de concepto siguen saliendo del monolito por `/ws-tranqui` (ver N3).
+
+### N6 — infraestructura local y datos
+- **Bases por servicio:** en vez de un script de inicialización de PostgreSQL (que solo corre con
+  un volumen nuevo), un contenedor de una sola ejecución `db-servicios`, idempotente, que corre en
+  cada arranque. Así funciona con el volumen de producción que ya existe.
+- **Copia de datos:** la carga inicial del servicio copia los contactos y las notificaciones de las
+  últimas 24 h por la ruta interna; no hace falta correr un script a mano. La comparación de
+  cantidades es `scripts/fase1-comparar-notificaciones.mjs` (solo lee).
+- `docker-compose.yml` queda preparado; no se desplegó nada.

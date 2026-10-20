@@ -16,6 +16,13 @@ scrape_configs:
         labels:
           servicio: 'backend'
 
+  - job_name: 'notificaciones'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['notificaciones:8082']
+        labels:
+          servicio: 'notificaciones'
+
   - job_name: 'rabbitmq'
     metrics_path: '/metrics'
     static_configs:

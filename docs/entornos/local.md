@@ -47,6 +47,12 @@ terminal interactiva, aborta y lista los puertos ocupados.
 A partir de la Fase 0 ([Plan de migración a microservicios](../arquitectura/microservicios.md)), el
 entorno local incluye la infraestructura de soporte para la arquitectura distribuida:
 
+- **Servicio de notificaciones (`notificaciones`, Fase 1):** manda los mails (a Mailpit) y crea las
+  notificaciones de la campanita a partir de eventos. Sin puerto publicado: se llega por el gateway
+  (`/api/notificaciones`, `/ws-notificaciones`). Su base `notificaciones` la crea el contenedor
+  `db-servicios` al levantar el entorno. Para comparar con el monolito:
+  `node scripts/fase1-comparar-notificaciones.mjs`. Para volver al envío desde el monolito, poner
+  `NOTIFICACIONES_ENVIO_DIRECTO: "true"` en el backend y sacar `TRANQUI_SERVICES_NOTIFICACIONES_URI` del gateway.
 - **RabbitMQ (`rabbitmq:3.13-management-alpine`):** broker de eventos asincrónicos por *push*.
   Configurado en `infra/rabbitmq/rabbitmq.conf` con `vm_memory_high_watermark.relative = 0.6`
   (límite de 256 MB de RAM), plugins `rabbitmq_management` y `rabbitmq_prometheus` habilitados,

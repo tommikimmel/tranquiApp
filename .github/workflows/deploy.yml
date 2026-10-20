@@ -48,6 +48,9 @@ jobs:
           - servicio: gateway
             context: .
             file: ./gateway/Dockerfile
+          - servicio: notificaciones
+            context: .
+            file: ./services/notificaciones/Dockerfile
           - servicio: backend
             context: .
             file: ./backend/Dockerfile

@@ -27,6 +27,10 @@ public class ClienteInterno {
     /** Enlaces de un solo uso del mail de confirmación de asistencia. */
     public record EnlacesAsistencia(String confirmarUrl, String noAsistiraUrl) {}
 
+    /** Una notificación vigente del monolito, para la carga inicial. */
+    public record NotificacionInterna(Long usuarioId, String titulo, String mensaje, boolean leido, String tipo,
+                                      java.time.LocalDateTime fechaCreacion) {}
+
     private final RestClient http;
     private final ServiceJwt serviceJwt;
 
@@ -45,6 +49,18 @@ public class ClienteInterno {
     public List<ContactoInterno> contactos(int pagina, int tamanio) {
         List<ContactoInterno> respuesta = http.get()
                 .uri("/internal/monolito/contactos?pagina={p}&tamanio={t}", pagina, tamanio)
+                .headers(h -> {
+                    h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
+                    h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
+                })
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {});
+        return respuesta != null ? respuesta : List.of();
+    }
+
+    public List<NotificacionInterna> notificacionesVigentes() {
+        List<NotificacionInterna> respuesta = http.get()
+                .uri("/internal/monolito/notificaciones-vigentes")
                 .headers(h -> {
                     h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
                     h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
