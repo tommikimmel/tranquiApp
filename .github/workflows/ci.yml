@@ -16,12 +16,9 @@ permissions:
 
 jobs:
   backend:
-    name: Backend (tests)
+    name: Backend y librerías (tests)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -74,3 +71,55 @@ jobs:
         working-directory: frontend
       - name: Lint de los archivos modificados
         run: node scripts/ci/lint-cambios.mjs "origin/${{ github.base_ref }}"
+
+  imagen-gateway:
+    name: Imagen Gateway (build sin push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen del gateway
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./gateway/Dockerfile
+          push: false
+          cache-from: type=gha,scope=gateway
+          cache-to: type=gha,mode=max,scope=gateway
+
+  imagen-notificaciones:
+    name: Imagen Notificaciones (build sin push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen del servicio de notificaciones
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/notificaciones/Dockerfile
+          push: false
+          cache-from: type=gha,scope=notificaciones
+          cache-to: type=gha,mode=max,scope=notificaciones
+
+  imagen-chat:
+    name: Imagen Chat (build sin push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen del servicio de chat
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/chat/Dockerfile
+          push: false
+          cache-from: type=gha,scope=chat
+          cache-to: type=gha,mode=max,scope=chat
+
