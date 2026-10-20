@@ -298,12 +298,15 @@ CREATE INDEX outbox_pendientes ON outbox (id) WHERE published_at IS NULL;
   falla, no hay evento; si se confirma, el evento existe sí o sí.
 - **Relay** (dentro de cada servicio):
   - Un trigger hace `pg_notify('outbox', …)` al insertar. El relay escucha (`LISTEN`) y publica
-    **al instante**, sin esperar.
+    **al instante**, sin esperar. La escucha se realiza con una conexión JDBC dedicada fuera del
+    pool de Hikari (vía PGSimpleDataSource/DriverManager), evitando agotar o retener conexiones del pool.
   - Como respaldo (por ejemplo, si el relay se reconectó y perdió un aviso), barre los pendientes
     cada 30 segundos.
   - Publica en orden de `id`, en lotes de hasta 100, con *publisher confirms*. Marca `published_at`
-    solo con la confirmación del broker. Si falla, suma `attempts`, guarda el error y reintenta con
-    espera creciente.
+    solo con la confirmación del broker. Si un mensaje no tiene cola enlazada (`getReturned()` no nulo
+    ante `mandatory=true`), se marca como publicado igualmente para no bloquear la outbox, se emite un
+    WARN y se incrementa el contador Micrometer `outbox.eventos.sin_ruta` con tag `topico`. Si falla la
+    confirmación o el broker cae, suma `attempts`, guarda el error y reintenta con espera creciente.
   - Las filas publicadas se borran a los 7 días.
 - **Garantía resultante:** entrega *al menos una vez* (un evento puede llegar dos veces, nunca
   cero). Lo duplicado lo resuelve la idempotencia del consumidor.
