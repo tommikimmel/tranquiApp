@@ -24,8 +24,8 @@ services:
     # build: queda para el deploy manual de emergencia (node deploy.js --compilar).
     image: ghcr.io/tommikimmel/tranqui-backend:${TRANQUI_VERSION:-latest}
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: tranqui-backend
     restart: always
     ports:

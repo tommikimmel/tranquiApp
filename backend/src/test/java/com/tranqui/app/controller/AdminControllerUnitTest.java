@@ -26,6 +26,7 @@ class AdminControllerUnitTest {
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private com.tranqui.app.repository.SubscriptionRepository subscriptionRepository;
     @Mock private com.tranqui.app.service.SubscriptionService subscriptionService;
+    @Mock private com.tranqui.app.eventos.OutboxPublisher outboxPublisher;
 
     @InjectMocks
     private AdminController controller;
