@@ -93,9 +93,10 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
+			<!-- Outbox (paquete outbox): LISTEN de PostgreSQL. Opcional, como el resto de lo de Spring. -->
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
-			<scope>test</scope>
+			<optional>true</optional>
 		</dependency>
 		<dependency>
 			<groupId>org.testcontainers</groupId>
