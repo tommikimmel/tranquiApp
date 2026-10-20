@@ -46,3 +46,7 @@ jwt:
 eventos:
   relay:
     enabled: true
+
+tranqui:
+  jwt:
+    service-secret: ${SERVICE_JWT_KEY:local-service-jwt-secret-key-32chars}

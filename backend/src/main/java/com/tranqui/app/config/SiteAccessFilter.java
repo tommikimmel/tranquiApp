@@ -38,6 +38,8 @@ public class SiteAccessFilter extends OncePerRequestFilter {
             "/api/site-access/",
             "/api/health",
             "/actuator/",
+            // Rutas internas entre servicios (las protege FiltroServicioInterno).
+            "/internal/",
             "/api/payments/webhook",
             "/api/medicos/google-calendar/webhook",
             "/error"
