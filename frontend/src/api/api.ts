@@ -9,6 +9,12 @@ export function getBackendOrigin(): string {
     : `http://${window.location.hostname}:8080`;
 }
 
+// Avisos en vivo (/topic/notificaciones/{id}). Desde la Fase 1 de microservicios llegan por dos
+// endpoints: las notificaciones guardadas (turnos, tickets, documentos) por /ws-notificaciones,
+// del servicio de notificaciones, y los avisos de "nuevo mensaje" del chat y de pagos de concepto
+// por /ws-tranqui, que sigue siendo del monolito (y en la Fase 2, del servicio de chat).
+export const ENDPOINTS_AVISOS_EN_VIVO = ['/ws-tranqui', '/ws-notificaciones'] as const;
+
 const API_BASE = `${getBackendOrigin()}/api`;
 
 export function sanitizeErrorMessage(errorText: string, status: number): string {

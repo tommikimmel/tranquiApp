@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react'
 import { Icon } from './Icon'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import '../styles/landing.css'
-import { api, getBackendOrigin } from '../api/api'
+import { api, getBackendOrigin, ENDPOINTS_AVISOS_EN_VIVO } from '../api/api'
 import { useChat } from '../hooks/useChat'
 import { useAlert } from '../context/AlertContext'
 import { Client } from '@stomp/stompjs'
@@ -895,12 +895,13 @@ export default function LandingPage({
   useEffect(() => {
     if (!currentUser || currentUser.rol !== 'PACIENTE') return
 
-    let client: Client | null = null;
-    
-    if (currentUser.id) {
-      const socketUrl = `${getBackendOrigin()}/ws-tranqui`;
+    const clients: Client[] = [];
+
+    // Mismo canal en los dos endpoints: ver ENDPOINTS_AVISOS_EN_VIVO.
+    if (currentUser.id) for (const endpoint of ENDPOINTS_AVISOS_EN_VIVO) {
+      const socketUrl = `${getBackendOrigin()}${endpoint}`;
       const socket = new SockJS(socketUrl, null, { withCredentials: true } as any)
-      client = new Client({
+      const client: Client = new Client({
         webSocketFactory: () => socket,
         reconnectDelay: 5000,
         onConnect: () => {
@@ -929,10 +930,11 @@ export default function LandingPage({
         }
       })
       client.activate()
+      clients.push(client)
     }
 
     return () => {
-      client?.deactivate()
+      clients.forEach((c) => c.deactivate())
     }
     // Deliberately keyed on the stable id/rol pair, not the whole `currentUser` object (a new
     // reference on every parent re-render) or the unrelated `loading` state (the médicos list
