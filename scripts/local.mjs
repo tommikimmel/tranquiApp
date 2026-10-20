@@ -25,6 +25,10 @@ const PORTS = [
   { port: 5173, what: 'frontend' },
   { port: 8025, what: 'Mailpit (bandeja web)' },
   { port: 1025, what: 'Mailpit (SMTP)' },
+  { port: 5672, what: 'RabbitMQ (AMQP)' },
+  { port: 15672, what: 'RabbitMQ (panel web)' },
+  { port: 8500, what: 'Consul (UI y catálogo)' },
+  { port: 6379, what: 'Redis' },
 ]
 
 const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { stdio: 'inherit', cwd: ROOT, ...opts })
@@ -137,6 +141,9 @@ Entorno local levantándose (la primera vez tarda unos minutos: compila el backe
   Backend:   http://localhost:8081
   Mails:     http://localhost:8025
   Base:      localhost:5433 (tranqui / tranqui-local)
+  RabbitMQ:  http://localhost:15672 (tranqui / tranqui-local)
+  Consul:    http://localhost:8500
+  Redis:     localhost:6379
 
 Cuentas de demo: ver docs/entornos/local.md (contraseña de todas: admin123).
 Logs del backend: npm run local:logs

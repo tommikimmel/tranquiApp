@@ -30,10 +30,58 @@ services:
       - "127.0.0.1:8025:8025"   # bandeja web
       - "127.0.0.1:1025:1025"   # SMTP
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: tranqui
+      RABBITMQ_DEFAULT_PASS: tranqui-local
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "127.0.0.1:15672:15672"   # UI de administración
+      - "127.0.0.1:5672:5672"     # AMQP
+    volumes:
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    mem_limit: 256m
+
+  consul:
+    image: hashicorp/consul:1.19
+    command: ["agent", "-dev", "-client=0.0.0.0", "-config-dir=/consul/config"]
+    ports:
+      - "127.0.0.1:8500:8500"     # UI y API de catálogo
+    volumes:
+      - ./infra/consul:/consul/config
+    healthcheck:
+      test: ["CMD", "consul", "info"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    mem_limit: 64m
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    mem_limit: 64m
+
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       SPRING_PROFILES_ACTIVE: local
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/tranqui_local
