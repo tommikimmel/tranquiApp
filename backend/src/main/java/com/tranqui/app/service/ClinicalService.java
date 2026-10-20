@@ -47,7 +47,7 @@ public class ClinicalService {
     private OutboxPublisher outboxPublisher;
 
     @Autowired
-    private MensajeRepository mensajeRepository;
+    private ResumenChatCliente resumenChatCliente;
 
     // Aviso para notificaciones de que se cargó algo en la historia clínica. Sección 5.3: el evento
     // dice qué se cargó y quién, nunca el contenido. Cada asiento es su propio agregado (versión 1).
@@ -87,7 +87,10 @@ public class ClinicalService {
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
         List<Usuario> pacientesConTurno = turnoRepository.findDistinctPacientesByMedicoId(medico.getId());
-        List<Usuario> pacientesConChat = mensajeRepository.findPacientesConMensajesConMedico(medico.getId());
+        // Fase 2: el chat vive en su propio servicio; el resumen llega por la ruta interna (o vacío si está caído).
+        ResumenChat resumenChat = resumenChatCliente.resumen(medico.getId());
+        List<Usuario> pacientesConChat = usuarioRepository.findAllById(resumenChat.pacientesConChat()).stream()
+                .filter(u -> u.getRol() == Rol.PACIENTE).toList();
 
         java.util.Map<Long, Usuario> pacientesMap = new java.util.LinkedHashMap<>();
         for (Usuario p : pacientesConTurno) {
@@ -110,10 +113,7 @@ public class ClinicalService {
         java.util.Map<Long, List<Turno>> turnosPorPaciente = todosLosTurnosDelMedico.stream()
                 .collect(Collectors.groupingBy(t -> t.getPaciente().getId()));
 
-        java.util.Map<Long, Integer> mensajesSinLeerPorPaciente = mensajeRepository.countUnreadMessagesGroupedByRemitente(medico.getId()).stream()
-                .collect(Collectors.toMap(
-                        com.tranqui.app.repository.MensajeRepository.UnreadCountPorRemitente::getRemitenteId,
-                        com.tranqui.app.repository.MensajeRepository.UnreadCountPorRemitente::getCantidad));
+        java.util.Map<Long, Integer> mensajesSinLeerPorPaciente = resumenChat.noLeidosPorPaciente();
 
         List<PacienteDto> dtos = new ArrayList<>();
         for (Usuario p : todosLosPacientes) {
@@ -464,7 +464,7 @@ public class ClinicalService {
         }
         
         Usuario saved = usuarioRepository.save(paciente);
-        int unreadMessagesCount = mensajeRepository.countUnreadMessages(saved.getId(), medico.getId());
+        int unreadMessagesCount = resumenChatCliente.resumen(medico.getId()).noLeidosPorPaciente().getOrDefault(saved.getId(), 0);
 
         return construirPacienteDto(saved, "Hoy", false, false, unreadMessagesCount);
     }

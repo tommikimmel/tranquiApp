@@ -39,6 +39,14 @@ class ClinicalServiceTest {
     @InjectMocks
     private ClinicalService clinicalService;
 
+    // Sin URL de gateway el resumen de chat se calcula con las tablas propias: los stubs de
+    // mensajeRepository de cada test siguen aplicando (Fase 2).
+    @org.junit.jupiter.api.BeforeEach
+    void resumenDeChatLocal() {
+        org.springframework.test.util.ReflectionTestUtils.setField(clinicalService, "resumenChatCliente",
+                new ResumenChatCliente(mensajeRepository, "", ""));
+    }
+
     private Usuario medico(String email) {
         return Usuario.builder().id(1L).nombre("Dra. Paula").email(email).rol(Rol.PSIQUIATRA).build();
     }
@@ -68,6 +76,9 @@ class ClinicalServiceTest {
                 .thenReturn(List.of(pacienteConTurnoUrgente));
         // Beto only has chat history, no appointment at all
         when(mensajeRepository.findPacientesConMensajesConMedico(1L))
+                .thenReturn(List.of(pacienteConTurnoUrgente, pacienteSinTurno));
+        // Fase 2: los pacientes del resumen de chat se buscan por id.
+        when(usuarioRepository.findAllById(List.of(10L, 20L)))
                 .thenReturn(List.of(pacienteConTurnoUrgente, pacienteSinTurno));
 
         LocalDate hoy = LocalDate.now();
