@@ -23,6 +23,13 @@ scrape_configs:
         labels:
           servicio: 'notificaciones'
 
+  - job_name: 'chat'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['chat:8082']
+        labels:
+          servicio: 'chat'
+
   - job_name: 'rabbitmq'
     metrics_path: '/metrics'
     static_configs:

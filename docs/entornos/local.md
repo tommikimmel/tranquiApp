@@ -47,6 +47,10 @@ terminal interactiva, aborta y lista los puertos ocupados.
 A partir de la Fase 0 ([Plan de migración a microservicios](../arquitectura/microservicios.md)), el
 entorno local incluye la infraestructura de soporte para la arquitectura distribuida:
 
+- **Servicio de chat (`chat`, Fase 2):** el chat en vivo (`/ws-tranqui`) y su historial, por el gateway.
+  Su base `chat` la crea `db-servicios`; en el primer arranque copia los mensajes del monolito. Para
+  volver el chat al monolito: sacar `TRANQUI_SERVICES_CHAT_URI` del gateway, frenar `chat` y correr
+  `node scripts/fase2-devolver-mensajes.mjs` (devuelve los mensajes escritos en el servicio).
 - **Servicio de notificaciones (`notificaciones`, Fase 1):** manda los mails (a Mailpit) y crea las
   notificaciones de la campanita a partir de eventos. Sin puerto publicado: se llega por el gateway
   (`/api/notificaciones`, `/ws-notificaciones`). Su base `notificaciones` la crea el contenedor

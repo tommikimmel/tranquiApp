@@ -143,6 +143,7 @@ async function main() {
         `docker build -f /srv/tranqui/codigo/backend/Dockerfile -t ghcr.io/tommikimmel/tranqui-backend:${etiqueta} /srv/tranqui/codigo`,
         `docker build -f /srv/tranqui/codigo/gateway/Dockerfile -t ghcr.io/tommikimmel/tranqui-gateway:${etiqueta} /srv/tranqui/codigo`,
         `docker build -f /srv/tranqui/codigo/services/notificaciones/Dockerfile -t ghcr.io/tommikimmel/tranqui-notificaciones:${etiqueta} /srv/tranqui/codigo`,
+        `docker build -f /srv/tranqui/codigo/services/chat/Dockerfile -t ghcr.io/tommikimmel/tranqui-chat:${etiqueta} /srv/tranqui/codigo`,
         `docker build -t ghcr.io/tommikimmel/tranqui-frontend:${etiqueta} /srv/tranqui/codigo/frontend`,
         'cp -r /srv/tranqui/codigo/infra /srv/tranqui/',
         // deploy-remoto.sh hace pull: con imágenes locales que no existen en GHCR el pull falla,

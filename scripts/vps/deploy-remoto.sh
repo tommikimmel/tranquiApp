@@ -29,7 +29,7 @@ ANTERIOR="$(cat "$DIR/version-actual" 2>/dev/null || true)"
 echo "=== Deploy $VERSION (versión anterior: ${ANTERIOR:-ninguna registrada}) ==="
 
 levantar() {
-  TRANQUI_VERSION="$1" "${COMPOSE[@]}" pull tranqui-backend tranqui-frontend gateway notificaciones
+  TRANQUI_VERSION="$1" "${COMPOSE[@]}" pull tranqui-backend tranqui-frontend gateway notificaciones chat
   TRANQUI_VERSION="$1" "${COMPOSE[@]}" up -d --remove-orphans
 }
 

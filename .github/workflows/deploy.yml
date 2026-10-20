@@ -51,6 +51,9 @@ jobs:
           - servicio: notificaciones
             context: .
             file: ./services/notificaciones/Dockerfile
+          - servicio: chat
+            context: .
+            file: ./services/chat/Dockerfile
           - servicio: backend
             context: .
             file: ./backend/Dockerfile
