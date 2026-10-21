@@ -117,7 +117,7 @@ Toda llamada sincrónica de un servicio a otro pasa por el gateway, con este esq
 
 - **Ruta interna:** `http://gateway:8080/internal/<servicio>/...` (ejemplo:
   `/internal/profesionales/medicos/7/resumen`). El gateway la reescribe y la deriva al servicio.
-- **Nunca expuesta afuera:** Traefik solo enruta `/api/**` y `/ws-tranqui/**` al gateway. Además, el
+- **Nunca expuesta afuera:** Traefik solo enruta `/api/**`, `/ws-tranqui/**` y `/ws-notificaciones/**` al gateway. Además, el
   gateway rechaza con 404 cualquier `/internal/**` que llegue con encabezados de Traefik
   (`X-Forwarded-*`).
 - **Autenticación de servicio:** cada servicio firma un JWT corto (5 minutos) con su nombre como

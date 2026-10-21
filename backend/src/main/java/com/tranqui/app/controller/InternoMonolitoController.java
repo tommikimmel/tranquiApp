@@ -37,22 +37,27 @@ public class InternoMonolitoController {
     public record NotificacionDto(Long usuarioId, String titulo, String mensaje, boolean leido, String tipo,
                                   LocalDateTime fechaCreacion) {}
 
+    public record AccesoDto(boolean permitido) {}
+
     private static final int TAMANIO_MAXIMO = 1000;
 
     private final UsuarioRepository usuarioRepository;
     private final TurnoRepository turnoRepository;
     private final NotificacionRepository notificacionRepository;
     private final com.tranqui.app.repository.MensajeRepository mensajeRepository;
+    private final com.tranqui.app.service.SubscriptionService subscriptionService;
     private final String publicUrl;
 
     public InternoMonolitoController(UsuarioRepository usuarioRepository, TurnoRepository turnoRepository,
                                      NotificacionRepository notificacionRepository,
                                      com.tranqui.app.repository.MensajeRepository mensajeRepository,
+                                     com.tranqui.app.service.SubscriptionService subscriptionService,
                                      @Value("${app.public-url:http://localhost:8081}") String publicUrl) {
         this.usuarioRepository = usuarioRepository;
         this.turnoRepository = turnoRepository;
         this.notificacionRepository = notificacionRepository;
         this.mensajeRepository = mensajeRepository;
+        this.subscriptionService = subscriptionService;
         this.publicUrl = publicUrl;
     }
 
@@ -135,5 +140,17 @@ public class InternoMonolitoController {
     private static ContactoDto contacto(Usuario u) {
         return new ContactoDto(u.getId(), u.getEmail(), u.getNombre(), u.getApellido(),
                 u.getRol() != null ? u.getRol().name() : null, u.isNotificacionesEmailHabilitadas());
+    }
+
+    /**
+     * Paywall de los servicios (Fase 3, G1): el gateway pregunta si un profesional tiene acceso. El JWT
+     * de usuario trae el mail como subject, no el id. Un usuario que no existe no se bloquea acá: lo
+     * resuelve la autenticación del servicio.
+     */
+    @GetMapping("/suscripciones/acceso")
+    public AccesoDto accesoSuscripcion(@RequestParam(name = "email") String email) {
+        return usuarioRepository.findByEmail(email)
+                .map(u -> new AccesoDto(subscriptionService.isAccessAllowed(u.getId())))
+                .orElse(new AccesoDto(true));
     }
 }
