@@ -209,6 +209,7 @@ public class MercadoPagoOAuthService {
         medico.setMpRefreshTokenEncrypted(null);
         medico.setMpTokenExpiresAt(null);
         medico.setMpUserId(null);
+        medico.setMpVinculada(false);
         medico = usuarioRepository.saveAndFlush(medico);
 
         outboxPublisher.publicar(

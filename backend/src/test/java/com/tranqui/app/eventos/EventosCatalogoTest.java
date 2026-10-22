@@ -40,7 +40,10 @@ class EventosCatalogoTest {
             Map.entry(Topicos.PAGOS_REEMBOLSO_REALIZADO_V1, List.of("ReembolsoService#procesarReembolso")),
             Map.entry(Topicos.PAGOS_CUENTA_MP_VINCULADA_V1, List.of("MercadoPagoOAuthService#procesarCallback", "MercadoPagoOAuthService#simularConexionDev")),
             Map.entry(Topicos.PAGOS_CUENTA_MP_DESVINCULADA_V1, List.of("MercadoPagoOAuthService#desvincular")),
-            Map.entry(Topicos.PAGOS_CONCEPTO_APROBADO_V1, List.of("PagoWebhookHandler#procesarAprobacionConcepto")),
+            Map.entry(Topicos.PAGOS_CONCEPTO_APROBADO_V1, List.of("PagoWebhookHandler#procesarAprobacionConcepto", "servicio de pagos")),
+            Map.entry(Topicos.PAGOS_CHECKOUT_CREADO_V1, List.of("servicio de pagos (Fase 4)")),
+            Map.entry(Topicos.PAGOS_REEMBOLSO_FALLIDO_V1, List.of("servicio de pagos (Fase 4)")),
+            Map.entry(Topicos.PROFESIONALES_CONCEPTO_SOLICITADO_V1, List.of("ConceptoService#crearSolicitud")),
             Map.entry(Topicos.SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1, List.of("SubscriptionService#logEvent")),
             Map.entry(Topicos.SUSCRIPCIONES_AVISO_PROGRAMADO_V1, List.of("SubscriptionService#registerManualPayment", "SubscriptionService#activarPagoSuscripcion", "SubscriptionService#processMercadoPagoPreapprovalWebhook", "SubscriptionService#cancelarSuscripcionPorProfesional", "SubscriptionReconciliationScheduler", "AdminSubscriptionController#updateSubscriptionStatus")),
             Map.entry(Topicos.CALENDARIO_MEET_CREADO_V1, List.of("PagoWebhookHandler#procesarAprobacionTurno", "TurnoService#confirmarTurnoOsde", "GoogleCalendarSyncService#exportarTurnosPendientesAGoogleCalendar")),
@@ -53,7 +56,7 @@ class EventosCatalogoTest {
     void todosLosTopicosTienenProductorAsignado() {
         List<String> todosLosTopicos = Topicos.TODOS_LOS_TOPICOS;
         assertThat(todosLosTopicos).isNotEmpty();
-        assertThat(todosLosTopicos).hasSize(32);
+        assertThat(todosLosTopicos).hasSize(35);
 
         for (String topico : todosLosTopicos) {
             assertThat(Topicos.esValido(topico))

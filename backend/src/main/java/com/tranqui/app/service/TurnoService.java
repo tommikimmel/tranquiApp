@@ -79,6 +79,13 @@ public class TurnoService {
     @Value("${payment.simulation.enabled:false}")
     private boolean paymentSimulationEnabled;
 
+    // Fase 4: con true el checkout y el reembolso los hace el servicio de pagos, por eventos.
+    @Value("${pagos.externo:false}")
+    private boolean pagosExterno;
+
+    @Value("${mercadopago.enabled:false}")
+    private boolean mercadoPagoEnabled;
+
     // Used to build the unauthenticated confirmar-asistencia / no-asistira links sent in the
     // "confirmá tu turno" email � those are backend endpoints (TurnoController), not frontend
     // routes, so this needs the backend's own public URL, not app.frontend-url.
@@ -441,26 +448,35 @@ public class TurnoService {
 
         turno = turnoRepository.save(turno);
         String checkoutUrl = "";
-        try {
-            checkoutUrl = mercadoPagoService.crearPreferenciaPago(turno, medico);
-            turno.setCheckoutUrl(checkoutUrl);
-            turno = turnoRepository.save(turno);
-        } catch (IllegalStateException e) {
-            if (paymentSimulationEnabled) {
-                // Real Mercado Pago checkout isn't reachable (professional not linked, or the
-                // integration itself is broken) but simulation mode is explicitly on, so fall
-                // back to the same mock preference URL the frontend already knows how to render
-                // as a "Simular Pago" dialog instead of blocking the booking outright.
-                checkoutUrl = "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-preference-id";
+        if (pagosExterno) {
+            // Fase 4: la preferencia la crea el servicio de pagos a partir de turnos.turno.reservado y
+            // llega por pagos.checkout.creado; el frontend la pide a GET /api/payments/checkout/{id}.
+            // Sin la cuenta vinculada se corta acá, con el mismo 409 de siempre.
+            if (mercadoPagoEnabled && !paymentSimulationEnabled && !medico.tieneMercadoPagoVinculado()) {
+                throw new IllegalStateException("El profesional todavía no vinculó su cuenta de Mercado Pago.");
+            }
+        } else {
+            try {
+                checkoutUrl = mercadoPagoService.crearPreferenciaPago(turno, medico);
                 turno.setCheckoutUrl(checkoutUrl);
                 turno = turnoRepository.save(turno);
-            } else {
-                // Preserve the type so GlobalExceptionHandler maps it to a clean 409 with this
-                // exact message, instead of it getting wrapped below into an opaque 500.
-                throw e;
+            } catch (IllegalStateException e) {
+                if (paymentSimulationEnabled) {
+                    // Real Mercado Pago checkout isn't reachable (professional not linked, or the
+                    // integration itself is broken) but simulation mode is explicitly on, so fall
+                    // back to the same mock preference URL the frontend already knows how to render
+                    // as a "Simular Pago" dialog instead of blocking the booking outright.
+                    checkoutUrl = "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-preference-id";
+                    turno.setCheckoutUrl(checkoutUrl);
+                    turno = turnoRepository.save(turno);
+                } else {
+                    // Preserve the type so GlobalExceptionHandler maps it to a clean 409 with this
+                    // exact message, instead of it getting wrapped below into an opaque 500.
+                    throw e;
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Error al conectar con la pasarela de Mercado Pago: " + e.getMessage(), e);
             }
-        } catch (Exception e) {
-            throw new RuntimeException("Error al conectar con la pasarela de Mercado Pago: " + e.getMessage(), e);
         }
 
         OffsetDateTime expiracion = OffsetDateTime.now().plusMinutes(5);
@@ -475,7 +491,8 @@ public class TurnoService {
                         turno.getFecha(),
                         turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00",
                         turno.getPrecio(),
-                        expiracion
+                        expiracion,
+                        MercadoPagoService.tituloCobroTurno(medico)
                 )
         );
 
@@ -816,7 +833,13 @@ public class TurnoService {
         // un fallo acá no debe impedir que la cancelación se confirme: se loguea y el médico puede
         // resolverlo manualmente desde Mercado Pago si hace falta.
         ResendEmailService.ResultadoReembolso resultadoReembolso = ResendEmailService.ResultadoReembolso.SIN_PAGO;
-        if (teniaPagoAprobado) {
+        if (teniaPagoAprobado && pagosExterno) {
+            // Fase 4: acá solo se decide si corresponde; el servicio de pagos reembolsa a partir de
+            // turnos.turno.cancelado y avisa con pagos.reembolso.realizado (segundo mail al paciente).
+            resultadoReembolso = ReembolsoService.correspondeReembolso(turno, profesionalCancela)
+                    ? ResendEmailService.ResultadoReembolso.EN_PROCESO
+                    : ResendEmailService.ResultadoReembolso.SIN_REEMBOLSO;
+        } else if (teniaPagoAprobado) {
             try {
                 boolean reembolsado = reembolsoService.procesarReembolso(turno, turno.getMedico(), profesionalCancela);
                 resultadoReembolso = reembolsado
@@ -844,7 +867,8 @@ public class TurnoService {
                         turno.getMedico().getId(),
                         profesionalCancela ? "PROFESIONAL" : "PACIENTE",
                         "Cancelado por usuario",
-                        resultadoReembolso == ResendEmailService.ResultadoReembolso.REEMBOLSADO,
+                        resultadoReembolso == ResendEmailService.ResultadoReembolso.REEMBOLSADO
+                                || resultadoReembolso == ResendEmailService.ResultadoReembolso.EN_PROCESO,
                         turno.getFecha(),
                         turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : null,
                         turno.isOcupaAgenda(),

@@ -146,6 +146,12 @@ notificaciones:
 calendario:
   externo: ${CALENDARIO_EXTERNO:false}
 
+# Fase 4: con true, Mercado Pago lo maneja el servicio de pagos (checkout, webhooks, reembolsos y
+# cuentas de los profesionales, por eventos). Las suscripciones siguen acá hasta la Fase 7.
+# Vuelta atrás: false y la ruta del gateway al monolito.
+pagos:
+  externo: ${PAGOS_EXTERNO:false}
+
 tranqui:
   jwt:
     # JWT de servicio (sección 4.2) para las rutas /internal/** que consultan otros servicios.

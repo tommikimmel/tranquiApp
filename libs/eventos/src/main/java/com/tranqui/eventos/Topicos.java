@@ -31,6 +31,8 @@ public final class Topicos {
     public static final String PROFESIONALES_TARIFA_ACTUALIZADA_V1 = "profesionales.tarifa.actualizada.v1";
     public static final String PROFESIONALES_DISPONIBILIDAD_ACTUALIZADA_V1 = "profesionales.disponibilidad.actualizada.v1";
     public static final String PROFESIONALES_HISTORIA_CLINICA_ACTUALIZADA_V1 = "profesionales.historia-clinica.actualizada.v1";
+    /** Fase 4: un paciente pidió un documento pago (API de conceptos); pagos crea la preferencia. */
+    public static final String PROFESIONALES_CONCEPTO_SOLICITADO_V1 = "profesionales.concepto.solicitado.v1";
 
     // ==================== Turnos ====================
     public static final String TURNOS_TURNO_RESERVADO_V1 = "turnos.turno.reservado.v1";
@@ -50,6 +52,10 @@ public final class Topicos {
     public static final String PAGOS_CUENTA_MP_VINCULADA_V1 = "pagos.cuenta-mp.vinculada.v1";
     public static final String PAGOS_CUENTA_MP_DESVINCULADA_V1 = "pagos.cuenta-mp.desvinculada.v1";
     public static final String PAGOS_CONCEPTO_APROBADO_V1 = "pagos.concepto.aprobado.v1";
+    /** Fase 4: el servicio de pagos creó la preferencia (checkout) de un turno o un documento. */
+    public static final String PAGOS_CHECKOUT_CREADO_V1 = "pagos.checkout.creado.v1";
+    /** Fase 4: Mercado Pago no aceptó un reembolso que correspondía; queda para revisar a mano. */
+    public static final String PAGOS_REEMBOLSO_FALLIDO_V1 = "pagos.reembolso.fallido.v1";
 
     // ==================== Suscripciones ====================
     public static final String SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1 = "suscripciones.suscripcion.cambio-estado.v1";
@@ -63,7 +69,7 @@ public final class Topicos {
     public static final String CHAT_MENSAJE_ENVIADO_V1 = "chat.mensaje.enviado.v1";
 
     /**
-     * Lista inmutable de todos los tópicos del catálogo de la sección 5.4, más los agregados en las Fases 1 (notificaciones) y 2 (chat).
+     * Lista inmutable de todos los tópicos del catálogo de la sección 5.4, más los agregados en las Fases 1 (notificaciones), 2 (chat) y 4 (pagos).
      */
     public static final List<String> TODOS_LOS_TOPICOS = List.of(
         IDENTIDAD_USUARIO_REGISTRADO_V1,
@@ -78,6 +84,7 @@ public final class Topicos {
         PROFESIONALES_TARIFA_ACTUALIZADA_V1,
         PROFESIONALES_DISPONIBILIDAD_ACTUALIZADA_V1,
         PROFESIONALES_HISTORIA_CLINICA_ACTUALIZADA_V1,
+        PROFESIONALES_CONCEPTO_SOLICITADO_V1,
         TURNOS_TURNO_RESERVADO_V1,
         TURNOS_TURNO_CONFIRMADO_V1,
         TURNOS_TURNO_CANCELADO_V1,
@@ -93,6 +100,8 @@ public final class Topicos {
         PAGOS_CUENTA_MP_VINCULADA_V1,
         PAGOS_CUENTA_MP_DESVINCULADA_V1,
         PAGOS_CONCEPTO_APROBADO_V1,
+        PAGOS_CHECKOUT_CREADO_V1,
+        PAGOS_REEMBOLSO_FALLIDO_V1,
         SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1,
         SUSCRIPCIONES_AVISO_PROGRAMADO_V1,
         CALENDARIO_MEET_CREADO_V1,
