@@ -56,8 +56,16 @@ Lo que encontré y el plan no resolvía:
   requiere obra social, agenda o es receta. Lo más simple es que cada evento traiga la disponibilidad o
   las tarifas completas del profesional, en un tópico de versión nueva (`.v2`).
 - Flag `profesionales.externo` (`PROFESIONALES_EXTERNO`): con `true` el monolito no escribe el perfil, la
-  disponibilidad ni las tarifas; mantiene sus tablas como copia a partir de los eventos del servicio, y
-  `TurnoService` sigue leyendo de ellas como hoy. Con `false` (vuelta atrás), todo como hoy.
+  disponibilidad ni las tarifas; mantiene sus tablas como copia (caché) del servicio, y `TurnoService`
+  sigue leyendo de ellas como hoy. Con `false` (vuelta atrás), todo como hoy.
+- La copia se actualiza de dos maneras (decisión 2):
+  - **Cuando hay una modificación:** cada cambio de perfil, disponibilidad o tarifa en el servicio publica
+    su evento y el monolito lo aplica en segundos.
+  - **Cada cierto tiempo:** una tarea del monolito (cada 15 minutos, configurable con
+    `PROFESIONALES_RESINCRONIZACION_MINUTOS`) pide al servicio, por una ruta interna, los profesionales
+    modificados desde la última pasada y corrige la copia. Cubre un evento perdido o aplicado fuera de
+    orden. Si el servicio está caído, la tarea lo reintenta en la próxima pasada y la agenda sigue con lo
+    que tiene.
 - Eventos que el servicio necesita del monolito: la verificación del administrador
   (`profesionales.profesional.visibilidad-cambiada`, que ya existe) y el estado de la suscripción
   (`suscripciones.suscripcion.cambio-estado`, que ya existe). Mercado Pago llega de pagos.
@@ -91,6 +99,7 @@ del buscador, el servicio caído (la agenda sigue con la copia del monolito), la
 - [ ] El buscador muestra exactamente a los mismos profesionales que hoy (perfil completo, verificado,
       Mercado Pago y suscripción).
 - [ ] Con el servicio caído, la agenda y la reserva siguen andando.
+- [ ] Un evento perdido se corrige solo en la siguiente resincronización periódica.
 - [ ] Ningún evento lleva datos de salud.
 - [ ] Con la vuelta atrás (variable del gateway + flag), todo funciona como hoy.
 - [ ] `./mvnw test`, tests del frontend y lint sin errores nuevos.
@@ -101,6 +110,15 @@ del buscador, el servicio caído (la agenda sigue con la copia del monolito), la
 - **La foto en base64** viaja en el buscador y en la carga inicial; la copia se hace paginada.
 - **Dos dueños del perfil durante la transición:** el corte va en un solo paso (flag + ruta), como en las
   fases anteriores.
+
+## Decisiones
+
+1. **Alcance:** la Fase 5 hace perfil, buscador, tarifas y disponibilidad. La historia clínica y las
+   recetas pasan a una fase propia después de turnos (Fase 6).
+2. **Disponibilidad y tarifas para turnos:** el monolito guarda una copia (caché) que se actualiza con cada
+   modificación (evento) y con una resincronización periódica (ver R1).
+3. **Estadísticas del panel:** quedan en el monolito y se mueven al final de la migración.
+4. Pendiente (ver Preguntas).
 
 ## Preguntas
 
@@ -118,4 +136,12 @@ del buscador, el servicio caído (la agenda sigue con la copia del monolito), la
    evento, o pasa al servicio con su ruta? **Recomiendo que siga en el monolito por ahora** (el panel de
    administración se reparte por dominio en las fases siguientes) y avise por
    `profesionales.profesional.visibilidad-cambiada`.
+
+   Qué es hoy: en el panel de administración, el admin revisa la matrícula que cargó el profesional y
+   toca **Verificar** (`POST /api/admin/users/{id}/verify`) o **Rechazar** (`.../reject`). Verificar pone
+   el rol de psiquiatra, marca `verificadoAdmin`, guarda quién y cuándo validó la matrícula (eso habilita
+   las recetas) y pasa la suscripción de "pendiente de verificación" a "verificada". Rechazar desmarca
+   `verificadoAdmin` y deja la suscripción rechazada. Sin la verificación, el profesional no aparece en el
+   buscador aunque tenga el perfil completo. Como toca rol (identidad), suscripción y recetas (que siguen
+   en el monolito), conviene que quede ahí y que el servicio solo reciba el resultado.
 5. Un PR a `develop` por tarea, Java 17, sin deploy (como en las fases anteriores).
