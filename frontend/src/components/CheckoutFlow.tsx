@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Icon } from './Icon'
 import '../styles/checkout.css'
-import { api } from '../api/api'
+import { api, getBackendOrigin } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { OBRAS_SOCIALES } from '../constants/obrasSociales'
@@ -1878,8 +1878,7 @@ export default function CheckoutFlow({
                   setSimulatingWebhook(true);
                   try {
                     // Send request to webhook controller directly
-                    const isHttps = window.location.protocol === 'https:';
-                    const baseUrl = isHttps ? `${window.location.protocol}//${window.location.host}` : `http://${window.location.hostname}:8081`;
+                    const baseUrl = getBackendOrigin();
                     const response = await fetch(`${baseUrl}/api/payments/webhook`, {
                       method: 'POST',
                       headers: {
