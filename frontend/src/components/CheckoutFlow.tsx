@@ -6,6 +6,7 @@ import { useAlert } from '../context/AlertContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { OBRAS_SOCIALES } from '../constants/obrasSociales'
 import { formatDetalleDomicilio } from '../utils/dashboardHelpers'
+import { esperarCheckout } from '../utils/esperarCheckout'
 
 let leafletLoadingPromise: Promise<void> | null = null
 function loadLeafletScript(): Promise<void> {
@@ -1737,7 +1738,12 @@ export default function CheckoutFlow({
       emailPaciente: patientData.email,
       telefonoPaciente: patientData.phone
     })
-    .then((res: any) => {
+    .then(async (res: any) => {
+      // Fase 4: el link lo crea el servicio de pagos un instante después de la reserva; mientras se
+      // espera, el botón sigue en "procesando".
+      if (res.checkoutPendiente && !res.checkoutUrl) {
+        res = { ...res, checkoutUrl: await esperarCheckout(() => api.obtenerCheckout(res.turnoId)) }
+      }
       setPaymentStatus('idle')
       setCreatedTurn(res)
       setHoldTimer(300)

@@ -124,6 +124,11 @@ export const api = {
     telefonoPaciente: string
   }) => apiFetch('/turnos/reservar', { method: 'POST', body: data as any }),
 
+  // Fase 4: con el servicio de pagos la reserva responde sin link (checkoutPendiente) y el link del
+  // checkout se pide aparte hasta que esté LISTO (o ERROR si no se pudo crear).
+  obtenerCheckout: (referencia: string | number): Promise<{ estado: 'PENDIENTE' | 'LISTO' | 'ERROR' | 'PAGADO' | 'VENCIDO'; checkoutUrl?: string; error?: string }> =>
+    apiFetch(`/payments/checkout/${encodeURIComponent(String(referencia))}`),
+
   // Public catalog of obras sociales/financiadores from QBI2 — used at checkout when the
   // médico marked a service as "Requiere Obra Social" (see Honorarios y Servicios).
   getFinanciadores: () => apiFetch('/recetas/financiadores'),

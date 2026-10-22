@@ -109,6 +109,7 @@ class PagosExternoTest {
 
         assertEquals("PENDIENTE_PAGO", respuesta.getEstado());
         assertEquals("", respuesta.getCheckoutUrl());
+        assertEquals(Boolean.TRUE, respuesta.getCheckoutPendiente());
         verify(mercadoPagoService, never()).crearPreferenciaPago(any(), any());
         ArgumentCaptor<Object> data = ArgumentCaptor.forClass(Object.class);
         verify(outboxPublisher).publicar(eq(Topicos.TURNOS_TURNO_RESERVADO_V1), anyString(), anyInt(), data.capture());

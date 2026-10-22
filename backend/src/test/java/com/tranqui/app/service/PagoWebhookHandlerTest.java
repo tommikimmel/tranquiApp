@@ -350,4 +350,20 @@ class PagoWebhookHandlerTest {
         assertEquals("mp-doc", solicitud.getTransactionId());
         verifyNoInteractions(outboxPublisher, messagingTemplate);
     }
+
+    @Test
+    void aplicarPagoAprobado_despuesDeUnRechazo_reusaElPagoDelTurno() {
+        Turno turno = turnoPendiente(24L);
+        Pago rechazado = Pago.builder().id(3L).turno(turno).transactionId("mp-rechazado").estado(EstadoPago.RECHAZADO).build();
+        turno.setPago(rechazado);
+        when(turnoRepository.findById(24L)).thenReturn(Optional.of(turno));
+
+        handler.aplicarPagoAprobado(new com.tranqui.eventos.data.PagoAprobadoData(9L, 24L, "mp-aprobado", new BigDecimal("60000"), "mercadopago"));
+        handler.aplicarPagoRechazado(new com.tranqui.eventos.data.PagoRechazadoData(10L, 24L, "mp-otro", "rejected"));
+
+        assertEquals(EstadoTurno.CONFIRMADO, turno.getEstado());
+        assertEquals(EstadoPago.APROBADO, rechazado.getEstado());
+        assertEquals("mp-aprobado", rechazado.getTransactionId());
+        verify(pagoRepository, times(1)).save(rechazado);
+    }
 }
