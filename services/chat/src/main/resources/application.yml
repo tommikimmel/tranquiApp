@@ -34,10 +34,15 @@ spring:
         enabled: ${CONSUL_DISCOVERY_ENABLED:true}
         service-name: chat
         instance-id: ${spring.application.name}:${random.value}
-        # El actuator vive en el puerto de management (8082): ahí está /actuator/health.
-        health-check-path: /actuator/health
-        health-check-interval: 10s
+        # Chequeo por TTL: el servicio le manda a Consul su salud del actuator cada 20 s. Si sigue
+        # crítico más de un minuto (caído, o con la base caída) Consul lo da de baja, y en cuanto se
+        # recupera el próximo latido lo vuelve a registrar. Con el chequeo HTTP de antes se registraba
+        # una sola vez al arrancar: después de una baja seguía andando pero el gateway respondía 503.
         health-check-critical-timeout: 1m
+        heartbeat:
+          enabled: true
+          ttl: 30s
+          reregister-service-on-failure: true
         # Registro por IP: el gateway lo alcanza en la red de Docker sin resolver el hostname del contenedor.
         prefer-ip-address: true
         tags: version=${TRANQUI_VERSION:dev}
