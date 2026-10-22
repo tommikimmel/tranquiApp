@@ -12,6 +12,9 @@ import java.util.Optional;
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> findByEmail(String email);
     Optional<Usuario> findByMpUserId(String mpUserId);
+
+    /** Fase 4: cuentas de Mercado Pago vinculadas, para la carga inicial del servicio de pagos. */
+    List<Usuario> findByMpAccessTokenEncryptedIsNotNull();
     List<Usuario> findByRol(Rol rol);
     List<Usuario> findByRolAndGoogleCalendarConnectedTrue(Rol rol);
     Optional<Usuario> findByGoogleWatchChannelId(String googleWatchChannelId);
