@@ -498,6 +498,21 @@ spring:
                 rate-limiter: "#{@tranquiRateLimiter}"
                 key-resolver: "#{@serviceKeyResolver}"
 
+        # Fase 3: consultas internas al calendario (horarios ocupados para la disponibilidad).
+        - id: internal-calendario
+          uri: ${tranqui.services.calendario.uri}
+          predicates:
+            - Path=/internal/calendario/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: calendario
+                fallbackUri: forward:/fallback/internal
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@serviceKeyResolver}"
+
         # --- RUTA INTERNA ENTRE SERVICIOS ---
         - id: internal
           uri: ${tranqui.services.internal.uri:${tranqui.services.monolito.uri}}
@@ -573,8 +588,11 @@ tranqui:
       uri: ${TRANQUI_SERVICES_CHAT_URI:${tranqui.services.monolito.uri}}
     chat-ws:
       uri: ${tranqui.services.chat.uri}
+    # Fase 3: lb://calendario cuando el servicio está desplegado (docker-compose). Lleva
+    # /api/medicos/google-calendar (incluidos el callback del OAuth y el webhook de Google) y
+    # /internal/calendario. Vuelta atrás: sacar la variable y CALENDARIO_EXTERNO=false en el monolito.
     calendario:
-      uri: ${tranqui.services.monolito.uri}
+      uri: ${TRANQUI_SERVICES_CALENDARIO_URI:${tranqui.services.monolito.uri}}
     internal:
       uri: ${tranqui.services.monolito.uri}
   # Fase 3 (G1): portón del sitio para las rutas que van a servicios (vacío = apagado, como en el

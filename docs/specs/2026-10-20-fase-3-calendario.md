@@ -202,3 +202,9 @@ de prueba (decisión 4).
   implementación real hace las mismas llamadas que el monolito.
 - **`calendario.meet.creado` también para presenciales**, sin link y con `linkNuevo=false`: el monolito
   guarda el id del evento (para la vuelta atrás) y notificaciones no manda nada.
+
+### G4 — gateway
+- La ruta `medicos-google-calendar` ya existía (va antes de `/api/medicos/**`); solo cambia su destino.
+  `/internal/calendario/**` es una ruta propia antes de la interna general, como la del chat. El
+  callback y el webhook mantienen la URL pública: la consola de Google y los canales registrados no
+  cambian.
