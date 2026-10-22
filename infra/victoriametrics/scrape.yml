@@ -30,6 +30,13 @@ scrape_configs:
         labels:
           servicio: 'chat'
 
+  - job_name: 'calendario'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['calendario:8082']
+        labels:
+          servicio: 'calendario'
+
   - job_name: 'rabbitmq'
     metrics_path: '/metrics'
     static_configs:

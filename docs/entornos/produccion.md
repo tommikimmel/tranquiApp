@@ -27,15 +27,16 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 | `tranqui-node-exporter` | `node-exporter` | Prometheus Node Exporter v1.8.2 (métricas del host VPS) | 32 MB | 0.2 |
 | `tranqui-notificaciones` | `notificaciones` | Servicio de notificaciones (Fase 1): mails y avisos en la app a partir de eventos, base propia `notificaciones` | 288 MB | 0.5 |
 | `tranqui-chat` | `chat` | Servicio de chat (Fase 2): mensajería en vivo por `/ws-tranqui` e historial, base propia `chat` | 288 MB | 0.5 |
+| `tranqui-calendario` | `calendario` | Servicio de calendario (Fase 3): Google Calendar y Meet, eventos de los turnos y horarios ocupados, base propia `calendario` | 288 MB | 0.5 |
 | `tranqui-db-servicios` | `db-servicios` | Contenedor de una sola ejecución: crea la base y el usuario de cada servicio (`infra/postgres/crear-bases-servicios.sh`) y termina | 32 MB | 0.2 |
 | `tranqui-bot`, `tranqui-bot-worker`, `wsp-db`, `wsp-redis` | — | Bot de WhatsApp (proyecto aparte, fuera de este repositorio) | ~70 MB | — |
 
 ### Presupuesto de memoria (RAM)
 
-- **Total suma `mem_limit` Docker Compose (Fase 2):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 288 + 288 = 2.688 MB` (~2,69 GB; `db-servicios` corre unos segundos al arrancar y no suma).
+- **Total suma `mem_limit` Docker Compose (Fase 3):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 288 + 288 + 288 = 2.976 MB` (~2,98 GB; `db-servicios` corre unos segundos al arrancar y no suma).
 - **Traefik y bot de WhatsApp:** ~112 MB.
 - **Sistema operativo y buffers mínimos:** ~1 GB.
-- **Consumo proyectado total en VPS:** **~3,8 GB**, ampliamente dentro del techo presupuestado de **~4,8 GB**
+- **Consumo proyectado total en VPS:** **~4,1 GB**, ampliamente dentro del techo presupuestado de **~4,8 GB**
   de la sección 9.1 para la Fase 0, reservando ~3 GB de margen libre para picos y caché de disco de PostgreSQL.
 
 ### Afinación de JVM (backend y gateway)
@@ -44,7 +45,7 @@ Tanto el backend monolítico como el gateway configuran flags estrictos de JVM (
 según la sección 9.2:
 `-XX:+UseSerialGC -XX:MaxRAMPercentage=65 -Xss256k -XX:ReservedCodeCacheSize=48m -XX:MaxMetaspaceSize=96m -Duser.timezone=America/Argentina/Buenos_Aires`.
 
-### Afinación de JVM (servicios chicos: notificaciones y chat)
+### Afinación de JVM (servicios chicos: notificaciones, chat y calendario)
 
 `-XX:+UseSerialGC -XX:MinRAMPercentage=30 -XX:MaxRAMPercentage=30 -Xss256k -XX:ReservedCodeCacheSize=32m -XX:MaxMetaspaceSize=128m -XX:TieredStopAtLevel=1`,
 con `mem_limit` de 288 MB. Medido en la Fase 2 (con Native Memory Tracking): lo que no es heap (clases
@@ -140,6 +141,45 @@ define dependencias escalonadas con `condition: service_healthy`:
    docker compose -p app ps
    curl -fsS https://tranquisalud.com/api/health
    ```
+
+## Fase 3: servicio de calendario
+
+Google Calendar y Meet (`/api/medicos/google-calendar`, incluidos el callback del OAuth y el webhook de
+Google, que no cambian de URL) viven en el contenedor `calendario`. Crea, mueve y borra los eventos de
+los turnos a partir de los eventos de turnos, y el Meet vuelve al monolito por `calendario.meet.creado`
+(el monolito lo consume con `EVENTOS_CONSUMO_SERVICIO=monolito`). La disponibilidad de turnos le pide
+los horarios ocupados por `/internal/calendario/...`; si no responde, la agenda sale sin ese filtro.
+
+**Variables en `/srv/tranqui/.env`:** `CALENDARIO_DB_PASSWORD` (`openssl rand -hex 24`). Las de Google
+(`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALENDAR_ENABLED`, `GOOGLE_CALENDAR_WATCH_ENABLED`) y
+`APP_PUBLIC_URL`/`FRONTEND_URL` son las mismas que ya usa el monolito. La consola de Google no cambia.
+
+**Clave de cifrado:** el servicio lee los tokens de Google que guardó el monolito, así que resuelve la
+clave igual que él (`security.encryption.key`). Hoy el monolito no recibe `ENCRYPTION_KEY` y usa el
+valor de respaldo del código: ver el hallazgo en `docs/specs/2026-10-20-fase-3-calendario.md` antes de
+tocar esa clave (hay que cambiarla en los dos a la vez y volver a cifrar los tokens).
+
+**Primer arranque:** copia del monolito los usuarios, las cuentas de Google (tokens cifrados, sin
+descifrarlos: nadie vuelve a autorizar), la caché de eventos externos y los turnos confirmados con su
+evento. La primera pasada (a los 30 s, con Google habilitado) hace una sincronización completa.
+
+**El corte va en un solo paso:** `CALENDARIO_EXTERNO=true` en el monolito y la ruta del gateway al
+servicio. Si cambia uno solo, el evento de Google se crea dos veces o ninguna.
+
+**Vuelta atrás de la Fase 3** (sin desconectar a nadie):
+
+1. En `/srv/tranqui/.env`: `CALENDARIO_EXTERNO=false` y
+   `TRANQUI_SERVICES_CALENDARIO_URI=http://tranqui-backend:8080`.
+2. `docker compose -p app stop calendario` y `docker compose -p app up -d tranqui-backend gateway`.
+3. Devolver al monolito las cuentas de Google y los eventos de los turnos (idempotente; `--prueba`
+   solo cuenta):
+   ```bash
+   node scripts/fase3-devolver-calendario.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+   ```
+
+**Volver al servicio después:** borrar la base del calendario para que el primer arranque vuelva a
+copiar todo: `docker compose -p app exec tranqui-db psql -U <DB_USER> -d tranqui_app -c "DROP DATABASE calendario"`,
+volver las dos variables a su valor y `docker compose -p app up -d`.
 
 ## Fase 2: servicio de chat
 

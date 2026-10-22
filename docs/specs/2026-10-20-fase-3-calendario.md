@@ -208,3 +208,10 @@ de prueba (decisión 4).
   `/internal/calendario/**` es una ruta propia antes de la interna general, como la del chat. El
   callback y el webhook mantienen la URL pública: la consola de Google y los canales registrados no
   cambian.
+
+### G5 — infraestructura
+- El servicio no recibe una clave de cifrado en el compose: resuelve `security.encryption.key` igual que
+  el monolito (decisión 3 y hallazgo de G2). El callback y el webhook entran por el gateway, así que en
+  local el calendario usa `APP_PUBLIC_URL=http://localhost:8080`.
+- El script de vuelta atrás deja vacío el syncToken del monolito, para que su primera pasada rearme la
+  caché de eventos, y desconecta a los profesionales que se desvincularon mientras estuvo el servicio.
