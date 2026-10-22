@@ -154,10 +154,11 @@ los horarios ocupados por `/internal/calendario/...`; si no responde, la agenda 
 (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALENDAR_ENABLED`, `GOOGLE_CALENDAR_WATCH_ENABLED`) y
 `APP_PUBLIC_URL`/`FRONTEND_URL` son las mismas que ya usa el monolito. La consola de Google no cambia.
 
-**Clave de cifrado:** el servicio lee los tokens de Google que guardó el monolito, así que resuelve la
-clave igual que él (`security.encryption.key`). Hoy el monolito no recibe `ENCRYPTION_KEY` y usa el
-valor de respaldo del código: ver el hallazgo en `docs/specs/2026-10-20-fase-3-calendario.md` antes de
-tocar esa clave (hay que cambiarla en los dos a la vez y volver a cifrar los tokens).
+**Clave de cifrado:** el servicio lee los tokens de Google que guardó el monolito, así que recibe la
+misma `ENCRYPTION_KEY` y cifra igual que él (formato `v2:`, del hotfix de la clave de cifrado). Lee
+también los tokens del formato anterior y acepta los canales firmados con la clave vieja hasta que se
+renuevan. El monolito tiene que tener ese hotfix antes de desplegar el servicio: con la v1.1.0 no leería
+los tokens que el servicio renueva, ni en la vuelta atrás.
 
 **Primer arranque:** copia del monolito los usuarios, las cuentas de Google (tokens cifrados, sin
 descifrarlos: nadie vuelve a autorizar), la caché de eventos externos y los turnos confirmados con su

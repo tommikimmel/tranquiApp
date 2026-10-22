@@ -216,7 +216,9 @@ con las credenciales de prueba (decisión 4).
 
 ### G5 — infraestructura
 - El servicio no recibe una clave de cifrado en el compose: resuelve `security.encryption.key` igual que
-  el monolito (decisión 3 y hallazgo de G2). El callback y el webhook entran por el gateway, así que en
+  el monolito (decisión 3 y hallazgo de G2). *Actualizado con el hotfix de la clave de cifrado:* el
+  servicio recibe la misma `ENCRYPTION_KEY` y usa el formato `v2:` del monolito, leyendo también el
+  anterior. El callback y el webhook entran por el gateway, así que en
   local el calendario usa `APP_PUBLIC_URL=http://localhost:8080`.
 - El script de vuelta atrás deja vacío el syncToken del monolito, para que su primera pasada rearme la
   caché de eventos, y desconecta a los profesionales que se desvincularon mientras estuvo el servicio.

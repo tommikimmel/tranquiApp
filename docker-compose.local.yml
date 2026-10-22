@@ -242,6 +242,8 @@ services:
       CONSUL_PORT: "8500"
       JWT_SECRET: local-dev-encryption-key-32chars
       SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
+      # La misma clave que el monolito: los tokens de Google se leen en los dos.
+      ENCRYPTION_KEY: local-dev-encryption-key-32chars
       TRANQUI_GATEWAY_URL: http://gateway:8080
       # El callback del OAuth y el webhook de Google entran por el gateway.
       APP_PUBLIC_URL: http://localhost:8080
