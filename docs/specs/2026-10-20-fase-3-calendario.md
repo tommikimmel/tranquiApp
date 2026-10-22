@@ -165,3 +165,24 @@ de prueba (decisión 4).
 - **Encontrado al revisar el borde:** la regla de Traefik de producción solo derivaba `/api` y
   `/ws-tranqui`, así que el WebSocket `/ws-notificaciones` de la Fase 1 habría ido al frontend. Suma
   `/ws-notificaciones` (en local no se veía porque Vite deriva todo al gateway).
+
+### G2 — catálogo y monolito
+- **Disponibilidad:** `HorariosOcupadosCliente` decide con el mismo flag: con `calendario.externo` pide al
+  calendario por el gateway; sin el flag lee Google como antes. Por eso el monolito no necesita responder
+  `/internal/calendario/...` para la vuelta atrás (la spec lo proponía): en la vuelta atrás el flag va en
+  `false` y no se hace la consulta. Los intervalos traen "todo el día" y los eventos "disponible" de
+  Google ya no llegan.
+- **Mail de confirmación:** se deja el texto actual para los turnos online sin link ("El link de la
+  videollamada va a estar en Mis Turnos"). Prometer "un mail aparte" sería falso para los profesionales
+  sin Google conectado, que nunca generan el segundo mail.
+- **Consumo en el monolito:** se prende solo con `EVENTOS_CONSUMO_SERVICIO=monolito`; una propiedad vacía
+  en `application.yml` activaría el consumidor sin nombre de cola. El inbox usa la tabla
+  `eventos_procesados` que el monolito ya tenía (misma estructura que la librería).
+- **Hallazgo (producción, sin tocar):** el monolito no lee la `ENCRYPTION_KEY` del `.env`. Sus cuatro usos
+  (`EncryptionUtil`, el `state` del OAuth de Google y de Mercado Pago, y el token de los canales de Google)
+  leen `security.encryption.key`, que ningún `application.yml` mapea, así que en producción usan la clave de
+  respaldo escrita en el código, pública porque el repo es público. Afecta los tokens de Mercado Pago y de
+  Google guardados. Arreglarlo exige volver a cifrar esos tokens en la base de producción: queda para
+  una decisión del usuario, junto con el hotfix del `JWT_SECRET`. Mientras tanto, el servicio de calendario
+  resuelve la clave exactamente igual que el monolito (decisión 3), así lee los tokens existentes y el día
+  que se corrija cambia en los dos a la vez.

@@ -46,18 +46,21 @@ public class InternoMonolitoController {
     private final NotificacionRepository notificacionRepository;
     private final com.tranqui.app.repository.MensajeRepository mensajeRepository;
     private final com.tranqui.app.service.SubscriptionService subscriptionService;
+    private final com.tranqui.app.repository.GoogleCalendarEventoExternoRepository eventoExternoRepository;
     private final String publicUrl;
 
     public InternoMonolitoController(UsuarioRepository usuarioRepository, TurnoRepository turnoRepository,
                                      NotificacionRepository notificacionRepository,
                                      com.tranqui.app.repository.MensajeRepository mensajeRepository,
                                      com.tranqui.app.service.SubscriptionService subscriptionService,
+                                     com.tranqui.app.repository.GoogleCalendarEventoExternoRepository eventoExternoRepository,
                                      @Value("${app.public-url:http://localhost:8081}") String publicUrl) {
         this.usuarioRepository = usuarioRepository;
         this.turnoRepository = turnoRepository;
         this.notificacionRepository = notificacionRepository;
         this.mensajeRepository = mensajeRepository;
         this.subscriptionService = subscriptionService;
+        this.eventoExternoRepository = eventoExternoRepository;
         this.publicUrl = publicUrl;
     }
 
@@ -108,8 +111,19 @@ public class InternoMonolitoController {
 
     // La fecha va como texto ISO (yyyy-MM-dd): el monolito serializa LocalDate como dd/MM/yyyy para la
     // interfaz (DateConfig), y las rutas internas son un contrato entre servicios.
+    /** Fase 3: suma lo que necesita el calendario para sus eventos (el chat ignora lo que no usa). */
     public record TurnoConfirmadoDto(Long turnoId, Long pacienteId, Long profesionalId, String fecha,
-                                     String horaInicio) {}
+                                     String horaInicio, String horaFin, String modalidad, boolean ocupaAgenda,
+                                     String googleEventId, String meetUrl) {}
+
+    /** Fase 3: cuenta de Google de un profesional, con los tokens tal cual están guardados (cifrados). */
+    public record CuentaGoogleDto(Long profesionalId, String accessTokenCifrado, String refreshTokenCifrado,
+                                  LocalDateTime tokenVenceEn, String calendarId, String syncToken,
+                                  String watchChannelId, String watchResourceId, LocalDateTime watchVenceEn,
+                                  boolean watchActivo) {}
+
+    public record EventoExternoDto(Long id, Long profesionalId, String googleEventId, String titulo,
+                                   LocalDateTime inicio, LocalDateTime fin, boolean todoElDia, String estado) {}
 
     /** Fase 2: carga inicial de los mensajes del servicio de chat, por id y conservando los ids. */
     @GetMapping("/mensajes")
@@ -133,7 +147,38 @@ public class InternoMonolitoController {
         return turnoRepository.findByEstadoAndFechaGreaterThanEqualOrderByIdAsc(EstadoTurno.CONFIRMADO,
                         java.time.LocalDate.now()).stream()
                 .map(t -> new TurnoConfirmadoDto(t.getId(), t.getPaciente().getId(), t.getMedico().getId(), t.getFecha().toString(),
-                        t.getHoraInicio() != null ? t.getHoraInicio().toString() : null))
+                        t.getHoraInicio() != null ? t.getHoraInicio().toString() : null,
+                        t.getHoraFin() != null ? t.getHoraFin().toString() : null,
+                        t.getModalidad() != null ? t.getModalidad().name() : null,
+                        t.isOcupaAgenda(), t.getGoogleEventId(), t.getTelemedicinaUrl()))
+                .toList();
+    }
+
+    /**
+     * Fase 3: cuentas de Google conectadas, para la carga inicial del servicio de calendario. Los tokens
+     * viajan cifrados con la ENCRYPTION_KEY, que el servicio comparte (decisión 3 de la spec): nunca se
+     * descifran para moverlos. Solo con JWT de servicio (FiltroServicioInterno).
+     */
+    @GetMapping("/calendario/cuentas")
+    @Transactional(readOnly = true)
+    public List<CuentaGoogleDto> cuentasGoogle() {
+        return usuarioRepository.findByRolAndGoogleCalendarConnectedTrue(com.tranqui.app.model.Rol.PSIQUIATRA).stream()
+                .map(u -> new CuentaGoogleDto(u.getId(), u.getGoogleAccessTokenEncrypted(), u.getGoogleRefreshTokenEncrypted(),
+                        u.getGoogleTokenExpiresAt(), u.getGoogleCalendarId(), u.getGoogleSyncToken(),
+                        u.getGoogleWatchChannelId(), u.getGoogleWatchResourceId(), u.getGoogleWatchExpiresAt(),
+                        Boolean.TRUE.equals(u.getGoogleWatchActive())))
+                .toList();
+    }
+
+    /** Fase 3: caché de eventos externos de Google (los propios del profesional), paginada por id. */
+    @GetMapping("/calendario/eventos-externos")
+    @Transactional(readOnly = true)
+    public List<EventoExternoDto> eventosExternos(@RequestParam(name = "desdeId", defaultValue = "0") long desdeId,
+                                                  @RequestParam(name = "tamanio", defaultValue = "500") int tamanio) {
+        int tamanioSeguro = Math.max(1, Math.min(tamanio, TAMANIO_MAXIMO));
+        return eventoExternoRepository.findByIdGreaterThanOrderByIdAsc(desdeId, PageRequest.of(0, tamanioSeguro)).stream()
+                .map(e -> new EventoExternoDto(e.getId(), e.getMedico().getId(), e.getGoogleEventId(), e.getTitulo(),
+                        e.getFechaInicio(), e.getFechaFin(), Boolean.TRUE.equals(e.getTodoElDia()), e.getEstado()))
                 .toList();
     }
 

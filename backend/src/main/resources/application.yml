@@ -141,6 +141,11 @@ jwt:
 notificaciones:
   envio-directo: ${NOTIFICACIONES_ENVIO_DIRECTO:false}
 
+# Fase 3: con true, Google Calendar lo maneja el servicio de calendario (eventos y Meet por eventos,
+# disponibilidad por /internal/calendario). Vuelta atrás: false y la ruta del gateway al monolito.
+calendario:
+  externo: ${CALENDARIO_EXTERNO:false}
+
 tranqui:
   jwt:
     # JWT de servicio (sección 4.2) para las rutas /internal/** que consultan otros servicios.

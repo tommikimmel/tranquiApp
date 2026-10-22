@@ -45,6 +45,9 @@ public class TurnoService {
     private GoogleCalendarService calendarService;
 
     @Autowired
+    private HorariosOcupadosCliente horariosOcupadosCliente;
+
+    @Autowired
     private AgendaService agendaService;
 
     @Autowired
@@ -113,61 +116,38 @@ public class TurnoService {
             return locales;
         }
 
-        // Consultar eventos de Google Calendar del día
-        List<com.google.api.services.calendar.model.Event> eventosGoogle = java.util.Collections.emptyList();
+        // Horarios ocupados en el Google Calendar del profesional (sus eventos propios). Desde la
+        // Fase 3 los responde el servicio de calendario; ver HorariosOcupadosCliente.
+        List<HorariosOcupadosCliente.Intervalo> ocupados = java.util.Collections.emptyList();
         try {
-            eventosGoogle = calendarService.obtenerEventosDelDia(medico, fecha);
+            ocupados = horariosOcupadosCliente.ocupados(medico, fecha);
         } catch (Exception e) {
             // Fallback silencioso: loguear y seguir con la disponibilidad local
             org.slf4j.LoggerFactory.getLogger(TurnoService.class)
                 .warn("Error consultando disponibilidad en Google Calendar para médico ID: {}. Usando fallback local.", medicoId, e);
         }
 
-        if (eventosGoogle.isEmpty()) {
+        if (ocupados == null || ocupados.isEmpty()) {
             return locales;
         }
+        if (ocupados.stream().anyMatch(HorariosOcupadosCliente.Intervalo::todoElDia)) {
+            // Evento de todo el día bloquea todo el día
+            return java.util.Collections.emptyList();
+        }
 
-        java.time.ZoneId zoneId = java.time.ZoneId.of("America/Argentina/Buenos_Aires");
-        List<com.google.api.services.calendar.model.Event> finalEventos = eventosGoogle;
-
+        List<HorariosOcupadosCliente.Intervalo> finalOcupados = ocupados;
         return locales.stream()
                 .filter(hora -> {
                     java.time.LocalTime bloqueInicio = hora;
                     // Must match the médico's actual configured session length (same
-                    // duracionTurnoMinutos used above to generate `locales` itself) � a
+                    // duracionTurnoMinutos used above to generate `locales` itself) — a
                     // hardcoded 45 here under-checks the overlap window for any médico who
                     // configured a different duration, letting a slot near the edge of a Google
                     // Calendar event through when it shouldn't be offered.
                     java.time.LocalTime bloqueFin = hora.plusMinutes(duracionTurnoMinutos);
-
-                    for (com.google.api.services.calendar.model.Event event : finalEventos) {
-                        // Eventos transparent (disponibles) no bloquean la agenda
-                        if ("transparent".equals(event.getTransparency())) {
-                            continue;
-                        }
-
-                        // Validar evento de todo el día (all-day event)
-                        if (event.getStart() != null && event.getStart().getDateTime() == null && event.getStart().getDate() != null) {
-                            // Evento de todo el día bloquea todo el día
-                            return false;
-                        }
-
-                        if (event.getStart() != null && event.getStart().getDateTime() != null &&
-                            event.getEnd() != null && event.getEnd().getDateTime() != null) {
-                            
-                            java.time.Instant startInstant = java.time.Instant.ofEpochMilli(event.getStart().getDateTime().getValue());
-                            java.time.Instant endInstant = java.time.Instant.ofEpochMilli(event.getEnd().getDateTime().getValue());
-                            
-                            java.time.LocalTime eventStart = startInstant.atZone(zoneId).toLocalTime();
-                            java.time.LocalTime eventEnd = endInstant.atZone(zoneId).toLocalTime();
-
-                            // Solapamiento: bloqueInicio < eventEnd && bloqueFin > eventStart
-                            if (bloqueInicio.isBefore(eventEnd) && bloqueFin.isAfter(eventStart)) {
-                                return false; // Está ocupado por Google Calendar
-                            }
-                        }
-                    }
-                    return true;
+                    // Solapamiento: bloqueInicio < fin && bloqueFin > inicio
+                    return finalOcupados.stream().noneMatch(o ->
+                            bloqueInicio.isBefore(o.fin()) && bloqueFin.isAfter(o.inicio()));
                 })
                 .collect(Collectors.toList());
     }
@@ -567,7 +547,8 @@ public class TurnoService {
                         null,
                         turno.getModalidad() == Modalidad.ONLINE ? null : turno.getMedico().getDomicilioAtencion(),
                         turno.getTelemedicinaUrl(),
-                        TurnoConfirmadoData.ORIGEN_OSDE
+                        TurnoConfirmadoData.ORIGEN_OSDE,
+                        turno.getHoraFin() != null ? turno.getHoraFin().toString() : null
                 )
         );
 
@@ -1076,7 +1057,8 @@ public class TurnoService {
                         nuevaHoraInicio.toString(),
                         turno.getModalidad() != null ? turno.getModalidad().name() : null,
                         turno.getModalidad() == Modalidad.ONLINE ? null : turno.getMedico().getDomicilioAtencion(),
-                        turno.getTelemedicinaUrl()
+                        turno.getTelemedicinaUrl(),
+                        nuevaHoraFin.toString()
                 )
         );
 

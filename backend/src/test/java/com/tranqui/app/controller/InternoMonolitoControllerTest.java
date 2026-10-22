@@ -133,7 +133,40 @@ class InternoMonolitoControllerTest {
         assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(respuesta.getBody()).contains("\"turnoId\":" + futuro.getId()).contains("\"horaInicio\":\"11:00\"")
                 .contains("\"fecha\":\"" + futuro.getFecha() + "\"")
+                .contains("\"horaFin\":\"11:45\"").contains("\"ocupaAgenda\":true")
                 .doesNotContain("\"turnoId\":" + pasado.getId() + ",");
+    }
+
+    @Autowired private com.tranqui.app.repository.GoogleCalendarEventoExternoRepository eventoExternoRepository;
+
+    @Test
+    void cuentasYEventosDeGoogle_paraLaCargaInicialDelCalendario() {
+        Usuario medico = usuarioRepository.save(Usuario.builder().nombre("Dra")
+                .email("gc.med." + System.nanoTime() + "@mail.com").rol(Rol.PSIQUIATRA).build());
+        medico.setGoogleCalendarConnected(true);
+        medico.setGoogleRefreshTokenEncrypted("refresh-cifrado-" + medico.getId());
+        medico.setGoogleSyncToken("sync-" + medico.getId());
+        usuarioRepository.save(medico);
+        com.tranqui.app.model.GoogleCalendarEventoExterno evento = eventoExternoRepository.save(
+                com.tranqui.app.model.GoogleCalendarEventoExterno.builder().medico(medico)
+                        .googleEventId("ext-" + System.nanoTime()).titulo("Dentista")
+                        .fechaInicio(java.time.LocalDateTime.now().plusDays(1))
+                        .fechaFin(java.time.LocalDateTime.now().plusDays(1).plusHours(1))
+                        .ultimaActualizacion(java.time.LocalDateTime.now()).build());
+
+        ResponseEntity<String> cuentas = get("/internal/monolito/calendario/cuentas", tokenServicio());
+        assertThat(cuentas.getStatusCode()).isEqualTo(HttpStatus.OK);
+        // Los tokens viajan tal cual están guardados (cifrados), sin descifrar.
+        assertThat(cuentas.getBody()).contains("\"profesionalId\":" + medico.getId())
+                .contains("\"refreshTokenCifrado\":\"refresh-cifrado-" + medico.getId() + "\"")
+                .contains("\"syncToken\":\"sync-" + medico.getId() + "\"");
+
+        ResponseEntity<String> eventos = get("/internal/monolito/calendario/eventos-externos?desdeId="
+                + (evento.getId() - 1) + "&tamanio=5", tokenServicio());
+        assertThat(eventos.getBody()).contains("\"googleEventId\":\"" + evento.getGoogleEventId() + "\"")
+                .contains("\"profesionalId\":" + medico.getId()).contains("\"titulo\":\"Dentista\"");
+
+        assertThat(get("/internal/monolito/calendario/cuentas", null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
