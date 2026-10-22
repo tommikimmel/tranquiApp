@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-20
 - **Tipo:** feature
 - **Sprint:** sprint-02
-- **Estado:** aprobada (2026-10-20)
+- **Estado:** implementada y verificada en local (2026-10-22); Google real pendiente (decisión 4)
 - **Rama / PR:** una rama y un PR a `develop` por tarea (G1 a G6), encadenadas sobre la Fase 2
 - **Plan:** [microservicios.md, Fase 3](../arquitectura/microservicios.md#fase-3-calendario)
 
@@ -113,20 +113,25 @@ de prueba (decisión 4).
 
 ## Criterios de aceptación
 
-- [ ] Las 7 rutas de `/api/medicos/google-calendar` responden igual desde el servicio; el frontend no cambia.
-- [ ] Un turno online confirmado (pago u OSDE) termina con su evento en Google y el link en el turno y
-      en el mail del paciente, sin duplicados.
-- [ ] Cancelar o reprogramar borra o mueve el evento; desvincular borra los de la app.
-- [ ] La disponibilidad no ofrece horarios ocupados en el Google del profesional, y sale igual si el
+Verificados en local con Meet simulado (G6). Lo que depende de Google real queda marcado y se prueba
+con las credenciales de prueba (decisión 4).
+
+- [x] Las 7 rutas de `/api/medicos/google-calendar` responden igual desde el servicio; el frontend no cambia.
+- [x] Un turno online confirmado (pago u OSDE) termina con su evento en Google y el link en el turno y
+      en el mail del paciente, sin duplicados. *(Meet simulado; el evento en Google real, pendiente.)*
+- [x] Cancelar o reprogramar borra o mueve el evento; desvincular borra los de la app. *(Reflejado en la
+      copia del servicio; contra Google real, pendiente.)*
+- [x] La disponibilidad no ofrece horarios ocupados en el Google del profesional, y sale igual si el
       calendario está caído.
-- [ ] Con el calendario caído, confirmar un turno no falla; al volver, crea el evento y manda el link.
+- [x] Con el calendario caído, confirmar un turno no falla; al volver, crea el evento y manda el link.
 - [ ] Las cuentas ya conectadas siguen conectadas después de la carga inicial, sin volver a autorizar,
-      y los canales de webhook existentes siguen llegando.
-- [ ] Ningún evento lleva tokens de Google.
-- [ ] Con la vuelta atrás (variable del gateway + flag), el calendario funciona como hoy.
-- [ ] Un psiquiatra sin suscripción recibe 403 `SUBSCRIPTION_REQUIRED` en las rutas de los
+      y los canales de webhook existentes siguen llegando. *(La cuenta sigue conectada; los canales,
+      con Google real.)*
+- [x] Ningún evento lleva tokens de Google.
+- [x] Con la vuelta atrás (variable del gateway + flag), el calendario funciona como hoy.
+- [x] Un psiquiatra sin suscripción recibe 403 `SUBSCRIPTION_REQUIRED` en las rutas de los
       servicios, y el portón del sitio también las cubre.
-- [ ] `./mvnw test`, tests del frontend y lint sin errores nuevos.
+- [x] `./mvnw test`, tests del frontend y lint sin errores nuevos.
 
 ## Riesgos e impacto
 
@@ -215,3 +220,34 @@ de prueba (decisión 4).
   local el calendario usa `APP_PUBLIC_URL=http://localhost:8080`.
 - El script de vuelta atrás deja vacío el syncToken del monolito, para que su primera pasada rearme la
   caché de eventos, y desconecta a los profesionales que se desvincularon mientras estuvo el servicio.
+
+### G6 — verificación en local
+Stack completo (`docker-compose.local.yml`), Google deshabilitado y Meet simulado, con la profesional
+Lucía (cuenta conectada) y la paciente Martina.
+
+| Escenario | Resultado |
+|---|---|
+| Carga inicial | 28 participantes, 1 cuenta, 6 turnos; reintenta mientras arranca el monolito |
+| Panel de Google Calendar | Estado servido por el calendario; Sofía (suscripción vencida) recibe 403 |
+| Turno online pagado | Meet simulado → el monolito lo guarda → mail de confirmación y aparte "Ya tenés el link" |
+| Reprogramar y cancelar | Reflejados en `turno_agendado` |
+| Disponibilidad | Un evento propio de 10:00 a 11:30 saca los horarios de las 10 y las 11 |
+| Calendario apagado | Agenda sin el filtro (200), panel 503, la confirmación anda y el Meet llega al volver |
+| Vuelta atrás | Script con `--prueba` y real, idempotente; el monolito sirve el panel (Lucía sigue conectada, syncToken vacío) y crea el Meet en el momento, con un solo mail |
+| Vuelta al servicio | Con la base `calendario` borrada: carga inicial de nuevo, los eventos encolados mientras tanto se procesan después y no tocan el Meet del monolito |
+| Memoria | 163 a 186 MB de 288 (sin JPA; notificaciones y chat rondan 245 MB) |
+
+- **Bug encontrado y corregido:** al volver al servicio, la cola `calendario.eventos` traía las
+  confirmaciones de cuando estuvo apagado y el servicio las consumía antes de terminar la carga inicial.
+  Sin el turno copiado, creaba un Meet nuevo y pisaba el que había creado el monolito (el paciente recibía
+  otro mail con otro link; con Google real, un evento duplicado). Ahora `libs/eventos` tiene
+  `EsperaAntesDeConsumir`: el consumidor declara la topología (la cola sigue juntando eventos) pero no
+  consume hasta que esos beans están listos, y `CargaInicial` lo implementa. Repetido con el arreglo: la
+  carga terminó a las 15:15:51.491 y los dos eventos encolados se procesaron a las :51.744 y :51.760; el
+  turno conservó su Meet y no salió un segundo mail.
+- **Problema encontrado en Consul (Fases 1 a 3), con PR aparte:** los servicios registran un chequeo HTTP
+  con `health-check-critical-timeout: 1m` y se registran una sola vez, al arrancar. Una noche el host se
+  quedó sin memoria, los chequeos pasaron a críticos, Consul dio de baja a notificaciones y chat, y siguieron
+  andando pero el gateway respondió 503 hasta reiniciarlos. En producción pasaría lo mismo con la base de
+  servicios caída más de un minuto.
+- Tests: `libs/eventos` 64, calendario 22, chat 6 y notificaciones 19, sin fallas.
