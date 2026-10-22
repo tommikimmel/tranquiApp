@@ -35,6 +35,22 @@
 - Mercado Pago en modo real (no sandbox): cobros y débitos son reales.
 - Recetas (QBI2) y facturación (ARCA) deshabilitadas.
 
+### Clave JWT
+
+`JWT_SECRET` firma los tokens de sesión de los usuarios. Es obligatoria: si falta en
+`/srv/tranqui/.env`, `docker compose` corta con `Falta JWT_SECRET en .env`, y si mide menos de 32
+bytes el backend no arranca. Hasta la v1.1.0 el backend no la recibía y firmaba con una clave escrita
+en el código (pública, porque el repo es público).
+
+- **Generarla** en el VPS y pegarla en `/srv/tranqui/.env` (nunca en el repo):
+  ```bash
+  openssl rand -base64 48
+  ```
+- **Al cargarla por primera vez se cierran todas las sesiones abiertas:** los tokens firmados con la
+  clave anterior dejan de valer y todos tienen que volver a iniciar sesión. Conviene desplegar en un
+  horario de poco uso. Lo mismo pasa cada vez que se rota.
+- No reutilizar `ENCRYPTION_KEY`: cada clave tiene un uso distinto.
+
 ## Base de datos
 
 - Esquema: Hibernate `ddl-auto: update` crea lo nuevo; Flyway aplica las migraciones de

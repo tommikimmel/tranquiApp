@@ -105,4 +105,25 @@ class JwtServiceTest {
 
         assertNull(token);
     }
+
+    @Test
+    void whenSecretMissing_thenStartupFails() {
+        JwtService sinClave = new JwtService();
+        ReflectionTestUtils.setField(sinClave, "secretKey", "");
+
+        assertThrows(IllegalStateException.class, sinClave::validateSecret);
+    }
+
+    @Test
+    void whenSecretShorterThan32Bytes_thenStartupFails() {
+        JwtService claveCorta = new JwtService();
+        ReflectionTestUtils.setField(claveCorta, "secretKey", "corta-de-31-bytes-0123456789abc");
+
+        assertThrows(IllegalStateException.class, claveCorta::validateSecret);
+    }
+
+    @Test
+    void whenSecretLongEnough_thenStartupPasses() {
+        assertDoesNotThrow(jwtService::validateSecret);
+    }
 }
