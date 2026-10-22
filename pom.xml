@@ -28,6 +28,7 @@
 		<module>gateway</module>
 		<module>services/notificaciones</module>
 		<module>services/chat</module>
+		<module>services/calendario</module>
 	</modules>
 
 	<dependencyManagement>
