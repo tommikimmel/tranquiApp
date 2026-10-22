@@ -105,4 +105,17 @@ class JwtServiceTest {
 
         assertNull(token);
     }
+
+    @Test
+    void whenSecretIsMissingOrTooShort_thenValidateSecretThrowsIllegalStateException() {
+        JwtService serviceWithoutSecret = new JwtService();
+        ReflectionTestUtils.setField(serviceWithoutSecret, "secretKey", "");
+        assertThrows(IllegalStateException.class, serviceWithoutSecret::validateSecret);
+
+        ReflectionTestUtils.setField(serviceWithoutSecret, "secretKey", "short-secret");
+        assertThrows(IllegalStateException.class, serviceWithoutSecret::validateSecret);
+
+        ReflectionTestUtils.setField(serviceWithoutSecret, "secretKey", null);
+        assertThrows(IllegalStateException.class, serviceWithoutSecret::validateSecret);
+    }
 }

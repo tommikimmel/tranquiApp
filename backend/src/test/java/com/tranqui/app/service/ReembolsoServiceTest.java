@@ -9,6 +9,8 @@ import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.TipoTurno;
 import com.tranqui.app.model.Turno;
 import com.tranqui.app.model.Usuario;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.app.repository.PagoRepository;
 import com.tranqui.app.util.EncryptionUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +36,12 @@ class ReembolsoServiceTest {
 
     @Mock
     private EncryptionUtil encryptionUtil;
+
+    @Mock
+    private OutboxPublisher outboxPublisher;
+
+    @Mock
+    private PagoRepository pagoRepository;
 
     @InjectMocks
     private ReembolsoService reembolsoService;
@@ -141,6 +149,7 @@ class ReembolsoServiceTest {
             }
         };
         ReflectionTestUtils.setField(spyService, "encryptionUtil", encryptionUtil);
+        ReflectionTestUtils.setField(spyService, "outboxPublisher", outboxPublisher);
         ReflectionTestUtils.setField(spyService, "isEnabled", true);
 
         boolean resultado = spyService.procesarReembolso(turnoConTiempo, medico);
@@ -169,6 +178,7 @@ class ReembolsoServiceTest {
             }
         };
         ReflectionTestUtils.setField(spyService, "encryptionUtil", encryptionUtil);
+        ReflectionTestUtils.setField(spyService, "outboxPublisher", outboxPublisher);
         ReflectionTestUtils.setField(spyService, "isEnabled", false);
 
         boolean resultado = spyService.procesarReembolso(turnoConTiempo, medico);
