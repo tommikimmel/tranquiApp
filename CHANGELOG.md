@@ -6,6 +6,10 @@ Todos los cambios relevantes de Tranqui App. Formato basado en
 
 ## [Sin publicar]
 
+### Seguridad
+
+- **Clave de los JWT de sesión (hotfix):** el backend de producción no recibía `JWT_SECRET` y firmaba las sesiones con una clave escrita en el código, pública porque el repo es público: cualquiera podía armarse una sesión de administrador. Ahora `jwt.secret` sale de `JWT_SECRET`, sin default; el backend no arranca si falta o mide menos de 32 bytes, y `docker-compose.yml` la exige. Al desplegar se cierran las sesiones abiertas. Ver "Clave JWT" en `docs/entornos/produccion.md`.
+
 ## [v1.1.0] - 2026-10-07
 
 ### CI y deploy

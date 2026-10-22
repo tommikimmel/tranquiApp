@@ -92,3 +92,8 @@ novedades:
 resend:
   api-key: ${RESEND_API_KEY:}
   from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}
+
+# Firma de los JWT de sesión. Obligatoria y sin default (JwtService no arranca sin ella); en
+# producción vive en el .env del VPS. Ver docs/entornos/produccion.md, "Clave JWT".
+jwt:
+  secret: ${JWT_SECRET:}

@@ -12,7 +12,7 @@ cifrado. `.env` está en `.gitignore`; `.env.template` lista los nombres con val
 | Datos del VPS para Actions | Secretos `VPS_HOST`, `VPS_USER`, `VPS_KNOWN_HOSTS` (línea de `ssh-keyscan`) y `VPS_HOST_FINGERPRINT` (`SHA256:...`) | Reemplazarlos en GitHub si cambia el servidor |
 | Tu clave SSH personal (privada) | Solo en tu máquina (`~/.ssh/tranqui_vps`) | Igual que la de Actions, con tu propia clave |
 | Configuración local de los scripts | `.env.vps` en la raíz del repo (ignorado por git): `VPS_HOST`, `VPS_USER`, `VPS_PRIVATE_KEY_PATH`, `VPS_HOST_FINGERPRINT` | Editando el archivo |
-| Variables de producción (base, cifrado, Mercado Pago, Resend, Google, `NOVEDADES_TOKEN`) | `/srv/tranqui/.env` en el VPS | Por SSH, editando el archivo; después un deploy (o `docker compose -p app --env-file /srv/tranqui/.env -f /srv/tranqui/docker-compose.yml up -d`) |
+| Variables de producción (base, cifrado, `JWT_SECRET`, Mercado Pago, Resend, Google, `NOVEDADES_TOKEN`) | `/srv/tranqui/.env` en el VPS | Por SSH, editando el archivo; después un deploy (o `docker compose -p app --env-file /srv/tranqui/.env -f /srv/tranqui/docker-compose.yml up -d`) |
 | Contraseña de root del VPS | Solo en el gestor de contraseñas del dueño | La cambia el dueño (`passwd` en el VPS). No la usa ningún script ni el CI |
 | Token de GHCR para publicar imágenes | No hace falta: Actions usa el `GITHUB_TOKEN` automático | — |
 
