@@ -5,6 +5,15 @@ import com.tranqui.app.model.dto.NotificacionDocDto;
 import com.tranqui.app.repository.PagoRepository;
 import com.tranqui.app.repository.SolicitudDocumentoRepository;
 import com.tranqui.app.repository.TurnoRepository;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.DocumentoSolicitadoData;
+import com.tranqui.eventos.data.ConceptoAprobadoData;
+import com.tranqui.eventos.data.MeetCreadoData;
+import com.tranqui.eventos.data.PagoAprobadoData;
+import com.tranqui.eventos.data.PagoRechazadoData;
+import com.tranqui.eventos.data.ReembolsoRealizadoData;
+import com.tranqui.eventos.data.TurnoConfirmadoData;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +27,9 @@ import java.time.LocalDateTime;
 public class PagoWebhookHandler {
 
     private static final Logger log = LoggerFactory.getLogger(PagoWebhookHandler.class);
+
+    @Autowired
+    private OutboxPublisher outboxPublisher;
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
@@ -42,10 +54,27 @@ public class PagoWebhookHandler {
 
     @Transactional
     public void procesarAprobacionConcepto(Long solicitudId, String transactionId) {
+        aprobarConcepto(solicitudId, transactionId, true);
+    }
+
+    /**
+     * Fase 4: pagos.concepto.aprobado que publicó el servicio de pagos. Se marca la solicitud sin volver
+     * a publicar el evento; el aviso en vivo al profesional lo manda notificaciones con ese mismo evento.
+     */
+    @Transactional
+    public void aplicarConceptoAprobado(ConceptoAprobadoData d) {
+        if (!solicitudRepository.existsById(d.solicitudId())) {
+            log.warn("pagos.concepto.aprobado de una solicitud que no existe en el monolito: {}", d.solicitudId());
+            return;
+        }
+        aprobarConcepto(d.solicitudId(), d.mpPaymentId(), false);
+    }
+
+    private void aprobarConcepto(Long solicitudId, String transactionId, boolean publicar) {
         SolicitudDocumento solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
-        // Idempotent: this can now be reached twice for the same payment — once from the real
+        // Idempotent: this can now be reached twice for the same payment � once from the real
         // Mercado Pago webhook and once from WebhookController#verificarPago's fallback, which
         // exists precisely because the webhook alone isn't reliable enough (delayed/dropped
         // deliveries used to leave turnos stuck "pending" forever even though the patient paid).
@@ -57,6 +86,24 @@ public class PagoWebhookHandler {
         solicitud.setEstado(EstadoPago.APROBADO);
         solicitud.setTransactionId(transactionId);
         solicitudRepository.save(solicitud);
+        if (!publicar) {
+            return;
+        }
+
+        // Fase 2: /ws-tranqui pasa al servicio de chat; el aviso en vivo al profesional lo manda el
+        // servicio de notificaciones a partir de este evento. El push de abajo queda para la vuelta atrás.
+        outboxPublisher.publicar(
+                Topicos.PAGOS_CONCEPTO_APROBADO_V1,
+                "solicitud",
+                String.valueOf(solicitud.getId()),
+                1,
+                new ConceptoAprobadoData(
+                        solicitud.getId(),
+                        solicitud.getMedico().getId(),
+                        solicitud.getPaciente().getId(),
+                        solicitud.getTipoConcepto() != null ? solicitud.getTipoConcepto().toString() : null
+                )
+        );
 
         log.info("Aprobación de concepto procesada para solicitud ID: {}. Enviando notificación WebSocket...", solicitudId);
 
@@ -77,8 +124,29 @@ public class PagoWebhookHandler {
     public void procesarAprobacionTurno(Long turnoId, String transactionId) {
         Turno turno = turnoRepository.findById(turnoId)
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado con ID: " + turnoId));
+        confirmarTurnoPagado(turno, transactionId, true);
+    }
 
-        // Idempotent for the same reason as procesarAprobacionConcepto above — this now has two
+    /**
+     * Fase 4: pagos.pago.aprobado que publicó el servicio de pagos. Confirma el turno igual que el webhook
+     * (mismos eventos, avisos y mails) y guarda una copia del pago, que todavía leen los ingresos del
+     * profesional y la cancelación; no vuelve a publicar pagos.pago.aprobado. Idempotente: el monolito en
+     * la vuelta atrás también publica este evento y lo recibe.
+     */
+    @Transactional
+    public void aplicarPagoAprobado(PagoAprobadoData d) {
+        Turno turno = turnoRepository.findById(d.turnoId()).orElse(null);
+        if (turno == null) {
+            log.warn("pagos.pago.aprobado de un turno que no existe en el monolito: {}", d.turnoId());
+            return;
+        }
+        confirmarTurnoPagado(turno, d.mpPaymentId(), false);
+    }
+
+    private void confirmarTurnoPagado(Turno turno, String transactionId, boolean publicarPagoAprobado) {
+        Long turnoId = turno.getId();
+
+        // Idempotent for the same reason as procesarAprobacionConcepto above � this now has two
         // callers (the async webhook and the synchronous fallback WebhookController#verificarPago
         // runs right after the patient returns from Checkout Pro) that can legitimately race to
         // process the very same approved payment.
@@ -89,7 +157,7 @@ public class PagoWebhookHandler {
 
         turno.setEstado(EstadoTurno.CONFIRMADO);
 
-        // Sincronizar en Google Calendar todo turno que ocupa agenda (online y presencial) —
+        // Sincronizar en Google Calendar todo turno que ocupa agenda (online y presencial) �
         // mismo criterio que TurnoService#confirmarTurnoOsde. Antes solo se creaba para online, así
         // que los turnos presenciales pagos nunca aparecían en el calendario del profesional.
         if (turno.isOcupaAgenda()) {
@@ -98,9 +166,12 @@ public class PagoWebhookHandler {
                 turno.setTelemedicinaUrl(meetUrl);
             }
         }
-        turnoRepository.save(turno);
+        Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+        if (turnoGuardado != null) {
+            turno = turnoGuardado;
+        }
 
-        // Registrar el Pago
+        // Registrar el Pago (con el servicio de pagos, una copia del que registró el servicio)
         Pago pago = Pago.builder()
                 .turno(turno)
                 .transactionId(transactionId)
@@ -108,12 +179,79 @@ public class PagoWebhookHandler {
                 .monto(turno.getPrecio())
                 .fechaPago(LocalDateTime.now())
                 .build();
-        pagoRepository.save(pago);
+        Pago pagoGuardado = pagoRepository.save(pago);
+        Long pagoId = (pagoGuardado != null && pagoGuardado.getId() != null) ? pagoGuardado.getId() : (pago.getId() != null ? pago.getId() : turno.getId());
+        int pagoVersion = pagoGuardado != null ? pagoGuardado.getAggregateVersion() : pago.getAggregateVersion();
+
+        if (publicarPagoAprobado) {
+            outboxPublisher.publicar(
+                    Topicos.PAGOS_PAGO_APROBADO_V1,
+                    String.valueOf(pagoId),
+                    pagoVersion,
+                    new PagoAprobadoData(
+                            pagoId,
+                            turno.getId(),
+                            transactionId,
+                            pago.getMonto(),
+                            "mercadopago"
+                    )
+            );
+        }
+
+        outboxPublisher.publicar(
+                Topicos.TURNOS_TURNO_CONFIRMADO_V1,
+                String.valueOf(turno.getId()),
+                turno.getAggregateVersion(),
+                new TurnoConfirmadoData(
+                        turno.getId(),
+                        turno.getPaciente().getId(),
+                        turno.getMedico().getId(),
+                        turno.getFecha(),
+                        turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00",
+                        turno.getModalidad() != null ? turno.getModalidad().name() : "ONLINE",
+                        turno.getPrecio(),
+                        turno.isOcupaAgenda(),
+                        turno.isOcupaAgenda() ? resolverTipoTurnoLabel(turno) : null,
+                        turno.isOcupaAgenda() ? null : resolverTipoDocumentoLabel(turno),
+                        turno.getModalidad() == com.tranqui.app.model.Modalidad.ONLINE ? null : turno.getMedico().getDomicilioAtencion(),
+                        turno.getTelemedicinaUrl(),
+                        TurnoConfirmadoData.ORIGEN_PAGO,
+                        turno.getHoraFin() != null ? turno.getHoraFin().toString() : null
+                )
+        );
+
+            if (turno.getTelemedicinaUrl() != null && !turno.getTelemedicinaUrl().isBlank()) {
+                outboxPublisher.publicar(
+                        Topicos.CALENDARIO_MEET_CREADO_V1,
+                        String.valueOf(turno.getId()),
+                        turno.getAggregateVersion(),
+                        new MeetCreadoData(
+                                turno.getId(),
+                                turno.getTelemedicinaUrl(),
+                                turno.getGoogleEventId()
+                        )
+                );
+            }
+
+            if (!turno.isOcupaAgenda()) {
+                outboxPublisher.publicar(
+                        Topicos.TURNOS_DOCUMENTO_SOLICITADO_V1,
+                        String.valueOf(turno.getId()),
+                        turno.getAggregateVersion(),
+                        new DocumentoSolicitadoData(
+                                turno.getId(),
+                                turno.getPaciente().getId(),
+                                turno.getMedico().getId(),
+                                resolverTipoDocumentoLabel(turno),
+                                "DOCUMENTO"
+                        )
+                );
+            }
 
         log.info("Pago aprobado para turno ID: {}.", turnoId);
 
         // Crear notificación para el médico y el paciente. Document-only turnos (ocupaAgenda ==
-        // false) get their own wording — "Nuevo Documento Pendiente" instead of "Nuevo Turno
+        // false) get their own wording � "Nuevo Documento Pendiente" instead of "Nuevo Turno
         // Reservado", since there's no fecha/hora real to reference.
         boolean esDocumento = !turno.isOcupaAgenda();
         try {
@@ -144,7 +282,7 @@ public class PagoWebhookHandler {
             log.error("Error al crear notificaciones de confirmación para el turno ID: {}", turnoId, e);
         }
 
-        // Mail al profesional avisándole del nuevo turno reservado — solo para turnos reales, no
+        // Mail al profesional avisándole del nuevo turno reservado � solo para turnos reales, no
         // para documentos (recetas/certificados/informes tienen su propio flujo de aviso).
         if (!esDocumento && turno.getMedico().getEmail() != null) {
             try {
@@ -185,7 +323,7 @@ public class PagoWebhookHandler {
     }
 
     // Same shape as TurnoService#resolverTypeLabel (private there) but only needs to cover real
-    // turnos — this is only ever called for !esDocumento, so servicioId/tipo here can't be a
+    // turnos � this is only ever called for !esDocumento, so servicioId/tipo here can't be a
     // receta/certificado.
     private String resolverTipoTurnoLabel(Turno turno) {
         if (turno.getTipo() == com.tranqui.app.model.TipoTurno.OBRA_SOCIAL || turno.getTipo() == com.tranqui.app.model.TipoTurno.OSDE) {
@@ -204,5 +342,68 @@ public class PagoWebhookHandler {
         if (turno.getTipo() == com.tranqui.app.model.TipoTurno.RECETA) return "una receta";
         if (turno.getTipo() == com.tranqui.app.model.TipoTurno.CERTIFICADO) return "un certificado";
         return "un documento";
+    }
+
+    /**
+     * Fase 4: pagos.pago.rechazado que publicó el servicio de pagos: se guarda la copia del pago rechazado,
+     * como hacía el webhook, sin volver a publicar. El horario lo libera el vencimiento del bloqueo.
+     */
+    @Transactional
+    public void aplicarPagoRechazado(PagoRechazadoData d) {
+        if (d.mpPaymentId() != null && pagoRepository.findByTransactionId(d.mpPaymentId()).isPresent()) {
+            return;
+        }
+        Turno turno = turnoRepository.findById(d.turnoId()).orElse(null);
+        if (turno == null) {
+            log.warn("pagos.pago.rechazado de un turno que no existe en el monolito: {}", d.turnoId());
+            return;
+        }
+        pagoRepository.save(Pago.builder()
+                .turno(turno)
+                .transactionId(d.mpPaymentId())
+                .estado(EstadoPago.RECHAZADO)
+                .monto(turno.getPrecio())
+                .fechaPago(LocalDateTime.now())
+                .build());
+    }
+
+    /** Fase 4: pagos.reembolso.realizado que publicó el servicio de pagos: la copia del pago queda reembolsada. */
+    @Transactional
+    public void aplicarReembolsoRealizado(ReembolsoRealizadoData d) {
+        turnoRepository.findById(d.turnoId()).map(Turno::getPago).ifPresent(pago -> {
+            if (pago.getEstado() != EstadoPago.REEMBOLSADO) {
+                pago.setEstado(EstadoPago.REEMBOLSADO);
+                pagoRepository.save(pago);
+            }
+        });
+    }
+
+    @Transactional
+    public void procesarRechazoTurno(Long turnoId, String transactionId, String motivo) {
+        Turno turno = turnoRepository.findById(turnoId)
+                .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado con ID: " + turnoId));
+
+        Pago pago = Pago.builder()
+                .turno(turno)
+                .transactionId(transactionId)
+                .estado(EstadoPago.RECHAZADO)
+                .monto(turno.getPrecio())
+                .fechaPago(LocalDateTime.now())
+                .build();
+        Pago pagoGuardado = pagoRepository.save(pago);
+        Long pagoId = (pagoGuardado != null && pagoGuardado.getId() != null) ? pagoGuardado.getId() : (pago.getId() != null ? pago.getId() : turno.getId());
+        int pagoVersion = pagoGuardado != null ? pagoGuardado.getAggregateVersion() : pago.getAggregateVersion();
+
+        outboxPublisher.publicar(
+                Topicos.PAGOS_PAGO_RECHAZADO_V1,
+                String.valueOf(pagoId),
+                pagoVersion,
+                new PagoRechazadoData(
+                        pagoId,
+                        turno.getId(),
+                        transactionId,
+                        motivo != null ? motivo : "Pago rechazado"
+                )
+        );
     }
 }
