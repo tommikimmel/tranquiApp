@@ -41,6 +41,13 @@ public class ResendEmailService {
     private String frontendUrl;
 
     // "resend" (producción) o "smtp" (entorno local con Mailpit, ver application-local.yml).
+    // Fase 1: con false (por defecto) estos mails los manda el servicio de notificaciones a partir
+    // de los eventos que el monolito ya publica; con true vuelve el envío directo (vuelta atrás).
+    // Los mails sin evento (contraseña temporal, copia de datos, documento adjunto, receta,
+    // alerta al admin y novedades) no pasan por este flag y siempre salen de acá.
+    @Value("${notificaciones.envio-directo:false}")
+    private boolean envioDirecto;
+
     @Value("${mail.transport:resend}")
     private String transport;
 
@@ -201,6 +208,7 @@ public class ResendEmailService {
     // ================================================================================
 
     public void enviarCodigoVerificacion(String toEmail, String nombre, String codigo) {
+        if (salteaPorServicioDeNotificaciones("enviarCodigoVerificacion")) return;
         String asunto = "Código de verificación - Tranqui App";
         String cuerpo = "<p>Tu código de verificación para activar tu cuenta en <strong>Tranqui App</strong> es:</p>" +
                 cajaDestacada(codigo) +
@@ -211,6 +219,7 @@ public class ResendEmailService {
     }
 
     public void enviarCodigoRecuperacion(String toEmail, String nombre, String codigo) {
+        if (salteaPorServicioDeNotificaciones("enviarCodigoRecuperacion")) return;
         String asunto = "Recuperación de contraseña - Tranqui App";
         String cuerpo = "<p>Hola " + nombreOUsuario(nombre) + ", solicitaste restablecer tu contraseña en <strong>Tranqui App</strong>. Tu código de recuperación es:</p>" +
                 cajaDestacada(codigo) +
@@ -234,6 +243,7 @@ public class ResendEmailService {
     // the creator (paciente/profesional) gets emailed instead of having to keep the app open to
     // notice, same rationale as every other "something happened while you were away" email here.
     public void enviarRespuestaTicket(String toEmail, String nombreUsuario, String asuntoTicket, String respuesta) {
+        if (salteaPorServicioDeNotificaciones("enviarRespuestaTicket")) return;
         String asunto = "Respondieron tu consulta: " + asuntoTicket;
         String cuerpo = "<p>El equipo de soporte de <strong>Tranqui App</strong> respondió tu consulta \"" + asuntoTicket + "\":</p>" +
                 "<div style=\"background:" + COLOR_PANEL + ";border:1px solid " + COLOR_BORDER + ";padding:15px;border-radius:8px;white-space:pre-wrap;color:" + COLOR_INK + ";margin:16px 0;\">" + respuesta + "</div>" +
@@ -285,6 +295,7 @@ public class ResendEmailService {
 
     public void enviarNuevoTurnoProfesional(String toEmail, String nombreProfesional, String nombrePaciente,
                                              LocalDate fecha, LocalTime hora, String modalidadLabel, String tipoLabel) {
+        if (salteaPorServicioDeNotificaciones("enviarNuevoTurnoProfesional")) return;
         String asunto = "Nuevo turno reservado — " + nombrePaciente;
         String cuerpo = "<p>" + nombrePaciente + " reservó un turno con vos. Estos son los detalles:</p>" +
                 panelInfo(
@@ -302,6 +313,7 @@ public class ResendEmailService {
 
     public void enviarTurnoCanceladoProfesional(String toEmail, String nombreProfesional, String nombrePaciente,
                                                  LocalDate fecha, LocalTime hora) {
+        if (salteaPorServicioDeNotificaciones("enviarTurnoCanceladoProfesional")) return;
         String asunto = "Turno cancelado — " + nombrePaciente;
         String cuerpo = "<p>El siguiente turno fue cancelado:</p>" +
                 panelInfo(
@@ -317,6 +329,7 @@ public class ResendEmailService {
 
     public void enviarTurnoModificadoProfesional(String toEmail, String nombreProfesional, String nombrePaciente,
                                                   LocalDate fechaNueva, LocalTime horaNueva) {
+        if (salteaPorServicioDeNotificaciones("enviarTurnoModificadoProfesional")) return;
         String asunto = "Turno reprogramado — " + nombrePaciente;
         String cuerpo = "<p>Reprogramaste el turno de " + nombrePaciente + ". La nueva fecha y hora son:</p>" +
                 panelInfo(
@@ -341,6 +354,7 @@ public class ResendEmailService {
     public void enviarConfirmacionAsistencia(String toEmail, String nombrePaciente, String nombreProfesional,
                                               LocalDate fecha, LocalTime hora, String modalidadLabel, String tipoLabel,
                                               String direccion, String confirmarUrl, String noAsistiraUrl) {
+        if (salteaPorServicioDeNotificaciones("enviarConfirmacionAsistencia")) return;
         String asunto = "Confirmá tu turno del " + (fecha != null ? fecha.format(FECHA_FMT) : "");
         String cuerpo = "<p>Tu turno con <strong>" + nombreProfesional + "</strong> se acerca. Confirmá tu asistencia para que el profesional sepa que vas a estar, o avisanos si no vas a poder ir.</p>" +
                 panelInfo(
@@ -386,6 +400,7 @@ public class ResendEmailService {
     public void enviarTurnoConfirmadoPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
                                                LocalDate fecha, LocalTime hora, boolean esOnline, String tipoLabel,
                                                String direccion, String meetUrl, BigDecimal monto) {
+        if (salteaPorServicioDeNotificaciones("enviarTurnoConfirmadoPaciente")) return;
         String asunto = "Turno confirmado con " + nombreProfesional + " — " + (fecha != null ? fecha.format(FECHA_FMT) : "");
         String lugar = esOnline
                 ? (meetUrl != null && !meetUrl.isBlank()
@@ -416,6 +431,7 @@ public class ResendEmailService {
     // profesional lo prepara y se lo entrega al paciente.
     public void enviarDocumentoPagadoPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
                                                String tipoDocumentoLabel, BigDecimal monto) {
+        if (salteaPorServicioDeNotificaciones("enviarDocumentoPagadoPaciente")) return;
         String asunto = "Pago confirmado — " + tipoDocumentoLabel;
         String cuerpo = "<p>Recibimos tu pago. " + nombreProfesional + " ya tiene tu pedido y te lo va a enviar en cuanto lo prepare.</p>" +
                 panelInfo(
@@ -433,6 +449,7 @@ public class ResendEmailService {
     public void enviarTurnoCanceladoPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
                                               LocalDate fecha, LocalTime hora, boolean canceladoPorProfesional,
                                               ResultadoReembolso reembolso) {
+        if (salteaPorServicioDeNotificaciones("enviarTurnoCanceladoPaciente")) return;
         String asunto = "Turno cancelado" + (fecha != null ? " — " + fecha.format(FECHA_FMT) : "");
         String motivo = canceladoPorProfesional
                 ? "<p>" + nombreProfesional + " tuvo que cancelar tu turno. Te pedimos disculpas por el inconveniente.</p>"
@@ -460,6 +477,7 @@ public class ResendEmailService {
     public void enviarTurnoReprogramadoPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
                                                  LocalDate fechaNueva, LocalTime horaNueva, boolean esOnline,
                                                  String direccion, String meetUrl) {
+        if (salteaPorServicioDeNotificaciones("enviarTurnoReprogramadoPaciente")) return;
         String asunto = "Tu turno fue reprogramado — " + (fechaNueva != null ? fechaNueva.format(FECHA_FMT) : "");
         String lugar = esOnline
                 ? (meetUrl != null && !meetUrl.isBlank()
@@ -486,6 +504,7 @@ public class ResendEmailService {
     // Calendar no estaba disponible en ese momento o el profesional lo conectó más tarde).
     public void enviarLinkVideollamadaPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
                                                 LocalDate fecha, LocalTime hora, String meetUrl) {
+        if (salteaPorServicioDeNotificaciones("enviarLinkVideollamadaPaciente")) return;
         String asunto = "Ya tenés el link de tu sesión online — " + (fecha != null ? fecha.format(FECHA_FMT) : "");
         String cuerpo = "<p>Ya está listo el link de la videollamada de tu turno con " + nombreProfesional + ".</p>" +
                 panelInfo(
@@ -522,6 +541,7 @@ public class ResendEmailService {
     // ================================================================================
 
     public void enviarPreavisoRenovacionSuscripcion(String toEmail, String nombre, String nombrePlan, BigDecimal monto, LocalDateTime fechaCobro, String billingCycle) {
+        if (salteaPorServicioDeNotificaciones("enviarPreavisoRenovacionSuscripcion")) return;
         String asunto = "Recordatorio: tu suscripción se renovará en 3 días - Tranqui App";
         String fechaStr = fechaCobro != null ? fechaCobro.format(DATE_FORMATTER) : "en los próximos 3 días";
         String cicloStr = "annual".equalsIgnoreCase(billingCycle) ? "anual" : "mensual";
@@ -558,6 +578,7 @@ public class ResendEmailService {
     }
 
     public void enviarConfirmacionPagoSuscripcion(String toEmail, String nombre, String nombrePlan, BigDecimal monto, LocalDateTime periodoInicio, LocalDateTime periodoFin, String comprobanteRef) {
+        if (salteaPorServicioDeNotificaciones("enviarConfirmacionPagoSuscripcion")) return;
         String asunto = "¡Pago confirmado! Tu suscripción a Tranqui App está activa";
         String inicioStr = periodoInicio != null ? periodoInicio.format(DATE_FORMATTER) : "hoy";
         String finStr = periodoFin != null ? periodoFin.format(DATE_FORMATTER) : "próximo período";
@@ -593,6 +614,7 @@ public class ResendEmailService {
     }
 
     public void enviarAvisoPagoFallidoSuscripcion(String toEmail, String nombre, String nombrePlan, BigDecimal monto, LocalDateTime fechaVencimientoGracia) {
+        if (salteaPorServicioDeNotificaciones("enviarAvisoPagoFallidoSuscripcion")) return;
         String asunto = "Problema con el cobro de tu suscripción - Período de gracia activado";
         String graciaStr = fechaVencimientoGracia != null ? fechaVencimientoGracia.format(DATE_FORMATTER) : "en 7 días";
         String montoStr = monto != null ? String.format(Locale.GERMANY, "%,.2f", monto) : "0,00";
@@ -623,6 +645,7 @@ public class ResendEmailService {
     }
 
     public void enviarConfirmacionCancelacionSuscripcion(String toEmail, String nombre, String nombrePlan, LocalDateTime accesoHasta) {
+        if (salteaPorServicioDeNotificaciones("enviarConfirmacionCancelacionSuscripcion")) return;
         String asunto = "Suscripción cancelada - Tranqui App";
         String accesoHastaStr = accesoHasta != null ? accesoHasta.format(DATE_FORMATTER) : "el fin del período abonado";
 
@@ -652,6 +675,7 @@ public class ResendEmailService {
     }
 
     public void enviarAvisoSuspensionSuscripcion(String toEmail, String nombre, String nombrePlan) {
+        if (salteaPorServicioDeNotificaciones("enviarAvisoSuspensionSuscripcion")) return;
         String asunto = "Suscripción suspendida - Tranqui App";
 
         String htmlContent = String.format(
@@ -674,6 +698,7 @@ public class ResendEmailService {
     }
 
     public void enviarAvisoVencimientoManualSuscripcion(String toEmail, String nombre, String nombrePlan, LocalDateTime fechaVencimiento, int diasRestantes) {
+        if (salteaPorServicioDeNotificaciones("enviarAvisoVencimientoManualSuscripcion")) return;
         String asunto = String.format("Tu suscripción a Tranqui App vence en %d días", diasRestantes);
         String vencimientoStr = fechaVencimiento != null ? fechaVencimiento.format(DATE_FORMATTER) : "próximamente";
 
@@ -811,6 +836,14 @@ public class ResendEmailService {
     // ================================================================================
     // Transporte SMTP — solo entorno local (Mailpit). Mismo HTML que se envía por Resend.
     // ================================================================================
+
+    private boolean salteaPorServicioDeNotificaciones(String mail) {
+        if (envioDirecto) {
+            return false;
+        }
+        log.debug("{}: lo manda el servicio de notificaciones (notificaciones.envio-directo=false)", mail);
+        return true;
+    }
 
     private boolean usarSmtp() {
         return "smtp".equalsIgnoreCase(transport);
