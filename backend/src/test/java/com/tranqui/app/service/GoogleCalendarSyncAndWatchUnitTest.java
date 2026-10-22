@@ -1,5 +1,6 @@
 package com.tranqui.app.service;
 
+import com.tranqui.app.eventos.OutboxPublisher;
 import com.tranqui.app.model.GoogleCalendarEventoExterno;
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.Turno;
@@ -27,6 +28,9 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class GoogleCalendarSyncAndWatchUnitTest {
+
+    @Mock
+    private OutboxPublisher outboxPublisher;
 
     @Mock
     private GoogleCalendarOAuthService googleCalendarOAuthService;
@@ -155,8 +159,13 @@ class GoogleCalendarSyncAndWatchUnitTest {
 
         when(turnoRepository.existsByMedicoIdAndGoogleEventId(1L, "ext-normal-1")).thenReturn(false);
         when(eventoExternoRepository.findByGoogleEventId("ext-normal-1")).thenReturn(Optional.empty());
+        when(eventoExternoRepository.saveAndFlush(any(GoogleCalendarEventoExterno.class))).thenAnswer(i -> {
+            GoogleCalendarEventoExterno ev = i.getArgument(0);
+            ev.setId(999L);
+            return ev;
+        });
         ReflectionTestUtils.invokeMethod(syncService, "aplicarCambio", medico, normalEvent);
-        verify(eventoExternoRepository).save(any(GoogleCalendarEventoExterno.class));
+        verify(eventoExternoRepository).saveAndFlush(any(GoogleCalendarEventoExterno.class));
 
         // 4. aLocalDateTime tests
         assertNull(ReflectionTestUtils.invokeMethod(syncService, "aLocalDateTime", (com.google.api.services.calendar.model.EventDateTime) null));
@@ -283,6 +292,7 @@ class GoogleCalendarSyncAndWatchUnitTest {
                 .modalidad(com.tranqui.app.model.Modalidad.ONLINE)
                 .build();
         when(turnoRepository.findTurnosFuturosConfirmadosParaGoogle(eq(1L), any(), any())).thenReturn(List.of(turno));
+        when(turnoRepository.saveAndFlush(turno)).thenReturn(turno);
         when(googleCalendarService.crearEventoReunion(turno)).thenAnswer(i -> {
             turno.setGoogleEventId("evt-real");
             return "https://meet.google.com/abc-defg-hij";
@@ -291,7 +301,7 @@ class GoogleCalendarSyncAndWatchUnitTest {
         syncService.exportarTurnosPendientesAGoogleCalendar(medico);
 
         assertEquals("https://meet.google.com/abc-defg-hij", turno.getTelemedicinaUrl());
-        verify(turnoRepository).save(turno);
+        verify(turnoRepository).saveAndFlush(turno);
         verify(resendEmailService).enviarLinkVideollamadaPaciente(eq("ana@mail.com"), eq("Ana"), eq("Dr. Carlos"),
                 eq(turno.getFecha()), eq(turno.getHoraInicio()), eq("https://meet.google.com/abc-defg-hij"));
     }
