@@ -28,16 +28,17 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 | `tranqui-notificaciones` | `notificaciones` | Servicio de notificaciones (Fase 1): mails y avisos en la app a partir de eventos, base propia `notificaciones` | 288 MB | 0.5 |
 | `tranqui-chat` | `chat` | Servicio de chat (Fase 2): mensajería en vivo por `/ws-tranqui` e historial, base propia `chat` | 288 MB | 0.5 |
 | `tranqui-calendario` | `calendario` | Servicio de calendario (Fase 3): Google Calendar y Meet, eventos de los turnos y horarios ocupados, base propia `calendario` | 288 MB | 0.5 |
+| `tranqui-pagos` | `pagos` | Servicio de pagos (Fase 4): Mercado Pago de turnos y documentos (checkout, webhooks, reembolsos y cuentas de los profesionales), base propia `pagos` | 288 MB | 0.5 |
 | `tranqui-db-servicios` | `db-servicios` | Contenedor de una sola ejecución: crea la base y el usuario de cada servicio (`infra/postgres/crear-bases-servicios.sh`) y termina | 32 MB | 0.2 |
 | `tranqui-bot`, `tranqui-bot-worker`, `wsp-db`, `wsp-redis` | — | Bot de WhatsApp (proyecto aparte, fuera de este repositorio) | ~70 MB | — |
 
 ### Presupuesto de memoria (RAM)
 
-- **Total suma `mem_limit` Docker Compose (Fase 3):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 288 + 288 + 288 = 2.976 MB` (~2,98 GB; `db-servicios` corre unos segundos al arrancar y no suma).
+- **Total suma `mem_limit` Docker Compose (Fase 4):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 288 + 288 + 288 + 288 = 3.264 MB` (~3,26 GB; `db-servicios` corre unos segundos al arrancar y no suma).
 - **Traefik y bot de WhatsApp:** ~112 MB.
 - **Sistema operativo y buffers mínimos:** ~1 GB.
-- **Consumo proyectado total en VPS:** **~4,1 GB**, ampliamente dentro del techo presupuestado de **~4,8 GB**
-  de la sección 9.1 para la Fase 0, reservando ~3 GB de margen libre para picos y caché de disco de PostgreSQL.
+- **Consumo proyectado total en VPS:** **~4,4 GB**, dentro del techo presupuestado de **~4,8 GB**
+  de la sección 9.1 para la Fase 0, reservando ~3,5 GB de margen libre para picos y caché de disco de PostgreSQL.
 
 ### Afinación de JVM (backend y gateway)
 
@@ -141,6 +142,50 @@ define dependencias escalonadas con `condition: service_healthy`:
    docker compose -p app ps
    curl -fsS https://tranquisalud.com/api/health
    ```
+
+## Fase 4: servicio de pagos
+
+Mercado Pago de los turnos y de los documentos pagos vive en el contenedor `pagos`: `/api/payments`
+(el webhook, "verificar" y el link del checkout) y `/api/medicos/mercadopago` (incluido el callback del
+OAuth), en las mismas URLs públicas. Crea la preferencia a partir de la reserva (la reserva responde sin
+link y el frontend lo pide aparte), confirma por `pagos.pago.aprobado` y reembolsa a partir de la
+cancelación (el paciente recibe el mail de cancelación y otro cuando Mercado Pago confirma el reembolso).
+Las **suscripciones siguen en el monolito** (Fase 7): Mercado Pago avisa todo a la misma URL y el servicio
+le reenvía al monolito, por `/internal/monolito/pagos/notificacion-suscripcion`, lo que es de
+suscripciones. En el panel de Mercado Pago no cambia nada.
+
+**Variables en `/srv/tranqui/.env`:** `PAGOS_DB_PASSWORD` (`openssl rand -hex 24`). Las de Mercado Pago
+(`MERCADOPAGO_ENABLED`, `MERCADOPAGO_CLIENT_ID`, `MERCADOPAGO_CLIENT_SECRET`, `MERCADOPAGO_WEBHOOK_SECRET`,
+`PAYMENT_SIMULATION_ENABLED`) y `APP_PUBLIC_URL`/`FRONTEND_URL` son las mismas que ya usa el monolito.
+Necesita la misma `ENCRYPTION_KEY` y el hotfix de la clave de cifrado en el monolito, como el calendario.
+
+**Primer arranque:** copia del monolito los usuarios, las cuentas de Mercado Pago (tokens cifrados, sin
+descifrarlos: nadie vuelve a vincular), los pagos, los documentos de la API de conceptos y los turnos que
+están esperando el pago. Recién después empieza a consumir eventos.
+
+**El corte va en un solo paso**, en una ventana sin checkouts en curso (duran 5 minutos):
+`PAGOS_EXTERNO=true` en el monolito y la ruta del gateway al servicio. Mercado Pago reintenta los
+webhooks que no responden 200, y "verificar" rescata los que se pierdan. Después, una prueba con un
+monto mínimo (con aprobación) y la conciliación todos los días durante dos semanas:
+```bash
+node scripts/fase4-conciliar-pagos.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+```
+
+**Vuelta atrás de la Fase 4** (sin desvincular a nadie ni perder pagos):
+
+1. En `/srv/tranqui/.env`: `PAGOS_EXTERNO=false` y `TRANQUI_SERVICES_PAGOS_URI=http://tranqui-backend:8080`.
+2. `docker compose -p app stop pagos` y `docker compose -p app up -d tranqui-backend gateway`.
+3. Devolver al monolito las cuentas de Mercado Pago y los pagos registrados por el servicio (idempotente;
+   `--prueba` solo cuenta):
+   ```bash
+   node scripts/fase4-devolver-pagos.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+   ```
+4. Un reembolso que el servicio no llegó a hacer (cancelado con `EN_PROCESO` mientras estaba caído) se
+   hace a mano desde Mercado Pago: la conciliación lo muestra como pago aprobado de un turno cancelado.
+
+**Volver al servicio después:** borrar la base de pagos para que el primer arranque vuelva a copiar todo:
+`docker compose -p app exec tranqui-db psql -U <DB_USER> -d tranqui_app -c "DROP DATABASE pagos"`, volver
+las dos variables a su valor y `docker compose -p app up -d`.
 
 ## Fase 3: servicio de calendario
 

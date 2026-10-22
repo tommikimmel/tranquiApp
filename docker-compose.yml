@@ -228,6 +228,9 @@ services:
       # Fase 3: Google Calendar lo maneja el servicio de calendario; el monolito guarda el Meet que le
       # avisa. Vuelta atrás: CALENDARIO_EXTERNO=false en el .env, junto con la ruta del gateway.
       CALENDARIO_EXTERNO: ${CALENDARIO_EXTERNO:-true}
+      # Fase 4: Mercado Pago lo maneja el servicio de pagos (las suscripciones siguen acá). Vuelta atrás:
+      # PAGOS_EXTERNO=false en el .env, junto con la ruta del gateway y scripts/fase4-devolver-pagos.mjs.
+      PAGOS_EXTERNO: ${PAGOS_EXTERNO:-true}
       EVENTOS_CONSUMO_SERVICIO: monolito
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || exit 1"]
@@ -272,6 +275,9 @@ services:
       # Fase 3: /api/medicos/google-calendar e /internal/calendario al servicio. Vuelta atrás: en el .env,
       # TRANQUI_SERVICES_CALENDARIO_URI=http://tranqui-backend:8080 y CALENDARIO_EXTERNO=false.
       TRANQUI_SERVICES_CALENDARIO_URI: ${TRANQUI_SERVICES_CALENDARIO_URI:-lb://calendario}
+      # Fase 4: /api/payments y /api/medicos/mercadopago al servicio. Vuelta atrás: en el .env,
+      # TRANQUI_SERVICES_PAGOS_URI=http://tranqui-backend:8080 y PAGOS_EXTERNO=false.
+      TRANQUI_SERVICES_PAGOS_URI: ${TRANQUI_SERVICES_PAGOS_URI:-lb://pagos}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
       # Fase 3 (G1): el gateway aplica el portón del sitio y el paywall a las rutas de los servicios.
@@ -314,10 +320,11 @@ services:
       PGUSER: ${DB_USER:-tomaskimmel}
       PGPASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
       PGDATABASE: ${DB_NAME:-tranqui_app}
-      SERVICIOS: notificaciones chat calendario
+      SERVICIOS: notificaciones chat calendario pagos
       DB_PASSWORD_NOTIFICACIONES: ${NOTIFICACIONES_DB_PASSWORD:?Falta NOTIFICACIONES_DB_PASSWORD en .env}
       DB_PASSWORD_CHAT: ${CHAT_DB_PASSWORD:?Falta CHAT_DB_PASSWORD en .env}
       DB_PASSWORD_CALENDARIO: ${CALENDARIO_DB_PASSWORD:?Falta CALENDARIO_DB_PASSWORD en .env}
+      DB_PASSWORD_PAGOS: ${PAGOS_DB_PASSWORD:?Falta PAGOS_DB_PASSWORD en .env}
     volumes:
       - ./infra/postgres:/infra:ro
     mem_limit: 32m
@@ -493,6 +500,66 @@ services:
       tranqui-network:
         aliases:
           - tranqui-calendario
+
+  pagos:
+    image: ghcr.io/tommikimmel/tranqui-pagos:${TRANQUI_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: services/pagos/Dockerfile
+    container_name: tranqui-pagos
+    restart: always
+    mem_limit: 288m
+    cpus: 0.5
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+      JAVA_TOOL_OPTIONS: "-XX:+UseSerialGC -XX:MinRAMPercentage=30 -XX:MaxRAMPercentage=30 -Xss256k -XX:ReservedCodeCacheSize=32m -XX:MaxMetaspaceSize=128m -XX:TieredStopAtLevel=1"
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://tranqui-db:5432/pagos
+      SPRING_DATASOURCE_USERNAME: pagos
+      SPRING_DATASOURCE_PASSWORD: ${PAGOS_DB_PASSWORD:?Falta PAGOS_DB_PASSWORD en .env}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-tranqui}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD en .env}
+      SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/}
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+      TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
+      # Las mismas variables de Mercado Pago que tenía el monolito (misma aplicación y mismo webhook).
+      MERCADOPAGO_ENABLED: ${MERCADOPAGO_ENABLED:-false}
+      MERCADOPAGO_CLIENT_ID: ${MERCADOPAGO_CLIENT_ID:-}
+      MERCADOPAGO_CLIENT_SECRET: ${MERCADOPAGO_CLIENT_SECRET:-}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-}
+      PAYMENT_SIMULATION_ENABLED: ${PAYMENT_SIMULATION_ENABLED:-false}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:8081}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      # La misma clave que el monolito: los tokens de Mercado Pago se leen en los dos.
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Falta ENCRYPTION_KEY en .env}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    # Arranque escalonado (sección 9.3): una JVM detrás de la otra.
+    depends_on:
+      db-servicios:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+      calendario:
+        condition: service_healthy
+    networks:
+      tranqui-network:
+        aliases:
+          - tranqui-pagos
 
   tranqui-frontend:
     image: ghcr.io/tommikimmel/tranqui-frontend:${TRANQUI_VERSION:-latest}

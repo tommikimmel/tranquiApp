@@ -57,6 +57,9 @@ jobs:
           - servicio: calendario
             context: .
             file: ./services/calendario/Dockerfile
+          - servicio: pagos
+            context: .
+            file: ./services/pagos/Dockerfile
           - servicio: backend
             context: .
             file: ./backend/Dockerfile

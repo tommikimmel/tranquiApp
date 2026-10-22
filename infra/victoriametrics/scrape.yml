@@ -37,6 +37,13 @@ scrape_configs:
         labels:
           servicio: 'calendario'
 
+  - job_name: 'pagos'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['pagos:8082']
+        labels:
+          servicio: 'pagos'
+
   - job_name: 'rabbitmq'
     metrics_path: '/metrics'
     static_configs:

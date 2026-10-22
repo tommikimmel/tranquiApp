@@ -140,3 +140,20 @@ jobs:
           cache-from: type=gha,scope=calendario
           cache-to: type=gha,mode=max,scope=calendario
 
+  imagen-pagos:
+    name: Imagen Pagos (build sin push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen del servicio de pagos
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/pagos/Dockerfile
+          push: false
+          cache-from: type=gha,scope=pagos
+          cache-to: type=gha,mode=max,scope=pagos
+
