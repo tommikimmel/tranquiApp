@@ -242,6 +242,17 @@ class GoogleCalendarSyncAndWatchUnitTest {
     }
 
     @Test
+    void watchService_aceptaLosCanalesFirmadosConLaClaveAnterior() {
+        // Un canal registrado antes de la v2 se firmó con la clave legada: vale hasta la renovación.
+        ReflectionTestUtils.setField(watchService, "channelTokenSigningKey", "masterdecryptionkey32charspart12");
+        String tokenViejo = watchService.signChannelToken(7L);
+        ReflectionTestUtils.setField(watchService, "channelTokenSigningKey", "01234567890123456789012345678901");
+
+        assertEquals(7L, watchService.verificarChannelToken(tokenViejo));
+        assertNotEquals(tokenViejo, watchService.signChannelToken(7L));
+    }
+
+    @Test
     void watchService_guardsWhenDisabled() {
         ReflectionTestUtils.setField(watchService, "watchEnabled", false);
         assertFalse(watchService.isWatchEnabled());

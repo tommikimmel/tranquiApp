@@ -4,6 +4,7 @@ import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.model.Channel;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.app.util.EncryptionUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,7 +43,7 @@ public class GoogleCalendarWatchService {
     @Value("${app.public-url:http://localhost:8081}")
     private String appPublicUrl;
 
-    @Value("${security.encryption.key:masterdecryptionkey32charspart12}")
+    @Value("${security.encryption.key:}")
     private String channelTokenSigningKey;
 
     @Autowired
@@ -140,7 +141,7 @@ public class GoogleCalendarWatchService {
     // for this médico without needing session/auth on a public endpoint.
     public String signChannelToken(Long medicoId) {
         String payload = String.valueOf(medicoId);
-        return payload + "." + hmac(payload);
+        return payload + "." + hmac(payload, channelTokenSigningKey);
     }
 
     public Long verificarChannelToken(String token) {
@@ -150,7 +151,10 @@ public class GoogleCalendarWatchService {
         int sep = token.lastIndexOf('.');
         String payload = token.substring(0, sep);
         String signature = token.substring(sep + 1);
-        if (!constantTimeEquals(hmac(payload), signature)) {
+        // Los canales registrados hasta la v1.1.0 se firmaron con la clave legada; valen hasta que la
+        // renovación diaria los vuelve a registrar con la actual.
+        if (!constantTimeEquals(hmac(payload, channelTokenSigningKey), signature)
+                && !constantTimeEquals(hmac(payload, EncryptionUtil.claveLegada()), signature)) {
             return null;
         }
         try {
@@ -160,9 +164,9 @@ public class GoogleCalendarWatchService {
         }
     }
 
-    private String hmac(String payload) {
+    private String hmac(String payload, String clave) {
         try {
-            SecretKeySpec keySpec = new SecretKeySpec(channelTokenSigningKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            SecretKeySpec keySpec = new SecretKeySpec(clave.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(keySpec);
             byte[] rawHmac = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));

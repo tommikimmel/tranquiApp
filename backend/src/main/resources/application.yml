@@ -89,6 +89,13 @@ novedades:
   segmento-pacientes: Tranqui App - Pacientes
   segmento-profesionales: Tranqui App - Profesionales
 
+# Cifra los tokens de Mercado Pago y Google guardados y firma el state del OAuth y los canales de
+# Google. Obligatoria (EncryptionUtil no arranca sin ella). Hasta la v1.1.0 nada mapeaba
+# ENCRYPTION_KEY a esta propiedad. Ver docs/entornos/produccion.md, "Clave de cifrado".
+security:
+  encryption:
+    key: ${ENCRYPTION_KEY:}
+
 resend:
   api-key: ${RESEND_API_KEY:}
   from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}

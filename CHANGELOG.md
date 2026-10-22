@@ -6,6 +6,10 @@ Todos los cambios relevantes de Tranqui App. Formato basado en
 
 ## [Sin publicar]
 
+### Seguridad
+
+- **Clave de cifrado de los tokens (hotfix):** el backend nunca usó la `ENCRYPTION_KEY` del `.env`: leía `security.encryption.key`, que nada mapeaba, y cifraba los tokens de Mercado Pago y de Google, y firmaba el `state` del OAuth y los canales de Google, con una clave escrita en el código, pública porque el repo es público. Ahora la propiedad sale de `ENCRYPTION_KEY`, sin default, y el backend no arranca si falta, si mide menos de 32 bytes o si es un valor publicado en el repo. Cifrado nuevo AES-256-GCM con IV aleatorio (formato `v2:`). Los tokens viejos se siguen leyendo, y `RecifradoTokensLegados` los pasa a la clave nueva al arrancar, guardando 14 días un respaldo para la vuelta atrás. Ver "Clave de cifrado" en `docs/entornos/produccion.md`.
+
 ## [v1.1.0] - 2026-10-07
 
 ### CI y deploy
