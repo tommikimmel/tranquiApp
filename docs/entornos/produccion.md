@@ -35,6 +35,38 @@
 - Mercado Pago en modo real (no sandbox): cobros y débitos son reales.
 - Recetas (QBI2) y facturación (ARCA) deshabilitadas.
 
+### Clave de cifrado
+
+`ENCRYPTION_KEY` cifra los tokens de Mercado Pago y de Google guardados en la base (AES-256-GCM, formato
+`v2:`) y firma el `state` del OAuth y los canales de Google. Es obligatoria, de al menos 32 bytes, y el
+backend no arranca si falta o si tiene un valor publicado en el repo (el de `.env.template` o el viejo).
+
+Hasta la v1.1.0 el backend **no la usaba**: leía `security.encryption.key`, que nada mapeaba, y cifraba
+con una clave escrita en el código, pública porque el repo es público.
+
+- **Primer deploy con la corrección:**
+  1. Generar una clave nueva en el VPS y pegarla en `/srv/tranqui/.env` (nunca en el repo):
+     `openssl rand -base64 48`. No reutilizar la de antes ni `JWT_SECRET`.
+  2. Desplegar. Al arrancar, `RecifradoTokensLegados` pasa a la clave nueva los tokens viejos y deja
+     en el log cuántos pasó (`Cifrado de tokens: N valor(es)...`). Corre en cada arranque y no hace
+     nada cuando ya no quedan.
+  3. Los profesionales siguen conectados a Mercado Pago y a Google sin volver a autorizar. Los canales
+     de Google firmados antes valen hasta que la renovación diaria los vuelve a registrar.
+- **Volver a una imagen anterior:** la v1.1.0 no lee el formato nuevo. Antes de bajar la imagen,
+  devolver los valores originales desde `cifrado_legado_respaldo` (con aprobación, como todo lo que
+  toca la base), una vez por columna:
+  ```sql
+  UPDATE usuario u SET mp_access_token_encrypted = r.valor
+  FROM cifrado_legado_respaldo r
+  WHERE r.usuario_id = u.id AND r.columna = 'mp_access_token_encrypted';
+  -- igual con mp_refresh_token_encrypted, google_access_token_encrypted y google_refresh_token_encrypted
+  ```
+  Un token que se renovó después del deploy no tiene respaldo (sigue en `v2:`) y ese profesional tiene
+  que volver a conectar la cuenta. El respaldo se borra solo a los 14 días, porque está cifrado con la
+  clave pública.
+- Rotarla más adelante no tiene un proceso automático: los tokens en `v2:` solo se leen con la clave con
+  la que se cifraron.
+
 ## Base de datos
 
 - Esquema: Hibernate `ddl-auto: update` crea lo nuevo; Flyway aplica las migraciones de

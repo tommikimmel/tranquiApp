@@ -40,3 +40,7 @@ app:
   admin-initial-password: admin123
   demo-data: ${DEMO_DATA:true}
   local-simulations: true
+
+security:
+  encryption:
+    key: ${ENCRYPTION_KEY:local-dev-encryption-key-32chars}

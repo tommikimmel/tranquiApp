@@ -52,7 +52,7 @@ public class MercadoPagoOAuthService {
     @Value("${app.public-url:http://localhost:8081}")
     private String appPublicUrl;
 
-    @Value("${security.encryption.key:masterdecryptionkey32charspart12}")
+    @Value("${security.encryption.key:}")
     private String stateSigningKey;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
