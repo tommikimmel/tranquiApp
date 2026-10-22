@@ -574,8 +574,11 @@ tranqui:
       uri: ${tranqui.services.monolito.uri}
     turnos:
       uri: ${tranqui.services.monolito.uri}
+    # Fase 4: lb://pagos cuando el servicio está desplegado (docker-compose). Lleva /api/payments (webhook,
+    # verificar y el link del checkout) y /api/medicos/mercadopago (incluido el callback del OAuth). Vuelta
+    # atrás: sacar la variable y PAGOS_EXTERNO=false en el monolito.
     pagos:
-      uri: ${tranqui.services.monolito.uri}
+      uri: ${TRANQUI_SERVICES_PAGOS_URI:${tranqui.services.monolito.uri}}
     suscripciones:
       uri: ${tranqui.services.monolito.uri}
     # Fase 1: lb://notificaciones cuando el servicio está desplegado (docker-compose).
