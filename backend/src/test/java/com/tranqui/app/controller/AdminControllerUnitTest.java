@@ -26,6 +26,7 @@ class AdminControllerUnitTest {
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private com.tranqui.app.repository.SubscriptionRepository subscriptionRepository;
     @Mock private com.tranqui.app.service.SubscriptionService subscriptionService;
+    @Mock private com.tranqui.app.eventos.OutboxPublisher outboxPublisher;
 
     @InjectMocks
     private AdminController controller;
@@ -69,7 +70,7 @@ class AdminControllerUnitTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(Rol.PSIQUIATRA, usuario.getRol());
         assertEquals(Boolean.TRUE, usuario.getVerificadoAdmin());
-        verify(usuarioRepository).save(usuario);
+        verify(usuarioRepository).saveAndFlush(usuario);
     }
 
     @Test
