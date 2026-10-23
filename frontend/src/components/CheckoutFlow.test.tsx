@@ -15,9 +15,11 @@ vi.mock('../api/api', () => ({
     getTurnosDisponibles: vi.fn(),
     getFinanciadores: vi.fn(),
     reservarTurno: vi.fn(),
+    obtenerCheckout: vi.fn(),
     abandonarReservaPendiente: vi.fn(),
     getMisTurnos: vi.fn(),
   },
+  getBackendOrigin: () => 'http://localhost:8080',
 }))
 
 // Every hour of the day, so "Hoy" always keeps at least one slot regardless of what time the
@@ -374,6 +376,43 @@ describe('CheckoutFlow', () => {
       expect(screen.getByText('Dirección del consultorio')).toBeInTheDocument()
       expect(screen.getAllByText('Av. Colón 1234').length).toBeGreaterThan(0)
       expect(screen.getByText('Cómo llegar')).toBeInTheDocument()
+    })
+
+    it('Fase 4: with checkoutPendiente it asks pagos for the link and then opens the gateway', async () => {
+      const user = userEvent.setup()
+      ;(api.reservarTurno as any).mockResolvedValueOnce({ turnoId: 61, checkoutUrl: '', checkoutPendiente: true, precio: 20000 })
+      ;(api.obtenerCheckout as any)
+        .mockResolvedValueOnce({ estado: 'PENDIENTE' })
+        .mockResolvedValueOnce({ estado: 'LISTO', checkoutUrl: 'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-preference-id' })
+      const { container } = render(
+        <CheckoutFlow professional={baseProfessional()} onBack={vi.fn()} onComplete={vi.fn()} />
+      )
+      await selectFirstFreeDayAndSlot(user, container)
+      await fillPatientData(user, container)
+      await waitFor(() => expect(getPayButton()).not.toBeDisabled())
+
+      await user.click(getPayButton())
+
+      expect(await screen.findByText('Simulador de Pago de Turno', {}, { timeout: 4000 })).toBeInTheDocument()
+      expect(api.obtenerCheckout).toHaveBeenCalledWith(61)
+      expect(screen.queryByText('¡Turno confirmado!')).not.toBeInTheDocument()
+    })
+
+    it('Fase 4: shows the error pagos reports when the link could not be created', async () => {
+      const user = userEvent.setup()
+      ;(api.reservarTurno as any).mockResolvedValueOnce({ turnoId: 62, checkoutUrl: '', checkoutPendiente: true, precio: 20000 })
+      ;(api.obtenerCheckout as any).mockResolvedValueOnce({ estado: 'ERROR', error: 'El profesional todavía no vinculó su cuenta de Mercado Pago.' })
+      const { container } = render(
+        <CheckoutFlow professional={baseProfessional()} onBack={vi.fn()} onComplete={vi.fn()} />
+      )
+      await selectFirstFreeDayAndSlot(user, container)
+      await fillPatientData(user, container)
+      await waitFor(() => expect(getPayButton()).not.toBeDisabled())
+
+      await user.click(getPayButton())
+
+      expect(await screen.findByText('El profesional todavía no vinculó su cuenta de Mercado Pago.')).toBeInTheDocument()
+      expect(screen.queryByText('¡Turno confirmado!')).not.toBeInTheDocument()
     })
 
     it('shows the booking error message and stays on the select step when reservarTurno rejects', async () => {

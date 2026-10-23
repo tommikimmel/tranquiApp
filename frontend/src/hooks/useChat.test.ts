@@ -67,7 +67,7 @@ vi.mock('../api/api', () => ({
   api: {
     getChatHistorial: vi.fn(),
   },
-  getBackendOrigin: () => 'http://localhost:8081',
+  getBackendOrigin: () => 'http://localhost:8080',
 }))
 
 const mockedApi = vi.mocked(api)
