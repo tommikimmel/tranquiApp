@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-22
 - **Tipo:** feature
 - **Sprint:** sprint-02
-- **Estado:** aprobada (2026-10-22)
+- **Estado:** aprobada (2026-10-22); R1 a R4 implementadas (#50 a #53), R5 postergada
 - **Rama / PR:** una rama y un PR a `develop` por tarea, encadenadas sobre la Fase 4
 - **Plan:** [microservicios.md, Fase 5](../arquitectura/microservicios.md#fase-5-profesionales)
 
@@ -136,6 +136,10 @@ perfil de cada profesional sale del buscador (`GET /api/medicos`).
 Editar el perfil y verlo en el buscador, la disponibilidad y las tarifas en la agenda y la reserva, la
 verificación del administrador, la suscripción vencida y Mercado Pago desvinculado sacando al profesional
 del buscador, el servicio caído (la agenda sigue con la copia del monolito), la vuelta atrás.
+- **Postergada (2026-10-22):** el usuario pidió no buildear imágenes ni levantar el stack por ahora (los
+  microservicios consumen mucha memoria en la máquina de desarrollo); por ahora solo se cambia la
+  arquitectura. Queda hecha la línea base del monolito (4 profesionales en el buscador; Lucía con 3 tarifas
+  y 10+10 franjas) para comparar cuando se pruebe. R1 a R4 están en #50 a #53 con sus tests.
 
 ## Criterios de aceptación
 
