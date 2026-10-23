@@ -44,6 +44,13 @@ scrape_configs:
         labels:
           servicio: 'pagos'
 
+  - job_name: 'profesionales'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['profesionales:8082']
+        labels:
+          servicio: 'profesionales'
+
   - job_name: 'rabbitmq'
     metrics_path: '/metrics'
     static_configs:

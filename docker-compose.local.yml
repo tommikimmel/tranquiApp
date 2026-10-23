@@ -119,6 +119,9 @@ services:
       # Fase 4: Mercado Pago (checkout, webhooks, reembolsos y cuentas) lo maneja el servicio de pagos.
       # "false" vuelve los pagos al monolito (vuelta atrás).
       PAGOS_EXTERNO: "true"
+      # Fase 5: el perfil, la disponibilidad, las tarifas y el buscador los maneja el servicio de profesionales;
+      # el monolito guarda una copia para turnos. "false" vuelve el perfil al monolito (vuelta atrás).
+      PROFESIONALES_EXTERNO: "true"
       EVENTOS_CONSUMO_SERVICIO: monolito
     ports:
       - "127.0.0.1:8081:8080"
@@ -140,11 +143,12 @@ services:
       PGUSER: tranqui
       PGPASSWORD: tranqui-local
       PGDATABASE: tranqui_local
-      SERVICIOS: notificaciones chat calendario pagos
+      SERVICIOS: notificaciones chat calendario pagos profesionales
       DB_PASSWORD_NOTIFICACIONES: notificaciones-local
       DB_PASSWORD_CHAT: chat-local
       DB_PASSWORD_CALENDARIO: calendario-local
       DB_PASSWORD_PAGOS: pagos-local
+      DB_PASSWORD_PROFESIONALES: profesionales-local
     volumes:
       - ./infra/postgres:/infra:ro
     depends_on:
@@ -306,6 +310,40 @@ services:
         condition: service_healthy
     mem_limit: 288m
 
+  profesionales:
+    build:
+      context: .
+      dockerfile: services/profesionales/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/profesionales
+      SPRING_DATASOURCE_USERNAME: profesionales
+      SPRING_DATASOURCE_PASSWORD: profesionales-local
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: tranqui
+      SPRING_RABBITMQ_PASSWORD: tranqui-local
+      SPRING_RABBITMQ_VIRTUAL_HOST: /
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      JWT_SECRET: local-dev-encryption-key-32chars
+      SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    depends_on:
+      db-servicios:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    mem_limit: 288m
+
   gateway:
     build:
       context: .
@@ -324,6 +362,8 @@ services:
       TRANQUI_SERVICES_CALENDARIO_URI: lb://calendario
       # Fase 4: /api/payments y /api/medicos/mercadopago al servicio de pagos.
       TRANQUI_SERVICES_PAGOS_URI: lb://pagos
+      # Fase 5: el buscador, /api/medicos/perfil, la disponibilidad y /internal/profesionales al servicio.
+      TRANQUI_SERVICES_PROFESIONALES_URI: lb://profesionales
       SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
       JWT_SECRET: local-dev-encryption-key-32chars
       VICTORIAMETRICS_URL: http://victoriametrics:8428
