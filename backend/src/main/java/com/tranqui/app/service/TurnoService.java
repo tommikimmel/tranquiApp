@@ -6,12 +6,27 @@ import com.tranqui.app.model.Modalidad;
 import com.tranqui.app.model.TipoTurno;
 import com.tranqui.app.model.Turno;
 import com.tranqui.app.model.Usuario;
+import com.tranqui.app.repository.DisponibilidadRepository;
+import com.tranqui.app.repository.TarifaMedicoRepository;
 import com.tranqui.app.repository.TurnoRepository;
+import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.AsistenciaConfirmadaData;
+import com.tranqui.eventos.data.DocumentoEnviadoData;
+import com.tranqui.eventos.data.DocumentoSolicitadoData;
+import com.tranqui.eventos.data.MeetCreadoData;
+import com.tranqui.eventos.data.TurnoCanceladoData;
+import com.tranqui.eventos.data.TurnoConfirmadoData;
+import com.tranqui.eventos.data.TurnoRecordatorioData;
+import com.tranqui.eventos.data.TurnoReprogramadoData;
+import com.tranqui.eventos.data.TurnoReservadoData;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -21,22 +36,28 @@ import java.util.stream.Collectors;
 public class TurnoService {
 
     @Autowired
+    private OutboxPublisher outboxPublisher;
+
+    @Autowired
     private TurnoRepository turnoRepository;
 
     @Autowired
     private GoogleCalendarService calendarService;
 
     @Autowired
+    private HorariosOcupadosCliente horariosOcupadosCliente;
+
+    @Autowired
     private AgendaService agendaService;
 
     @Autowired
-    private com.tranqui.app.repository.DisponibilidadRepository disponibilidadRepository;
+    private DisponibilidadRepository disponibilidadRepository;
 
     @Autowired
-    private com.tranqui.app.repository.UsuarioRepository usuarioRepository;
+    private UsuarioRepository usuarioRepository;
 
     @Autowired
-    private com.tranqui.app.repository.TarifaMedicoRepository tarifaRepository;
+    private TarifaMedicoRepository tarifaRepository;
 
     @Autowired
     private MercadoPagoService mercadoPagoService;
@@ -52,14 +73,21 @@ public class TurnoService {
 
     // Off by default. Only turn this on temporarily while the real Mercado Pago integration
     // is broken/unlinked and you need to exercise the rest of the booking flow (Google
-    // Calendar sync, notifications, etc). Never leave it "true" once real patients are paying —
+    // Calendar sync, notifications, etc). Never leave it "true" once real patients are paying �
     // it lets a booking be confirmed without any real payment. See reservarTurno() below and
     // MercadoPagoWebhookValidator for the other half of this.
     @Value("${payment.simulation.enabled:false}")
     private boolean paymentSimulationEnabled;
 
+    // Fase 4: con true el checkout y el reembolso los hace el servicio de pagos, por eventos.
+    @Value("${pagos.externo:false}")
+    private boolean pagosExterno;
+
+    @Value("${mercadopago.enabled:false}")
+    private boolean mercadoPagoEnabled;
+
     // Used to build the unauthenticated confirmar-asistencia / no-asistira links sent in the
-    // "confirmá tu turno" email — those are backend endpoints (TurnoController), not frontend
+    // "confirmá tu turno" email � those are backend endpoints (TurnoController), not frontend
     // routes, so this needs the backend's own public URL, not app.frontend-url.
     @Value("${app.public-url:http://localhost:8081}")
     private String publicUrl;
@@ -67,7 +95,7 @@ public class TurnoService {
     @Transactional(readOnly = true)
     public List<java.time.LocalTime> obtenerHorariosDisponibles(Long medicoId, java.time.LocalDate fecha, Modalidad modalidad) {
         List<com.tranqui.app.model.Disponibilidad> disponibilidades = disponibilidadRepository.findByMedicoIdAndModalidadOLegacy(medicoId, modalidad);
-        // IMPORTANT: turnosExistentes is loaded WITHOUT any modalidad filter on purpose — a
+        // IMPORTANT: turnosExistentes is loaded WITHOUT any modalidad filter on purpose � a
         // médico can't be in two consultas at once, so a turno booked in PRESENCIAL must also
         // block that same horario when calculating ONLINE availability (and vice versa). Do not
         // "fix" this by filtering turnosExistentes by modalidad, that would break the mutual lock.
@@ -95,23 +123,26 @@ public class TurnoService {
             return locales;
         }
 
-        // Consultar eventos de Google Calendar del día
-        List<com.google.api.services.calendar.model.Event> eventosGoogle = java.util.Collections.emptyList();
+        // Horarios ocupados en el Google Calendar del profesional (sus eventos propios). Desde la
+        // Fase 3 los responde el servicio de calendario; ver HorariosOcupadosCliente.
+        List<HorariosOcupadosCliente.Intervalo> ocupados = java.util.Collections.emptyList();
         try {
-            eventosGoogle = calendarService.obtenerEventosDelDia(medico, fecha);
+            ocupados = horariosOcupadosCliente.ocupados(medico, fecha);
         } catch (Exception e) {
             // Fallback silencioso: loguear y seguir con la disponibilidad local
             org.slf4j.LoggerFactory.getLogger(TurnoService.class)
                 .warn("Error consultando disponibilidad en Google Calendar para médico ID: {}. Usando fallback local.", medicoId, e);
         }
 
-        if (eventosGoogle.isEmpty()) {
+        if (ocupados == null || ocupados.isEmpty()) {
             return locales;
         }
+        if (ocupados.stream().anyMatch(HorariosOcupadosCliente.Intervalo::todoElDia)) {
+            // Evento de todo el día bloquea todo el día
+            return java.util.Collections.emptyList();
+        }
 
-        java.time.ZoneId zoneId = java.time.ZoneId.of("America/Argentina/Buenos_Aires");
-        List<com.google.api.services.calendar.model.Event> finalEventos = eventosGoogle;
-
+        List<HorariosOcupadosCliente.Intervalo> finalOcupados = ocupados;
         return locales.stream()
                 .filter(hora -> {
                     java.time.LocalTime bloqueInicio = hora;
@@ -121,42 +152,16 @@ public class TurnoService {
                     // configured a different duration, letting a slot near the edge of a Google
                     // Calendar event through when it shouldn't be offered.
                     java.time.LocalTime bloqueFin = hora.plusMinutes(duracionTurnoMinutos);
-
-                    for (com.google.api.services.calendar.model.Event event : finalEventos) {
-                        // Eventos transparent (disponibles) no bloquean la agenda
-                        if ("transparent".equals(event.getTransparency())) {
-                            continue;
-                        }
-
-                        // Validar evento de todo el día (all-day event)
-                        if (event.getStart() != null && event.getStart().getDateTime() == null && event.getStart().getDate() != null) {
-                            // Evento de todo el día bloquea todo el día
-                            return false;
-                        }
-
-                        if (event.getStart() != null && event.getStart().getDateTime() != null &&
-                            event.getEnd() != null && event.getEnd().getDateTime() != null) {
-                            
-                            java.time.Instant startInstant = java.time.Instant.ofEpochMilli(event.getStart().getDateTime().getValue());
-                            java.time.Instant endInstant = java.time.Instant.ofEpochMilli(event.getEnd().getDateTime().getValue());
-                            
-                            java.time.LocalTime eventStart = startInstant.atZone(zoneId).toLocalTime();
-                            java.time.LocalTime eventEnd = endInstant.atZone(zoneId).toLocalTime();
-
-                            // Solapamiento: bloqueInicio < eventEnd && bloqueFin > eventStart
-                            if (bloqueInicio.isBefore(eventEnd) && bloqueFin.isAfter(eventStart)) {
-                                return false; // Está ocupado por Google Calendar
-                            }
-                        }
-                    }
-                    return true;
+                    // Solapamiento: bloqueInicio < fin && bloqueFin > inicio
+                    return finalOcupados.stream().noneMatch(o ->
+                            bloqueInicio.isBefore(o.fin()) && bloqueFin.isAfter(o.inicio()));
                 })
                 .collect(Collectors.toList());
     }
 
     // Batched counterpart of obtenerHorariosDisponibles for the public homepage, which used to
     // fire one HTTP request per visible professional every time a date filter changed. Reuses
-    // the exact same per-médico logic (including the Google Calendar overlay) unchanged — this
+    // the exact same per-médico logic (including the Google Calendar overlay) unchanged � this
     // only collapses the *transport* into a single request/response instead of N of them.
     @Transactional(readOnly = true)
     public java.util.Map<Long, Integer> obtenerConteosDisponibilidad(List<Long> medicoIds, java.time.LocalDate fecha, Modalidad modalidad) {
@@ -168,7 +173,7 @@ public class TurnoService {
                     continue;
                 }
                 // No modalidad chosen yet (public homepage badge, before the patient picks
-                // presencial/online) — count the union of whatever modalidades this médico offers.
+                // presencial/online) � count the union of whatever modalidades this médico offers.
                 Usuario medico = usuarioRepository.findById(medicoId).orElse(null);
                 if (medico == null) {
                     conteos.put(medicoId, 0);
@@ -194,6 +199,23 @@ public class TurnoService {
         return !turnoRepository.existsByPacienteEmailAndEstadoNot(email, EstadoTurno.CANCELADO);
     }
 
+    // Aviso en la app de notificaciones; el documento en sí no viaja en el evento (sección 5.3).
+    private void publicarDocumentoEnviado(Turno turno, String origen) {
+        outboxPublisher.publicar(
+                Topicos.TURNOS_DOCUMENTO_ENVIADO_V1,
+                "turno",
+                String.valueOf(turno.getId()),
+                turno.getAggregateVersion(),
+                new DocumentoEnviadoData(
+                        turno.getId(),
+                        turno.getPaciente().getId(),
+                        turno.getMedico().getId(),
+                        resolverTypeLabel(turno),
+                        origen
+                )
+        );
+    }
+
     private String resolverTypeLabel(Turno t) {
         if ("receta-fuera".equals(t.getServicioId())) return "Receta fuera de turno";
         if ("certificado".equals(t.getServicioId())) return "Certificado";
@@ -203,7 +225,7 @@ public class TurnoService {
     }
 
     // Same detection PagoWebhookHandler#resolverTipoDocumentoLabel uses for the "Nuevo Documento
-    // Pendiente" notification — kept as its own explicit boolean (TurnoMedicoDto.esReceta)
+    // Pendiente" notification � kept as its own explicit boolean (TurnoMedicoDto.esReceta)
     // instead of making the frontend infer it from the `type` label, which a médico can rename.
     // t.isEsReceta() (denormalized from TarifaMedico.esReceta at booking time, see reservarTurno)
     // is the source of truth for turnos booked after that field existed; the OR'd legacy checks
@@ -213,7 +235,7 @@ public class TurnoService {
     }
 
     // A tarifa's precioOnline/precioPresencial only override precio when the médico explicitly
-    // set one for this modalidad — most services keep a single precio regardless of modalidad,
+    // set one for this modalidad � most services keep a single precio regardless of modalidad,
     // so a null override just falls back to it.
     private java.math.BigDecimal resolverPrecioPorModalidad(com.tranqui.app.model.TarifaMedico tarifa, Modalidad modalidad) {
         if (modalidad == Modalidad.ONLINE && tarifa.getPrecioOnline() != null) {
@@ -227,7 +249,7 @@ public class TurnoService {
 
     @Transactional
     public com.tranqui.app.model.dto.TurnoResponseDto reservarTurno(com.tranqui.app.model.dto.ReservaTurnoDto dto) {
-        // Normalize the same way AuthController.register/login do — this "find or create
+        // Normalize the same way AuthController.register/login do � this "find or create
         // patient" path (used when a médico books/registers a turno for a patient who doesn't
         // have an account yet) used to look up and store dto.getEmailPaciente() verbatim, so a
         // mixed-case or padded email here could create a second Usuario row for an address that
@@ -243,8 +265,8 @@ public class TurnoService {
         Usuario medico = usuarioRepository.findById(dto.getMedicoId())
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
-        // Resolve which tarifa this booking is for up front — before touching modalidad/agenda
-        // below — because whether it reserves a slot at all (TarifaMedico.requiereAgenda) depends
+        // Resolve which tarifa this booking is for up front � before touching modalidad/agenda
+        // below � because whether it reserves a slot at all (TarifaMedico.requiereAgenda) depends
         // on which tarifa it is, and that decides which path the rest of this method takes.
         String servicioId = "particular";
         Set<String> servicioIdsConocidos = Set.of("particular", "sobreturno", "obra_social", "osde", "receta-fuera", "certificado");
@@ -275,15 +297,15 @@ public class TurnoService {
             tarifaOpt = tarifaRepository.findByMedicoIdAndServicioId(medico.getId(), "osde");
         }
 
-        // Whether this booking requires a número de afiliado — resolved from the actual tarifa
+        // Whether this booking requires a número de afiliado � resolved from the actual tarifa
         // (its specific obra social, see TarifaMedico.obraSocial) rather than trusting the
         // frontend, so the requirement can't be bypassed by calling this endpoint directly.
         boolean requiereAfiliado;
-        // Whether this service reserves a slot on the médico's agenda at all — false for pure
+        // Whether this service reserves a slot on the médico's agenda at all � false for pure
         // document services (recetas, certificados, informes). Unknown/legacy tarifas default to
         // true, matching the old behavior of always blocking a slot.
         boolean requiereAgendaServicio;
-        // Whether this specific document service is a receta — see TarifaMedico.esReceta.
+        // Whether this specific document service is a receta � see TarifaMedico.esReceta.
         // Meaningless (and left false) whenever requiereAgendaServicio is true.
         boolean esRecetaServicio;
         if (usoTarifaCustom) {
@@ -304,7 +326,7 @@ public class TurnoService {
 
         if (!requiereAgendaServicio) {
             // Document-only service: no consultorio, no videollamada, so there's no real
-            // modalidad or scheduled time to resolve — the booking timestamp is only for record
+            // modalidad or scheduled time to resolve � the booking timestamp is only for record
             // keeping and must never block obtenerHorariosDisponibles for anyone else (enforced
             // there by filtering out turnos with ocupaAgenda == false).
             modalidad = null;
@@ -313,7 +335,7 @@ public class TurnoService {
             horaFinFinal = horaInicioFinal;
         } else {
             // Resolve which agenda (presencial/online) this turno books against. Only ambiguous
-            // when the médico offers both and the caller didn't say — reject rather than guess,
+            // when the médico offers both and the caller didn't say � reject rather than guess,
             // since guessing wrong would silently book against the wrong agenda's horarios.
             boolean ofreceAmbasModalidades = medico.isOfrecePresencial() && medico.isOfreceOnline();
             modalidad = dto.getModalidad();
@@ -426,26 +448,67 @@ public class TurnoService {
 
         turno = turnoRepository.save(turno);
         String checkoutUrl = "";
-        try {
-            checkoutUrl = mercadoPagoService.crearPreferenciaPago(turno, medico);
-            turno.setCheckoutUrl(checkoutUrl);
-            turno = turnoRepository.save(turno);
-        } catch (IllegalStateException e) {
-            if (paymentSimulationEnabled) {
-                // Real Mercado Pago checkout isn't reachable (professional not linked, or the
-                // integration itself is broken) but simulation mode is explicitly on, so fall
-                // back to the same mock preference URL the frontend already knows how to render
-                // as a "Simular Pago" dialog instead of blocking the booking outright.
-                checkoutUrl = "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-preference-id";
+        if (pagosExterno) {
+            // Fase 4: la preferencia la crea el servicio de pagos a partir de turnos.turno.reservado y
+            // llega por pagos.checkout.creado; el frontend la pide a GET /api/payments/checkout/{id}.
+            // Sin la cuenta vinculada se corta acá, con el mismo 409 de siempre.
+            if (mercadoPagoEnabled && !paymentSimulationEnabled && !medico.tieneMercadoPagoVinculado()) {
+                throw new IllegalStateException("El profesional todavía no vinculó su cuenta de Mercado Pago.");
+            }
+        } else {
+            try {
+                checkoutUrl = mercadoPagoService.crearPreferenciaPago(turno, medico);
                 turno.setCheckoutUrl(checkoutUrl);
                 turno = turnoRepository.save(turno);
-            } else {
-                // Preserve the type so GlobalExceptionHandler maps it to a clean 409 with this
-                // exact message, instead of it getting wrapped below into an opaque 500.
-                throw e;
+            } catch (IllegalStateException e) {
+                if (paymentSimulationEnabled) {
+                    // Real Mercado Pago checkout isn't reachable (professional not linked, or the
+                    // integration itself is broken) but simulation mode is explicitly on, so fall
+                    // back to the same mock preference URL the frontend already knows how to render
+                    // as a "Simular Pago" dialog instead of blocking the booking outright.
+                    checkoutUrl = "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-preference-id";
+                    turno.setCheckoutUrl(checkoutUrl);
+                    turno = turnoRepository.save(turno);
+                } else {
+                    // Preserve the type so GlobalExceptionHandler maps it to a clean 409 with this
+                    // exact message, instead of it getting wrapped below into an opaque 500.
+                    throw e;
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Error al conectar con la pasarela de Mercado Pago: " + e.getMessage(), e);
             }
-        } catch (Exception e) {
-            throw new RuntimeException("Error al conectar con la pasarela de Mercado Pago: " + e.getMessage(), e);
+        }
+
+        OffsetDateTime expiracion = OffsetDateTime.now().plusMinutes(5);
+        outboxPublisher.publicar(
+                Topicos.TURNOS_TURNO_RESERVADO_V1,
+                String.valueOf(turno.getId()),
+                turno.getAggregateVersion(),
+                new TurnoReservadoData(
+                        turno.getId(),
+                        turno.getPaciente().getId(),
+                        turno.getMedico().getId(),
+                        turno.getFecha(),
+                        turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00",
+                        turno.getPrecio(),
+                        expiracion,
+                        MercadoPagoService.tituloCobroTurno(medico)
+                )
+        );
+
+        if (!turno.isOcupaAgenda() || esReceta(turno)) {
+            outboxPublisher.publicar(
+                    Topicos.TURNOS_DOCUMENTO_SOLICITADO_V1,
+                    String.valueOf(turno.getId()),
+                    turno.getAggregateVersion(),
+                    new DocumentoSolicitadoData(
+                            turno.getId(),
+                            turno.getPaciente().getId(),
+                            turno.getMedico().getId(),
+                            turno.getServicioId() != null ? turno.getServicioId() : "documento",
+                            turno.getTipo() != null ? turno.getTipo().name() : "DOCUMENTO"
+                    )
+            );
         }
 
         return com.tranqui.app.model.dto.TurnoResponseDto.builder()
@@ -456,6 +519,7 @@ public class TurnoService {
                 .horaInicio(turno.getHoraInicio())
                 .precio(turno.getPrecio())
                 .checkoutUrl(checkoutUrl)
+                .checkoutPendiente(pagosExterno ? Boolean.TRUE : null)
                 .tokenReserva(turno.getTokenReserva())
                 .build();
     }
@@ -479,7 +543,45 @@ public class TurnoService {
             }
         }
 
-        turno = turnoRepository.save(turno);
+        Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+        if (turnoGuardado != null) {
+            turno = turnoGuardado;
+        }
+
+        outboxPublisher.publicar(
+                Topicos.TURNOS_TURNO_CONFIRMADO_V1,
+                String.valueOf(turno.getId()),
+                turno.getAggregateVersion(),
+                new TurnoConfirmadoData(
+                        turno.getId(),
+                        turno.getPaciente().getId(),
+                        turno.getMedico().getId(),
+                        turno.getFecha(),
+                        turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00",
+                        turno.getModalidad() != null ? turno.getModalidad().name() : "ONLINE",
+                        turno.getPrecio(),
+                        turno.isOcupaAgenda(),
+                        resolverTypeLabel(turno),
+                        null,
+                        turno.getModalidad() == Modalidad.ONLINE ? null : turno.getMedico().getDomicilioAtencion(),
+                        turno.getTelemedicinaUrl(),
+                        TurnoConfirmadoData.ORIGEN_OSDE,
+                        turno.getHoraFin() != null ? turno.getHoraFin().toString() : null
+                )
+        );
+
+        if (turno.getTelemedicinaUrl() != null && !turno.getTelemedicinaUrl().isBlank()) {
+            outboxPublisher.publicar(
+                    Topicos.CALENDARIO_MEET_CREADO_V1,
+                    String.valueOf(turno.getId()),
+                    turno.getAggregateVersion(),
+                    new MeetCreadoData(
+                            turno.getId(),
+                            turno.getTelemedicinaUrl(),
+                            turno.getGoogleEventId()
+                    )
+            );
+        }
 
         Usuario paciente = turno.getPaciente();
         if (turno.isOcupaAgenda() && paciente != null && paciente.getEmail() != null && paciente.isNotificacionesEmailHabilitadas()) {
@@ -523,7 +625,7 @@ public class TurnoService {
                     // If start time is past, could be completed. Document-only turnos (ocupaAgenda
                     // false) stamp horaFin == horaInicio == the booking timestamp itself (see
                     // reservarTurno), so this would otherwise flip to "completed" within the same
-                    // second they're paid — they have no real session to complete, only a
+                    // second they're paid � they have no real session to complete, only a
                     // documentoEnviado flag, so they just stay "confirmed" until then.
                     if (t.isOcupaAgenda() && t.getEstado() == EstadoTurno.CONFIRMADO && t.getHoraFin().isBefore(java.time.LocalTime.now())) {
                         status = "completed";
@@ -556,7 +658,7 @@ public class TurnoService {
 
     // Replaces calling esPrimeraConsulta() once per turno (one exists-query per row) with a
     // single batched lookup of which of this list's patient emails already have a non-cancelled
-    // turno — same semantics as esPrimeraConsulta, computed for many patients in one query.
+    // turno � same semantics as esPrimeraConsulta, computed for many patients in one query.
     private java.util.Set<String> emailsConTurnoNoCancelado(List<Turno> turnos) {
         List<String> emails = turnos.stream()
                 .map(t -> t.getPaciente().getEmail())
@@ -590,7 +692,7 @@ public class TurnoService {
                     }
                     // Document-only turnos (ocupaAgenda false) stamp horaFin == horaInicio == the
                     // booking timestamp itself (see reservarTurno) and fecha == the day they were
-                    // bought — without this guard they'd flip to "completed" within the same
+                    // bought � without this guard they'd flip to "completed" within the same
                     // second they're paid, hiding the send/generar-receta actions entirely. They
                     // have no real session to complete, only a documentoEnviado flag, so they just
                     // stay "confirmed" indefinitely.
@@ -642,7 +744,7 @@ public class TurnoService {
                     }
                     // Document-only turnos (ocupaAgenda false) stamp horaFin == horaInicio == the
                     // booking timestamp itself (see reservarTurno) and fecha == the day they were
-                    // bought — without this guard they'd flip to "completed" within the same
+                    // bought � without this guard they'd flip to "completed" within the same
                     // second they're paid, hiding the send/generar-receta actions entirely. They
                     // have no real session to complete, only a documentoEnviado flag, so they just
                     // stay "confirmed" indefinitely.
@@ -655,7 +757,7 @@ public class TurnoService {
                     String typeLabel = resolverTypeLabel(t);
 
                     // The checkout URL is generated once at booking time (reservarTurno) and
-                    // persisted on the turno — re-generating it here on every list read used to
+                    // persisted on the turno � re-generating it here on every list read used to
                     // mean one synchronous external Mercado Pago call per pending turno.
                     String checkoutUrl = t.getCheckoutUrl() != null ? t.getCheckoutUrl() : "";
 
@@ -712,7 +814,7 @@ public class TurnoService {
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
 
         boolean teniaPagoAprobado = turno.getPago() != null && turno.getPago().getEstado() == EstadoPago.APROBADO;
-        // Whoever is cancelling — used to decide whether the 48h refund-withholding policy
+        // Whoever is cancelling � used to decide whether the 48h refund-withholding policy
         // applies (see ReembolsoService#procesarReembolso): it shouldn't when the médico
         // themselves cancels, only when the patient bails last-minute.
         boolean profesionalCancela = requesterEmail != null
@@ -732,7 +834,13 @@ public class TurnoService {
         // un fallo acá no debe impedir que la cancelación se confirme: se loguea y el médico puede
         // resolverlo manualmente desde Mercado Pago si hace falta.
         ResendEmailService.ResultadoReembolso resultadoReembolso = ResendEmailService.ResultadoReembolso.SIN_PAGO;
-        if (teniaPagoAprobado) {
+        if (teniaPagoAprobado && pagosExterno) {
+            // Fase 4: acá solo se decide si corresponde; el servicio de pagos reembolsa a partir de
+            // turnos.turno.cancelado y avisa con pagos.reembolso.realizado (segundo mail al paciente).
+            resultadoReembolso = ReembolsoService.correspondeReembolso(turno, profesionalCancela)
+                    ? ResendEmailService.ResultadoReembolso.EN_PROCESO
+                    : ResendEmailService.ResultadoReembolso.SIN_REEMBOLSO;
+        } else if (teniaPagoAprobado) {
             try {
                 boolean reembolsado = reembolsoService.procesarReembolso(turno, turno.getMedico(), profesionalCancela);
                 resultadoReembolso = reembolsado
@@ -745,7 +853,29 @@ public class TurnoService {
             }
         }
 
-        turno = turnoRepository.save(turno);
+        Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+        if (turnoGuardado != null) {
+            turno = turnoGuardado;
+        }
+
+        outboxPublisher.publicar(
+                Topicos.TURNOS_TURNO_CANCELADO_V1,
+                String.valueOf(turno.getId()),
+                turno.getAggregateVersion(),
+                new TurnoCanceladoData(
+                        turno.getId(),
+                        turno.getPaciente().getId(),
+                        turno.getMedico().getId(),
+                        profesionalCancela ? "PROFESIONAL" : "PACIENTE",
+                        "Cancelado por usuario",
+                        resultadoReembolso == ResendEmailService.ResultadoReembolso.REEMBOLSADO
+                                || resultadoReembolso == ResendEmailService.ResultadoReembolso.EN_PROCESO,
+                        turno.getFecha(),
+                        turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : null,
+                        turno.isOcupaAgenda(),
+                        resultadoReembolso.name()
+                )
+        );
 
         // Notify Doctor
         String tituloMed = "Turno cancelado";
@@ -808,16 +938,16 @@ public class TurnoService {
         }
     }
 
-    // 8MB cap on the decoded attachment — generous for a certificado/informe scan/PDF while
+    // 8MB cap on the decoded attachment � generous for a certificado/informe scan/PDF while
     // keeping the request payload (and the outgoing email) reasonably sized.
     private static final long MAX_DOCUMENTO_ADJUNTO_BYTES = 8L * 1024 * 1024;
 
-    // Only for document-only turnos (ocupaAgenda == false) that AREN'T recetas — a receta is
+    // Only for document-only turnos (ocupaAgenda == false) that AREN'T recetas � a receta is
     // never sent through this path, it's auto-marked when the médico actually generates it (see
     // marcarRecetasEnviadasParaPaciente, called from RecetaService#emitirReceta). For
     // certificados/informes there's no generation/storage pipeline in TranquiApp at all (the
     // médico writes them up externally), so the uploaded file is required here and goes straight
-    // out as a real email attachment (ResendEmailService) — nothing about it is persisted, only
+    // out as a real email attachment (ResendEmailService) � nothing about it is persisted, only
     // the boolean documentoEnviado flips.
     @Transactional
     public void marcarDocumentoEnviado(Long turnoId, String medicoEmail, String archivoData, String archivoNombre) {
@@ -840,11 +970,11 @@ public class TurnoService {
             throw new IllegalArgumentException("Adjuntá el archivo del documento para poder enviarlo por mail.");
         }
         if (estimateBase64Bytes(archivoData) > MAX_DOCUMENTO_ADJUNTO_BYTES) {
-            throw new IllegalArgumentException("El archivo pesa demasiado — el máximo permitido es 8MB.");
+            throw new IllegalArgumentException("El archivo pesa demasiado � el máximo permitido es 8MB.");
         }
         String pacienteEmail = turno.getPaciente().getEmail();
         if (pacienteEmail == null || pacienteEmail.isBlank()) {
-            throw new IllegalStateException("El paciente no tiene un email registrado — no se puede enviar el documento.");
+            throw new IllegalStateException("El paciente no tiene un email registrado � no se puede enviar el documento.");
         }
 
         boolean enviado = resendEmailService.enviarDocumentoAdjunto(
@@ -859,7 +989,11 @@ public class TurnoService {
         }
 
         turno.setDocumentoEnviado(true);
-        turnoRepository.save(turno);
+        Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+        if (turnoGuardado != null) {
+            turno = turnoGuardado;
+        }
+        publicarDocumentoEnviado(turno, "ADJUNTO");
 
         String titulo = "Documento enviado";
         String mensaje = "Tu " + resolverTypeLabel(turno).toLowerCase() + " te llegó por mail.";
@@ -867,11 +1001,11 @@ public class TurnoService {
     }
 
     // Called right after RecetaService#emitirReceta successfully generates a receta electrónica
-    // for (medico, paciente) — there's no explicit turnoId passed from the Recetas Electrónicas
+    // for (medico, paciente) � there's no explicit turnoId passed from the Recetas Electrónicas
     // screen back to the originating "receta fuera de turno" purchase, so this matches by
     // médico+paciente instead: any of that médico's still-pending receta-fuera turnos for this
     // exact paciente are assumed fulfilled by the receta that was just generated. Best-effort
-    // (never throws) — a médico who writes a routine receta during any other flow for a patient
+    // (never throws) � a médico who writes a routine receta during any other flow for a patient
     // who also happens to have an unrelated pending purchase would incidentally clear it too, but
     // that's an acceptable trade-off against making the médico track it by hand.
     @Transactional
@@ -880,13 +1014,17 @@ public class TurnoService {
                 medicoId, pacienteId, "receta-fuera", EstadoTurno.CONFIRMADO, false);
         for (Turno turno : pendientes) {
             turno.setDocumentoEnviado(true);
-            turnoRepository.save(turno);
+            Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+            if (turnoGuardado != null) {
+                turno = turnoGuardado;
+            }
+            publicarDocumentoEnviado(turno, "RECETA");
             notificacionService.crearNotificacion(turno.getPaciente(), "Documento enviado",
                     "Tu receta fuera de turno ya fue generada.", "DOCUMENTO_ENVIADO");
         }
     }
 
-    // Decoded byte size of a base64 data: URI, without decoding it — same math as
+    // Decoded byte size of a base64 data: URI, without decoding it � same math as
     // ImageUtils#decodedByteSize, duplicated here since that helper's regex is image-specific
     // (data:image/...) and this accepts any mime type (PDFs included).
     private long estimateBase64Bytes(String dataUri) {
@@ -903,10 +1041,13 @@ public class TurnoService {
         Turno turno = turnoRepository.findById(turnoId)
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
 
+        java.time.LocalDate fechaAnterior = turno.getFecha();
+        java.time.LocalTime horaInicioAnterior = turno.getHoraInicio();
+
         java.time.LocalDate nuevaFecha = com.tranqui.app.config.DateConfig.parseLocalDate(fechaStr);
         java.time.LocalTime nuevaHoraInicio = java.time.LocalTime.parse(horaStr);
-        // Must use the médico's configured session length — same pattern as reservarTurno and
-        // obtenerHorariosDisponibles — instead of a hardcoded 45, which under/over-stated horaFin
+        // Must use the médico's configured session length � same pattern as reservarTurno and
+        // obtenerHorariosDisponibles � instead of a hardcoded 45, which under/over-stated horaFin
         // for any médico who configured a different duracionTurnoMinutos.
         Usuario medicoDelTurno = turno.getMedico();
         int duracionTurnoMinutos = (medicoDelTurno != null && medicoDelTurno.getDuracionTurnoMinutos() != null)
@@ -917,12 +1058,34 @@ public class TurnoService {
         turno.setHoraInicio(nuevaHoraInicio);
         turno.setHoraFin(nuevaHoraFin);
         // La nueva fecha invalida cualquier recordatorio/confirmación de asistencia que ya se
-        // haya mandado para la fecha vieja — el link de confirmación viejo (si lo hubiera) queda
+        // haya mandado para la fecha vieja � el link de confirmación viejo (si lo hubiera) queda
         // sin efecto, y el scheduler vuelve a evaluar este turno para la nueva fecha.
         turno.setConfirmacionAsistenciaEmailEnviado(false);
         turno.setAsistenciaConfirmadaPaciente(false);
         turno.setTokenConfirmacionAsistencia(null);
-        turno = turnoRepository.save(turno);
+        Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+        if (turnoGuardado != null) {
+            turno = turnoGuardado;
+        }
+
+        outboxPublisher.publicar(
+                Topicos.TURNOS_TURNO_REPROGRAMADO_V1,
+                String.valueOf(turno.getId()),
+                turno.getAggregateVersion(),
+                new TurnoReprogramadoData(
+                        turno.getId(),
+                        turno.getPaciente().getId(),
+                        turno.getMedico().getId(),
+                        fechaAnterior,
+                        horaInicioAnterior != null ? horaInicioAnterior.toString() : "",
+                        nuevaFecha,
+                        nuevaHoraInicio.toString(),
+                        turno.getModalidad() != null ? turno.getModalidad().name() : null,
+                        turno.getModalidad() == Modalidad.ONLINE ? null : turno.getMedico().getDomicilioAtencion(),
+                        turno.getTelemedicinaUrl(),
+                        nuevaHoraFin.toString()
+                )
+        );
 
         try {
             calendarService.actualizarEventoReunion(turno);
@@ -967,7 +1130,7 @@ public class TurnoService {
 
     // Llamado por NotificationScheduler una vez por día. Busca turnos reales (ocupaAgenda = true
     // excluye recetas/certificados/informes, ver reservarTurno) de mañana o pasado mañana que
-    // todavía no recibieron el mail de confirmación de asistencia — antes era solo "exactamente
+    // todavía no recibieron el mail de confirmación de asistencia � antes era solo "exactamente
     // en 2 días", así que un turno reservado para mañana nunca lo recibía. Genera un token de un
     // solo uso por turno y envía el mail con los enlaces "Confirmar asistencia" / "No podré asistir".
     @Transactional
@@ -986,13 +1149,35 @@ public class TurnoService {
                 String token = java.util.UUID.randomUUID().toString();
                 turno.setTokenConfirmacionAsistencia(token);
                 turno.setConfirmacionAsistenciaEmailEnviado(true);
-                turnoRepository.save(turno);
+                Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+                if (turnoGuardado != null) {
+                    turno = turnoGuardado;
+                }
 
-                String confirmarUrl = publicUrl + "/api/turnos/" + turno.getId() + "/confirmar-asistencia?token=" + token;
-                String noAsistiraUrl = publicUrl + "/api/turnos/" + turno.getId() + "/no-asistira?token=" + token;
                 String modalidadLabel = turno.getModalidad() == Modalidad.ONLINE ? "Online (videollamada)"
                         : turno.getModalidad() == Modalidad.PRESENCIAL ? "Presencial" : null;
                 String direccion = turno.getModalidad() == Modalidad.PRESENCIAL ? turno.getMedico().getDomicilioAtencion() : null;
+
+                // El token no viaja en el evento (sección 5.3): notificaciones arma los enlaces con
+                // la ruta interna /internal/monolito/turnos/{id}/enlaces-asistencia.
+                outboxPublisher.publicar(
+                        Topicos.TURNOS_RECORDATORIO_PROGRAMADO_V1,
+                        String.valueOf(turno.getId()),
+                        turno.getAggregateVersion(),
+                        new TurnoRecordatorioData(
+                                turno.getId(),
+                                turno.getPaciente().getId(),
+                                turno.getMedico().getId(),
+                                turno.getFecha(),
+                                turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00",
+                                modalidadLabel,
+                                resolverTypeLabel(turno),
+                                direccion
+                        )
+                );
+
+                String confirmarUrl = publicUrl + "/api/turnos/" + turno.getId() + "/confirmar-asistencia?token=" + token;
+                String noAsistiraUrl = publicUrl + "/api/turnos/" + turno.getId() + "/no-asistira?token=" + token;
 
                 resendEmailService.enviarConfirmacionAsistencia(
                         turno.getPaciente().getEmail(),
@@ -1020,7 +1205,7 @@ public class TurnoService {
     }
 
     // Called from the public confirmar-asistencia link in the reminder email. Purely informational
-    // for the médico — does not change EstadoTurno, which is (and stays) driven by payment.
+    // for the médico � does not change EstadoTurno, which is (and stays) driven by payment.
     @Transactional
     public void confirmarAsistenciaPaciente(Long turnoId, String token) {
         Turno turno = turnoRepository.findById(turnoId)
@@ -1031,7 +1216,24 @@ public class TurnoService {
         }
 
         turno.setAsistenciaConfirmadaPaciente(true);
-        turnoRepository.save(turno);
+        Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+        if (turnoGuardado != null) {
+            turno = turnoGuardado;
+        }
+
+        outboxPublisher.publicar(
+                Topicos.TURNOS_ASISTENCIA_CONFIRMADA_V1,
+                "turno",
+                String.valueOf(turno.getId()),
+                turno.getAggregateVersion(),
+                new AsistenciaConfirmadaData(
+                        turno.getId(),
+                        turno.getPaciente().getId(),
+                        turno.getMedico().getId(),
+                        turno.getFecha(),
+                        turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : null
+                )
+        );
 
         String titulo = "Paciente confirmó su asistencia";
         String mensaje = turno.getPaciente().getNombre() + " confirmó que va a asistir al turno del " +
@@ -1039,7 +1241,7 @@ public class TurnoService {
         notificacionService.crearNotificacion(turno.getMedico(), titulo, mensaje, "TURNO_ASISTENCIA_CONFIRMADA");
     }
 
-    // Called from the public no-asistira link in the reminder email — the patient is telling us
+    // Called from the public no-asistira link in the reminder email � the patient is telling us
     // ahead of time they can't make it, so this cancels the turno exactly like a patient-initiated
     // cancellation would (same refund policy, same notifications), just triggered by token instead
     // of a logged-in session.
@@ -1049,7 +1251,7 @@ public class TurnoService {
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
         validarTokenConfirmacionAsistencia(turno, token);
         if (turno.getEstado() == EstadoTurno.CANCELADO) {
-            return; // idempotente — ya estaba cancelado
+            return; // idempotente � ya estaba cancelado
         }
         cancelarTurno(turnoId, turno.getPaciente().getEmail());
     }

@@ -1,5 +1,6 @@
 package com.tranqui.app.service;
 
+import com.tranqui.app.eventos.OutboxPublisher;
 import com.tranqui.app.model.*;
 import com.tranqui.app.model.dto.PacienteDto;
 import com.tranqui.app.repository.*;
@@ -32,8 +33,19 @@ class ClinicalServiceTest {
     @Mock private NotificacionService notificacionService;
     @Mock private MensajeRepository mensajeRepository;
 
+    @Mock
+    private OutboxPublisher outboxPublisher;
+
     @InjectMocks
     private ClinicalService clinicalService;
+
+    // Sin URL de gateway el resumen de chat se calcula con las tablas propias: los stubs de
+    // mensajeRepository de cada test siguen aplicando (Fase 2).
+    @org.junit.jupiter.api.BeforeEach
+    void resumenDeChatLocal() {
+        org.springframework.test.util.ReflectionTestUtils.setField(clinicalService, "resumenChatCliente",
+                new ResumenChatCliente(mensajeRepository, "", ""));
+    }
 
     private Usuario medico(String email) {
         return Usuario.builder().id(1L).nombre("Dra. Paula").email(email).rol(Rol.PSIQUIATRA).build();
@@ -64,6 +76,9 @@ class ClinicalServiceTest {
                 .thenReturn(List.of(pacienteConTurnoUrgente));
         // Beto only has chat history, no appointment at all
         when(mensajeRepository.findPacientesConMensajesConMedico(1L))
+                .thenReturn(List.of(pacienteConTurnoUrgente, pacienteSinTurno));
+        // Fase 2: los pacientes del resumen de chat se buscan por id.
+        when(usuarioRepository.findAllById(List.of(10L, 20L)))
                 .thenReturn(List.of(pacienteConTurnoUrgente, pacienteSinTurno));
 
         LocalDate hoy = LocalDate.now();
@@ -244,6 +259,28 @@ class ClinicalServiceTest {
         assertEquals(LocalDate.now(), saved.getFecha());
         verify(notificacionService).crearNotificacion(eq(medico), anyString(), anyString(), eq("INFORME"));
         verify(notificacionService).crearNotificacion(eq(paciente), anyString(), anyString(), eq("INFORME"));
+    }
+
+    @Test
+    void guardarInforme_publicaHistoriaClinicaSinContenidoClinico() {
+        Usuario medico = medico("dra@mail.com");
+        Usuario paciente = paciente(5L, "Ana");
+        when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico));
+        when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
+        when(informeClinicoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        clinicalService.guardarInforme("dra@mail.com", 5L, "GENERAL", "plan secreto", "contenido secreto", "archivo.pdf");
+
+        org.mockito.ArgumentCaptor<com.tranqui.eventos.data.HistoriaClinicaActualizadaData> captor =
+                org.mockito.ArgumentCaptor.forClass(com.tranqui.eventos.data.HistoriaClinicaActualizadaData.class);
+        verify(outboxPublisher).publicar(eq(com.tranqui.eventos.Topicos.PROFESIONALES_HISTORIA_CLINICA_ACTUALIZADA_V1),
+                eq("informe"), anyString(), eq(1), captor.capture());
+        com.tranqui.eventos.data.HistoriaClinicaActualizadaData data = captor.getValue();
+        assertEquals(5L, data.pacienteId());
+        assertEquals("INFORME", data.tipo());
+        assertEquals("PROFESIONAL", data.cargadoPor());
+        assertEquals("GENERAL", data.tipoInforme());
+        assertFalse(data.toString().contains("secreto"));
     }
 
     // ── obtenerSeguimientosPaciente / obtenerInformesPaciente ───────
