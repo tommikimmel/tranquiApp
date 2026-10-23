@@ -30,6 +30,7 @@
 		<module>services/chat</module>
 		<module>services/calendario</module>
 		<module>services/pagos</module>
+		<module>services/profesionales</module>
 	</modules>
 
 	<dependencyManagement>
