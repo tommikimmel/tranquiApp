@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-22
 - **Tipo:** feature
 - **Sprint:** sprint-02
-- **Estado:** propuesta (esperando aprobación)
+- **Estado:** aprobada (2026-10-22)
 - **Rama / PR:** una rama y un PR a `develop` por tarea, encadenadas sobre la Fase 4
 - **Plan:** [microservicios.md, Fase 5](../arquitectura/microservicios.md#fase-5-profesionales)
 
@@ -118,7 +118,9 @@ del buscador, el servicio caído (la agenda sigue con la copia del monolito), la
 2. **Disponibilidad y tarifas para turnos:** el monolito guarda una copia (caché) que se actualiza con cada
    modificación (evento) y con una resincronización periódica (ver R1).
 3. **Estadísticas del panel:** quedan en el monolito y se mueven al final de la migración.
-4. Pendiente (ver Preguntas).
+4. **Verificación del administrador:** queda en el monolito (`AdminController`) y avisa al servicio por
+   `profesionales.profesional.visibilidad-cambiada`, que ya se publica al verificar y al rechazar.
+5. Un PR a `develop` por tarea, Java 17, sin deploy.
 
 ## Preguntas
 
