@@ -75,9 +75,10 @@ export function useChat(activeContactId: number | null, onMessageReceived?: (msg
   // Connect to STOMP Broker
   useEffect(() => {
     const socketUrl = `${getBackendOrigin()}/ws-tranqui`;
-    const socket = new SockJS(socketUrl, null, { withCredentials: true } as any)
     const client = new Client({
-      webSocketFactory: () => socket,
+      // Un SockJS nuevo en cada intento: con el mismo objeto, la reconexión (reconnectDelay) reusaba
+      // un socket cerrado y nunca volvía a conectar (por ejemplo, al reiniciarse el servicio de chat).
+      webSocketFactory: () => new SockJS(socketUrl, null, { withCredentials: true } as any),
       debug: (str) => {
         console.log('STOMP Debug:', str)
       },
