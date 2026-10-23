@@ -71,6 +71,46 @@ Lo que encontré y el plan no resolvía:
   (`suscripciones.suscripcion.cambio-estado`, que ya existe). Mercado Pago llega de pagos.
 - Rutas internas para la carga inicial: perfiles, disponibilidad y tarifas.
 
+### Detalle de diseño (escrito al arrancar R1)
+
+Al revisar el código aparecieron dos cosas que la propuesta no cubría y que definen el diseño:
+
+1. **El perfil tiene dos escritores.** Además de `PUT /api/medicos/perfil`, el registro, `mi-cuenta` y
+   "completar perfil" escriben nombre, apellido, teléfono, sexo, fecha de nacimiento, CUIL, documento y
+   foto, que son datos de identidad (siguen en el monolito). Para que cada dato tenga un solo dueño:
+   - **Monolito (identidad):** esos campos, el mail, el rol, la profesión, `verificadoAdmin`, la
+     suscripción y si tiene Mercado Pago vinculado.
+   - **Servicio:** el resto del perfil (matrícula, título, especialidad, descripción, domicilio de
+     atención, modalidades, duración e intervalo, tags, experiencia, redes, sello, REFEPS, CUIT, etc.),
+     la disponibilidad y las tarifas.
+   - `PUT /api/medicos/perfil` sigue recibiendo todo junto (el frontend no cambia). El servicio valida,
+     manda la parte de identidad al monolito (`PUT /internal/monolito/profesionales/{id}/identidad`) y
+     recién después guarda lo suyo. Si el monolito no responde, devuelve 503 y no guarda nada.
+2. **La suscripción no publica eventos.** El tópico `suscripciones.suscripcion.cambio-estado` existe en el
+   catálogo pero el monolito no lo publica, y el estado cambia en 26 lugares; además el acceso depende de
+   la hora (vence con `currentPeriodEnd`). El servicio no lo espera por eventos:
+   - Cada minuto (`PROFESIONALES_SINCRONIZACION_SEGUNDOS`, 60 por defecto) pide al monolito
+     `GET /internal/monolito/profesionales/estado`: identidad sin la foto (más un hash de la foto),
+     rol, profesión, verificación, Mercado Pago, estado y fin del período de la suscripción, y si puede
+     recetar. Con eso evalúa el acceso con la misma regla que `SubscriptionService.isAccessAllowed`, en el
+     momento de cada consulta. La foto la pide aparte solo si cambió el hash.
+   - Para no esperar el minuto, refresca a un profesional enseguida cuando llega
+     `identidad.usuario.registrado/actualizado/eliminado` o `profesionales.profesional.visibilidad-cambiada`.
+
+Eventos del servicio al monolito (copia de turnos y del resto del monolito):
+- `profesionales.profesional.actualizado.v1` con dos campos nuevos opcionales: el intervalo entre turnos y
+  `perfil` (los campos del perfil del servicio). Lo siguen consumiendo calendario, chat, notificaciones y
+  pagos, que descartan versiones viejas: el servicio arranca su versión desde la del usuario en el
+  monolito y el monolito, al aplicar la copia, se pone por encima, así la vuelta atrás no pierde eventos.
+- `profesionales.disponibilidad.actualizada.v2` y `profesionales.tarifa.actualizada.v2`: la disponibilidad
+  y las tarifas completas del profesional (el v1 iba fila por fila y nadie lo consume).
+- La resincronización del monolito (decisión 2) pide `GET /internal/profesionales/profesionales?desde=` y
+  aplica lo mismo que los eventos.
+
+Con el flag prendido, las rutas del perfil, la disponibilidad y el buscador del monolito responden 409 (no
+deberían llegarle: el gateway las manda al servicio). No hay una ruta de "perfil público" aparte: el
+perfil de cada profesional sale del buscador (`GET /api/medicos`).
+
 ### R2 — Servicio `services/profesionales`
 - Base propia `profesionales` (JDBC, como calendario y pagos): `profesional` (el perfil, con la foto),
   `disponibilidad`, `tarifa`, y los flags del buscador (verificado, Mercado Pago, suscripción).

@@ -152,6 +152,13 @@ calendario:
 pagos:
   externo: ${PAGOS_EXTERNO:false}
 
+# Fase 5: con true, el perfil, la disponibilidad, las tarifas y el buscador los administra el servicio de
+# profesionales; el monolito guarda una copia (turnos lee de ahí) que se actualiza con sus eventos y con una
+# resincronización cada resincronizacion-minutos. La identidad, la verificación y la suscripción siguen acá.
+profesionales:
+  externo: ${PROFESIONALES_EXTERNO:false}
+  resincronizacion-minutos: ${PROFESIONALES_RESINCRONIZACION_MINUTOS:15}
+
 tranqui:
   jwt:
     # JWT de servicio (sección 4.2) para las rutas /internal/** que consultan otros servicios.

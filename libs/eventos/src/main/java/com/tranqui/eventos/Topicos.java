@@ -33,6 +33,10 @@ public final class Topicos {
     public static final String PROFESIONALES_HISTORIA_CLINICA_ACTUALIZADA_V1 = "profesionales.historia-clinica.actualizada.v1";
     /** Fase 4: un paciente pidió un documento pago (API de conceptos); pagos crea la preferencia. */
     public static final String PROFESIONALES_CONCEPTO_SOLICITADO_V1 = "profesionales.concepto.solicitado.v1";
+    /** Fase 5: la disponibilidad completa del profesional (el v1 iba franja por franja). */
+    public static final String PROFESIONALES_DISPONIBILIDAD_ACTUALIZADA_V2 = "profesionales.disponibilidad.actualizada.v2";
+    /** Fase 5: todas las tarifas del profesional (el v1 iba tarifa por tarifa y sin los servicios). */
+    public static final String PROFESIONALES_TARIFA_ACTUALIZADA_V2 = "profesionales.tarifa.actualizada.v2";
 
     // ==================== Turnos ====================
     public static final String TURNOS_TURNO_RESERVADO_V1 = "turnos.turno.reservado.v1";
@@ -69,7 +73,7 @@ public final class Topicos {
     public static final String CHAT_MENSAJE_ENVIADO_V1 = "chat.mensaje.enviado.v1";
 
     /**
-     * Lista inmutable de todos los tópicos del catálogo de la sección 5.4, más los agregados en las Fases 1 (notificaciones), 2 (chat) y 4 (pagos).
+     * Lista inmutable de todos los tópicos del catálogo de la sección 5.4, más los agregados en las Fases 1 (notificaciones), 2 (chat), 4 (pagos) y 5 (profesionales).
      */
     public static final List<String> TODOS_LOS_TOPICOS = List.of(
         IDENTIDAD_USUARIO_REGISTRADO_V1,
@@ -85,6 +89,8 @@ public final class Topicos {
         PROFESIONALES_DISPONIBILIDAD_ACTUALIZADA_V1,
         PROFESIONALES_HISTORIA_CLINICA_ACTUALIZADA_V1,
         PROFESIONALES_CONCEPTO_SOLICITADO_V1,
+        PROFESIONALES_DISPONIBILIDAD_ACTUALIZADA_V2,
+        PROFESIONALES_TARIFA_ACTUALIZADA_V2,
         TURNOS_TURNO_RESERVADO_V1,
         TURNOS_TURNO_CONFIRMADO_V1,
         TURNOS_TURNO_CANCELADO_V1,

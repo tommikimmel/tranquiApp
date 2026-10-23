@@ -55,6 +55,17 @@ public class MedicoService {
     @Value("${mercadopago.enabled:false}")
     private boolean mercadoPagoEnabled;
 
+    // Fase 5: con el flag, el perfil, la disponibilidad y las tarifas son del servicio de profesionales (el
+    // gateway le manda estas rutas). Si alguna llega igual al monolito, no se escribe la copia.
+    @Value("${profesionales.externo:false}")
+    private boolean profesionalesExterno;
+
+    private void exigirPerfilLocal() {
+        if (profesionalesExterno) {
+            throw new IllegalStateException("El perfil de los profesionales lo administra el servicio de profesionales.");
+        }
+    }
+
     private static final long MAX_FOTO_BYTES = 3L * 1024 * 1024; // 3MB decoded
 
     // Fallback values for médicos who haven't configured their agenda settings yet �
@@ -86,6 +97,7 @@ public class MedicoService {
     // 500, not just that one médico's card.
     @Transactional
     public List<MedicoDto> obtenerMedicosActivos() {
+        exigirPerfilLocal();
         // Filter by role at the DB level (was findAll() + Java-side filtering, scanning every
         // usuario row � patients included � on every public homepage load).
         // Perfil completo + verificado por admin (isMedicoVerificado) Y suscripción activa
@@ -117,6 +129,7 @@ public class MedicoService {
 
     @Transactional
     public MedicoDto obtenerPerfil(String email) {
+        exigirPerfilLocal();
         Usuario medico = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado con email: " + email));
         
@@ -142,6 +155,7 @@ public class MedicoService {
 
     @Transactional
     public MedicoDto actualizarPerfil(String email, MedicoDto dto) {
+        exigirPerfilLocal();
         Usuario medico = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
@@ -511,6 +525,7 @@ public class MedicoService {
      */
     @Transactional
     public MedicoDto actualizarConfigAgenda(String email, Integer duracionTurnoMinutos, Integer intervaloEntreTurnosMinutos) {
+        exigirPerfilLocal();
         Usuario medico = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
