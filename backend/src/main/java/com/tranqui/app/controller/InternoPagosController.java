@@ -107,7 +107,7 @@ public class InternoPagosController {
 
     /**
      * La única ruta interna que no es una consulta: es el webhook de Mercado Pago mismo. Las
-     * suscripciones siguen en el monolito hasta la Fase 7, pero Mercado Pago avisa todo a la misma URL,
+     * suscripciones siguen en el monolito hasta la Fase 8, pero Mercado Pago avisa todo a la misma URL,
      * que con la Fase 4 atiende el servicio de pagos; el servicio valida la firma y reenvía acá lo que
      * es de suscripciones (decisión 2 de la spec).
      */

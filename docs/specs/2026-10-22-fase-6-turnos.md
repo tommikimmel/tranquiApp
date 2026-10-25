@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-22
 - **Tipo:** feature
 - **Sprint:** sprint-02
-- **Estado:** propuesta (esperando aprobación)
+- **Estado:** aprobada (2026-10-25)
 - **Rama / PR:** una rama y un PR a `develop` por tarea, encadenadas sobre la Fase 5
 - **Plan:** [microservicios.md, Fase 6](../arquitectura/microservicios.md#fase-6-turnos)
 - **Forma de trabajo (pedido del usuario, 2026-10-22):** solo cambiar la arquitectura. Sin buildear imágenes
@@ -36,7 +36,7 @@ Lo que encontré y el plan no resolvía:
    - **Identidad:** la reserva **crea al paciente** si el mail no existe (un médico que le reserva a alguien
      sin cuenta) y le guarda la obra social y el número de afiliado. Además, la agenda del profesional
      muestra datos personales del paciente (DNI, CUIL, domicilio, sexo, fecha de nacimiento, credencial de
-     la obra social). Identidad sigue en el monolito hasta la Fase 8.
+     la obra social). Identidad sigue en el monolito hasta la Fase 9.
    - **Pagos:** "¿el profesional vinculó Mercado Pago?" para cortar la reserva, y confirmar el turno cuando
      llega `pagos.pago.aprobado` (hoy lo hace `ManejadoresPagos` en el monolito).
    - **Calendario:** el link de Meet (`calendario.meet.creado`) y los horarios ocupados de Google (ruta
@@ -133,6 +133,20 @@ tomado, el servicio caído, la ventana de corte y la vuelta atrás.
   vuelta atrás probadas antes en local (cuando se pueda levantar el stack).
 - **Doble dueño durante la transición:** se evita con el corte en un solo paso (flag + ruta + mantenimiento).
 - **Memoria del VPS** (pregunta 5).
+
+## Decisiones (2026-10-25)
+
+1. **Pacientes:** el servicio le pide al monolito "buscar o crear paciente" por una ruta interna (503 si no
+   responde) y guarda una copia de los datos que muestra la agenda, actualizada con los eventos de identidad.
+2. **Copia en el monolito:** `turno` queda como copia, con `turno.actualizado` y la resincronización periódica.
+3. **Documento adjunto:** lo manda el servicio de notificaciones por una ruta interna nueva; turnos le pasa el
+   archivo en el momento y no se guarda.
+4. **Turno vencido pagado con el horario tomado:** se cancela y se reembolsa con la misma lógica de
+   cancelación y reembolso de hoy (mismos eventos y mismos mails).
+5. **Memoria:** se acepta pasar el techo por ahora y se mide el consumo real en el VPS antes del deploy.
+6. **Numeración:** historia clínica y recetas son la Fase 7; suscripciones pasa a la 8 e identidad a la 9
+   (plan, documentación y comentarios del código actualizados en el PR de esta spec).
+7. Un PR a `develop` por tarea, Java 17, sin deploy ni pruebas con el stack.
 
 ## Preguntas
 

@@ -15,7 +15,7 @@ import java.util.Optional;
 /**
  * El webhook de Mercado Pago, ya autenticado. Mercado Pago avisa todo a la misma URL: los pagos de turnos y
  * documentos (cobrados con la cuenta de cada profesional) se procesan acá; las suscripciones (cobradas con la
- * cuenta de la plataforma) se le reenvían al monolito, que las atiende hasta la Fase 7 (decisión 2).
+ * cuenta de la plataforma) se le reenvían al monolito, que las atiende hasta la Fase 8 (decisión 2).
  *
  * <p>Cómo se reconoce cada aviso, igual que el webhook del monolito:
  * <ul>

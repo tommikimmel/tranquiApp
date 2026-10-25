@@ -20,7 +20,7 @@ import java.util.UUID;
  * confirma, existe sí o sí. El relay lo manda a RabbitMQ después.
  *
  * <p>Mismo contrato que el {@code OutboxPublisher} del monolito, que sigue usando el suyo hasta la
- * Fase 8. Requiere la tabla de {@code db/eventos/outbox.sql}.
+ * Fase 9. Requiere la tabla de {@code db/eventos/outbox.sql}.
  */
 public class OutboxPublisher {
 
