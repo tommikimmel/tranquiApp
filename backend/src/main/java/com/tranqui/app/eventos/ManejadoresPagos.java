@@ -24,6 +24,10 @@ import org.springframework.context.annotation.Configuration;
  * "Mis Turnos", marca los reembolsos y documentos, y sabe qué profesionales tienen Mercado Pago
  * vinculado (el buscador y la reserva lo exigen).
  *
+ * <p>Fase 6: con {@code turnos.externo=true} los turnos (y la copia de su pago) los actualiza el servicio de
+ * turnos y llegan a la copia del monolito con {@code turnos.turno.actualizado}; los handlers de turnos no
+ * hacen nada. Los documentos de la API de conceptos y las cuentas siguen igual.
+ *
  * <p>Todos son idempotentes: en la vuelta atrás el monolito vuelve a publicar estos tópicos él mismo y
  * también los recibe. Se prenden con {@code EVENTOS_CONSUMO_SERVICIO=monolito}, como los del calendario.
  */
@@ -33,9 +37,13 @@ public class ManejadoresPagos {
     private static final Logger log = LoggerFactory.getLogger(ManejadoresPagos.class);
 
     @Bean
-    ManejadorEvento<CheckoutCreadoData> checkoutEnTurno(TurnoRepository turnoRepository) {
+    ManejadorEvento<CheckoutCreadoData> checkoutEnTurno(TurnoRepository turnoRepository, @org.springframework.beans.factory.annotation.Value("${turnos.externo:false}") boolean turnosExterno) {
         return ManejadorEvento.de("checkout-en-turno", Topicos.PAGOS_CHECKOUT_CREADO_V1, CheckoutCreadoData.class,
-                e -> guardarCheckout(turnoRepository, e.data()));
+                e -> {
+                    if (!turnosExterno) {
+                        guardarCheckout(turnoRepository, e.data());
+                    }
+                });
     }
 
     static void guardarCheckout(TurnoRepository turnoRepository, CheckoutCreadoData d) {
@@ -52,21 +60,33 @@ public class ManejadoresPagos {
     }
 
     @Bean
-    ManejadorEvento<PagoAprobadoData> turnoPagado(PagoWebhookHandler pagos) {
+    ManejadorEvento<PagoAprobadoData> turnoPagado(PagoWebhookHandler pagos, @org.springframework.beans.factory.annotation.Value("${turnos.externo:false}") boolean turnosExterno) {
         return ManejadorEvento.de("turno-pagado", Topicos.PAGOS_PAGO_APROBADO_V1, PagoAprobadoData.class,
-                e -> pagos.aplicarPagoAprobado(e.data()));
+                e -> {
+                    if (!turnosExterno) {
+                        pagos.aplicarPagoAprobado(e.data());
+                    }
+                });
     }
 
     @Bean
-    ManejadorEvento<PagoRechazadoData> turnoPagoRechazado(PagoWebhookHandler pagos) {
+    ManejadorEvento<PagoRechazadoData> turnoPagoRechazado(PagoWebhookHandler pagos, @org.springframework.beans.factory.annotation.Value("${turnos.externo:false}") boolean turnosExterno) {
         return ManejadorEvento.de("turno-pago-rechazado", Topicos.PAGOS_PAGO_RECHAZADO_V1, PagoRechazadoData.class,
-                e -> pagos.aplicarPagoRechazado(e.data()));
+                e -> {
+                    if (!turnosExterno) {
+                        pagos.aplicarPagoRechazado(e.data());
+                    }
+                });
     }
 
     @Bean
-    ManejadorEvento<ReembolsoRealizadoData> turnoReembolsado(PagoWebhookHandler pagos) {
+    ManejadorEvento<ReembolsoRealizadoData> turnoReembolsado(PagoWebhookHandler pagos, @org.springframework.beans.factory.annotation.Value("${turnos.externo:false}") boolean turnosExterno) {
         return ManejadorEvento.de("turno-reembolsado", Topicos.PAGOS_REEMBOLSO_REALIZADO_V1, ReembolsoRealizadoData.class,
-                e -> pagos.aplicarReembolsoRealizado(e.data()));
+                e -> {
+                    if (!turnosExterno) {
+                        pagos.aplicarReembolsoRealizado(e.data());
+                    }
+                });
     }
 
     @Bean

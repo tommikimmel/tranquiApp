@@ -22,9 +22,16 @@ public class LiberarTurnosScheduler {
     @Autowired
     private OutboxPublisher outboxPublisher;
 
+    // Fase 6: con el flag, el vencimiento del bloqueo lo hace el servicio de turnos.
+    @org.springframework.beans.factory.annotation.Value("${turnos.externo:false}")
+    private boolean turnosExterno;
+
     @Scheduled(fixedRate = 60000) // Every minute
     @Transactional
     public void liberarTurnosExpirados() {
+        if (turnosExterno) {
+            return;
+        }
         LocalDateTime limite = LocalDateTime.now().minusMinutes(5);
         List<Turno> turnosExpirados = turnoRepository.findByEstadoAndFechaCreacionBefore(
                 EstadoTurno.PENDIENTE_PAGO, limite

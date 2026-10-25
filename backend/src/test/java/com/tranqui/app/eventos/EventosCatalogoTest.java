@@ -46,6 +46,8 @@ class EventosCatalogoTest {
             Map.entry(Topicos.PROFESIONALES_CONCEPTO_SOLICITADO_V1, List.of("ConceptoService#crearSolicitud")),
             Map.entry(Topicos.PROFESIONALES_DISPONIBILIDAD_ACTUALIZADA_V2, List.of("servicio de profesionales (Fase 5)")),
             Map.entry(Topicos.PROFESIONALES_TARIFA_ACTUALIZADA_V2, List.of("servicio de profesionales (Fase 5)")),
+            Map.entry(Topicos.PROFESIONALES_RECETA_EMITIDA_V1, List.of("RecetaService#emitirReceta")),
+            Map.entry(Topicos.TURNOS_TURNO_ACTUALIZADO_V1, List.of("servicio de turnos (Fase 6)")),
             Map.entry(Topicos.SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1, List.of("SubscriptionService#logEvent")),
             Map.entry(Topicos.SUSCRIPCIONES_AVISO_PROGRAMADO_V1, List.of("SubscriptionService#registerManualPayment", "SubscriptionService#activarPagoSuscripcion", "SubscriptionService#processMercadoPagoPreapprovalWebhook", "SubscriptionService#cancelarSuscripcionPorProfesional", "SubscriptionReconciliationScheduler", "AdminSubscriptionController#updateSubscriptionStatus")),
             Map.entry(Topicos.CALENDARIO_MEET_CREADO_V1, List.of("PagoWebhookHandler#procesarAprobacionTurno", "TurnoService#confirmarTurnoOsde", "GoogleCalendarSyncService#exportarTurnosPendientesAGoogleCalendar")),
@@ -58,7 +60,7 @@ class EventosCatalogoTest {
     void todosLosTopicosTienenProductorAsignado() {
         List<String> todosLosTopicos = Topicos.TODOS_LOS_TOPICOS;
         assertThat(todosLosTopicos).isNotEmpty();
-        assertThat(todosLosTopicos).hasSize(37);
+        assertThat(todosLosTopicos).hasSize(39);
 
         for (String topico : todosLosTopicos) {
             assertThat(Topicos.esValido(topico))

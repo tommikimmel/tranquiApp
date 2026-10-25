@@ -17,6 +17,9 @@ import org.springframework.context.annotation.Configuration;
  *
  * <p>El consumo se prende solo con {@code EVENTOS_CONSUMO_SERVICIO=monolito} (los compose); sin esa
  * variable este handler no se registra en ningún consumidor.
+ *
+ * <p>Fase 6: con {@code turnos.externo=true} el Meet lo guarda el servicio de turnos y llega a la copia del
+ * monolito con {@code turnos.turno.actualizado}.
  */
 @Configuration
 public class ManejadoresCalendario {
@@ -24,9 +27,13 @@ public class ManejadoresCalendario {
     private static final Logger log = LoggerFactory.getLogger(ManejadoresCalendario.class);
 
     @Bean
-    ManejadorEvento<MeetCreadoData> meetEnTurno(TurnoRepository turnoRepository) {
+    ManejadorEvento<MeetCreadoData> meetEnTurno(TurnoRepository turnoRepository, @org.springframework.beans.factory.annotation.Value("${turnos.externo:false}") boolean turnosExterno) {
         return ManejadorEvento.de("meet-en-turno", Topicos.CALENDARIO_MEET_CREADO_V1, MeetCreadoData.class,
-                e -> guardarMeet(turnoRepository, e.data()));
+                e -> {
+                    if (!turnosExterno) {
+                        guardarMeet(turnoRepository, e.data());
+                    }
+                });
     }
 
     static void guardarMeet(TurnoRepository turnoRepository, MeetCreadoData d) {

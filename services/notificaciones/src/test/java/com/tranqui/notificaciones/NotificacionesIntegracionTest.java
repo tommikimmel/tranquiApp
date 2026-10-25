@@ -339,4 +339,42 @@ class NotificacionesIntegracionTest {
         assertThat(get("no-es-un-jwt").getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(get(token("admin@mail.com", "ADMIN")).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
+
+    // ------------------------------------------------------------------ documento adjunto (Fase 6)
+
+    private ResponseEntity<String> documento(String cuerpo, boolean conToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        if (conToken) {
+            headers.setBearerAuth(new com.tranqui.eventos.jwt.ServiceJwt("clave-servicio-test-de-32-bytes-ok").emitirToken("turnos"));
+        }
+        return http.exchange("/internal/notificaciones/documentos", HttpMethod.POST, new HttpEntity<>(cuerpo, headers), String.class);
+    }
+
+    private static final String DOCUMENTO = "{\"email\":\"pac@mail.com\",\"pacienteNombre\":\"Ana\",\"medicoNombre\":\"Dra. Paz\","
+            + "\"tipoDocumento\":\"Certificado\",\"archivoDataUri\":\"data:application/pdf;base64,JVBERi0=\","
+            + "\"archivoNombre\":\"certificado.pdf\"}";
+
+    @Test
+    void documentoAdjunto_soloConTokenDeServicio_yLoMandaConElArchivo() {
+        assertThat(documento(DOCUMENTO, false).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        ResponseEntity<String> r = documento(DOCUMENTO, true);
+
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(r.getBody()).contains("\"enviado\":true");
+        verify(mails).enviarDocumentoAdjunto("pac@mail.com", "Ana", "Dra. Paz", "Certificado",
+                "data:application/pdf;base64,JVBERi0=", "certificado.pdf");
+    }
+
+    @Test
+    void documentoAdjunto_siElMailNoSale_502() {
+        doThrow(new EnvioMailException("Resend caído")).when(mails).enviarDocumentoAdjunto(anyString(), anyString(), anyString(),
+                anyString(), anyString(), anyString());
+
+        ResponseEntity<String> r = documento(DOCUMENTO, true);
+
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
+        assertThat(r.getBody()).contains("\"enviado\":false");
+    }
 }

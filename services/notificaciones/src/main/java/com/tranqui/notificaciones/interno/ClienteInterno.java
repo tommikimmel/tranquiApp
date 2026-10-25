@@ -72,7 +72,8 @@ public class ClienteInterno {
 
     public EnlacesAsistencia enlacesAsistencia(Long turnoId) {
         EnlacesAsistencia enlaces = http.get()
-                .uri("/internal/monolito/turnos/{id}/enlaces-asistencia", turnoId)
+                // Fase 6: la ruta del servicio de turnos (sin él, el gateway la manda al monolito, que la atiende igual).
+                .uri("/internal/turnos/turnos/{id}/enlaces-asistencia", turnoId)
                 .headers(h -> {
                     h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
                     h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
