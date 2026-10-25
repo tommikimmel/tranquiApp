@@ -63,7 +63,7 @@ class InternoProfesionalesControllerTest {
     private Usuario profesional() {
         Usuario u = usuarioRepository.save(Usuario.builder().nombre("Ana").apellido("Paz")
                 .email("ana." + System.nanoTime() + "@mail.com").rol(Rol.PSIQUIATRA).profession("psiquiatra")
-                .specialty("Psiquiatría").titulo("Médica").matriculaTipo("MN").matriculaNumero(1234)
+                .specialty("Psiquiatría").titulo("Médica").fechaNacimiento(LocalDate.of(1980, 5, 4)).matriculaTipo("MN").matriculaNumero(1234)
                 .ofreceOnline(true).ofrecePresencial(false).duracionTurnoMinutos(50)
                 .fotoUrl("data:image/png;base64,AAAA").verificadoAdmin(true).build());
         disponibilidadRepository.save(Disponibilidad.builder().medico(u).diaSemana(1)
@@ -91,6 +91,7 @@ class InternoProfesionalesControllerTest {
                 .contains("\"duracionTurnoMinutos\":50")
                 .contains("\"horaInicio\":\"09:00\"").contains("\"modalidad\":\"ONLINE\"")
                 .contains("\"servicioId\":\"particular\"").contains("\"verificadoAdmin\":true")
+                .contains("\"fechaNacimiento\":\"1980-05-04\"")
                 .doesNotContain("password");
     }
 

@@ -48,10 +48,12 @@ public class InternoProfesionalesController {
      * Un profesional visto desde el monolito. En {@code /estado} van sin la foto (solo su hash), sin el
      * perfil, la disponibilidad ni las tarifas.
      */
+    // La fecha va en ISO (yyyy-MM-dd) aunque el monolito serializa LocalDate como dd/MM/yyyy para el
+    // frontend (DateConfig): los servicios la leen con el Jackson de siempre.
     public record ProfesionalDto(Long id, int version, String email, String rol, String profession,
                                  String nombre, String apellido, String telefono, String sexo,
-                                 LocalDate fechaNacimiento, Long cuil, String tipoDocumento, Integer numeroDocumento,
-                                 String fotoUrl, String fotoHash,
+                                 @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer.class) LocalDate fechaNacimiento, Long cuil, String tipoDocumento,
+                                 Integer numeroDocumento, String fotoUrl, String fotoHash,
                                  Boolean verificadoAdmin, boolean mpVinculada,
                                  String suscripcionEstado, LocalDateTime suscripcionPeriodoHasta, boolean puedeRecetar,
                                  PerfilProfesionalData perfil,

@@ -39,11 +39,14 @@ public class InternoTurnosController {
     public record TurnoDto(int version, TurnoActualizadoData turno, String tokenReserva, String tokenConfirmacionAsistencia) {}
 
     /** Los datos de un usuario que muestran la agenda y los turnos (no hay datos de salud). */
+    // La fecha va en ISO (yyyy-MM-dd) aunque el monolito serializa LocalDate como dd/MM/yyyy para el
+    // frontend (DateConfig): los servicios la leen con el Jackson de siempre.
     public record PacienteDto(Long id, int version, String rol, String email, String nombre, String apellido,
                               String telefono, String dni, String direccion, String obraSocial, String numAfiliado,
-                              String sexo, LocalDate fechaNacimiento, Long cuil, String tipoDocumento,
+                              String sexo, @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer.class) LocalDate fechaNacimiento, Long cuil, String tipoDocumento,
                               Integer numeroDocumento, String datosOfuscado, Integer credencialCodEntidad,
-                              String credencialPan, String credencialPlan, String credencialToken) {}
+                              String credencialPan, String credencialPlan, String credencialToken,
+                              boolean emailHabilitado) {}
 
     /** Lo que manda la reserva para "buscar o crear paciente", como lo resolvía {@code TurnoService#reservarTurno}. */
     public record BuscarOCrearPaciente(String email, String nombre, String telefono, String obraSocial, String numAfiliado) {}
@@ -135,6 +138,6 @@ public class InternoTurnosController {
                 u.getNombre(), u.getApellido(), u.getTelefono(), u.getDni(), u.getDireccion(), u.getObraSocial(),
                 u.getNumAfiliado(), u.getSexo(), u.getFechaNacimiento(), u.getCuil(), u.getTipoDocumento(),
                 u.getNumeroDocumento(), u.getDatosOfuscado(), u.getCredencialCodEntidad(), u.getCredencialPan(),
-                u.getCredencialPlan(), u.getCredencialToken());
+                u.getCredencialPlan(), u.getCredencialToken(), u.isNotificacionesEmailHabilitadas());
     }
 }

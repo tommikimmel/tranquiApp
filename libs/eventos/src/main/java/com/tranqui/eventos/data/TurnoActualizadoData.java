@@ -1,5 +1,8 @@
 package com.tranqui.eventos.data;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -11,11 +14,15 @@ import java.time.LocalTime;
  * pago). Trae también el estado de su pago (lo registra el servicio de pagos y turnos lo sigue), así la
  * copia del pago en el monolito sale del mismo evento y no depende del orden de llegada. No lleva los
  * tokens de los links de los mails (confirmar asistencia, abandonar el pago) ni datos de salud.
+ *
+ * <p>La fecha se escribe siempre en ISO: el monolito manda este record en una ruta interna y su Jackson
+ * serializa LocalDate como dd/MM/yyyy.
  */
 public record TurnoActualizadoData(
     Long turnoId,
     Long pacienteId,
     Long profesionalId,
+    @JsonSerialize(using = LocalDateSerializer.class)
     LocalDate fecha,
     LocalTime horaInicio,
     LocalTime horaFin,

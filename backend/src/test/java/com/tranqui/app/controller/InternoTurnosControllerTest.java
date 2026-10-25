@@ -58,7 +58,7 @@ class InternoTurnosControllerTest {
         Usuario medico = usuarioRepository.save(Usuario.builder().nombre("Dra").email("dra.t." + System.nanoTime() + "@mail.com")
                 .rol(Rol.PSIQUIATRA).build());
         Usuario paciente = usuarioRepository.save(Usuario.builder().nombre("Pac").email("pac.t." + System.nanoTime() + "@mail.com")
-                .rol(Rol.PACIENTE).dni("30111222").obraSocial("OSDE").build());
+                .rol(Rol.PACIENTE).dni("30111222").obraSocial("OSDE").fechaNacimiento(LocalDate.of(1990, 3, 7)).build());
         return turnoRepository.save(Turno.builder().medico(medico).paciente(paciente).fecha(LocalDate.now().plusDays(4))
                 .horaInicio(LocalTime.of(9, 0)).horaFin(LocalTime.of(9, 45)).tipo(TipoTurno.PARTICULAR).modalidad(Modalidad.ONLINE)
                 .estado(EstadoTurno.CONFIRMADO).precio(new BigDecimal("60000")).tokenReserva("reserva-123")
@@ -78,11 +78,13 @@ class InternoTurnosControllerTest {
         ResponseEntity<String> turnos = llamar(HttpMethod.GET, "/internal/monolito/turnos?pagina=0&tamanio=1000", null, true);
         assertThat(turnos.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(turnos.getBody()).contains("\"turnoId\":" + t.getId()).contains("\"tokenReserva\":\"reserva-123\"")
-                .contains("\"tokenConfirmacionAsistencia\":\"asistencia-456\"").contains("\"estado\":\"CONFIRMADO\"");
+                .contains("\"tokenConfirmacionAsistencia\":\"asistencia-456\"").contains("\"estado\":\"CONFIRMADO\"")
+                .contains("\"fecha\":\"" + t.getFecha() + "\"");
 
         ResponseEntity<String> paciente = llamar(HttpMethod.GET, "/internal/monolito/pacientes/" + t.getPaciente().getId(), null, true);
         assertThat(paciente.getBody()).contains("\"dni\":\"30111222\"").contains("\"obraSocial\":\"OSDE\"")
-                .contains("\"rol\":\"PACIENTE\"").doesNotContain("password");
+                .contains("\"rol\":\"PACIENTE\"").contains("\"fechaNacimiento\":\"1990-03-07\"")
+                .doesNotContain("password");
     }
 
     @Test
