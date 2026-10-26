@@ -488,7 +488,7 @@ spring:
           filters:
             - name: CircuitBreaker
               args:
-                name: profesionales
+                name: clinica
                 fallbackUri: forward:/fallback/profesionales
             - name: Retry
               args:

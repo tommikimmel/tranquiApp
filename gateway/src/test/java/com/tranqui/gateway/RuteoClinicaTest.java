@@ -2,6 +2,7 @@ package com.tranqui.gateway;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -35,18 +36,23 @@ public class RuteoClinicaTest {
     private static WireMockServer monolito;
     private static WireMockServer clinica;
     private static WireMockServer turnos;
+    private static WireMockServer profesionales;
 
     @Autowired
     private WebTestClient webTestClient;
+
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakerRegistry;
 
     @BeforeAll
     static void arrancar() {
         monolito = new WireMockServer(WireMockConfiguration.wireMockConfig().dynamicPort());
         clinica = new WireMockServer(WireMockConfiguration.wireMockConfig().dynamicPort());
         turnos = new WireMockServer(WireMockConfiguration.wireMockConfig().dynamicPort());
-        for (WireMockServer servidor : new WireMockServer[]{monolito, clinica, turnos}) {
+        profesionales = new WireMockServer(WireMockConfiguration.wireMockConfig().dynamicPort());
+        for (WireMockServer servidor : new WireMockServer[]{monolito, clinica, turnos, profesionales}) {
             servidor.start();
-            String quien = servidor == monolito ? "monolito" : servidor == clinica ? "clinica" : "turnos";
+            String quien = servidor == monolito ? "monolito" : servidor == clinica ? "clinica" : servidor == turnos ? "turnos" : "profesionales";
             servidor.stubFor(any(urlPathMatching("/.*")).willReturn(aResponse()
                     .withStatus(200).withHeader("Content-Type", "application/json").withBody("{\"desde\":\"" + quien + "\"}")));
         }
@@ -57,6 +63,7 @@ public class RuteoClinicaTest {
         monolito.stop();
         clinica.stop();
         turnos.stop();
+        profesionales.stop();
     }
 
     @DynamicPropertySource
@@ -64,6 +71,7 @@ public class RuteoClinicaTest {
         registry.add("tranqui.services.monolito.uri", () -> "http://localhost:" + monolito.port());
         registry.add("tranqui.services.clinica.uri", () -> "http://localhost:" + clinica.port());
         registry.add("tranqui.services.turnos.uri", () -> "http://localhost:" + turnos.port());
+        registry.add("tranqui.services.profesionales.uri", () -> "http://localhost:" + profesionales.port());
     }
 
     private void va(String metodo, String ruta, String destino) {
@@ -91,6 +99,41 @@ public class RuteoClinicaTest {
     void recetasFinanciadoresSinSesion_llegaAlDestino() {
         webTestClient.get().uri("/api/recetas/financiadores").exchange()
                 .expectStatus().isOk().expectBody().jsonPath("$.desde").isEqualTo("clinica");
+    }
+
+    @Test
+    void circuitoClinica_esIndependienteDeProfesionales() {
+        var cbClinica = circuitBreakerRegistry.circuitBreaker("clinica");
+        var cbProfesionales = circuitBreakerRegistry.circuitBreaker("profesionales");
+        try {
+            // Abrir el circuito de clínica no afecta al buscador ni perfil de profesionales
+            cbClinica.transitionToOpenState();
+
+            webTestClient.get().uri("/api/pacientes/atendidos").exchange()
+                    .expectStatus().isEqualTo(503)
+                    .expectHeader().contentType("application/json")
+                    .expectBody()
+                    .jsonPath("$.error").isEqualTo("servicio_no_disponible")
+                    .jsonPath("$.servicio").isEqualTo("profesionales");
+
+            va("GET", "/api/medicos", "profesionales");
+
+            // Restaurar clínica y abrir profesionales: clínica responde, profesionales va a fallback
+            cbClinica.transitionToClosedState();
+            cbProfesionales.transitionToOpenState();
+
+            va("GET", "/api/pacientes/atendidos", "clinica");
+
+            webTestClient.get().uri("/api/medicos").exchange()
+                    .expectStatus().isEqualTo(503)
+                    .expectHeader().contentType("application/json")
+                    .expectBody()
+                    .jsonPath("$.error").isEqualTo("servicio_no_disponible")
+                    .jsonPath("$.servicio").isEqualTo("profesionales");
+        } finally {
+            cbClinica.transitionToClosedState();
+            cbProfesionales.transitionToClosedState();
+        }
     }
 }
 
