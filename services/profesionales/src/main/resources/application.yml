@@ -85,6 +85,15 @@ eventos:
 
 # El mismo flag que el monolito (MedicoService#isMedicoVerificado): con Mercado Pago real, el buscador
 # exige la cuenta vinculada.
+qbi2:
+  recipe:
+    enabled: ${QBI2_RECIPE_ENABLED:false}
+    environment: ${QBI2_RECIPE_ENV:hml}
+    base-url-hml: https://apirecipe.hml.qbitos.com
+    base-url-prod: https://apirecipe.qbitos.com
+    cliente-app-id: ${QBI2_CLIENTE_APP_ID:}
+    token: ${QBI2_RECIPE_TOKEN:}
+
 mercadopago:
   enabled: ${MERCADOPAGO_ENABLED:false}
 

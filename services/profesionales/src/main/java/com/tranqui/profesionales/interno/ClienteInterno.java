@@ -190,6 +190,7 @@ public class ClienteInterno {
     }
 
     private final RestClient http;
+    private final RestClient httpRapido;
     private final ServiceJwt serviceJwt;
 
     public ClienteInterno(@Value("${tranqui.gateway.url}") String gatewayUrl,
@@ -201,6 +202,11 @@ public class ClienteInterno {
         fabrica.setConnectTimeout(2_000);
         fabrica.setReadTimeout(30_000);
         this.http = RestClient.builder().baseUrl(gatewayUrl).requestFactory(fabrica).build();
+
+        SimpleClientHttpRequestFactory fabricaRapida = new SimpleClientHttpRequestFactory();
+        fabricaRapida.setConnectTimeout(2_000);
+        fabricaRapida.setReadTimeout(5_000);
+        this.httpRapido = RestClient.builder().baseUrl(gatewayUrl).requestFactory(fabricaRapida).build();
         this.serviceJwt = new ServiceJwt(claveServicio);
     }
 
@@ -296,6 +302,25 @@ public class ClienteInterno {
     }
 
     /** Solicitudes de documentos del monolito para la carga inicial clínica. */
+    /** Payload para POST /internal/notificaciones/recetas (decisión 4). */
+    public record NotificacionReceta(String email, String pacienteNombre, String medicoNombre,
+                                     String matricula, String pdfUrl, String nroRecetario) {}
+
+    /**
+     * Mail de la receta emitida al paciente (decisión 4). Timeouts cortos.
+     * Si notificaciones está caído o responde error, tira excepción (el llamador la atrapa).
+     */
+    public void enviarMailReceta(NotificacionReceta pedido) {
+        httpRapido.post().uri("/internal/notificaciones/recetas")
+                .contentType(MediaType.APPLICATION_JSON)
+                .headers(h -> {
+                    h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
+                    h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
+                })
+                .body(pedido)
+                .retrieve().toBodilessEntity();
+    }
+
     public List<SolicitudMonolito> solicitudes(int pagina, int tamanio) {
         List<SolicitudMonolito> r = get("/internal/monolito/clinica/solicitudes?pagina={p}&tamanio={t}",
                 new ParameterizedTypeReference<>() {}, pagina, tamanio);
