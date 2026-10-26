@@ -380,8 +380,8 @@ describe('CheckoutFlow', () => {
 
     it('Fase 4: with checkoutPendiente it asks pagos for the link and then opens the gateway', async () => {
       const user = userEvent.setup()
-      ;(api.reservarTurno as any).mockResolvedValueOnce({ turnoId: 61, checkoutUrl: '', checkoutPendiente: true, precio: 20000 })
-      ;(api.obtenerCheckout as any)
+      vi.mocked(api.reservarTurno).mockResolvedValueOnce({ turnoId: 61, checkoutUrl: '', checkoutPendiente: true, precio: 20000 })
+      vi.mocked(api.obtenerCheckout)
         .mockResolvedValueOnce({ estado: 'PENDIENTE' })
         .mockResolvedValueOnce({ estado: 'LISTO', checkoutUrl: 'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mock-preference-id' })
       const { container } = render(
@@ -400,8 +400,8 @@ describe('CheckoutFlow', () => {
 
     it('Fase 4: shows the error pagos reports when the link could not be created', async () => {
       const user = userEvent.setup()
-      ;(api.reservarTurno as any).mockResolvedValueOnce({ turnoId: 62, checkoutUrl: '', checkoutPendiente: true, precio: 20000 })
-      ;(api.obtenerCheckout as any).mockResolvedValueOnce({ estado: 'ERROR', error: 'El profesional todavía no vinculó su cuenta de Mercado Pago.' })
+      vi.mocked(api.reservarTurno).mockResolvedValueOnce({ turnoId: 62, checkoutUrl: '', checkoutPendiente: true, precio: 20000 })
+      vi.mocked(api.obtenerCheckout).mockResolvedValueOnce({ estado: 'ERROR', error: 'El profesional todavía no vinculó su cuenta de Mercado Pago.' })
       const { container } = render(
         <CheckoutFlow professional={baseProfessional()} onBack={vi.fn()} onComplete={vi.fn()} />
       )
