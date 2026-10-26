@@ -105,14 +105,16 @@ class AgendaServiceTest {
     @Test
     void whenFechaIsTodayAndWindowAlreadyEnded_thenAllItsSlotsAreExcluded() {
         LocalTime ahora = LocalTime.now(ZONE_CBA);
-        LocalTime inicio = ahora.minusHours(3);
-        LocalTime fin = ahora.minusHours(1);
-        if (fin.isAfter(ahora) || inicio.isAfter(fin)) {
-            // Wrapped past midnight (test ran very early in the morning) — fall back to a
-            // window that's still guaranteed to be entirely in the past for "today".
-            inicio = LocalTime.of(0, 1);
-            fin = LocalTime.of(2, 1);
-        }
+        // If it's too early in the day (e.g. before 00:46), no 45-min slot could have ended today yet.
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                !ahora.isBefore(LocalTime.of(0, 46)),
+                "Not enough time has elapsed today in America/Argentina/Cordoba to test an already-ended window: " + ahora
+        );
+
+        LocalTime fin = ahora.minusMinutes(1);
+        LocalTime inicio = ahora.isBefore(LocalTime.of(3, 0))
+                ? LocalTime.of(0, 0)
+                : ahora.minusHours(3);
 
         Disponibilidad disp = Disponibilidad.builder()
                 .horaInicio(inicio)
