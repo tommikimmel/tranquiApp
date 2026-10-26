@@ -12,4 +12,5 @@ public interface GoogleCalendarEventoExternoRepository extends JpaRepository<Goo
     Optional<GoogleCalendarEventoExterno> findByGoogleEventId(String googleEventId);
     void deleteByGoogleEventId(String googleEventId);
     void deleteByMedicoId(Long medicoId);
+    List<GoogleCalendarEventoExterno> findByIdGreaterThanOrderByIdAsc(Long id, org.springframework.data.domain.Pageable pagina);
 }
