@@ -123,7 +123,8 @@ Lo que encontré y el plan no resolvía:
     al día y no terminaba nunca; el servicio corta ahí.
   - **Encontrado y sin cambiar (mismo comportamiento que hoy):** cancelar, marcar asistencia y reprogramar no
     verifican que el turno sea de quien lo pide (cualquier paciente o profesional logueado puede hacerlo con el
-    id). Queda para decidir aparte.
+    id). **Corregido en un PR aparte** (decidido el 2026-10-25): en el monolito y en el servicio, cancelar exige ser
+    el paciente o el profesional del turno, y asistencia y reprogramar, el profesional; si no, 403.
 
 ### T3 — Gateway
 - Las rutas de `TurnoController` van a `TRANQUI_SERVICES_TURNOS_URI`: las reglas `turnos-conteo`,

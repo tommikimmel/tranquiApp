@@ -349,6 +349,29 @@ class TurnosIntegracionTest {
     }
 
     @Test
+    void cancelarAsistenciaYReprogramar_soloElDuenioDelTurno() {
+        personas.guardar(persona(31L, "PACIENTE", "Otro", "otro@mail.com"));
+        personas.guardar(persona(17L, "PSIQUIATRA", "Dr. Otro", "otro.dr@mail.com"));
+        Turno t = turnoGuardado(75, Turno.CONFIRMADO, LocalDate.now().plusDays(6), LocalTime.of(9, 0), "APROBADO", LocalDateTime.now());
+
+        assertThat(pedir(HttpMethod.POST, "/api/turnos/" + t.id + "/cancelar", token("otro@mail.com", "PACIENTE"), null)
+                .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(pedir(HttpMethod.PUT, "/api/turnos/" + t.id + "/asistencia?asistencia=LLEGO", token("otro.dr@mail.com", "PSIQUIATRA"), null)
+                .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(pedir(HttpMethod.PUT, "/api/turnos/" + t.id + "/reprogramar?fecha=" + LocalDate.now().plusDays(7) + "&hora=10:30",
+                token("otro.dr@mail.com", "PSIQUIATRA"), null).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(turnos.porId(t.id).orElseThrow().estado).isEqualTo(Turno.CONFIRMADO);
+
+        assertThat(pedir(HttpMethod.PUT, "/api/turnos/" + t.id + "/asistencia?asistencia=LLEGO", token("lucia@mail.com", "PSIQUIATRA"), null)
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(pedir(HttpMethod.PUT, "/api/turnos/" + t.id + "/reprogramar?fecha=" + LocalDate.now().plusDays(7) + "&hora=10:30",
+                token("lucia@mail.com", "PSIQUIATRA"), null).getStatusCode()).isEqualTo(HttpStatus.OK);
+        Turno cambiado = turnos.porId(t.id).orElseThrow();
+        assertThat(cambiado.asistencia).isEqualTo("LLEGO");
+        assertThat(cambiado.horaInicio).isEqualTo(LocalTime.of(10, 30));
+    }
+
+    @Test
     void abandonarPago_soloConElTokenDeLaReserva() {
         Turno t = turnoGuardado(80, Turno.PENDIENTE_PAGO, LocalDate.now().plusDays(3), LocalTime.of(9, 0), null, LocalDateTime.now());
 

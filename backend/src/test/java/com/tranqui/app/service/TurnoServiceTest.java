@@ -478,6 +478,21 @@ class TurnoServiceTest {
     }
 
     @Test
+    void exigirDuenio_soloElPacienteOElProfesionalDelTurno() {
+        assertDoesNotThrow(() -> turnoService.exigirDuenio(turno.getId(), paciente.getEmail(), false));
+        assertDoesNotThrow(() -> turnoService.exigirDuenio(turno.getId(), medico.getEmail().toUpperCase(), false));
+        assertDoesNotThrow(() -> turnoService.exigirDuenio(turno.getId(), medico.getEmail(), true));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> turnoService.exigirDuenio(turno.getId(), paciente.getEmail(), true));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> turnoService.exigirDuenio(turno.getId(), "otro@mail.com", false));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> turnoService.exigirDuenio(turno.getId(), null, false));
+        assertThrows(jakarta.persistence.EntityNotFoundException.class,
+                () -> turnoService.exigirDuenio(-1L, medico.getEmail(), false));
+    }
+
+    @Test
     void testCancelarTurno_turnoNoEncontrado() {
         assertThrows(jakarta.persistence.EntityNotFoundException.class,
                 () -> turnoService.cancelarTurno(-1L, medico.getEmail()));

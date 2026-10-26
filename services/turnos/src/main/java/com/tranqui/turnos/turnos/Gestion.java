@@ -62,9 +62,24 @@ public class Gestion {
         return cancelaProfesional || !LocalDateTime.now().plusHours(48).isAfter(fechaTurno);
     }
 
+    /**
+     * Que el turno sea de quien lo pide: su paciente o su profesional, o solo su profesional. El monolito no lo
+     * verificaba en cancelar, asistencia y reprogramar (cualquier usuario con el rol podía con el id).
+     */
+    private void exigirDuenio(Turno t, String email, boolean soloProfesional) {
+        String emailMedico = personas.porId(t.medicoId).map(Personas.Persona::email).orElse(null);
+        String emailPaciente = personas.porId(t.pacienteId).map(Personas.Persona::email).orElse(null);
+        boolean esProfesional = email != null && email.equalsIgnoreCase(emailMedico);
+        boolean esPaciente = email != null && email.equalsIgnoreCase(emailPaciente);
+        if (!esProfesional && (soloProfesional || !esPaciente)) {
+            throw new ProhibidoException("No tenés permiso para modificar este turno.");
+        }
+    }
+
     @Transactional
     public void cancelar(Long turnoId, String emailQuienCancela) {
         Turno t = buscar(turnoId);
+        exigirDuenio(t, emailQuienCancela, false);
         String emailMedico = personas.porId(t.medicoId).map(Personas.Persona::email).orElse(null);
         boolean cancelaProfesional = emailQuienCancela != null && emailMedico != null && emailMedico.equalsIgnoreCase(emailQuienCancela);
         String resultado = "SIN_PAGO";
@@ -93,8 +108,9 @@ public class Gestion {
     }
 
     @Transactional
-    public void asistencia(Long turnoId, String asistencia) {
+    public void asistencia(Long turnoId, String asistencia, String emailMedico) {
         Turno t = buscar(turnoId);
+        exigirDuenio(t, emailMedico, true);
         String valor = asistencia != null ? asistencia.toUpperCase() : null;
         if (valor == null || !ASISTENCIAS.contains(valor)) {
             throw new IllegalArgumentException("Estado de asistencia inválido: " + asistencia);
@@ -162,8 +178,9 @@ public class Gestion {
     }
 
     @Transactional
-    public void reprogramar(Long turnoId, String fechaTexto, String horaTexto) {
+    public void reprogramar(Long turnoId, String fechaTexto, String horaTexto, String emailMedico) {
         Turno t = buscar(turnoId);
+        exigirDuenio(t, emailMedico, true);
         LocalDate fechaAnterior = t.fecha;
         LocalTime horaAnterior = t.horaInicio;
         LocalDate nuevaFecha = Fechas.leer(fechaTexto);

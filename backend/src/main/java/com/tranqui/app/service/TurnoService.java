@@ -925,6 +925,23 @@ public class TurnoService {
         }
     }
 
+    /**
+     * Que el turno sea de quien lo pide: su paciente o su profesional, o solo su profesional. Antes cancelar,
+     * marcar la asistencia y reprogramar no lo verificaban: cualquier usuario con el rol podía hacerlo con el id.
+     */
+    @Transactional(readOnly = true)
+    public void exigirDuenio(Long turnoId, String email, boolean soloProfesional) {
+        Turno turno = turnoRepository.findById(turnoId)
+                .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado"));
+        boolean esProfesional = email != null && turno.getMedico().getEmail() != null
+                && turno.getMedico().getEmail().equalsIgnoreCase(email);
+        boolean esPaciente = email != null && turno.getPaciente().getEmail() != null
+                && turno.getPaciente().getEmail().equalsIgnoreCase(email);
+        if (!esProfesional && (soloProfesional || !esPaciente)) {
+            throw new org.springframework.security.access.AccessDeniedException("No tenés permiso para modificar este turno.");
+        }
+    }
+
     @Transactional
     public void actualizarAsistencia(Long turnoId, String asistenciaStr) {
         Turno turno = turnoRepository.findById(turnoId)
