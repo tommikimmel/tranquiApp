@@ -8,6 +8,8 @@
 //   fecha_emision, transaction_id).
 // - NUNCA pisa el contenido clínico ni el hash de un asiento existente: si difieren, informa el
 //   conflicto y aborta con código de error.
+// - NUNCA descarta asientos de historia clínica: si algún paciente o médico no existe en el
+//   monolito, informa los asientos afectados y aborta con código de error para que el operador decida.
 // - Ajusta las secuencias (identity) del monolito por encima del máximo id.
 // - Todo en una transacción única en PostgreSQL.
 //
@@ -63,8 +65,10 @@ if (prueba) {
   process.exit(0);
 }
 
-// 1. Detección de conflictos antes de modificar la base:
+// 1. Detección de conflictos y de usuarios inexistentes antes de modificar la base:
 // Si un asiento existente difiere en contenido clínico o hash, no se debe pisar.
+// Si un asiento referencia un paciente o médico inexistente en el monolito, no se descarta en silencio:
+// se aborta para que el operador decida (Ley 26.529 y 27.706).
 const normal = (v) => (v === null || v === undefined || v === '' ? null : String(v));
 const mismoNumero = (a, b) => a !== null && b !== null && !Number.isNaN(Number(a)) && Number(a) === Number(b);
 
@@ -133,12 +137,48 @@ for (const [id, s] of solsS) {
   }
 }
 
+// Usuarios inexistentes en el monolito:
+const usuariosMonolito = new Set(json(base, 'SELECT id FROM usuario').map((u) => String(u.id)));
+const huerfanos = [];
+const verificarUsuario = (tabla, id, campo, usuarioId) => {
+  if (usuarioId !== null && usuarioId !== undefined && !usuariosMonolito.has(String(usuarioId))) {
+    huerfanos.push({ tabla, id, campo, usuarioId });
+  }
+};
+
+for (const [id, s] of segsS) {
+  verificarUsuario('seguimiento_diario', id, 'paciente_id', s.paciente_id);
+  verificarUsuario('seguimiento_diario', id, 'medico_id', s.medico_id);
+}
+for (const [id, i] of infsS) {
+  verificarUsuario('informe_clinico', id, 'paciente_id', i.paciente_id);
+  verificarUsuario('informe_clinico', id, 'medico_id', i.medico_id);
+}
+for (const [id, r] of recsS) {
+  verificarUsuario('receta', id, 'paciente_id', r.paciente_id);
+  verificarUsuario('receta', id, 'medico_id', r.medico_id);
+}
+for (const [id, d] of solsS) {
+  verificarUsuario('solicitud_documento', id, 'paciente_id', d.paciente_id);
+  verificarUsuario('solicitud_documento', id, 'medico_id', d.medico_id);
+}
+
 if (conflictos.length > 0) {
   console.error(`Conflictos detectados (${conflictos.length}): un asiento existente difiere en contenido o hash:`);
   for (const c of conflictos.slice(0, 50)) {
     console.error(`  - [${c.tabla}] id=${c.id}: difiere en ${c.campo}`);
   }
   if (conflictos.length > 50) console.error(`  ... y ${conflictos.length - 50} más`);
+  console.error('Abortando vuelta atrás: ningún asiento fue modificado.');
+  process.exit(1);
+}
+
+if (huerfanos.length > 0) {
+  console.error(`Asientos con usuarios inexistentes en el monolito (${huerfanos.length}):`);
+  for (const h of huerfanos.slice(0, 50)) {
+    console.error(`  - [${h.tabla}] id=${h.id}: falta ${h.campo}=${h.usuarioId} en usuario`);
+  }
+  if (huerfanos.length > 50) console.error(`  ... y ${huerfanos.length - 50} más`);
   console.error('Abortando vuelta atrás: ningún asiento fue modificado.');
   process.exit(1);
 }
@@ -182,11 +222,6 @@ const carga = [
   '\\copy dev_solicitud FROM STDIN WITH CSV',
   csvSol.trimEnd(),
   '\\.',
-  // Limpieza de huérfanos por si algún usuario de prueba no existe en monolito
-  'DELETE FROM dev_seguimiento d WHERE NOT EXISTS (SELECT 1 FROM usuario u WHERE u.id = d.paciente_id) OR NOT EXISTS (SELECT 1 FROM usuario u WHERE u.id = d.medico_id);',
-  'DELETE FROM dev_informe d WHERE NOT EXISTS (SELECT 1 FROM usuario u WHERE u.id = d.paciente_id) OR NOT EXISTS (SELECT 1 FROM usuario u WHERE u.id = d.medico_id);',
-  'DELETE FROM dev_receta d WHERE NOT EXISTS (SELECT 1 FROM usuario u WHERE u.id = d.paciente_id) OR NOT EXISTS (SELECT 1 FROM usuario u WHERE u.id = d.medico_id);',
-  'DELETE FROM dev_solicitud d WHERE NOT EXISTS (SELECT 1 FROM usuario u WHERE u.id = d.paciente_id) OR NOT EXISTS (SELECT 1 FROM usuario u WHERE u.id = d.medico_id);',
   // Inserciones de nuevos registros
   `INSERT INTO seguimiento_diario (${COL_SEG.join(', ')}) SELECT ${COL_SEG.map((c) => `d.${c}`).join(', ')} FROM dev_seguimiento d WHERE NOT EXISTS (SELECT 1 FROM seguimiento_diario m WHERE m.id = d.id);`,
   `INSERT INTO informe_clinico (${COL_INF.join(', ')}) SELECT ${COL_INF.map((c) => `d.${c}`).join(', ')} FROM dev_informe d WHERE NOT EXISTS (SELECT 1 FROM informe_clinico m WHERE m.id = d.id);`,

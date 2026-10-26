@@ -191,6 +191,7 @@ y consume eventos de recetas.
    docker compose -p app up -d profesionales
    docker compose -p app up -d gateway
    ```
+   (El monolito queda respondiendo las rutas internas `/internal/monolito/clinica/**` para la carga inicial aunque tenga `CLINICA_EXTERNO=true`, ya que `ClinicaExternoFilter` solo filtra `/api/**`. El modo mantenimiento no corta la comunicación interna entre contenedores).
 4. Esperar que `profesionales` esté sano y en sus logs figure:
    `Carga inicial clínica completada` (o `Carga inicial clínica:`).
 5. Conciliar las cuatro tablas y, si da sin diferencias, desactivar mantenimiento:
@@ -198,20 +199,23 @@ y consume eventos de recetas.
    node scripts/fase7-conciliar-clinica.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
    npm run mantenimiento -- off
    ```
-6. Correr la conciliación a diario durante las primeras dos semanas.
+   A diferencia de otras fases, la conciliación no se corre a diario después del corte: el monolito ya no recibe asientos nuevos, por lo que la conciliación diaria daría diferencias esperables. La conciliación sirve justo después del corte y después de una vuelta atrás.
 
 **Vuelta atrás de la Fase 7:**
 
 1. `npm run mantenimiento -- on "Mantenimiento por actualización"`.
 2. Devolver al monolito todos los seguimientos, informes, recetas y solicitudes creados o modificados en el
    servicio, con validación estricta de inalterabilidad (si difiere el contenido o hash de un asiento existente,
-   aborta con error sin tocar datos) y ajuste de secuencias:
+   o si algún paciente o médico no existe en el monolito, aborta con error sin tocar datos) y ajuste de secuencias:
    ```bash
    node scripts/fase7-devolver-clinica.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
    ```
 3. En `/srv/tranqui/.env`: `CLINICA_EXTERNO=false` y sacar `TRANQUI_SERVICES_CLINICA_URI` (o apuntarla a
-   `http://tranqui-backend:8080`). ¿Qué pasa con `PROFESIONALES_CLINICA`? Se define `PROFESIONALES_CLINICA=false`
-   (o se saca del `.env`) para que el servicio de profesionales apague la atención y sincronización de clínica.
+   `http://tranqui-backend:8080`). Con la vuelta atrás, lo que deja de mandar tráfico clínico al servicio es el
+   gateway (sacar `TRANQUI_SERVICES_CLINICA_URI`) y `CLINICA_EXTERNO=false`. `PROFESIONALES_CLINICA` no apaga
+   rutas ni sincronizaciones del servicio, solo habilita la carga inicial clínica (que además solo corre con las
+   cuatro tablas vacías); se define `PROFESIONALES_CLINICA=false` (o se saca del `.env`) para que, si el servicio
+   se reinicia, no intente ninguna carga.
 4. Reiniciar monolito, profesionales y gateway:
    ```bash
    docker compose -p app up -d tranqui-backend gateway profesionales
@@ -219,9 +223,20 @@ y consume eventos de recetas.
 5. Conciliar (`node scripts/fase7-conciliar-clinica.mjs ...`).
 6. `npm run mantenimiento -- off`.
 
+**Volver a cortar después de una vuelta atrás:**
+Como la carga inicial clínica solo corre con las cuatro tablas vacías, antes de volver a cortar hay que vaciar en
+la base `profesionales` las tablas `seguimiento_diario`, `informe_clinico`, `receta` y `solicitud_documento`
+(después de haber devuelto y conciliado).
+> **Advertencia:** ejecutar este vaciado únicamente si la conciliación anterior finalizó sin diferencias. Si no se
+> vacían, el servicio arrancaría con los datos viejos y no volvería a cargar los asientos del monolito:
+```bash
+docker compose -p app exec tranqui-db psql -U <DB_USER> -d profesionales -c "TRUNCATE TABLE seguimiento_diario, informe_clinico, receta, solicitud_documento;"
+```
+Luego repetir los pasos del corte.
+
 **Compatibilidad con vuelta atrás de la Fase 6 (turnos al monolito):**
 Si los turnos vuelven al monolito (`TURNOS_EXTERNO=false`), la Fase 7 sigue funcionando plenamente: el servicio
-de profesionales resincroniza periódicamente los turnos atendidos cada 15 minutos consultando `/internal/turnos/**`
+de profesionales resincroniza periódicamente los turnos atendidos cada 15 minutos consultando `/internal/monolito/turnos`
 (ruta que el monolito atiende en su vuelta atrás), y el monolito marca los turnos de recetas fuera de turno por
 evento (`profesionales.receta.emitida.v1`).
 

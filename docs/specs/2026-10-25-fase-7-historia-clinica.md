@@ -50,6 +50,8 @@ Lo que encontré y el plan no resolvía:
 
 ## Solución propuesta (con las recomendaciones de las Preguntas)
 
+- **Accesos en el monolito (#61):** las reglas de acceso a datos de salud (decisión 2) se implementaron en el monolito en #61 antes de H1.
+
 ### H1 — Catálogo y monolito
 - Flag `clinica.externo` (`CLINICA_EXTERNO`): con `true`, las rutas de historia clínica, recetas y conceptos del
   monolito responden 409 (el gateway las manda al servicio). Con `false` (vuelta atrás), todo como hoy.
@@ -60,7 +62,7 @@ Lo que encontré y el plan no resolvía:
   su link, sin guardarlo. El monolito atiende la misma URL para la vuelta atrás de la Fase 1.
 - Sin copia en el monolito: después del corte nadie más lee la historia clínica (las estadísticas cuentan turnos y
   pagos). Menos copias de datos de salud. La vuelta atrás los devuelve con un script.
-- **Hecho en H1:** flag CLINICA_EXTERNO con ClinicaExternoFilter (409), rutas internas /internal/monolito/{seguimientos,informes,recetas,solicitudes} paginadas y /internal/monolito/pacientes/{id} (con saveAndFlush y propagación de fallos), POST /internal/notificaciones/recetas en notificaciones y consumo de receta.emitida en el monolito para la vuelta atrás de la Fase 6.
+- **Hecho en H1:** flag CLINICA_EXTERNO con ClinicaExternoFilter (409), rutas internas /internal/monolito/clinica/{seguimientos,informes,recetas,solicitudes} paginadas y PUT /internal/monolito/pacientes/{id} (con saveAndFlush y propagación de fallos), y POST /internal/notificaciones/recetas en notificaciones.
 
 ### H2 — Historia clínica y recetas en el servicio de profesionales (pregunta 1)
 - Tablas nuevas en la base `profesionales`: `seguimiento_diario`, `informe_clinico`, `receta`, `solicitud_documento`
@@ -75,7 +77,7 @@ Lo que encontré y el plan no resolvía:
   profesional se rechaza en vez de asignarlo a uno fijo.
 - Publica `profesionales.historia-clinica.actualizada` (igual que hoy, sin contenido) y
   `profesionales.receta.emitida` (para turnos y para el mail).
-- **Hecho en H2 (dividido en H2a, H2b y H2c):** H2a (esquema Flyway V2 en base profesionales, copias de turnos_atendidos y personas con PacienteDto interno que suma el domicilio, carga inicial clínica); H2b (historia clínica, ficha, pacientes atendidos con validación de relación profesional-paciente y conceptos, donde emitir un concepto ajeno responde 403 en vez de 500); H2c (recetas electrónicas con QBI2 e integración simulada en local).
+- **Hecho en H2 (dividido en H2a, H2b y H2c):** los accesos (decisión 2) se hicieron en el monolito en #61 antes de H1; H2a (esquema Flyway V2 en base profesionales, copias de turnos_atendidos y personas con PacienteDto interno que suma el domicilio, carga inicial clínica); H2b (historia clínica, ficha, pacientes atendidos con validación de relación profesional-paciente y conceptos, donde emitir un concepto ajeno responde 403 en vez de 500); H2c (recetas electrónicas con QBI2 e integración simulada en local, y consumo de receta.emitida en el monolito para la vuelta atrás de la Fase 6).
 
 ### H3 — Gateway
 - `/api/pacientes/**` (menos `/me/turnos`), `/api/recetas/**` y `/api/conceptos/**` al servicio de profesionales
