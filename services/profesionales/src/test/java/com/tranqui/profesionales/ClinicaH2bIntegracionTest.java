@@ -299,18 +299,21 @@ class ClinicaH2bIntegracionTest {
         assertThat(rSinMed.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(rSinMed.getBody()).contains("El seguimiento tiene que ser para un profesional que te atiende.");
 
-        // Paciente carga seguimiento con profesional que lo atiende -> OK
+        long cantSegAntes = seguimientos.cantidad();
+        long cantOutboxAntes = jdbc.queryForObject("SELECT count(*) FROM outbox", Long.class);
+
+        // Paciente carga seguimiento con profesional que lo atiende -> también responde 400 y no inserta nada en seguimiento_diario ni outbox
         String jsonConMed = """
                 {
-                    "estadoAnimo": "Regular",
-                    "sintomas": "Insomnio",
+                    "estadoAnimo": "Bueno",
                     "medico": { "id": 1 }
                 }
                 """;
         ResponseEntity<String> rConMed = pedir(HttpMethod.POST, "/api/pacientes/me/seguimientos", tokenPacTurno, jsonConMed);
-        assertThat(rConMed.getStatusCode()).isEqualTo(HttpStatus.OK);
-        JsonNode segCreado = mapper.readTree(rConMed.getBody());
-        assertThat(segCreado.get("nombreMedico").asText()).isEqualTo("Ana Paz");
+        assertThat(rConMed.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(rConMed.getBody()).contains("El seguimiento tiene que ser para un profesional que te atiende.");
+        assertThat(seguimientos.cantidad()).isEqualTo(cantSegAntes);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM outbox", Long.class)).isEqualTo(cantOutboxAntes);
     }
 
     // =========================================================================================

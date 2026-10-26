@@ -294,31 +294,12 @@ public class HistoriaClinicaService {
 
     @Transactional
     public Dtos.SeguimientoResponse guardarSeguimientoPaciente(String email, Dtos.SeguimientoRequest entry) {
-        Persona paciente = personas.porEmail(email)
+        personas.porEmail(email)
                 .orElseThrow(() -> new NoEncontradoException("Paciente no encontrado"));
 
-        if (entry.medico() == null || entry.medico().id() == null) {
-            throw new IllegalArgumentException("El seguimiento tiene que ser para un profesional que te atiende.");
-        }
-        Persona medico = personas.porId(entry.medico().id())
-                .orElseThrow(() -> new NoEncontradoException("Médico no encontrado"));
-
-        accesoPacientes.exigirAtendido(medico.id(), paciente.id());
-
-        LocalDate fecha = entry.fecha() != null ? entry.fecha() : LocalDate.now();
-        LocalDateTime ahora = LocalDateTime.now();
-        String estado = ESTADO_VIGENTE;
-        String hash = calcularHash(medico.email(), String.valueOf(paciente.id()),
-                entry.estadoAnimo(), entry.sintomas(), entry.notas(), ahora.toString());
-
-        Long id = seguimientos.insertarNuevo(new Seguimientos.Seguimiento(
-                null, paciente.id(), medico.id(), fecha, entry.estadoAnimo(), entry.sintomas(), entry.notas(),
-                ahora, estado, null, hash));
-
-        publicarHistoriaClinica("seguimiento", id, medico.id(), paciente.id(), "SEGUIMIENTO", "PACIENTE", null);
-
-        return new Dtos.SeguimientoResponse(id, fecha, entry.estadoAnimo(), entry.sintomas(), entry.notas(),
-                ahora, estado, null, hash, nombreMedico(medico));
+        // En el monolito el profesional nunca llega en el JSON (@JsonIgnore en SeguimientoDiario.medico);
+        // la decisión 2 de la spec rechaza en vez de asignarlo a uno fijo.
+        throw new IllegalArgumentException("El seguimiento tiene que ser para un profesional que te atiende.");
     }
 
     @Transactional(readOnly = true)

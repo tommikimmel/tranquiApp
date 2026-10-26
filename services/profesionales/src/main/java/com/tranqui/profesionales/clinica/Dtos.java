@@ -1,5 +1,6 @@
 package com.tranqui.profesionales.clinica;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.math.BigDecimal;
@@ -57,14 +58,12 @@ public final class Dtos {
             DomicilioDto domicilio
     ) {}
 
-    public record MedicoRef(Long id) {}
-
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record SeguimientoRequest(
             LocalDate fecha,
             String estadoAnimo,
             String sintomas,
-            String notas,
-            MedicoRef medico
+            String notas
     ) {}
 
     public record SeguimientoResponse(
