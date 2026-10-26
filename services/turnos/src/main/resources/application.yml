@@ -1,0 +1,119 @@
+spring:
+  application:
+    name: turnos
+  # Sección 6.7: al apagarse termina lo que está procesando, hasta 20 s.
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/turnos}
+    username: ${SPRING_DATASOURCE_USERNAME:turnos}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    hikari:
+      # Sección 9.2: pools chicos.
+      maximum-pool-size: 5
+  flyway:
+    enabled: true
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:tranqui}
+    password: ${SPRING_RABBITMQ_PASSWORD:}
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/}
+    # La outbox (libs/eventos) publica con confirmación del broker.
+    publisher-confirm-type: correlated
+    publisher-returns: true
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      discovery:
+        enabled: ${CONSUL_DISCOVERY_ENABLED:true}
+        service-name: turnos
+        instance-id: ${spring.application.name}:${random.value}
+        # Chequeo por TTL, como los demás servicios: se vuelve a registrar solo después de una baja.
+        health-check-critical-timeout: 1m
+        heartbeat:
+          enabled: true
+          ttl: 30s
+          reregister-service-on-failure: true
+        # Registro por IP: el gateway lo alcanza en la red de Docker sin resolver el hostname del contenedor.
+        prefer-ip-address: true
+        tags: version=${TRANQUI_VERSION:dev}
+
+server:
+  port: 8080
+  tomcat:
+    threads:
+      max: 50
+  shutdown: graceful
+
+management:
+  server:
+    port: 8082
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+      group:
+        readiness:
+          include: readinessState,db,rabbit
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      servicio: turnos
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+# Eventos (libs/eventos): consume turnos.eventos (profesionales, pagos, calendario, identidad y recetas) y
+# publica por su outbox los turnos.* de siempre más turnos.turno.actualizado.
+eventos:
+  consumo:
+    servicio: turnos
+  outbox:
+    habilitada: true
+
+# Los mismos flags que el monolito: con Mercado Pago real, la reserva exige la cuenta vinculada del
+# profesional (salvo con el pago simulado).
+mercadopago:
+  enabled: ${MERCADOPAGO_ENABLED:false}
+
+payment:
+  simulation:
+    enabled: ${PAYMENT_SIMULATION_ENABLED:false}
+
+app:
+  # Los links de los mails (confirmar asistencia y "no voy a ir") apuntan al gateway.
+  public-url: ${APP_PUBLIC_URL:http://localhost:8081}
+
+turnos:
+  carga-inicial:
+    habilitada: true
+  # Los profesionales (agenda, tarifas, Mercado Pago) se resincronizan desde el monolito cada tanto, además
+  # de los eventos: su copia está al día con o sin el servicio de profesionales.
+  resincronizacion-profesionales-minutos: ${TURNOS_RESINCRONIZACION_PROFESIONALES_MINUTOS:15}
+
+jwt:
+  # Misma clave que identidad (hoy el monolito) usa para firmar los JWT de usuario. Sin default.
+  secret: ${JWT_SECRET:}
+
+tranqui:
+  gateway:
+    # Las consultas internas (monolito, calendario y notificaciones) pasan por el gateway.
+    url: ${TRANQUI_GATEWAY_URL:http://gateway:8080}
+  jwt:
+    service-secret: ${SERVICE_JWT_KEY:}
+
+logging:
+  level:
+    root: INFO
