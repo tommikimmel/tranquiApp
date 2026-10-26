@@ -74,7 +74,17 @@ public class WebhookController {
         }
 
         log.info("Webhook autenticado con éxito. Body: {}", body);
+        procesarNotificacion(body, dataId, false);
+        return ResponseEntity.ok().build();
+    }
 
+    /**
+     * Procesa una notificación de Mercado Pago ya autenticada. Fase 4: con el servicio de pagos el
+     * webhook llega allá, que valida la firma y le reenvía al monolito (por
+     * {@code /internal/monolito/pagos/notificacion-suscripcion}) las de suscripciones, que siguen acá
+     * hasta la Fase 8. Con {@code soloSuscripciones} se ignoran los pagos de turnos y documentos.
+     */
+    public void procesarNotificacion(String body, String dataId, boolean soloSuscripciones) {
         try {
             JsonNode node = objectMapper.readTree(body);
             String externalReference = null;
@@ -104,7 +114,7 @@ public class WebhookController {
 
                 log.info("Procesando webhook subscription_preapproval: id={}, status={}", preapprovalId, subStatus);
                 subscriptionService.processMercadoPagoPreapprovalWebhook(preapprovalId, subStatus);
-                return ResponseEntity.ok().build();
+                return;
             }
 
             if ("subscription_authorized_payment".equals(topic) || action.startsWith("subscription_authorized_payment")) {
@@ -144,7 +154,7 @@ public class WebhookController {
 
                 log.info("Procesando webhook subscription_authorized_payment: id={}, preapprovalId={}, status={}, amount={}", subPaymentId, preapprovalId, payStatus, amount);
                 subscriptionService.processMercadoPagoPaymentWebhook(subPaymentId, preapprovalId, amount, payStatus);
-                return ResponseEntity.ok().build();
+                return;
             }
 
             // Caso 1: Es un webhook real de Mercado Pago (tipo = payment)
@@ -181,7 +191,11 @@ public class WebhookController {
                             String.valueOf(pagoSuscripcion.getId()),
                             pagoSuscripcion.getTransactionAmount(),
                             pagoSuscripcion.getStatus());
-                    return ResponseEntity.ok().build();
+                    return;
+                }
+                if (soloSuscripciones) {
+                    log.warn("Notificación reenviada como de suscripción pero el pago {} no lo es; se ignora.", paymentId);
+                    return;
                 }
 
                 if (mpUserId != null) {
@@ -205,7 +219,7 @@ public class WebhookController {
                 }
             }
             // Caso 2: Es un mock webhook del simulador local
-            else if (node.has("external_reference")) {
+            else if (node.has("external_reference") && !soloSuscripciones) {
                 externalReference = node.get("external_reference").asText();
                 transactionId = node.has("transaction_id") ? node.get("transaction_id").asText() : "mock-tx-123";
                 status = "approved"; // El simulador local siempre aprueba
@@ -225,12 +239,19 @@ public class WebhookController {
                         log.error("Referencia externa de webhook no válida: {}", externalReference);
                     }
                 }
+            } else if (externalReference != null && ("rejected".equals(status) || "cancelled".equals(status))) {
+                if (!externalReference.startsWith("doc-")) {
+                    try {
+                        Long turnoId = Long.parseLong(externalReference);
+                        pagoWebhookHandler.procesarRechazoTurno(turnoId, transactionId, status);
+                    } catch (NumberFormatException e) {
+                        log.error("Referencia externa de webhook no válida: {}", externalReference);
+                    }
+                }
             }
         } catch (Exception e) {
             log.error("Error al procesar el webhook de pago", e);
         }
-
-        return ResponseEntity.ok().build();
     }
 
     /**

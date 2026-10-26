@@ -44,7 +44,17 @@ public class RecetaService {
     private TurnoService turnoService;
 
     @Autowired
+    private com.tranqui.app.eventos.OutboxPublisher outboxPublisher;
+
+    // Fase 6: con el flag, los turnos son del servicio de turnos y se le avisa por evento.
+    @org.springframework.beans.factory.annotation.Value("${turnos.externo:false}")
+    private boolean turnosExterno;
+
+    @Autowired
     private SubscriptionService subscriptionService;
+
+    @Autowired
+    private AccesoPacientes accesoPacientes;
 
     @Transactional
     public RecetaResponseDto emitirReceta(String medicoEmail, RecetaDto dto) {
@@ -56,6 +66,7 @@ public class RecetaService {
 
         Usuario paciente = usuarioRepository.findById(dto.getPacienteId())
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
+        accesoPacientes.exigirAtendido(medico.getId(), paciente.getId());
 
         // These used to silently fall back to hardcoded placeholder values (a fake DNI, a fake
         // birth date...) whenever the real data was missing, so a receta could go out to QBI2
@@ -346,7 +357,13 @@ public class RecetaService {
         // TurnoService#marcarRecetasEnviadasParaPaciente for the matching rationale. Never let a
         // failure here undo the receta that was already successfully emitted through QBI2.
         try {
-            turnoService.marcarRecetasEnviadasParaPaciente(medico.getId(), paciente.getId());
+            if (turnosExterno) {
+                outboxPublisher.publicar(com.tranqui.eventos.Topicos.PROFESIONALES_RECETA_EMITIDA_V1, "receta",
+                        String.valueOf(receta.getId()), 1,
+                        new com.tranqui.eventos.data.RecetaEmitidaData(medico.getId(), paciente.getId()));
+            } else {
+                turnoService.marcarRecetasEnviadasParaPaciente(medico.getId(), paciente.getId());
+            }
         } catch (Exception e) {
             log.error("Error al auto-marcar turnos de receta como enviados para médico ID {} / paciente ID {}", medico.getId(), paciente.getId(), e);
         }

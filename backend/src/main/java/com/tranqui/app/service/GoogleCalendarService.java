@@ -29,6 +29,15 @@ public class GoogleCalendarService {
     @Value("${google.calendar.enabled:false}")
     private boolean isEnabled;
 
+    // Fase 3: el servicio de calendario crea, mueve y borra los eventos a partir de los eventos de
+    // turnos; el monolito no llama a Google ni inventa un Meet simulado.
+    @Value("${calendario.externo:false}")
+    private boolean externo;
+
+    public boolean esExterno() {
+        return externo;
+    }
+
     @Autowired
     private GoogleCalendarOAuthService googleCalendarOAuthService;
 
@@ -59,6 +68,9 @@ public class GoogleCalendarService {
     }
 
     public String crearEventoReunion(Turno turno) {
+        if (externo) {
+            return "";
+        }
         log.info("Iniciando creación de evento en Google Calendar para el turno ID: {}", turno.getId());
 
         Usuario medico = turno.getMedico();
@@ -201,6 +213,9 @@ public class GoogleCalendarService {
     }
 
     public void eliminarEventoReunion(Turno turno) {
+        if (externo) {
+            return;
+        }
         Usuario medico = turno.getMedico();
         boolean medicoConectado = medico != null && medico.getGoogleCalendarConnected() != null && medico.getGoogleCalendarConnected();
         String eventId = turno.getGoogleEventId();
@@ -224,6 +239,9 @@ public class GoogleCalendarService {
     }
 
     public void actualizarEventoReunion(Turno turno) {
+        if (externo) {
+            return;
+        }
         Usuario medico = turno.getMedico();
         boolean medicoConectado = medico != null && medico.getGoogleCalendarConnected() != null && medico.getGoogleCalendarConnected();
         String eventId = turno.getGoogleEventId();
