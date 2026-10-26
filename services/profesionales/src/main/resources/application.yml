@@ -85,6 +85,11 @@ eventos:
 
 # El mismo flag que el monolito (MedicoService#isMedicoVerificado): con Mercado Pago real, el buscador
 # exige la cuenta vinculada.
+mercadopago:
+  enabled: ${MERCADOPAGO_ENABLED:false}
+
+# Fase 7: recetas electrónicas con QBI2/Innovamed, las mismas variables que el monolito. Deshabilitado usa el
+# cliente simulado (Qbi2RecipeClientMock).
 qbi2:
   recipe:
     enabled: ${QBI2_RECIPE_ENABLED:false}
@@ -93,9 +98,6 @@ qbi2:
     base-url-prod: https://apirecipe.qbitos.com
     cliente-app-id: ${QBI2_CLIENTE_APP_ID:}
     token: ${QBI2_RECIPE_TOKEN:}
-
-mercadopago:
-  enabled: ${MERCADOPAGO_ENABLED:false}
 
 profesionales:
   carga-inicial:

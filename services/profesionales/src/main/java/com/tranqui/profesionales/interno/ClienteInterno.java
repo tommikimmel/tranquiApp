@@ -302,6 +302,12 @@ public class ClienteInterno {
     }
 
     /** Solicitudes de documentos del monolito para la carga inicial clínica. */
+    public List<SolicitudMonolito> solicitudes(int pagina, int tamanio) {
+        List<SolicitudMonolito> r = get("/internal/monolito/clinica/solicitudes?pagina={p}&tamanio={t}",
+                new ParameterizedTypeReference<>() {}, pagina, tamanio);
+        return r != null ? r : List.of();
+    }
+
     /** Payload para POST /internal/notificaciones/recetas (decisión 4). */
     public record NotificacionReceta(String email, String pacienteNombre, String medicoNombre,
                                      String matricula, String pdfUrl, String nroRecetario) {}
@@ -319,11 +325,5 @@ public class ClienteInterno {
                 })
                 .body(pedido)
                 .retrieve().toBodilessEntity();
-    }
-
-    public List<SolicitudMonolito> solicitudes(int pagina, int tamanio) {
-        List<SolicitudMonolito> r = get("/internal/monolito/clinica/solicitudes?pagina={p}&tamanio={t}",
-                new ParameterizedTypeReference<>() {}, pagina, tamanio);
-        return r != null ? r : List.of();
     }
 }
