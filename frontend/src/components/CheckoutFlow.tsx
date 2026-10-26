@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Icon } from './Icon'
 import '../styles/checkout.css'
-import { api } from '../api/api'
+import { api, getBackendOrigin } from '../api/api'
 import { useAlert } from '../context/AlertContext'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { OBRAS_SOCIALES } from '../constants/obrasSociales'
 import { formatDetalleDomicilio } from '../utils/dashboardHelpers'
+import { esperarCheckout } from '../utils/esperarCheckout'
 
 let leafletLoadingPromise: Promise<void> | null = null
 function loadLeafletScript(): Promise<void> {
@@ -1737,7 +1738,12 @@ export default function CheckoutFlow({
       emailPaciente: patientData.email,
       telefonoPaciente: patientData.phone
     })
-    .then((res: any) => {
+    .then(async (res: any) => {
+      // Fase 4: el link lo crea el servicio de pagos un instante después de la reserva; mientras se
+      // espera, el botón sigue en "procesando".
+      if (res.checkoutPendiente && !res.checkoutUrl) {
+        res = { ...res, checkoutUrl: await esperarCheckout(() => api.obtenerCheckout(res.turnoId)) }
+      }
       setPaymentStatus('idle')
       setCreatedTurn(res)
       setHoldTimer(300)
@@ -1878,8 +1884,7 @@ export default function CheckoutFlow({
                   setSimulatingWebhook(true);
                   try {
                     // Send request to webhook controller directly
-                    const isHttps = window.location.protocol === 'https:';
-                    const baseUrl = isHttps ? `${window.location.protocol}//${window.location.host}` : `http://${window.location.hostname}:8081`;
+                    const baseUrl = getBackendOrigin();
                     const response = await fetch(`${baseUrl}/api/payments/webhook`, {
                       method: 'POST',
                       headers: {
