@@ -7,6 +7,7 @@ import com.tranqui.app.model.Usuario;
 import com.tranqui.app.repository.TurnoRepository;
 import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.service.CopiaTurnos;
+import com.tranqui.app.service.FichaPaciente;
 import com.tranqui.eventos.Topicos;
 import com.tranqui.eventos.data.TurnoActualizadoData;
 import com.tranqui.eventos.data.UsuarioRegistradoData;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -46,7 +48,10 @@ public class InternoTurnosController {
                               String sexo, @com.fasterxml.jackson.databind.annotation.JsonSerialize(using = com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer.class) LocalDate fechaNacimiento, Long cuil, String tipoDocumento,
                               Integer numeroDocumento, String datosOfuscado, Integer credencialCodEntidad,
                               String credencialPan, String credencialPlan, String credencialToken,
-                              boolean emailHabilitado) {}
+                              boolean emailHabilitado,
+                              String domicilioCalle, String domicilioNumero, String domicilioPiso,
+                              String domicilioDpto, String domicilioCodigoPostal, String domicilioLocalidad,
+                              String domicilioProvincia, String domicilioPais) {}
 
     /** Lo que manda la reserva para "buscar o crear paciente", como lo resolvía {@code TurnoService#reservarTurno}. */
     public record BuscarOCrearPaciente(String email, String nombre, String telefono, String obraSocial, String numAfiliado) {}
@@ -56,12 +61,14 @@ public class InternoTurnosController {
     private final TurnoRepository turnoRepository;
     private final UsuarioRepository usuarioRepository;
     private final OutboxPublisher outboxPublisher;
+    private final FichaPaciente fichaPaciente;
 
     public InternoTurnosController(TurnoRepository turnoRepository, UsuarioRepository usuarioRepository,
-                                   OutboxPublisher outboxPublisher) {
+                                   OutboxPublisher outboxPublisher, FichaPaciente fichaPaciente) {
         this.turnoRepository = turnoRepository;
         this.usuarioRepository = usuarioRepository;
         this.outboxPublisher = outboxPublisher;
+        this.fichaPaciente = fichaPaciente;
     }
 
     /** Carga inicial: todos los turnos, paginados por id. */
@@ -129,15 +136,28 @@ public class InternoTurnosController {
         return paciente(paciente);
     }
 
+    /**
+     * Fase 7: actualización de la ficha del paciente por el servicio de profesionales.
+     * Guarda en el monolito (dueño de identidad hasta la Fase 9) y publica identidad.usuario.actualizado.
+     */
+    @PutMapping("/pacientes/{id}")
+    @Transactional
+    public PacienteDto actualizarPaciente(@PathVariable("id") Long id,
+                                          @RequestBody com.tranqui.app.model.dto.PacienteDto dto) {
+        return paciente(fichaPaciente.actualizar(id, dto));
+    }
+
     private static TurnoDto turno(Turno t) {
         return new TurnoDto(t.getAggregateVersion(), CopiaTurnos.datos(t), t.getTokenReserva(), t.getTokenConfirmacionAsistencia());
     }
 
-    private static PacienteDto paciente(Usuario u) {
+    public static PacienteDto paciente(Usuario u) {
         return new PacienteDto(u.getId(), u.getAggregateVersion(), u.getRol() != null ? u.getRol().name() : null, u.getEmail(),
                 u.getNombre(), u.getApellido(), u.getTelefono(), u.getDni(), u.getDireccion(), u.getObraSocial(),
                 u.getNumAfiliado(), u.getSexo(), u.getFechaNacimiento(), u.getCuil(), u.getTipoDocumento(),
                 u.getNumeroDocumento(), u.getDatosOfuscado(), u.getCredencialCodEntidad(), u.getCredencialPan(),
-                u.getCredencialPlan(), u.getCredencialToken(), u.isNotificacionesEmailHabilitadas());
+                u.getCredencialPlan(), u.getCredencialToken(), u.isNotificacionesEmailHabilitadas(),
+                u.getDomicilioCalle(), u.getDomicilioNumero(), u.getDomicilioPiso(), u.getDomicilioDpto(),
+                u.getDomicilioCodigoPostal(), u.getDomicilioLocalidad(), u.getDomicilioProvincia(), u.getDomicilioPais());
     }
 }

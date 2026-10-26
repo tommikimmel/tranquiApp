@@ -521,7 +521,7 @@ public class ResendEmailService {
         enviarCorreo(toEmail, asunto, html);
     }
 
-    public void enviarRecetaEmitidaPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
+    public boolean enviarRecetaEmitidaPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
                                              String matricula, String pdfUrl, String nroRecetario) {
         String asunto = "Tu receta electrónica de " + nombreProfesional;
         String cuerpo = "<p>" + nombreProfesional + " emitió una receta electrónica oficial para vos. Podés presentarla en cualquier farmacia adherida a Innovamed/QBI2.</p>" +
@@ -534,7 +534,7 @@ public class ResendEmailService {
         String html = plantilla("Receta emitida", TONO_INFO,
                 "Tu receta está lista, " + nombreOUsuario(nombrePaciente), cuerpo,
                 tienePdf ? "Descargar receta" : "Ver en Tranqui App", tienePdf ? pdfUrl : frontendUrl);
-        enviarCorreo(toEmail, asunto, html);
+        return enviarCorreo(toEmail, asunto, html);
     }
 
     // ================================================================================
@@ -784,14 +784,13 @@ public class ResendEmailService {
         }
     }
 
-    private void enviarCorreo(String toEmail, String asunto, String htmlBody) {
-        enviarCorreo(toEmail, asunto, htmlBody, null);
+    private boolean enviarCorreo(String toEmail, String asunto, String htmlBody) {
+        return enviarCorreo(toEmail, asunto, htmlBody, null);
     }
 
-    private void enviarCorreo(String toEmail, String asunto, String htmlBody, String replyTo) {
+    private boolean enviarCorreo(String toEmail, String asunto, String htmlBody, String replyTo) {
         if (usarSmtp()) {
-            enviarPorSmtp(toEmail, asunto, htmlBody, replyTo, null, null);
-            return;
+            return enviarPorSmtp(toEmail, asunto, htmlBody, replyTo, null, null);
         }
         if (apiKey == null || apiKey.trim().isEmpty() || !apiKey.startsWith("re_")) {
             log.info("==================================================================");
@@ -800,7 +799,7 @@ public class ResendEmailService {
             log.info("Asunto: {}", asunto);
             log.info("Contenido enviado (Simulación). Colocá RESEND_API_KEY en tu .env para envíos reales.");
             log.info("==================================================================");
-            return;
+            return true;
         }
 
         try {
@@ -827,11 +826,14 @@ public class ResendEmailService {
 
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
                 log.info("Correo enviado exitosamente mediante Resend a {}. Status: {}", toEmail, response.statusCode());
+                return true;
             } else {
                 log.error("Error al enviar correo vía Resend a {}. Status: {}. Respuesta: {}", toEmail, response.statusCode(), response.body());
+                return false;
             }
         } catch (Exception e) {
             log.error("Excepción al enviar correo mediante Resend a {}", toEmail, e);
+            return false;
         }
     }
 

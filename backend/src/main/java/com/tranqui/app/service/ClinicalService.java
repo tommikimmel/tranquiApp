@@ -52,6 +52,9 @@ public class ClinicalService {
     @Autowired
     private ResumenChatCliente resumenChatCliente;
 
+    @Autowired
+    private FichaPaciente fichaPaciente;
+
     // Aviso para notificaciones de que se cargó algo en la historia clínica. Sección 5.3: el evento
     // dice qué se cargó y quién, nunca el contenido. Cada asiento es su propio agregado (versión 1).
     private void publicarHistoriaClinica(String tipoAgregado, Long asientoId, Long profesionalId, Long pacienteId,
@@ -336,77 +339,7 @@ public class ClinicalService {
     // Fields are only validated when present — this endpoint doubles as the "borrar datos
     // cargados" action (Historia Clínica), which intentionally sends most fields as null.
     private void validarDatosPaciente(PacienteDto dto) {
-        List<String> errores = new ArrayList<>();
-
-        if (dto.getNombre() == null || dto.getNombre().trim().isEmpty()) {
-            errores.add("el nombre del paciente es obligatorio");
-        }
-
-        if (dto.getTipoDocumento() != null && !dto.getTipoDocumento().trim().isEmpty()
-                && !TIPOS_DOCUMENTO_VALIDOS.contains(dto.getTipoDocumento().trim())) {
-            errores.add("el tipo de documento debe ser DNI, LC, LE o Pasaporte");
-        }
-
-        if (dto.getNumeroDocumento() != null) {
-            int digits = String.valueOf(Math.abs(dto.getNumeroDocumento())).length();
-            if (dto.getNumeroDocumento() <= 0 || digits < 6 || digits > 9) {
-                errores.add("el número de documento debe tener entre 6 y 9 dígitos");
-            }
-        }
-
-        if (dto.getFechaNacimiento() != null && !dto.getFechaNacimiento().trim().isEmpty()) {
-            try {
-                LocalDate fecha = LocalDate.parse(dto.getFechaNacimiento().trim());
-                if (fecha.isAfter(LocalDate.now())) {
-                    errores.add("la fecha de nacimiento no puede ser futura");
-                } else if (fecha.isBefore(LocalDate.of(1900, 1, 1))) {
-                    errores.add("la fecha de nacimiento no es válida");
-                }
-            } catch (java.time.format.DateTimeParseException e) {
-                errores.add("la fecha de nacimiento no tiene un formato válido");
-            }
-        }
-
-        if (dto.getTelefono() != null && !dto.getTelefono().trim().isEmpty()) {
-            String soloDigitos = dto.getTelefono().trim().replaceFirst("^\\+54\\s*", "").replaceAll("\\D", "");
-            if (!soloDigitos.matches("\\d{6,15}")) {
-                errores.add("el teléfono debe contener solo números, entre 6 y 15 dígitos");
-            }
-        }
-
-        if (dto.getDomicilio() != null) {
-            PacienteDto.DomicilioDto d = dto.getDomicilio();
-            List<String> partes = List.of(
-                    d.getCalle() == null ? "" : d.getCalle().trim(),
-                    d.getNumero() == null ? "" : d.getNumero().trim(),
-                    d.getLocalidad() == null ? "" : d.getLocalidad().trim(),
-                    d.getProvincia() == null ? "" : d.getProvincia().trim());
-            boolean algunaCompleta = partes.stream().anyMatch(p -> !p.isEmpty());
-            boolean todasCompletas = partes.stream().allMatch(p -> !p.isEmpty());
-            if (algunaCompleta && !todasCompletas) {
-                errores.add("el domicilio requiere calle, número, localidad y provincia completos");
-            }
-        }
-
-        if (dto.getCredencial() != null) {
-            PacienteDto.CredencialInfoDto c = dto.getCredencial();
-            if (c.getCodEntidad() == null) {
-                errores.add("falta seleccionar la obra social");
-            }
-            if (c.getPan() == null || c.getPan().trim().isEmpty()) {
-                errores.add("el número de afiliado es obligatorio cuando hay obra social");
-            } else if (!c.getPan().trim().matches("[A-Za-z0-9\\-/. ]{6,30}")) {
-                // QBI2 rechaza la receta con QBI124 "LA CANTIDAD DE CARACTERES NO CUMPLE EL RANGO
-                // MINIMO O MAXIMO PARA EL FINANCIADOR SELECCIONADO" recién al emitir — sin este
-                // chequeo, un número de afiliado de 1-2 caracteres pasaba esta validación y llegaba
-                // hasta QBI2 antes de ser rechazado.
-                errores.add("el número de afiliado debe tener entre 6 y 30 caracteres válidos (letras, números, guiones, barras o puntos)");
-            }
-        }
-
-        if (!errores.isEmpty()) {
-            throw new IllegalArgumentException("Datos del paciente inválidos: " + String.join("; ", errores) + ".");
-        }
+        fichaPaciente.validar(dto);
     }
 
     @Transactional
@@ -418,59 +351,7 @@ public class ClinicalService {
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
         accesoPacientes.exigirAtendido(medico.getId(), paciente.getId());
 
-        validarDatosPaciente(dto);
-
-        paciente.setNombre(dto.getNombre());
-        paciente.setApellido(dto.getApellido());
-        paciente.setNumAfiliado(dto.getNumAfiliado());
-        paciente.setDni(dto.getDni());
-        paciente.setObraSocial(dto.getObraSocial());
-        paciente.setDireccion(dto.getDireccion());
-        String patientTel = dto.getTelefono();
-        if (patientTel != null && !patientTel.trim().isEmpty() && !patientTel.trim().startsWith("+54")) {
-            patientTel = "+54 " + patientTel.trim();
-        }
-        paciente.setTelefono(patientTel);
-        paciente.setSexo(dto.getSexo());
-        if (dto.getFechaNacimiento() != null && !dto.getFechaNacimiento().trim().isEmpty()) {
-            paciente.setFechaNacimiento(java.time.LocalDate.parse(dto.getFechaNacimiento().trim()));
-        }
-        paciente.setCuil(dto.getCuil());
-        paciente.setTipoDocumento(dto.getTipoDocumento());
-        paciente.setNumeroDocumento(dto.getNumeroDocumento());
-        paciente.setDatosOfuscado(dto.getDatosOfuscado());
-
-        if (dto.getDomicilio() != null) {
-            paciente.setDomicilioCalle(dto.getDomicilio().getCalle());
-            paciente.setDomicilioNumero(dto.getDomicilio().getNumero());
-            paciente.setDomicilioPiso(dto.getDomicilio().getPiso());
-            paciente.setDomicilioDpto(dto.getDomicilio().getDpto());
-            paciente.setDomicilioCodigoPostal(dto.getDomicilio().getCodigoPostal());
-            paciente.setDomicilioLocalidad(dto.getDomicilio().getLocalidad());
-            paciente.setDomicilioProvincia(dto.getDomicilio().getProvincia());
-            paciente.setDomicilioPais(dto.getDomicilio().getPais());
-        }
-
-        if (dto.getCredencial() != null) {
-            paciente.setCredencialCodEntidad(dto.getCredencial().getCodEntidad());
-            paciente.setCredencialPan(dto.getCredencial().getPan());
-            paciente.setCredencialPlan(dto.getCredencial().getPlan());
-            paciente.setCredencialToken(dto.getCredencial().getToken());
-            if (dto.getCredencial().getPlan() != null && !dto.getCredencial().getPlan().trim().isEmpty()) {
-                String baseOs = (dto.getObraSocial() != null && !dto.getObraSocial().isBlank()) ? dto.getObraSocial() : "Obra Social";
-                paciente.setObraSocial(baseOs + " " + dto.getCredencial().getPlan());
-            } else {
-                paciente.setObraSocial(dto.getObraSocial());
-            }
-        } else {
-            paciente.setCredencialCodEntidad(null);
-            paciente.setCredencialPan(null);
-            paciente.setCredencialPlan(null);
-            paciente.setCredencialToken(null);
-            paciente.setObraSocial(null);
-        }
-        
-        Usuario saved = usuarioRepository.save(paciente);
+        Usuario saved = fichaPaciente.aplicarCambiosYGuardar(paciente, dto);
         int unreadMessagesCount = resumenChatCliente.resumen(medico.getId()).noLeidosPorPaciente().getOrDefault(saved.getId(), 0);
 
         return construirPacienteDto(saved, "Hoy", false, false, unreadMessagesCount);

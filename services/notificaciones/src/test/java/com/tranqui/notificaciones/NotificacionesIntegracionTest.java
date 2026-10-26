@@ -377,4 +377,44 @@ class NotificacionesIntegracionTest {
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
         assertThat(r.getBody()).contains("\"enviado\":false");
     }
+
+    // ------------------------------------------------------------------ receta emitida (Fase 7)
+
+    private ResponseEntity<String> receta(String cuerpo, boolean conToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        if (conToken) {
+            headers.setBearerAuth(new com.tranqui.eventos.jwt.ServiceJwt("clave-servicio-test-de-32-bytes-ok").emitirToken("profesionales"));
+        }
+        return http.exchange("/internal/notificaciones/recetas", HttpMethod.POST, new HttpEntity<>(cuerpo, headers), String.class);
+    }
+
+    private static final String RECETA = "{\"email\":\"pac@mail.com\",\"pacienteNombre\":\"Ana\",\"medicoNombre\":\"Dra. Paz\","
+            + "\"matricula\":\"MN 12345\",\"pdfUrl\":\"https://s3.tranqui/r.pdf\",\"nroRecetario\":\"REC-1\"}";
+
+    @Test
+    void recetaEmitida_soloConTokenDeServicio_yLaManda() {
+        assertThat(receta(RECETA, false).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        ResponseEntity<String> sinEmail = receta("{\"email\":\"\",\"pacienteNombre\":\"Ana\"}", true);
+        assertThat(sinEmail.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseEntity<String> r = receta(RECETA, true);
+
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(r.getBody()).contains("\"enviado\":true");
+        verify(mails).enviarRecetaEmitidaPaciente("pac@mail.com", "Ana", "Dra. Paz", "MN 12345",
+                "https://s3.tranqui/r.pdf", "REC-1");
+    }
+
+    @Test
+    void recetaEmitida_siElMailNoSale_502() {
+        doThrow(new EnvioMailException("Resend caído")).when(mails).enviarRecetaEmitidaPaciente(anyString(), anyString(), anyString(),
+                anyString(), anyString(), anyString());
+
+        ResponseEntity<String> r = receta(RECETA, true);
+
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
+        assertThat(r.getBody()).contains("\"enviado\":false");
+    }
 }

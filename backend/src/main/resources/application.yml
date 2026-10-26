@@ -167,6 +167,11 @@ turnos:
   externo: ${TURNOS_EXTERNO:false}
   resincronizacion-minutos: ${TURNOS_RESINCRONIZACION_MINUTOS:15}
 
+# Fase 7: con true, la historia clínica, las recetas y los conceptos los administra el servicio de
+# profesionales; las rutas del monolito responden 409 (ClinicaExternoFilter). Vuelta atrás: false.
+clinica:
+  externo: ${CLINICA_EXTERNO:false}
+
 tranqui:
   jwt:
     # JWT de servicio (sección 4.2) para las rutas /internal/** que consultan otros servicios.

@@ -49,6 +49,8 @@ class ClinicalServiceTest {
     void resumenDeChatLocal() {
         org.springframework.test.util.ReflectionTestUtils.setField(clinicalService, "resumenChatCliente",
                 new ResumenChatCliente(mensajeRepository, "", ""));
+        org.springframework.test.util.ReflectionTestUtils.setField(clinicalService, "fichaPaciente",
+                new FichaPaciente(usuarioRepository, outboxPublisher));
     }
 
     private Usuario medico(String email) {
