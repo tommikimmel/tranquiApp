@@ -47,6 +47,9 @@ public class ClinicalService {
     private OutboxPublisher outboxPublisher;
 
     @Autowired
+    private AccesoPacientes accesoPacientes;
+
+    @Autowired
     private ResumenChatCliente resumenChatCliente;
 
     // Aviso para notificaciones de que se cargó algo en la historia clínica. Sección 5.3: el evento
@@ -199,6 +202,7 @@ public class ClinicalService {
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
         Usuario paciente = usuarioRepository.findById(pacienteId)
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
+        accesoPacientes.exigirAtendido(medico.getId(), paciente.getId());
 
         entry.setMedico(medico);
         entry.setPaciente(paciente);
@@ -238,6 +242,7 @@ public class ClinicalService {
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
         Usuario paciente = usuarioRepository.findById(pacienteId)
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
+        accesoPacientes.exigirAtendido(medico.getId(), paciente.getId());
 
         LocalDateTime ahora = LocalDateTime.now();
         InformeClinico informe = InformeClinico.builder()
@@ -286,12 +291,13 @@ public class ClinicalService {
         Usuario paciente = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
 
+        // Fase 7: sin profesional se rechaza. Antes quedaba asignado a uno fijo (paula@tranqui.com), un resto de
+        // las pruebas que mandaba la historia de cualquier paciente a esa cuenta.
         if (entry.getMedico() == null) {
-            Usuario medico = usuarioRepository.findByEmail("paula@tranqui.com")
-                    .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
-            entry.setMedico(medico);
+            throw new IllegalArgumentException("El seguimiento tiene que ser para un profesional que te atiende.");
         }
-        
+        accesoPacientes.exigirAtendido(entry.getMedico().getId(), paciente.getId());
+
         entry.setPaciente(paciente);
         if (entry.getFecha() == null) {
             entry.setFecha(LocalDate.now());
@@ -410,6 +416,7 @@ public class ClinicalService {
 
         Usuario paciente = usuarioRepository.findById(pacienteId)
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
+        accesoPacientes.exigirAtendido(medico.getId(), paciente.getId());
 
         validarDatosPaciente(dto);
 
