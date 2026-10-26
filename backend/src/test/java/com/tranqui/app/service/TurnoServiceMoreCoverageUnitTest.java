@@ -1,5 +1,6 @@
 package com.tranqui.app.service;
 
+import com.tranqui.app.eventos.OutboxPublisher;
 import com.tranqui.app.model.*;
 import com.tranqui.app.repository.*;
 import jakarta.persistence.EntityNotFoundException;
@@ -21,6 +22,12 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TurnoServiceMoreCoverageUnitTest {
+
+    @Mock
+    private HorariosOcupadosCliente horariosOcupadosCliente;
+
+    @Mock
+    private OutboxPublisher outboxPublisher;
 
     @Mock
     private TurnoRepository turnoRepository;
@@ -144,7 +151,7 @@ class TurnoServiceMoreCoverageUnitTest {
         Pago pago = Pago.builder().estado(EstadoPago.APROBADO).build();
         turno.setPago(pago);
         when(turnoRepository.findById(10L)).thenReturn(Optional.of(turno));
-        when(turnoRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(turnoRepository.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
 
         // Profesional cancels
         turnoService.cancelarTurno(10L, "medico@example.com");
@@ -162,7 +169,7 @@ class TurnoServiceMoreCoverageUnitTest {
         turno.setOcupaAgenda(true);
         turno.setPago(Pago.builder().estado(EstadoPago.APROBADO).build());
         when(turnoRepository.findById(10L)).thenReturn(Optional.of(turno));
-        when(turnoRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(turnoRepository.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
 
         // Con 48 hs o más: reembolsado
         when(reembolsoService.procesarReembolso(turno, medico, false)).thenReturn(true);
@@ -187,7 +194,7 @@ class TurnoServiceMoreCoverageUnitTest {
     void cancelarTurno_porElProfesional_yPacienteSinPago() throws Exception {
         turno.setOcupaAgenda(true);
         when(turnoRepository.findById(10L)).thenReturn(Optional.of(turno));
-        when(turnoRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(turnoRepository.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
 
         turnoService.cancelarTurno(10L, "medico@example.com");
 
@@ -199,7 +206,7 @@ class TurnoServiceMoreCoverageUnitTest {
     void cancelarTurno_noMandaMailSiElPacienteDesactivoLasNotificaciones() {
         paciente.setNotificacionesEmailHabilitadas(false);
         when(turnoRepository.findById(10L)).thenReturn(Optional.of(turno));
-        when(turnoRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(turnoRepository.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
 
         turnoService.cancelarTurno(10L, "paciente@example.com");
 
@@ -252,13 +259,13 @@ class TurnoServiceMoreCoverageUnitTest {
 
         turnoService.marcarRecetasEnviadasParaPaciente(1L, 2L);
         assertTrue(turno.isDocumentoEnviado());
-        verify(turnoRepository).save(turno);
+        verify(turnoRepository).saveAndFlush(turno);
     }
 
     @Test
     void testReprogramarTurno() {
         when(turnoRepository.findById(10L)).thenReturn(Optional.of(turno));
-        when(turnoRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(turnoRepository.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
 
         turnoService.reprogramarTurno(10L, "2026-11-15", "14:00");
         assertEquals(LocalDate.of(2026, 11, 15), turno.getFecha());
