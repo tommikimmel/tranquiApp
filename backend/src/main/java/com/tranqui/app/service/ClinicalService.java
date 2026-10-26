@@ -3,6 +3,9 @@ package com.tranqui.app.service;
 import com.tranqui.app.model.*;
 import com.tranqui.app.model.dto.PacienteDto;
 import com.tranqui.app.repository.*;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.HistoriaClinicaActualizadaData;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -41,7 +44,26 @@ public class ClinicalService {
     private NotificacionService notificacionService;
 
     @Autowired
-    private MensajeRepository mensajeRepository;
+    private OutboxPublisher outboxPublisher;
+
+    @Autowired
+    private AccesoPacientes accesoPacientes;
+
+    @Autowired
+    private ResumenChatCliente resumenChatCliente;
+
+    // Aviso para notificaciones de que se cargó algo en la historia clínica. Sección 5.3: el evento
+    // dice qué se cargó y quién, nunca el contenido. Cada asiento es su propio agregado (versión 1).
+    private void publicarHistoriaClinica(String tipoAgregado, Long asientoId, Long profesionalId, Long pacienteId,
+                                         String tipo, String cargadoPor, String tipoInforme) {
+        outboxPublisher.publicar(
+                Topicos.PROFESIONALES_HISTORIA_CLINICA_ACTUALIZADA_V1,
+                tipoAgregado,
+                String.valueOf(asientoId),
+                1,
+                new HistoriaClinicaActualizadaData(profesionalId, pacienteId, tipo, cargadoPor, tipoInforme)
+        );
+    }
 
     // Sella la integridad de un asiento clínico en el momento de su creación (o de su anexo de
     // corrección) — no es una firma digital en el sentido de la Ley 25.506 (eso requeriría un
@@ -68,7 +90,10 @@ public class ClinicalService {
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
         List<Usuario> pacientesConTurno = turnoRepository.findDistinctPacientesByMedicoId(medico.getId());
-        List<Usuario> pacientesConChat = mensajeRepository.findPacientesConMensajesConMedico(medico.getId());
+        // Fase 2: el chat vive en su propio servicio; el resumen llega por la ruta interna (o vacío si está caído).
+        ResumenChat resumenChat = resumenChatCliente.resumen(medico.getId());
+        List<Usuario> pacientesConChat = usuarioRepository.findAllById(resumenChat.pacientesConChat()).stream()
+                .filter(u -> u.getRol() == Rol.PACIENTE).toList();
 
         java.util.Map<Long, Usuario> pacientesMap = new java.util.LinkedHashMap<>();
         for (Usuario p : pacientesConTurno) {
@@ -91,10 +116,7 @@ public class ClinicalService {
         java.util.Map<Long, List<Turno>> turnosPorPaciente = todosLosTurnosDelMedico.stream()
                 .collect(Collectors.groupingBy(t -> t.getPaciente().getId()));
 
-        java.util.Map<Long, Integer> mensajesSinLeerPorPaciente = mensajeRepository.countUnreadMessagesGroupedByRemitente(medico.getId()).stream()
-                .collect(Collectors.toMap(
-                        com.tranqui.app.repository.MensajeRepository.UnreadCountPorRemitente::getRemitenteId,
-                        com.tranqui.app.repository.MensajeRepository.UnreadCountPorRemitente::getCantidad));
+        java.util.Map<Long, Integer> mensajesSinLeerPorPaciente = resumenChat.noLeidosPorPaciente();
 
         List<PacienteDto> dtos = new ArrayList<>();
         for (Usuario p : todosLosPacientes) {
@@ -180,6 +202,7 @@ public class ClinicalService {
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
         Usuario paciente = usuarioRepository.findById(pacienteId)
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
+        accesoPacientes.exigirAtendido(medico.getId(), paciente.getId());
 
         entry.setMedico(medico);
         entry.setPaciente(paciente);
@@ -193,6 +216,7 @@ public class ClinicalService {
                 entry.getEstadoAnimo(), entry.getSintomas(), entry.getNotas(), ahora.toString()));
 
         SeguimientoDiario saved = seguimientoDiarioRepository.save(entry);
+        publicarHistoriaClinica("seguimiento", saved != null ? saved.getId() : null, medico.getId(), paciente.getId(), "SEGUIMIENTO", "PROFESIONAL", null);
 
         // Notify professional/patient (in this case, since the professional logged it or the patient logged it, we can notify the user)
         notificacionService.crearNotificacion(
@@ -218,6 +242,7 @@ public class ClinicalService {
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
         Usuario paciente = usuarioRepository.findById(pacienteId)
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
+        accesoPacientes.exigirAtendido(medico.getId(), paciente.getId());
 
         LocalDateTime ahora = LocalDateTime.now();
         InformeClinico informe = InformeClinico.builder()
@@ -235,6 +260,7 @@ public class ClinicalService {
                 .build();
 
         InformeClinico saved = informeClinicoRepository.save(informe);
+        publicarHistoriaClinica("informe", saved != null ? saved.getId() : null, medico.getId(), paciente.getId(), "INFORME", "PROFESIONAL", tipoInforme);
 
         notificacionService.crearNotificacion(
                 medico,
@@ -265,12 +291,13 @@ public class ClinicalService {
         Usuario paciente = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
 
+        // Fase 7: sin profesional se rechaza. Antes quedaba asignado a uno fijo (paula@tranqui.com), un resto de
+        // las pruebas que mandaba la historia de cualquier paciente a esa cuenta.
         if (entry.getMedico() == null) {
-            Usuario medico = usuarioRepository.findByEmail("paula@tranqui.com")
-                    .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
-            entry.setMedico(medico);
+            throw new IllegalArgumentException("El seguimiento tiene que ser para un profesional que te atiende.");
         }
-        
+        accesoPacientes.exigirAtendido(entry.getMedico().getId(), paciente.getId());
+
         entry.setPaciente(paciente);
         if (entry.getFecha() == null) {
             entry.setFecha(LocalDate.now());
@@ -282,6 +309,7 @@ public class ClinicalService {
                 entry.getEstadoAnimo(), entry.getSintomas(), entry.getNotas(), ahora.toString()));
 
         SeguimientoDiario saved = seguimientoDiarioRepository.save(entry);
+        publicarHistoriaClinica("seguimiento", saved != null ? saved.getId() : null, entry.getMedico().getId(), paciente.getId(), "SEGUIMIENTO", "PACIENTE", null);
 
         notificacionService.crearNotificacion(
                 entry.getMedico(),
@@ -388,6 +416,7 @@ public class ClinicalService {
 
         Usuario paciente = usuarioRepository.findById(pacienteId)
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
+        accesoPacientes.exigirAtendido(medico.getId(), paciente.getId());
 
         validarDatosPaciente(dto);
 
@@ -442,7 +471,7 @@ public class ClinicalService {
         }
         
         Usuario saved = usuarioRepository.save(paciente);
-        int unreadMessagesCount = mensajeRepository.countUnreadMessages(saved.getId(), medico.getId());
+        int unreadMessagesCount = resumenChatCliente.resumen(medico.getId()).noLeidosPorPaciente().getOrDefault(saved.getId(), 0);
 
         return construirPacienteDto(saved, "Hoy", false, false, unreadMessagesCount);
     }
