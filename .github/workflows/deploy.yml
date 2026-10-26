@@ -63,6 +63,9 @@ jobs:
           - servicio: profesionales
             context: .
             file: ./services/profesionales/Dockerfile
+          - servicio: turnos
+            context: .
+            file: ./services/turnos/Dockerfile
           - servicio: backend
             context: .
             file: ./backend/Dockerfile

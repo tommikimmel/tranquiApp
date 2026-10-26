@@ -30,19 +30,19 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 | `tranqui-calendario` | `calendario` | Servicio de calendario (Fase 3): Google Calendar y Meet, eventos de los turnos y horarios ocupados, base propia `calendario` | 288 MB | 0.5 |
 | `tranqui-pagos` | `pagos` | Servicio de pagos (Fase 4): Mercado Pago de turnos y documentos (checkout, webhooks, reembolsos y cuentas de los profesionales), base propia `pagos` | 288 MB | 0.5 |
 | `tranqui-profesionales` | `profesionales` | Servicio de profesionales (Fase 5): perfil, buscador, tarifas y disponibilidad, base propia `profesionales` | 288 MB | 0.5 |
+| `tranqui-turnos` | `turnos` | Servicio de turnos (Fase 6): reservas, agenda, cancelación, reprogramación, asistencia y documentos, base propia `turnos` | 288 MB | 0.5 |
 | `tranqui-db-servicios` | `db-servicios` | Contenedor de una sola ejecución: crea la base y el usuario de cada servicio (`infra/postgres/crear-bases-servicios.sh`) y termina | 32 MB | 0.2 |
 | `tranqui-bot`, `tranqui-bot-worker`, `wsp-db`, `wsp-redis` | — | Bot de WhatsApp (proyecto aparte, fuera de este repositorio) | ~70 MB | — |
 
 ### Presupuesto de memoria (RAM)
 
-- **Total suma `mem_limit` Docker Compose (Fase 5):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 288 + 288 + 288 + 288 + 288 = 3.552 MB` (~3,55 GB; `db-servicios` corre unos segundos al arrancar y no suma).
+- **Total suma `mem_limit` Docker Compose (Fase 6):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 288 + 288 + 288 + 288 + 288 + 288 = 3.840 MB` (~3,84 GB; `db-servicios` corre unos segundos al arrancar y no suma).
 - **Traefik y bot de WhatsApp:** ~112 MB.
 - **Sistema operativo y buffers mínimos:** ~1 GB.
-- **Consumo proyectado total en VPS:** **~4,7 GB**, todavía dentro del techo presupuestado de **~4,8 GB**
-  de la sección 9.1 para la Fase 0, reservando ~3,2 GB de margen libre para picos y caché de disco de PostgreSQL.
-  Con la Fase 5 el margen contra el techo queda en ~0,1 GB: antes de sumar otro servicio hay que medir el
-  consumo real en el VPS (los servicios usan bastante menos que su límite: pagos ~175 MB de 288) o revisar
-  el techo.
+- **Consumo proyectado total en VPS:** **~5,0 GB**, por encima del techo de **~4,8 GB** de la sección 9.1, con
+  ~3 GB de margen libre en el VPS de 8 GB para picos y caché de disco de PostgreSQL. Decisión de la Fase 6: se
+  acepta y se mide el consumo real en el VPS antes del deploy (los servicios usan bastante menos que su límite:
+  pagos ~175 MB de 288). Si hace falta, se baja el monolito a 384 MB o los servicios chicos a 256 MB.
 
 ### Afinación de JVM (backend y gateway)
 
@@ -146,6 +146,60 @@ define dependencias escalonadas con `condition: service_healthy`:
    docker compose -p app ps
    curl -fsS https://tranquisalud.com/api/health
    ```
+
+## Fase 6: servicio de turnos
+
+Las reservas, la agenda, la cancelación, la reprogramación, la asistencia y los documentos viven en el
+contenedor `turnos`, en las mismas URLs: `/api/turnos/**`, los horarios libres y el conteo de la home,
+`/api/medicos/turnos/**` y "Mis turnos" del paciente (`/api/pacientes/me/turnos`). Los links de los mails
+(confirmar asistencia, "no voy a ir") siguen funcionando: el servicio tiene los mismos ids y tokens.
+
+- **Pacientes:** siguen siendo del monolito (identidad). La reserva le pide "buscar o crear paciente"; si el
+  monolito no responde, la reserva falla con un error y no queda nada.
+- **Copia del monolito:** las estadísticas del panel, la historia clínica y las recetas siguen leyendo `turno`
+  y su pago. Se actualizan con `turnos.turno.actualizado` y una resincronización cada 15 minutos
+  (`TURNOS_RESINCRONIZACION_MINUTOS`).
+- **Documento adjunto:** lo manda notificaciones (`/internal/notificaciones/documentos`); el archivo no se
+  guarda en ningún lado.
+- **Pago de un turno vencido:** si el horario ya lo tomó otro paciente, el turno queda cancelado y pagos
+  reembolsa el pago completo (el paciente recibe los mails de cancelación y reembolso).
+
+**Variables en `/srv/tranqui/.env`:** `TURNOS_DB_PASSWORD` (`openssl rand -hex 24`). `MERCADOPAGO_ENABLED`,
+`PAYMENT_SIMULATION_ENABLED` y `APP_PUBLIC_URL` son las mismas que ya usa el monolito.
+
+**Primer arranque:** copia del monolito los usuarios, la agenda de los profesionales y todos los turnos con sus
+ids, versiones y los tokens de los mails, y pone la secuencia después del último. Recién después consume
+eventos, vence bloqueos y manda recordatorios.
+
+**El corte va con la app en mantenimiento** (pocos minutos, sin reservas a medio pagar que se pierdan):
+
+1. `npm run mantenimiento -- on "Volvemos en unos minutos"`.
+2. Esperar 5 minutos (que venzan los bloqueos de pago en curso).
+3. En `/srv/tranqui/.env`: `TURNOS_EXTERNO=true` (o sacarla) y `TRANQUI_SERVICES_TURNOS_URI` sin definir (usa
+   `lb://turnos`).
+4. `docker compose -p app up -d turnos tranqui-backend gateway` y esperar que `turnos` esté sano (en sus logs:
+   "Carga inicial de turnos: ...").
+5. Conciliar y, si da sin diferencias, `npm run mantenimiento -- off`:
+   ```bash
+   node scripts/fase6-conciliar-turnos.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+   ```
+6. La conciliación todos los días durante dos semanas.
+
+**Vuelta atrás de la Fase 6:**
+
+1. `npm run mantenimiento -- on`.
+2. En `/srv/tranqui/.env`: `TURNOS_EXTERNO=false` y `TRANQUI_SERVICES_TURNOS_URI=http://tranqui-backend:8080`.
+3. `docker compose -p app stop turnos` y `docker compose -p app up -d tranqui-backend gateway`.
+4. Devolver al monolito los turnos, sus pagos y los tokens de los mails, con la versión por encima de la del
+   servicio y la secuencia ajustada (idempotente; `--prueba` solo cuenta):
+   ```bash
+   node scripts/fase6-devolver-turnos.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+   ```
+5. `npm run mantenimiento -- off`.
+
+**Volver al servicio después:** borrar la base de turnos para que el primer arranque vuelva a copiar todo:
+`docker compose -p app exec tranqui-db psql -U <DB_USER> -d tranqui_app -c "DROP DATABASE turnos"`, y repetir el
+corte.
 
 ## Fase 5: servicio de profesionales
 

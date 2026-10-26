@@ -140,6 +140,10 @@ Lo que encontré y el plan no resolvía:
 - Script de vuelta atrás (turnos creados o cambiados en el servicio, al monolito, con la versión por encima) y
   de conciliación (cantidades por estado y por profesional, y campo por campo de una muestra).
 
+- **Hecho en T4:** el corte queda escrito en `produccion.md` (mantenimiento, esperar los 5 minutos de los
+  bloqueos, flag y ruta, conciliar, sacar el mantenimiento). Los scripts devuelven también el pago del turno, los
+  tokens de los mails, la versión y la secuencia de `turno` del monolito.
+
 ### T5 — Verificación de punta a punta (postergada)
 Queda escrita para cuando se pueda levantar el stack: reservar y pagar, cancelar con y sin reembolso,
 reprogramar, asistencia y los links de los mails, documentos y recetas, un turno vencido pagado con el horario

@@ -51,6 +51,13 @@ scrape_configs:
         labels:
           servicio: 'profesionales'
 
+  - job_name: 'turnos'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['turnos:8082']
+        labels:
+          servicio: 'turnos'
+
   - job_name: 'rabbitmq'
     metrics_path: '/metrics'
     static_configs:
