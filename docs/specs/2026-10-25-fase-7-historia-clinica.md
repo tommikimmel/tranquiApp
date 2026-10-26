@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-25
 - **Tipo:** feature
 - **Sprint:** sprint-02
-- **Estado:** propuesta (esperando aprobación)
+- **Estado:** aprobada (2026-10-26), con las recomendaciones de las seis preguntas
 - **Rama / PR:** una rama y un PR a `develop` por tarea, encadenadas sobre la Fase 6
 - **Plan:** [microservicios.md, Fase 7](../arquitectura/microservicios.md#fase-7-historia-clínica-y-recetas)
 - **Forma de trabajo:** solo cambiar la arquitectura; sin buildear imágenes ni levantar el stack. Tests con Maven,
@@ -125,3 +125,14 @@ mail, un documento de conceptos pago, los accesos rechazados, el servicio caído
 5. **Copia en el monolito:** ¿sin copia de la historia clínica en el monolito (nadie más la lee), con la vuelta
    atrás por script? **Recomiendo que sí**: menos copias de datos de salud.
 6. Un PR a `develop` por tarea, Java 17, sin deploy ni pruebas con el stack.
+
+## Decisiones (2026-10-26)
+
+1. Historia clínica y recetas en el servicio de profesionales, con sus tablas aparte (sin servicio nuevo).
+2. Cargar seguimientos e informes, ver y editar la ficha y emitir recetas exigen que el paciente sea "atendido"
+   por ese profesional. El seguimiento del paciente sin profesional se rechaza. En un PR propio dentro de la fase.
+3. La ficha del paciente se guarda en el monolito por una ruta interna (si no responde, la edición falla).
+4. El mail de la receta lo manda notificaciones por una ruta interna nueva.
+5. Sin copia de la historia clínica en el monolito; la vuelta atrás es por script.
+6. Un PR a `develop` por tarea, Java 17, sin deploy ni pruebas con el stack.
+   Las dudas se resuelven primero con lo que ya está implementado.
