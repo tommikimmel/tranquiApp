@@ -17,7 +17,10 @@ import java.util.List;
 /**
  * Primer arranque de profesionales (paso 1 de "Migración de datos en cada fase"): copia del monolito los
  * profesionales con su perfil, foto, disponibilidad y tarifas, y las copias de personas y turnos cuando
- * sus tablas están vacías. Todo o nada, reintenta con espera creciente si el monolito no está listo.
+ * sus tablas están vacías. Todo o nada, reintenta con espera creciente si el monolito no está listo, y
+ * la carga de profesionales solo corre con la base vacía. La versión de cada profesional arranca en la del
+ * usuario en el monolito: calendario, chat, notificaciones y pagos ya vieron esos números en
+ * {@code profesional.actualizado}.
  *
  * <p>El consumo de eventos y la sincronización esperan a que termine.
  */

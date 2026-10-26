@@ -3,6 +3,10 @@ package com.tranqui.profesionales.perfil;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateDeserializer;
+import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
 
 /**
  * El mismo JSON que {@code MedicoDto} del monolito (el buscador, "Mi perfil" y lo que manda el frontend al
@@ -30,6 +34,8 @@ public record MedicoDto(
         List<TarifaDto> tariffs,
         String apellido,
         String sexo,
+        @JsonSerialize(using = LocalDateSerializer.class)
+        @JsonDeserialize(using = LocalDateDeserializer.class)
         LocalDate fechaNacimiento,
         Long cuil,
         String tipoDocumento,

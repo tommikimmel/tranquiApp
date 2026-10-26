@@ -91,6 +91,11 @@ public class Solicitudes {
     }
 
     @Transactional
+    public void actualizarAprobado(Long id, String transactionId) {
+        jdbc.update("UPDATE solicitud_documento SET estado = 'APROBADO', transaction_id = ? WHERE id = ?", transactionId, id);
+    }
+
+    @Transactional
     public void actualizarEstado(Long id, String estado) {
         jdbc.update("UPDATE solicitud_documento SET estado = ? WHERE id = ?", estado, id);
     }

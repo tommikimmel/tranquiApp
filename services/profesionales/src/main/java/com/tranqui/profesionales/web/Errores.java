@@ -11,6 +11,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class Errores {
 
+    @ExceptionHandler(com.tranqui.profesionales.clinica.ProhibidoException.class)
+    public ResponseEntity<String> prohibido(com.tranqui.profesionales.clinica.ProhibidoException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+    }
+
     @ExceptionHandler(NoEncontradoException.class)
     public ResponseEntity<String> noEncontrado(NoEncontradoException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
