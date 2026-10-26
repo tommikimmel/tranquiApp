@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-22
 - **Tipo:** feature
 - **Sprint:** sprint-02
-- **Estado:** aprobada (2026-10-25)
+- **Estado:** aprobada (2026-10-25); T1 a T4 implementadas (#55 a #58), T5 postergada (sin builds ni stack)
 - **Rama / PR:** una rama y un PR a `develop` por tarea, encadenadas sobre la Fase 5
 - **Plan:** [microservicios.md, Fase 6](../arquitectura/microservicios.md#fase-6-turnos)
 - **Forma de trabajo (pedido del usuario, 2026-10-22):** solo cambiar la arquitectura. Sin buildear imágenes
