@@ -29,6 +29,9 @@ public class AdminSubscriptionController {
     private SubscriptionService subscriptionService;
 
     @Autowired
+    private com.tranqui.app.service.AvisoSuscripcionPublisher avisoSuscripcionPublisher;
+
+    @Autowired
     private InvoiceService invoiceService;
 
     @Autowired
@@ -295,6 +298,8 @@ public class AdminSubscriptionController {
             }
             try {
                 if (sub.getProfessional() != null) {
+                    avisoSuscripcionPublisher.publicar(sub, com.tranqui.eventos.data.SuscripcionAvisoData.CANCELACION_CONFIRMADA,
+                            null, sub.getCurrentPeriodEnd(), null, null, null, null);
                     resendEmailService.enviarConfirmacionCancelacionSuscripcion(
                             sub.getProfessional().getEmail(),
                             sub.getProfessional().getNombre(),
@@ -308,6 +313,8 @@ public class AdminSubscriptionController {
         } else if (newStatus == SubscriptionStatus.SUSPENDED) {
             try {
                 if (sub.getProfessional() != null) {
+                    avisoSuscripcionPublisher.publicar(sub, com.tranqui.eventos.data.SuscripcionAvisoData.SUSPENSION,
+                            null, null, null, null, null, null);
                     resendEmailService.enviarAvisoSuspensionSuscripcion(
                             sub.getProfessional().getEmail(),
                             sub.getProfessional().getNombre(),
