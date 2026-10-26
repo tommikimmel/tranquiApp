@@ -143,10 +143,12 @@ spring:
                 rate-limiter: "#{@tranquiRateLimiter}"
                 key-resolver: "#{@userOrIpKeyResolver}"
 
+        # Fase 6: también "Mis turnos" del paciente (en el monolito estaba en ClinicalController); el resto de
+        # /api/pacientes (la historia clínica) sigue en el monolito por la regla general.
         - id: turnos
           uri: ${tranqui.services.turnos.uri:${tranqui.services.monolito.uri}}
           predicates:
-            - Path=/api/turnos/**
+            - Path=/api/turnos/**,/api/pacientes/me/turnos
           filters:
             - name: CircuitBreaker
               args:
@@ -562,6 +564,36 @@ spring:
                 rate-limiter: "#{@tranquiRateLimiter}"
                 key-resolver: "#{@serviceKeyResolver}"
 
+        # Fase 6: la resincronización del monolito y los enlaces del mail de asistencia (notificaciones).
+        - id: internal-turnos
+          uri: ${tranqui.services.turnos.uri}
+          predicates:
+            - Path=/internal/turnos/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: turnos
+                fallbackUri: forward:/fallback/internal
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@serviceKeyResolver}"
+
+        # Fase 6: el documento adjunto que manda turnos (decisión 3).
+        - id: internal-notificaciones
+          uri: ${tranqui.services.notificaciones.uri}
+          predicates:
+            - Path=/internal/notificaciones/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: notificaciones
+                fallbackUri: forward:/fallback/internal
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@serviceKeyResolver}"
+
         # --- RUTA INTERNA ENTRE SERVICIOS ---
         - id: internal
           uri: ${tranqui.services.internal.uri:${tranqui.services.monolito.uri}}
@@ -624,8 +656,11 @@ tranqui:
     # PROFESIONALES_EXTERNO=false en el monolito.
     profesionales:
       uri: ${TRANQUI_SERVICES_PROFESIONALES_URI:${tranqui.services.monolito.uri}}
+    # Fase 6: lb://turnos cuando el servicio está desplegado (docker-compose). Lleva /api/turnos, los horarios
+    # libres y "Mis turnos" del profesional y del paciente, y /internal/turnos. Vuelta atrás: sacar la variable,
+    # TURNOS_EXTERNO=false en el monolito y scripts/fase6-devolver-turnos.mjs.
     turnos:
-      uri: ${tranqui.services.monolito.uri}
+      uri: ${TRANQUI_SERVICES_TURNOS_URI:${tranqui.services.monolito.uri}}
     # Fase 4: lb://pagos cuando el servicio está desplegado (docker-compose). Lleva /api/payments (webhook,
     # verificar y el link del checkout) y /api/medicos/mercadopago (incluido el callback del OAuth). Vuelta
     # atrás: sacar la variable y PAGOS_EXTERNO=false en el monolito.
