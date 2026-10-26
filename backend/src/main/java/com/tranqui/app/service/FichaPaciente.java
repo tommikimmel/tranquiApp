@@ -34,6 +34,11 @@ public class FichaPaciente {
         this.outboxPublisher = outboxPublisher;
     }
 
+    // Same manual accumulate-and-throw convention as RecetaService.emitirReceta's
+    // datosFaltantes check: collect every problem instead of failing on the first one, so a
+    // psiquiatra correcting a form sees all the issues at once instead of one per submit.
+    // Fields are only validated when present — this endpoint doubles as the "borrar datos
+    // cargados" action (Historia Clínica), which intentionally sends most fields as null.
     public void validar(PacienteDto dto) {
         List<String> errores = new ArrayList<>();
 
@@ -95,6 +100,10 @@ public class FichaPaciente {
             if (c.getPan() == null || c.getPan().trim().isEmpty()) {
                 errores.add("el número de afiliado es obligatorio cuando hay obra social");
             } else if (!c.getPan().trim().matches("[A-Za-z0-9\\-/. ]{6,30}")) {
+                // QBI2 rechaza la receta con QBI124 "LA CANTIDAD DE CARACTERES NO CUMPLE EL RANGO
+                // MINIMO O MAXIMO PARA EL FINANCIADOR SELECCIONADO" recién al emitir — sin este
+                // chequeo, un número de afiliado de 1-2 caracteres pasaba esta validación y llegaba
+                // hasta QBI2 antes de ser rechazado.
                 errores.add("el número de afiliado debe tener entre 6 y 30 caracteres válidos (letras, números, guiones, barras o puntos)");
             }
         }
@@ -165,17 +174,7 @@ public class FichaPaciente {
             paciente.setObraSocial(null);
         }
 
-        Usuario guardado = null;
-        try {
-            guardado = usuarioRepository.saveAndFlush(paciente);
-        } catch (Exception ignored) {
-        }
-        if (guardado == null) {
-            guardado = usuarioRepository.save(paciente);
-        }
-        if (guardado == null) {
-            guardado = paciente;
-        }
+        Usuario guardado = usuarioRepository.saveAndFlush(paciente);
 
         outboxPublisher.publicar(
                 Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1,

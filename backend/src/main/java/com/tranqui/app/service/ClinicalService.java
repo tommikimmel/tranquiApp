@@ -331,16 +331,6 @@ public class ClinicalService {
         return informeClinicoRepository.findByPacienteIdOrderByFechaDesc(paciente.getId());
     }
 
-    private static final java.util.Set<String> TIPOS_DOCUMENTO_VALIDOS = java.util.Set.of("DNI", "LC", "LE", "Pasaporte");
-
-    // Same manual accumulate-and-throw convention as RecetaService.emitirReceta's
-    // datosFaltantes check: collect every problem instead of failing on the first one, so a
-    // psiquiatra correcting a form sees all the issues at once instead of one per submit.
-    // Fields are only validated when present — this endpoint doubles as the "borrar datos
-    // cargados" action (Historia Clínica), which intentionally sends most fields as null.
-    private void validarDatosPaciente(PacienteDto dto) {
-        fichaPaciente.validar(dto);
-    }
 
     @Transactional
     public PacienteDto actualizarPaciente(Long pacienteId, String medicoEmail, PacienteDto dto) {
