@@ -12,7 +12,13 @@ import java.util.Optional;
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> findByEmail(String email);
     Optional<Usuario> findByMpUserId(String mpUserId);
+
+    /** Fase 4: cuentas de Mercado Pago vinculadas, para la carga inicial del servicio de pagos. */
+    List<Usuario> findByMpAccessTokenEncryptedIsNotNull();
     List<Usuario> findByRol(Rol rol);
+
+    // Fase 5: carga inicial del servicio de profesionales, paginada (la foto va en base64 dentro de la fila).
+    List<Usuario> findByRolOrderByIdAsc(Rol rol, org.springframework.data.domain.Pageable pageable);
     List<Usuario> findByRolAndGoogleCalendarConnectedTrue(Rol rol);
     Optional<Usuario> findByGoogleWatchChannelId(String googleWatchChannelId);
     List<Usuario> findByGoogleWatchActiveTrueAndGoogleWatchExpiresAtBefore(LocalDateTime limite);

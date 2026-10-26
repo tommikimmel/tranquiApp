@@ -1,5 +1,6 @@
 package com.tranqui.app.service;
 
+import com.tranqui.app.eventos.OutboxPublisher;
 import com.tranqui.app.model.*;
 import com.tranqui.app.model.dto.PacienteDto;
 import com.tranqui.app.repository.*;
@@ -32,8 +33,25 @@ class ClinicalServiceTest {
     @Mock private NotificacionService notificacionService;
     @Mock private MensajeRepository mensajeRepository;
 
+    @Mock
+    private OutboxPublisher outboxPublisher;
+
+    // Por defecto atiende a todos (no hace nada); los tests de rechazo lo hacen tirar.
+    @Mock
+    private AccesoPacientes accesoPacientes;
+
     @InjectMocks
     private ClinicalService clinicalService;
+
+    // Sin URL de gateway el resumen de chat se calcula con las tablas propias: los stubs de
+    // mensajeRepository de cada test siguen aplicando (Fase 2).
+    @org.junit.jupiter.api.BeforeEach
+    void resumenDeChatLocal() {
+        org.springframework.test.util.ReflectionTestUtils.setField(clinicalService, "resumenChatCliente",
+                new ResumenChatCliente(mensajeRepository, "", ""));
+        org.springframework.test.util.ReflectionTestUtils.setField(clinicalService, "fichaPaciente",
+                new FichaPaciente(usuarioRepository, outboxPublisher));
+    }
 
     private Usuario medico(String email) {
         return Usuario.builder().id(1L).nombre("Dra. Paula").email(email).rol(Rol.PSIQUIATRA).build();
@@ -64,6 +82,9 @@ class ClinicalServiceTest {
                 .thenReturn(List.of(pacienteConTurnoUrgente));
         // Beto only has chat history, no appointment at all
         when(mensajeRepository.findPacientesConMensajesConMedico(1L))
+                .thenReturn(List.of(pacienteConTurnoUrgente, pacienteSinTurno));
+        // Fase 2: los pacientes del resumen de chat se buscan por id.
+        when(usuarioRepository.findAllById(List.of(10L, 20L)))
                 .thenReturn(List.of(pacienteConTurnoUrgente, pacienteSinTurno));
 
         LocalDate hoy = LocalDate.now();
@@ -210,7 +231,31 @@ class ClinicalServiceTest {
         assertEquals(fechaExplicita, saved.getFecha());
     }
 
+    @Test
+    void guardarSeguimiento_deUnPacienteQueNoAtiendeSeRechaza() {
+        when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico("dra@mail.com")));
+        when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente(5L, "Ana")));
+        doThrow(new AccessDeniedException("no")).when(accesoPacientes).exigirAtendido(1L, 5L);
+
+        assertThrows(AccessDeniedException.class,
+                () -> clinicalService.guardarSeguimiento(5L, "dra@mail.com", SeguimientoDiario.builder().build()));
+        verify(seguimientoDiarioRepository, never()).save(any());
+        verifyNoInteractions(outboxPublisher);
+    }
+
     // ── guardarInforme ───────────────────────────────────────────────
+
+    @Test
+    void guardarInforme_deUnPacienteQueNoAtiendeSeRechaza() {
+        when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico("dra@mail.com")));
+        when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente(5L, "Ana")));
+        doThrow(new AccessDeniedException("no")).when(accesoPacientes).exigirAtendido(1L, 5L);
+
+        assertThrows(AccessDeniedException.class,
+                () -> clinicalService.guardarInforme("dra@mail.com", 5L, "GENERAL", "plan", "contenido", null));
+        verify(informeClinicoRepository, never()).save(any());
+        verifyNoInteractions(outboxPublisher);
+    }
 
     @Test
     void guardarInforme_shouldThrowWhenMedicoNotFound() {
@@ -244,6 +289,28 @@ class ClinicalServiceTest {
         assertEquals(LocalDate.now(), saved.getFecha());
         verify(notificacionService).crearNotificacion(eq(medico), anyString(), anyString(), eq("INFORME"));
         verify(notificacionService).crearNotificacion(eq(paciente), anyString(), anyString(), eq("INFORME"));
+    }
+
+    @Test
+    void guardarInforme_publicaHistoriaClinicaSinContenidoClinico() {
+        Usuario medico = medico("dra@mail.com");
+        Usuario paciente = paciente(5L, "Ana");
+        when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico));
+        when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
+        when(informeClinicoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        clinicalService.guardarInforme("dra@mail.com", 5L, "GENERAL", "plan secreto", "contenido secreto", "archivo.pdf");
+
+        org.mockito.ArgumentCaptor<com.tranqui.eventos.data.HistoriaClinicaActualizadaData> captor =
+                org.mockito.ArgumentCaptor.forClass(com.tranqui.eventos.data.HistoriaClinicaActualizadaData.class);
+        verify(outboxPublisher).publicar(eq(com.tranqui.eventos.Topicos.PROFESIONALES_HISTORIA_CLINICA_ACTUALIZADA_V1),
+                eq("informe"), anyString(), eq(1), captor.capture());
+        com.tranqui.eventos.data.HistoriaClinicaActualizadaData data = captor.getValue();
+        assertEquals(5L, data.pacienteId());
+        assertEquals("INFORME", data.tipo());
+        assertEquals("PROFESIONAL", data.cargadoPor());
+        assertEquals("GENERAL", data.tipoInforme());
+        assertFalse(data.toString().contains("secreto"));
     }
 
     // ── obtenerSeguimientosPaciente / obtenerInformesPaciente ───────
@@ -289,31 +356,28 @@ class ClinicalServiceTest {
                 () -> clinicalService.guardarSeguimientoPaciente("x@mail.com", SeguimientoDiario.builder().build()));
     }
 
+    // Fase 7: antes quedaba asignado a paula@tranqui.com, un resto de las pruebas.
     @Test
-    void guardarSeguimientoPaciente_shouldFallBackToDefaultMedicoWhenMissing() {
+    void guardarSeguimientoPaciente_sinProfesionalSeRechaza() {
         Usuario paciente = paciente(5L, "Ana");
-        Usuario medicoDefault = medico("paula@tranqui.com");
         when(usuarioRepository.findByEmail("ana@mail.com")).thenReturn(Optional.of(paciente));
-        when(usuarioRepository.findByEmail("paula@tranqui.com")).thenReturn(Optional.of(medicoDefault));
-        when(seguimientoDiarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        SeguimientoDiario entry = SeguimientoDiario.builder().build();
-        SeguimientoDiario saved = clinicalService.guardarSeguimientoPaciente("ana@mail.com", entry);
-
-        assertEquals(medicoDefault, saved.getMedico());
-        assertEquals(paciente, saved.getPaciente());
-        assertEquals(LocalDate.now(), saved.getFecha());
-        verify(notificacionService).crearNotificacion(eq(medicoDefault), anyString(), anyString(), eq("SEGUIMIENTO"));
+        assertThrows(IllegalArgumentException.class,
+                () -> clinicalService.guardarSeguimientoPaciente("ana@mail.com", SeguimientoDiario.builder().build()));
+        verify(usuarioRepository, never()).findByEmail("paula@tranqui.com");
+        verify(seguimientoDiarioRepository, never()).save(any());
     }
 
     @Test
-    void guardarSeguimientoPaciente_shouldThrowWhenDefaultMedicoMissing() {
+    void guardarSeguimientoPaciente_conUnProfesionalQueNoLoAtiendeSeRechaza() {
         Usuario paciente = paciente(5L, "Ana");
+        Usuario otro = medico("otra@mail.com");
         when(usuarioRepository.findByEmail("ana@mail.com")).thenReturn(Optional.of(paciente));
-        when(usuarioRepository.findByEmail("paula@tranqui.com")).thenReturn(Optional.empty());
+        doThrow(new AccessDeniedException("no")).when(accesoPacientes).exigirAtendido(1L, 5L);
 
-        assertThrows(EntityNotFoundException.class,
-                () -> clinicalService.guardarSeguimientoPaciente("ana@mail.com", SeguimientoDiario.builder().build()));
+        assertThrows(AccessDeniedException.class, () -> clinicalService.guardarSeguimientoPaciente("ana@mail.com",
+                SeguimientoDiario.builder().medico(otro).build()));
+        verify(seguimientoDiarioRepository, never()).save(any());
     }
 
     @Test
@@ -335,6 +399,18 @@ class ClinicalServiceTest {
     // ── actualizarPaciente ───────────────────────────────────────────
 
     @Test
+    void actualizarPaciente_deUnPacienteQueNoAtiendeSeRechaza() {
+        when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico("dra@mail.com")));
+        when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente(5L, "Ana")));
+        doThrow(new AccessDeniedException("no")).when(accesoPacientes).exigirAtendido(1L, 5L);
+
+        assertThrows(AccessDeniedException.class,
+                () -> clinicalService.actualizarPaciente(5L, "dra@mail.com", PacienteDto.builder().nombre("Ana").build()));
+        verify(usuarioRepository, never()).save(any());
+        verify(usuarioRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void actualizarPaciente_shouldThrowWhenMedicoNotFound() {
         when(usuarioRepository.findByEmail("x@mail.com")).thenReturn(Optional.empty());
         assertThrows(EntityNotFoundException.class,
@@ -354,7 +430,7 @@ class ClinicalServiceTest {
         when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico("dra@mail.com")));
         Usuario paciente = paciente(5L, "Ana");
         when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
-        when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PacienteDto dto = PacienteDto.builder()
                 .nombre("Ana Actualizada")
@@ -376,7 +452,7 @@ class ClinicalServiceTest {
         when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico("dra@mail.com")));
         Usuario paciente = paciente(5L, "Ana");
         when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
-        when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PacienteDto dto = PacienteDto.builder().nombre("Ana").fechaNacimiento("   ").build();
         clinicalService.actualizarPaciente(5L, "dra@mail.com", dto);
@@ -389,7 +465,7 @@ class ClinicalServiceTest {
         when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico("dra@mail.com")));
         Usuario paciente = paciente(5L, "Ana");
         when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
-        when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PacienteDto.CredencialInfoDto cred = PacienteDto.CredencialInfoDto.builder()
                 .codEntidad(1).pan("PAN123456").plan("210").token("TOK").build();
@@ -410,7 +486,7 @@ class ClinicalServiceTest {
         when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico("dra@mail.com")));
         Usuario paciente = paciente(5L, "Ana");
         when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
-        when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PacienteDto.CredencialInfoDto cred = PacienteDto.CredencialInfoDto.builder()
                 .codEntidad(1).pan("PAN123456").plan("  ").build();
@@ -428,7 +504,7 @@ class ClinicalServiceTest {
         paciente.setCredencialCodEntidad(9);
         paciente.setObraSocial("Algo");
         when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
-        when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PacienteDto dto = PacienteDto.builder().nombre("Ana").build();
         clinicalService.actualizarPaciente(5L, "dra@mail.com", dto);

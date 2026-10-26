@@ -133,26 +133,104 @@ class TurnoServiceTest {
     // same calendar day, regardless of what time the test happens to run at (a naive
     // now.plusHours(N) can wrap past midnight in the evening, which breaks the LocalTime
     // comparisons the production "completed" status logic relies on).
-    private static LocalTime[] horaFuturaSegura() {
-        LocalTime now = LocalTime.now();
-        LocalTime inicio = now.plusHours(2);
-        LocalTime fin = now.plusHours(3);
-        if (fin.isBefore(now)) {
-            return new LocalTime[]{ LocalTime.of(23, 0), LocalTime.of(23, 45) };
-        }
+    static LocalTime[] horaFuturaSegura() {
+        return horaFuturaSegura(LocalTime.now());
+    }
+
+    static LocalTime[] horaFuturaSegura(LocalTime now) {
+        // A strictly-future window [now+1min, min(now+46min, 23:59)] within today requires
+        // now <= 23:57 so that inicio <= 23:58 < fin <= 23:59.
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                !now.isAfter(LocalTime.of(23, 57)),
+                "Current time is too close to midnight to form a future window today: " + now
+        );
+
+        LocalTime inicio = now.plusMinutes(1);
+        LocalTime fin = now.isAfter(LocalTime.of(23, 13))
+                ? LocalTime.of(23, 59)
+                : now.plusMinutes(46);
+
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                inicio.isAfter(now) && inicio.isBefore(fin) && !fin.isBefore(now),
+                "Could not construct a valid future window for time: " + now
+        );
+
         return new LocalTime[]{ inicio, fin };
     }
 
     // Same idea as horaFuturaSegura(), but for a window guaranteed to be in the past
     // (guards against now.minusHours(N) underflowing past midnight in the early morning).
-    private static LocalTime[] horaPasadaSegura() {
-        LocalTime now = LocalTime.now();
-        LocalTime inicio = now.minusHours(3);
-        LocalTime fin = now.minusHours(2);
-        if (fin.isAfter(now)) {
-            return new LocalTime[]{ LocalTime.of(0, 1), LocalTime.of(0, 46) };
-        }
+    static LocalTime[] horaPasadaSegura() {
+        return horaPasadaSegura(LocalTime.now());
+    }
+
+    static LocalTime[] horaPasadaSegura(LocalTime now) {
+        // A strictly-past window [max(now-46min, 00:00), now-1min] within today requires
+        // now >= 00:02 so that inicio >= 00:00 < fin >= 00:01 < now.
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                !now.isBefore(LocalTime.of(0, 2)),
+                "Current time is too close to midnight to form a past window today: " + now
+        );
+
+        LocalTime inicio = now.isBefore(LocalTime.of(0, 46))
+                ? LocalTime.of(0, 0)
+                : now.minusMinutes(46);
+        LocalTime fin = now.minusMinutes(1);
+
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                inicio.isBefore(fin) && fin.isBefore(now) && !inicio.isAfter(fin),
+                "Could not construct a valid past window for time: " + now
+        );
+
         return new LocalTime[]{ inicio, fin };
+    }
+
+    @Test
+    void testHorariosSeguros_cercaDeLaMedianoche() {
+        // 12:00 (midday) — both future and past windows fit with full spans
+        LocalTime midday = LocalTime.of(12, 0);
+        LocalTime[] futMid = horaFuturaSegura(midday);
+        assertTrue(futMid[0].isAfter(midday));
+        assertTrue(futMid[0].isBefore(futMid[1]));
+
+        LocalTime[] pasMid = horaPasadaSegura(midday);
+        assertTrue(pasMid[1].isBefore(midday));
+        assertTrue(pasMid[0].isBefore(pasMid[1]));
+
+        // 23:56 — late evening: future window is clipped to 23:59, past window fits normally
+        LocalTime lateEvening = LocalTime.of(23, 56);
+        LocalTime[] futLate = horaFuturaSegura(lateEvening);
+        assertTrue(futLate[0].isAfter(lateEvening));
+        assertTrue(futLate[0].isBefore(futLate[1]));
+        assertFalse(futLate[1].isBefore(futLate[0]));
+
+        LocalTime[] pasLate = horaPasadaSegura(lateEvening);
+        assertTrue(pasLate[1].isBefore(lateEvening));
+        assertTrue(pasLate[0].isBefore(pasLate[1]));
+
+        // 00:12 — early morning: past window is clipped to 00:00, future window fits normally
+        LocalTime earlyMorning = LocalTime.of(0, 12);
+        LocalTime[] futEarly = horaFuturaSegura(earlyMorning);
+        assertTrue(futEarly[0].isAfter(earlyMorning));
+        assertTrue(futEarly[0].isBefore(futEarly[1]));
+
+        LocalTime[] pasEarly = horaPasadaSegura(earlyMorning);
+        assertTrue(pasEarly[1].isBefore(earlyMorning));
+        assertTrue(pasEarly[0].isBefore(pasEarly[1]));
+
+        // 00:00:30 — past window cannot exist within today (skipped via assumeTrue); future window is valid
+        LocalTime edgeMorning = LocalTime.of(0, 0, 30);
+        LocalTime[] futEdgeMorning = horaFuturaSegura(edgeMorning);
+        assertTrue(futEdgeMorning[0].isAfter(edgeMorning));
+        assertTrue(futEdgeMorning[0].isBefore(futEdgeMorning[1]));
+        assertThrows(org.opentest4j.TestAbortedException.class, () -> horaPasadaSegura(edgeMorning));
+
+        // 23:59:30 — future window cannot exist within today (skipped via assumeTrue); past window is valid
+        LocalTime edgeNight = LocalTime.of(23, 59, 30);
+        LocalTime[] pasEdgeNight = horaPasadaSegura(edgeNight);
+        assertTrue(pasEdgeNight[1].isBefore(edgeNight));
+        assertTrue(pasEdgeNight[0].isBefore(pasEdgeNight[1]));
+        assertThrows(org.opentest4j.TestAbortedException.class, () -> horaFuturaSegura(edgeNight));
     }
 
     @Test
@@ -475,6 +553,21 @@ class TurnoServiceTest {
 
         Turno dbTurno = turnoRepository.findById(turno.getId()).orElseThrow();
         assertEquals(EstadoTurno.CANCELADO, dbTurno.getEstado());
+    }
+
+    @Test
+    void exigirDuenio_soloElPacienteOElProfesionalDelTurno() {
+        assertDoesNotThrow(() -> turnoService.exigirDuenio(turno.getId(), paciente.getEmail(), false));
+        assertDoesNotThrow(() -> turnoService.exigirDuenio(turno.getId(), medico.getEmail().toUpperCase(), false));
+        assertDoesNotThrow(() -> turnoService.exigirDuenio(turno.getId(), medico.getEmail(), true));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> turnoService.exigirDuenio(turno.getId(), paciente.getEmail(), true));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> turnoService.exigirDuenio(turno.getId(), "otro@mail.com", false));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> turnoService.exigirDuenio(turno.getId(), null, false));
+        assertThrows(jakarta.persistence.EntityNotFoundException.class,
+                () -> turnoService.exigirDuenio(-1L, medico.getEmail(), false));
     }
 
     @Test
