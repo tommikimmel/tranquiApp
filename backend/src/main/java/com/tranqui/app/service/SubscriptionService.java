@@ -2,6 +2,10 @@ package com.tranqui.app.service;
 
 import com.tranqui.app.model.*;
 import com.tranqui.app.repository.*;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.SuscripcionAvisoData;
+import com.tranqui.eventos.data.SuscripcionCambioEstadoData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import jakarta.annotation.PostConstruct;
@@ -20,6 +24,9 @@ import java.util.*;
 public class SubscriptionService {
 
     private static final Logger log = LoggerFactory.getLogger(SubscriptionService.class);
+
+    @Autowired
+    private OutboxPublisher outboxPublisher;
 
     @Autowired
     private SubscriptionRepository subscriptionRepository;
@@ -46,6 +53,9 @@ public class SubscriptionService {
     private ResendEmailService resendEmailService;
 
     @Autowired
+    private AvisoSuscripcionPublisher avisoSuscripcionPublisher;
+
+    @Autowired
     private MercadoPagoService mercadoPagoService;
 
     @Autowired
@@ -57,7 +67,7 @@ public class SubscriptionService {
     /**
      * Etapa 2 del paywall: crea el Preapproval de Mercado Pago (cobrado a la cuenta del admin) para
      * que este profesional pague/renueve su suscripción, y devuelve la URL de checkout a la que
-     * hay que redirigirlo. No activa nada todavía — la activación real llega después, por
+     * hay que redirigirlo. No activa nada todavía � la activación real llega después, por
      * webhook (processMercadoPagoPreapprovalWebhook), cuando el profesional autoriza el pago.
      */
     @Transactional
@@ -68,7 +78,7 @@ public class SubscriptionService {
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Plan no encontrado"));
         // Self-heal: cuentas creadas antes de que /register empezara a crear la fila de
         // suscripción (o dadas de alta por otra vía, p.ej. Google signup) llegan acá sin ninguna
-        // fila — antes esto tiraba 422 y dejaba al profesional sin forma de salir del bloqueo del
+        // fila � antes esto tiraba 422 y dejaba al profesional sin forma de salir del bloqueo del
         // paywall (no podía pagar porque no tenía suscripción, y no tenía suscripción porque nunca
         // había pagado). Crear la fila en el momento del checkout es la misma inicialización que
         // hace AuthController.register, solo que tardía.
@@ -82,7 +92,7 @@ public class SubscriptionService {
                         .amountArs(plan.getPriceArs())
                         .build()));
 
-        // Cualquier valor que no sea exactamente "annual" se trata como "monthly" — nunca se cobra
+        // Cualquier valor que no sea exactamente "annual" se trata como "monthly" � nunca se cobra
         // el ciclo anual por accidente ante un valor inesperado del frontend.
         String billingCycle = "annual".equalsIgnoreCase(billingCycleInput) ? "annual" : "monthly";
         if ("annual".equals(billingCycle) && plan.getPriceArsAnual() == null) {
@@ -120,7 +130,7 @@ public class SubscriptionService {
             throw e;
         } catch (com.mercadopago.exceptions.MPApiException e) {
             // e.getMessage() de MPApiException es siempre el genérico "Api error. Check response
-            // for details" — el motivo real (payer == collector, moneda inválida, cuenta de
+            // for details" � el motivo real (payer == collector, moneda inválida, cuenta de
             // prueba vs. producción, etc.) viene en el body de la respuesta HTTP, no en el mensaje
             // de la excepción. Sin loguear esto acá, un 422 de Mercado Pago es indiagnosticable.
             Integer status = e.getApiResponse() != null ? e.getApiResponse().getStatusCode() : null;
@@ -128,7 +138,7 @@ public class SubscriptionService {
             log.error("Error de la API de Mercado Pago creando checkout para profesional {} (status {}): {}",
                     professionalId, status, detalle);
             // 429 = "local_rate_limited": Mercado Pago le puso un límite temporal a la cuenta admin
-            // por demasiados intentos seguidos de crear Preapproval — no es un error del profesional
+            // por demasiados intentos seguidos de crear Preapproval � no es un error del profesional
             // ni de nuestro lado, así que vale la pena distinguirlo del mensaje genérico.
             String mensaje = (status != null && status == 429)
                     ? "Mercado Pago está limitando temporalmente los intentos de pago. Esperá unos minutos y volvé a intentar."
@@ -160,7 +170,7 @@ public class SubscriptionService {
             // Si el profesional no tiene suscripción aún (entorno de pruebas o profesionales existentes),
             // permitimos el acceso a recetas solo si tiene capacidad legal real para prescribir. El rol
             // "PSIQUIATRA" es el único rol de profesional en el sistema (lo comparten psicólogos y
-            // psiquiatras) — no sirve para distinguirlos. Usuario.profession sí distingue.
+            // psiquiatras) � no sirve para distinguirlos. Usuario.profession sí distingue.
             if ("recetas_electronicas".equals(featureKey) && esPsiquiatraOMedico(usuario)) {
                 return true;
             }
@@ -193,7 +203,7 @@ public class SubscriptionService {
 
     /**
      * Paywall (Etapa 1): ¿este profesional tiene acceso real a la app en este momento?
-     * Deliberadamente estricto y en tiempo real — se evalúa en cada request vía SubscriptionAccessFilter.
+     * Deliberadamente estricto y en tiempo real � se evalúa en cada request vía SubscriptionAccessFilter.
      * En caso de cancelación de suscripción, el profesional conserva acceso pleno hasta la fecha exacta de
      * finalización de su período pagado (currentPeriodEnd).
      */
@@ -224,12 +234,12 @@ public class SubscriptionService {
     // Migra a los profesionales que YA estaban verificados/usando la app antes de que existiera
     // este paywall, dándoles 14 días de acceso (ACTIVE) antes de que el filtro los bloquee, en
     // vez de cortarles el acceso de un día para el otro sin aviso. Los profesionales nuevos que
-    // se registren de acá en más NO entran acá — arrancan en PENDING_VERIFICATION sin
+    // se registren de acá en más NO entran acá � arrancan en PENDING_VERIFICATION sin
     // currentPeriodEnd, así que el paywall los bloquea desde el primer momento hasta que paguen
     // (Etapa 2) o el admin les registre un pago manual.
     //
     // Cubre DOS casos, no solo uno: cuentas creadas antes de que existiera la tabla Subscription
-    // (seed/DataInitializer, o cualquier alta anterior a este feature) no tienen NINGUNA fila —
+    // (seed/DataInitializer, o cualquier alta anterior a este feature) no tienen NINGUNA fila �
     // a esas hay que crearles una desde cero, no solo completarles currentPeriodEnd. Se detectó
     // este caso en el primer deploy: TODOS los profesionales de producción no tenían fila de
     // suscripción y quedaron bloqueados porque la versión anterior de este método los saltaba.
@@ -252,14 +262,14 @@ public class SubscriptionService {
 
                 if (sub == null) {
                     // Rol=PSIQUIATRA es el único rol de profesional del sistema (lo comparten
-                    // psicólogos y psiquiatras) — no alcanza para elegir el plan de migración.
+                    // psicólogos y psiquiatras) � no alcanza para elegir el plan de migración.
                     // "clinico" incluye recetas_electronicas y no debe otorgársele a un psicólogo,
                     // así que la elección real depende de Usuario.profession.
                     String profession = u.getProfession();
                     String codigoPlan = "psicologo".equalsIgnoreCase(profession) ? "consultorio" : "clinico";
                     Plan planMigracion = planRepository.findByCode(codigoPlan).orElse(null);
                     if (planMigracion == null) {
-                        log.error("Paywall: no se encontró el plan '{}' para migrar al profesional {} — se omite.", codigoPlan, u.getId());
+                        log.error("Paywall: no se encontró el plan '{}' para migrar al profesional {} � se omite.", codigoPlan, u.getId());
                         continue;
                     }
                     sub = Subscription.builder()
@@ -305,7 +315,7 @@ public class SubscriptionService {
                         migrados, DIAS_GRACIA_MIGRACION_PROFESIONALES_EXISTENTES, gracePeriodEnd);
             }
         } catch (Exception e) {
-            // Nunca debe tumbar el arranque del server por esto — si falla, simplemente esos
+            // Nunca debe tumbar el arranque del server por esto � si falla, simplemente esos
             // profesionales quedan sin migrar y se pueden migrar a mano después (o en el próximo restart).
             log.error("Error migrando profesionales existentes al paywall de suscripciones: {}", e.getMessage(), e);
         }
@@ -369,7 +379,7 @@ public class SubscriptionService {
         Usuario prof = usuarioRepository.findById(professionalId)
                 .orElseThrow(() -> new IllegalArgumentException("Profesional no encontrado: " + professionalId));
 
-        // Solo bloquea el alta si la facturación ARCA está realmente habilitada — mientras
+        // Solo bloquea el alta si la facturación ARCA está realmente habilitada � mientras
         // arca.enabled=false (todavía sin certificados/alta real ante ARCA) generateInvoiceForPayment
         // no va a intentar nada igual, así que exigir CUIT acá solo trabaría el alta manual sin
         // motivo real.
@@ -446,9 +456,12 @@ public class SubscriptionService {
             emitirFacturaTrasCommit(payment.getId(), "pago manual");
         }
 
-        // 7. Mail de pago confirmado al profesional — mismo criterio que la facturación: un alta
+        // 7. Mail de pago confirmado al profesional � mismo criterio que la facturación: un alta
         // de cortesía no es un pago real, así que no corresponde el mail de "pago confirmado".
         if (!"COURTESY".equalsIgnoreCase(method)) {
+            avisoSuscripcionPublisher.publicar(subscription, SuscripcionAvisoData.PAGO_CONFIRMADO, payment.getAmountArs(),
+                    start, end, null,
+                    receiptReference != null && !receiptReference.isBlank() ? receiptReference : "Pago Manual " + method, null);
             try {
                 resendEmailService.enviarConfirmacionPagoSuscripcion(
                         prof.getEmail(),
@@ -467,21 +480,21 @@ public class SubscriptionService {
         return payment;
     }
 
-    // Dispara la emisión de factura ARCA recién DESPUÉS de que la transacción que activa la
-    // suscripción/registra el pago haya confirmado — nunca desde adentro de esa misma
+    // Dispara la emisión de factura ARCA recién DESPU�0S de que la transacción que activa la
+    // suscripción/registra el pago haya confirmado � nunca desde adentro de esa misma
     // transacción. generateInvoiceForPayment es @Transactional (REQUIRED): si se la llama desde
     // adentro y tira una excepción (ej. "el profesional no tiene CUIT/CUIL cargado"), Spring
     // marca la transacción compartida como rollback-only en el aspecto ANTES de que nuestro
-    // try/catch llegue a atraparla — así que igual termina en UnexpectedRollbackException al
+    // try/catch llegue a atraparla � así que igual termina en UnexpectedRollbackException al
     // commitear, revirtiendo silenciosamente TODO (suscripción activada, pago registrado
     // incluidos), sin ningún error visible para quien miraba la pantalla. Se detectó así: un
     // profesional pagaba de verdad en Mercado Pago, pero la suscripción se quedaba en el estado
-    // viejo para siempre. La factura fallida igual se recupera sola — hay un cron diario
+    // viejo para siempre. La factura fallida igual se recupera sola � hay un cron diario
     // (SubscriptionReconciliationScheduler.checkPaymentsWithoutInvoice) que reintenta facturar
     // cualquier pago aprobado sin factura.
     private void emitirFacturaTrasCommit(Long paymentId, String contexto) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            // No hay transacción activa (ej. tests) — generarla en el momento es lo mejor posible.
+            // No hay transacción activa (ej. tests) � generarla en el momento es lo mejor posible.
             try {
                 invoiceService.generateInvoiceForPayment(paymentId);
             } catch (Exception e) {
@@ -530,9 +543,9 @@ public class SubscriptionService {
     /**
      * Mismo caso que processMercadoPagoPaymentWebhook, pero para cuando Mercado Pago notifica el
      * cobro de una suscripción como un webhook "payment" genérico (type=payment) en vez del
-     * "subscription_authorized_payment" esperado — depende de qué tópicos tenga suscriptos la
+     * "subscription_authorized_payment" esperado � depende de qué tópicos tenga suscriptos la
      * app de MP en su panel de desarrollador, y en la práctica el genérico es el que más llega.
-     * Ahí no hay preapproval_id a mano, pero sí external_reference — que es justamente el "sub-
+     * Ahí no hay preapproval_id a mano, pero sí external_reference � que es justamente el "sub-
      * {subscriptionId}" que nosotros mismos seteamos al crear el Preapproval (ver
      * crearSuscripcionPreapproval), así que identificamos la suscripción por ahí en vez de por
      * mpPreapprovalId. Sin esto, un profesional que paga y solo recibe el webhook genérico se
@@ -609,6 +622,8 @@ public class SubscriptionService {
 
         if ("APPROVED".equalsIgnoreCase(payment.getStatus())) {
             emitirFacturaTrasCommit(payment.getId(), "pago MP");
+            avisoSuscripcionPublisher.publicar(sub, SuscripcionAvisoData.PAGO_CONFIRMADO, payment.getAmountArs(),
+                    sub.getCurrentPeriodStart(), sub.getCurrentPeriodEnd(), null, payment.getReceiptReference(), null);
             try {
                 resendEmailService.enviarConfirmacionPagoSuscripcion(
                         sub.getProfessional().getEmail(),
@@ -624,6 +639,8 @@ public class SubscriptionService {
             }
         } else {
             // Pago rechazado
+            avisoSuscripcionPublisher.publicar(sub, SuscripcionAvisoData.PAGO_FALLIDO, payment.getAmountArs(),
+                    sub.getGraceUntil(), null, null, null, null);
             try {
                 resendEmailService.enviarAvisoPagoFallidoSuscripcion(
                         sub.getProfessional().getEmail(),
@@ -664,6 +681,8 @@ public class SubscriptionService {
             if (sub.getCurrentPeriodEnd() != null && sub.getCurrentPeriodEnd().isAfter(LocalDateTime.now())) {
                 sub.setStatus(SubscriptionStatus.ACTIVE);
             }
+            avisoSuscripcionPublisher.publicar(sub, SuscripcionAvisoData.CANCELACION_CONFIRMADA, null,
+                    sub.getCurrentPeriodEnd(), null, null, null, null);
             try {
                 resendEmailService.enviarConfirmacionCancelacionSuscripcion(
                         sub.getProfessional().getEmail(),
@@ -677,7 +696,7 @@ public class SubscriptionService {
         }
         // Activa el período de acceso acá mismo en vez de esperar al webhook separado
         // subscription_authorized_payment (que confirma el primer cobro, pero puede tardar más en
-        // llegar) — así isAccessAllowed() desbloquea al profesional apenas autoriza, no cuando MP
+        // llegar) � así isAccessAllowed() desbloquea al profesional apenas autoriza, no cuando MP
         // termina de procesar el cargo. Si currentPeriodEnd ya está vigente (ej. venía de la
         // migración de gracia), no lo pisa para no acortarle el acceso que ya tenía.
         if (newStatus == SubscriptionStatus.ACTIVE
@@ -707,7 +726,7 @@ public class SubscriptionService {
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Suscripción no encontrada para el profesional: " + professionalId));
 
         if (Boolean.TRUE.equals(sub.getCancelAtPeriodEnd())) {
-            return sub; // ya estaba cancelada — idempotente, no reintenta cancelar en MP de nuevo
+            return sub; // ya estaba cancelada � idempotente, no reintenta cancelar en MP de nuevo
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -721,7 +740,7 @@ public class SubscriptionService {
                 log.info("Cancelando suscripción en Mercado Pago (preapproval: {}) para profesional {}", sub.getMpPreapprovalId(), professionalId);
                 mercadoPagoService.cancelarSuscripcionPreapproval(sub.getMpPreapprovalId());
             } catch (com.mercadopago.exceptions.MPApiException e) {
-                // e.getMessage() es siempre el genérico "Api error. Check response for details" —
+                // e.getMessage() es siempre el genérico "Api error. Check response for details" �
                 // el motivo real viene en el body.
                 String detalle = e.getApiResponse() != null ? e.getApiResponse().getContent() : e.getMessage();
                 log.error("Error de la API de Mercado Pago cancelando preapproval {} para profesional {} (status {}): {}",
@@ -758,6 +777,8 @@ public class SubscriptionService {
                 "Renovación cancelada por el profesional. Acceso habilitado hasta: " + sub.getCurrentPeriodEnd());
 
         // 3. Enviar email de confirmación de cancelación
+        avisoSuscripcionPublisher.publicar(sub, SuscripcionAvisoData.CANCELACION_CONFIRMADA, null,
+                sub.getCurrentPeriodEnd(), null, null, null, null);
         try {
             resendEmailService.enviarConfirmacionCancelacionSuscripcion(
                     sub.getProfessional().getEmail(),
@@ -773,7 +794,7 @@ public class SubscriptionService {
     }
 
     // 12 meses si el profesional contrató el ciclo anual, 1 mes en cualquier otro caso
-    // (incluidas filas viejas sin billingCycle seteado — el default de la entidad es "monthly").
+    // (incluidas filas viejas sin billingCycle seteado � el default de la entidad es "monthly").
     private int mesesDelCiclo(Subscription sub) {
         return "annual".equalsIgnoreCase(sub.getBillingCycle()) ? 12 : 1;
     }
@@ -787,6 +808,7 @@ public class SubscriptionService {
      * (ej. ACTIVE -> SUSPENDED), para que el panel de admin pueda mostrar "de dónde a dónde"
      * pasó la suscripción en cada evento del historial de auditoría.
      */
+    @Transactional
     public void logEvent(Long subscriptionId, String eventType, String previousStatus, String newStatus,
                           String actorType, String actorId, String payloadJson) {
         SubscriptionEvent event = SubscriptionEvent.builder()
@@ -800,6 +822,30 @@ public class SubscriptionService {
                 .createdAt(LocalDateTime.now())
                 .build();
         eventRepository.save(event);
+
+        if (previousStatus != null && newStatus != null && !previousStatus.equals(newStatus)) {
+            subscriptionRepository.findById(subscriptionId).ifPresent(subEntity -> {
+                Subscription sub = subEntity;
+                Subscription guardado = subscriptionRepository.saveAndFlush(sub);
+                if (guardado != null) {
+                    sub = guardado;
+                }
+                java.time.LocalDate vencimiento = sub.getCurrentPeriodEnd() != null ? sub.getCurrentPeriodEnd().toLocalDate() : null;
+                Long profId = sub.getProfessional() != null ? sub.getProfessional().getId() : null;
+                outboxPublisher.publicar(
+                        Topicos.SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1,
+                        String.valueOf(sub.getId()),
+                        sub.getAggregateVersion(),
+                        new SuscripcionCambioEstadoData(
+                                sub.getId(),
+                                profId,
+                                previousStatus,
+                                newStatus,
+                                vencimiento
+                        )
+                );
+            });
+        }
     }
 
     public Optional<Subscription> getSubscriptionForProfessional(Long professionalId) {
