@@ -239,6 +239,11 @@ services:
       # recetas). Vuelta atrás: TURNOS_EXTERNO=false en el .env, junto con la ruta del gateway y
       # scripts/fase6-devolver-turnos.mjs.
       TURNOS_EXTERNO: ${TURNOS_EXTERNO:-true}
+      # Fase 7: la historia clínica, las recetas y los conceptos los administra el servicio de profesionales.
+      # Default false hasta el corte en mantenimiento (la historia clínica no puede perder un asiento ni recibir
+      # 409 prematuros). Vuelta atrás: CLINICA_EXTERNO=false en el .env, sacar TRANQUI_SERVICES_CLINICA_URI y
+      # correr scripts/fase7-devolver-clinica.mjs.
+      CLINICA_EXTERNO: ${CLINICA_EXTERNO:-false}
       EVENTOS_CONSUMO_SERVICIO: monolito
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || exit 1"]
@@ -292,6 +297,10 @@ services:
       # Fase 6: los turnos al servicio. Vuelta atrás: en el .env, TRANQUI_SERVICES_TURNOS_URI=http://tranqui-backend:8080
       # y TURNOS_EXTERNO=false.
       TRANQUI_SERVICES_TURNOS_URI: ${TRANQUI_SERVICES_TURNOS_URI:-lb://turnos}
+      # Fase 7: historia clínica, recetas y conceptos al servicio de profesionales. Por defecto al monolito
+      # hasta el corte (o en vuelta atrás sin definir). En el corte se define TRANQUI_SERVICES_CLINICA_URI=lb://profesionales.
+      # Vuelta atrás: sacar la variable (o apuntar al monolito) y CLINICA_EXTERNO=false.
+      TRANQUI_SERVICES_CLINICA_URI: ${TRANQUI_SERVICES_CLINICA_URI:-http://tranqui-backend:8080}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
       # Fase 3 (G1): el gateway aplica el portón del sitio y el paywall a las rutas de los servicios.
@@ -584,6 +593,7 @@ services:
       dockerfile: services/profesionales/Dockerfile
     container_name: tranqui-profesionales
     restart: always
+    # Fase 7: no se agrega ningún contenedor; historia clínica y recetas viven acá dentro del límite de 288 MB.
     mem_limit: 288m
     cpus: 0.5
     environment:
@@ -606,6 +616,13 @@ services:
       TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
       # El mismo flag que el monolito: con Mercado Pago real, el buscador exige la cuenta vinculada.
       MERCADOPAGO_ENABLED: ${MERCADOPAGO_ENABLED:-false}
+      # Fase 7: carga inicial y atención de historia clínica y recetas. Default false hasta el corte en mantenimiento.
+      PROFESIONALES_CLINICA: ${PROFESIONALES_CLINICA:-false}
+      # Fase 7: QBI2 para recetas electrónicas (las mismas variables y defaults que el monolito).
+      QBI2_RECIPE_ENABLED: ${QBI2_RECIPE_ENABLED:-false}
+      QBI2_RECIPE_ENV: ${QBI2_RECIPE_ENV:-hml}
+      QBI2_CLIENTE_APP_ID: ${QBI2_CLIENTE_APP_ID:-}
+      QBI2_RECIPE_TOKEN: ${QBI2_RECIPE_TOKEN:-}
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
       interval: 10s

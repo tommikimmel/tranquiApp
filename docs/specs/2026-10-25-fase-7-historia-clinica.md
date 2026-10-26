@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-25
 - **Tipo:** feature
 - **Sprint:** sprint-02
-- **Estado:** aprobada (2026-10-26), con las recomendaciones de las seis preguntas
+- **Estado:** aprobada; accesos y H1 a H4 implementados (#61 a #67), H5 postergada
 - **Rama / PR:** una rama y un PR a `develop` por tarea, encadenadas sobre la Fase 6
 - **Plan:** [microservicios.md, Fase 7](../arquitectura/microservicios.md#fase-7-historia-clínica-y-recetas)
 - **Forma de trabajo:** solo cambiar la arquitectura; sin buildear imágenes ni levantar el stack. Tests con Maven,
@@ -60,6 +60,7 @@ Lo que encontré y el plan no resolvía:
   su link, sin guardarlo. El monolito atiende la misma URL para la vuelta atrás de la Fase 1.
 - Sin copia en el monolito: después del corte nadie más lee la historia clínica (las estadísticas cuentan turnos y
   pagos). Menos copias de datos de salud. La vuelta atrás los devuelve con un script.
+- **Hecho en H1:** flag CLINICA_EXTERNO con ClinicaExternoFilter (409), rutas internas /internal/monolito/{seguimientos,informes,recetas,solicitudes} paginadas y /internal/monolito/pacientes/{id} (con saveAndFlush y propagación de fallos), POST /internal/notificaciones/recetas en notificaciones y consumo de receta.emitida en el monolito para la vuelta atrás de la Fase 6.
 
 ### H2 — Historia clínica y recetas en el servicio de profesionales (pregunta 1)
 - Tablas nuevas en la base `profesionales`: `seguimiento_diario`, `informe_clinico`, `receta`, `solicitud_documento`
@@ -74,16 +75,19 @@ Lo que encontré y el plan no resolvía:
   profesional se rechaza en vez de asignarlo a uno fijo.
 - Publica `profesionales.historia-clinica.actualizada` (igual que hoy, sin contenido) y
   `profesionales.receta.emitida` (para turnos y para el mail).
+- **Hecho en H2 (dividido en H2a, H2b y H2c):** H2a (esquema Flyway V2 en base profesionales, copias de turnos_atendidos y personas con PacienteDto interno que suma el domicilio, carga inicial clínica); H2b (historia clínica, ficha, pacientes atendidos con validación de relación profesional-paciente y conceptos, donde emitir un concepto ajeno responde 403 en vez de 500); H2c (recetas electrónicas con QBI2 e integración simulada en local).
 
 ### H3 — Gateway
 - `/api/pacientes/**` (menos `/me/turnos`), `/api/recetas/**` y `/api/conceptos/**` al servicio de profesionales
   (la regla `profesionales-monolito` de la Fase 5 se reduce a las estadísticas).
+- **Hecho en H3:** la regla clinica del gateway tiene su propia variable TRANQUI_SERVICES_CLINICA_URI (por defecto al monolito hasta el corte o vuelta atrás) y circuito propio clinica en Resilience4J.
 
 ### H4 — Infraestructura, corte, vuelta atrás y conciliación
 - Variables de QBI2 en el servicio. Sin contenedor nuevo (pregunta 1): no suma memoria.
 - **Corte en mantenimiento**, como turnos: la historia clínica no puede perder un asiento.
 - Script de vuelta atrás (asientos, recetas y solicitudes nuevos o anulados en el servicio, al monolito, con sus
   ids y hashes) y de conciliación (cantidades y hashes de integridad asiento por asiento).
+- **Hecho en H4:** compose (docker-compose.yml y docker-compose.local.yml) sin contenedor nuevo; variables CLINICA_EXTERNO, PROFESIONALES_CLINICA y TRANQUI_SERVICES_CLINICA_URI con defaults por fase y QBI2 en profesionales; corte en mantenimiento y vuelta atrás documentados en produccion.md y local.md; scripts fase7-devolver-clinica.mjs (con chequeo estricto de conflictos en asientos existentes y ajuste de secuencias) y fase7-conciliar-clinica.mjs (comparación de las cuatro tablas sin imprimir datos clínicos).
 
 ### H5 — Verificación de punta a punta (postergada)
 Cargar y leer seguimientos e informes, anular y corregir, la ficha del paciente, una receta con QBI2 simulado y su

@@ -29,18 +29,18 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 | `tranqui-chat` | `chat` | Servicio de chat (Fase 2): mensajería en vivo por `/ws-tranqui` e historial, base propia `chat` | 288 MB | 0.5 |
 | `tranqui-calendario` | `calendario` | Servicio de calendario (Fase 3): Google Calendar y Meet, eventos de los turnos y horarios ocupados, base propia `calendario` | 288 MB | 0.5 |
 | `tranqui-pagos` | `pagos` | Servicio de pagos (Fase 4): Mercado Pago de turnos y documentos (checkout, webhooks, reembolsos y cuentas de los profesionales), base propia `pagos` | 288 MB | 0.5 |
-| `tranqui-profesionales` | `profesionales` | Servicio de profesionales (Fase 5): perfil, buscador, tarifas y disponibilidad, base propia `profesionales` | 288 MB | 0.5 |
+| `tranqui-profesionales` | `profesionales` | Servicio de profesionales (Fase 5 y Fase 7): perfil, buscador, tarifas, disponibilidad, historia clínica y recetas (Fase 7), base propia `profesionales` | 288 MB | 0.5 |
 | `tranqui-turnos` | `turnos` | Servicio de turnos (Fase 6): reservas, agenda, cancelación, reprogramación, asistencia y documentos, base propia `turnos` | 288 MB | 0.5 |
 | `tranqui-db-servicios` | `db-servicios` | Contenedor de una sola ejecución: crea la base y el usuario de cada servicio (`infra/postgres/crear-bases-servicios.sh`) y termina | 32 MB | 0.2 |
 | `tranqui-bot`, `tranqui-bot-worker`, `wsp-db`, `wsp-redis` | — | Bot de WhatsApp (proyecto aparte, fuera de este repositorio) | ~70 MB | — |
 
 ### Presupuesto de memoria (RAM)
 
-- **Total suma `mem_limit` Docker Compose (Fase 6):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 288 + 288 + 288 + 288 + 288 + 288 = 3.840 MB` (~3,84 GB; `db-servicios` corre unos segundos al arrancar y no suma).
+- **Total suma `mem_limit` Docker Compose (Fase 6 y Fase 7):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 288 + 288 + 288 + 288 + 288 + 288 = 3.840 MB` (~3,84 GB; `db-servicios` corre unos segundos al arrancar y no suma). La Fase 7 no agrega ningún contenedor (la historia clínica y recetas viven en `profesionales`, decisión 1), por lo que la suma de límites se mantiene idéntica.
 - **Traefik y bot de WhatsApp:** ~112 MB.
 - **Sistema operativo y buffers mínimos:** ~1 GB.
 - **Consumo proyectado total en VPS:** **~5,0 GB**, por encima del techo de **~4,8 GB** de la sección 9.1, con
-  ~3 GB de margen libre en el VPS de 8 GB para picos y caché de disco de PostgreSQL. Decisión de la Fase 6: se
+  ~3 GB de margen libre en el VPS de 8 GB para picos y caché de disco de PostgreSQL. Decisión de las Fases 6 y 7: se
   acepta y se mide el consumo real en el VPS antes del deploy (los servicios usan bastante menos que su límite:
   pagos ~175 MB de 288). Si hace falta, se baja el monolito a 384 MB o los servicios chicos a 256 MB.
 
@@ -146,6 +146,84 @@ define dependencias escalonadas con `condition: service_healthy`:
    docker compose -p app ps
    curl -fsS https://tranquisalud.com/api/health
    ```
+
+## Fase 7: historia clínica y recetas en el servicio de profesionales
+
+Los seguimientos diarios (`/api/pacientes/**/seguimientos`), los informes clínicos (`/api/pacientes/**/informes`),
+la lista de pacientes atendidos (`/api/pacientes/atendidos`), la ficha del paciente (`/api/pacientes/{id}`), las
+recetas electrónicas (`/api/recetas/**` con QBI2/Innovamed) y las solicitudes de conceptos (`/api/conceptos/**`)
+viven en el contenedor `profesionales`, sobre su base propia `profesionales`.
+
+- **Sin contenedor nuevo:** la historia clínica y recetas se alojan en el servicio de profesionales (decisión 1).
+  No suma memoria al presupuesto del VPS (se mantiene el límite de 288 MB).
+- **Pacientes y ficha:** los datos personales siguen siendo de identidad (monolito). La edición de la ficha
+  (`PUT /api/pacientes/{id}`) se delega al monolito por `/internal/monolito/pacientes/{id}`; si el monolito no
+  responde, la edición falla con error y no se persiste nada.
+- **Reglas de acceso (datos de salud):** cargar seguimientos e informes, ver y editar la ficha del paciente, y
+  emitir recetas exigen que el profesional atienda al paciente (un turno confirmado o pendiente de validación con
+  él, o un chat previo). El seguimiento cargado por un paciente sin profesional se rechaza (400) en vez de
+  asignarse a un usuario fijo.
+- **Mail de la receta:** lo envía notificaciones por la ruta interna `POST /internal/notificaciones/recetas`
+  (el monolito atiende la misma URL en la vuelta atrás).
+- **Recetas electrónicas (QBI2):** el servicio toma las mismas variables `QBI2_RECIPE_*` que el monolito. En
+  local funciona simulado.
+
+**Variables en `/srv/tranqui/.env`:** `CLINICA_EXTERNO=true` en el monolito, `PROFESIONALES_CLINICA=true` en
+el servicio de profesionales y `TRANQUI_SERVICES_CLINICA_URI=lb://profesionales` en el gateway. Las credenciales
+de la base de datos de profesionales (`PROFESIONALES_DB_PASSWORD`) y QBI2 son las que ya existían.
+
+**Primer arranque / carga inicial:** con `PROFESIONALES_CLINICA=true`, el servicio copia del monolito los
+seguimientos diarios, informes clínicos, recetas y solicitudes de conceptos con sus mismos ids, estados y
+hashes de integridad, y posiciona las secuencias después del máximo id. Recién después atiende las rutas clínicas
+y consume eventos de recetas.
+
+**El corte va con la app en mantenimiento** (la historia clínica no puede perder un asiento ni duplicar información):
+
+1. `npm run mantenimiento -- on "Volvemos en unos minutos"`.
+2. En `/srv/tranqui/.env`: agregar o configurar:
+   - `CLINICA_EXTERNO=true`
+   - `PROFESIONALES_CLINICA=true`
+   - `TRANQUI_SERVICES_CLINICA_URI=lb://profesionales`
+3. Reiniciar los contenedores en el orden adecuado para asegurar que el monolito exponga las rutas internas de
+   carga inicial antes de que profesionales arranque a copiar:
+   ```bash
+   docker compose -p app up -d tranqui-backend
+   docker compose -p app up -d profesionales
+   docker compose -p app up -d gateway
+   ```
+4. Esperar que `profesionales` esté sano y en sus logs figure:
+   `Carga inicial clínica completada` (o `Carga inicial clínica:`).
+5. Conciliar las cuatro tablas y, si da sin diferencias, desactivar mantenimiento:
+   ```bash
+   node scripts/fase7-conciliar-clinica.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+   npm run mantenimiento -- off
+   ```
+6. Correr la conciliación a diario durante las primeras dos semanas.
+
+**Vuelta atrás de la Fase 7:**
+
+1. `npm run mantenimiento -- on "Mantenimiento por actualización"`.
+2. Devolver al monolito todos los seguimientos, informes, recetas y solicitudes creados o modificados en el
+   servicio, con validación estricta de inalterabilidad (si difiere el contenido o hash de un asiento existente,
+   aborta con error sin tocar datos) y ajuste de secuencias:
+   ```bash
+   node scripts/fase7-devolver-clinica.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+   ```
+3. En `/srv/tranqui/.env`: `CLINICA_EXTERNO=false` y sacar `TRANQUI_SERVICES_CLINICA_URI` (o apuntarla a
+   `http://tranqui-backend:8080`). ¿Qué pasa con `PROFESIONALES_CLINICA`? Se define `PROFESIONALES_CLINICA=false`
+   (o se saca del `.env`) para que el servicio de profesionales apague la atención y sincronización de clínica.
+4. Reiniciar monolito, profesionales y gateway:
+   ```bash
+   docker compose -p app up -d tranqui-backend gateway profesionales
+   ```
+5. Conciliar (`node scripts/fase7-conciliar-clinica.mjs ...`).
+6. `npm run mantenimiento -- off`.
+
+**Compatibilidad con vuelta atrás de la Fase 6 (turnos al monolito):**
+Si los turnos vuelven al monolito (`TURNOS_EXTERNO=false`), la Fase 7 sigue funcionando plenamente: el servicio
+de profesionales resincroniza periódicamente los turnos atendidos cada 15 minutos consultando `/internal/turnos/**`
+(ruta que el monolito atiende en su vuelta atrás), y el monolito marca los turnos de recetas fuera de turno por
+evento (`profesionales.receta.emitida.v1`).
 
 ## Fase 6: servicio de turnos
 
