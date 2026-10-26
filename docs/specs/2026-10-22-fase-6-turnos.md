@@ -111,6 +111,20 @@ Lo que encontré y el plan no resolvía:
   el turno queda cancelado y se publica `turnos.turno.cancelado` con reembolso, para que pagos le devuelva la
   plata y el paciente reciba los mails de siempre.
 
+- **Hecho en T2:**
+  - La agenda de cada profesional (perfil, disponibilidad, tarifas, Mercado Pago) se copia del servicio de
+    profesionales por eventos y, además, cada 15 minutos de la copia del monolito: así sigue al día también si
+    profesionales vuelve al monolito (Fase 5). La ruta de profesionales del monolito suma `foto=false`.
+  - Las rutas internas del monolito mandan las fechas en ISO (el monolito las serializa `dd/MM/yyyy`); afectaba
+    también a la ruta de la Fase 5 (corregido en T1). El servicio responde al frontend con el mismo formato del
+    monolito.
+  - `confirmarTurnoOsde` no tiene llamadores en el monolito: no se portó.
+  - Cuidado al recorrer las franjas: si una termina cerca de la medianoche, el paso del monolito daba la vuelta
+    al día y no terminaba nunca; el servicio corta ahí.
+  - **Encontrado y sin cambiar (mismo comportamiento que hoy):** cancelar, marcar asistencia y reprogramar no
+    verifican que el turno sea de quien lo pide (cualquier paciente o profesional logueado puede hacerlo con el
+    id). Queda para decidir aparte.
+
 ### T3 — Gateway
 - Las rutas de `TurnoController` van a `TRANQUI_SERVICES_TURNOS_URI`: las reglas `turnos-conteo`,
   `turnos-disponibles`, `medicos-turnos` y las de `/api/turnos/**` ya existen desde la Fase 0 (hoy al

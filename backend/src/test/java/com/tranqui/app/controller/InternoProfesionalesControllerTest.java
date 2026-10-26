@@ -96,6 +96,18 @@ class InternoProfesionalesControllerTest {
     }
 
     @Test
+    void lista_conFotoFalse_vaSinLaFotoPeroConLaAgenda() {
+        Usuario u = profesional();
+
+        ResponseEntity<String> r = llamar(HttpMethod.GET, "/internal/monolito/profesionales?pagina=0&tamanio=200&foto=false",
+                tokenServicio(), null);
+
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(r.getBody()).contains("\"id\":" + u.getId()).contains("\"servicioId\":\"particular\"")
+                .doesNotContain("base64,AAAA");
+    }
+
+    @Test
     void estado_vaSinLaFotoPeroConSuHash() {
         Usuario u = profesional();
 

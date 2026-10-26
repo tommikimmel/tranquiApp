@@ -86,14 +86,18 @@ public class InternoProfesionalesController {
         this.outboxPublisher = outboxPublisher;
     }
 
-    /** Carga inicial: los profesionales completos (con la foto), paginados por id. */
+    /**
+     * Carga inicial: los profesionales completos (con la foto), paginados por id. Con {@code foto=false} va sin
+     * la foto (solo su hash): la resincronización del servicio de turnos no la usa.
+     */
     @GetMapping
     @Transactional(readOnly = true)
     public List<ProfesionalDto> profesionales(@RequestParam(name = "pagina", defaultValue = "0") int pagina,
-                                              @RequestParam(name = "tamanio", defaultValue = "50") int tamanio) {
+                                              @RequestParam(name = "tamanio", defaultValue = "50") int tamanio,
+                                              @RequestParam(name = "foto", defaultValue = "true") boolean foto) {
         int tamanioSeguro = Math.max(1, Math.min(tamanio, TAMANIO_MAXIMO));
         return usuarioRepository.findByRolOrderByIdAsc(Rol.PSIQUIATRA, PageRequest.of(Math.max(0, pagina), tamanioSeguro)).stream()
-                .map(this::completo)
+                .map(u -> armar(u, true, foto))
                 .toList();
     }
 
@@ -146,10 +150,14 @@ public class InternoProfesionalesController {
     }
 
     private ProfesionalDto completo(Usuario u) {
-        return armar(u, true);
+        return armar(u, true, true);
     }
 
     private ProfesionalDto armar(Usuario u, boolean completo) {
+        return armar(u, completo, completo);
+    }
+
+    private ProfesionalDto armar(Usuario u, boolean completo, boolean conFoto) {
         Subscription sub = subscriptionRepository.findByProfessionalId(u.getId()).orElse(null);
         List<DisponibilidadProfesionalData.Franja> franjas = null;
         List<TarifasProfesionalData.Tarifa> tarifas = null;
@@ -165,7 +173,7 @@ public class InternoProfesionalesController {
                 u.getRol() != null ? u.getRol().name() : null, u.getProfession(),
                 u.getNombre(), u.getApellido(), u.getTelefono(), u.getSexo(), u.getFechaNacimiento(), u.getCuil(),
                 u.getTipoDocumento(), u.getNumeroDocumento(),
-                completo ? u.getFotoUrl() : null, CopiaProfesionales.hashFoto(u.getFotoUrl()),
+                conFoto ? u.getFotoUrl() : null, CopiaProfesionales.hashFoto(u.getFotoUrl()),
                 u.getVerificadoAdmin(), u.tieneMercadoPagoVinculado(),
                 sub != null && sub.getStatus() != null ? sub.getStatus().name() : null,
                 sub != null ? sub.getCurrentPeriodEnd() : null,
