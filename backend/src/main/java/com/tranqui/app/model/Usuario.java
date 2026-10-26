@@ -19,6 +19,31 @@ public class Usuario {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Builder.Default
+    @Column(name = "version")
+    private Integer version = 0;
+
+    /**
+     * Versión del agregado para publicación de eventos de dominio (sección 5.3 y 6.4 del plan).
+     * En la creación (version == 0), retorna 1.
+     * Tras cada actualización persistida (donde @PreUpdate incrementa el campo version),
+     * retorna version + 1, garantizando que el aggregateVersion publicado sea estrictamente creciente
+     * (1 en creación, 2 en primera actualización, 3 en segunda, etc.).
+     * Para que el evento lleve la versión actualizada, el guardado de la entidad debe realizarse
+     * mediante saveAndFlush(...) antes de publicar el evento, asegurando la ejecución de @PreUpdate.
+     */
+    /**
+     * Si el profesional tiene la cuenta de Mercado Pago vinculada: por el aviso del servicio de pagos
+     * (Fase 4) o porque el monolito tiene sus tokens (hasta la Fase 4, y en la vuelta atrás).
+     */
+    public boolean tieneMercadoPagoVinculado() {
+        return Boolean.TRUE.equals(mpVinculada) || mpAccessTokenEncrypted != null;
+    }
+
+    public int getAggregateVersion() {
+        return (version != null ? version : 0) + 1;
+    }
+
     @Column(name = "nombre", nullable = false, length = 100)
     private String nombre;
 
@@ -43,6 +68,11 @@ public class Usuario {
 
     @Column(name = "mp_user_id", length = 50)
     private String mpUserId;
+
+    // Fase 4: con el servicio de pagos los tokens viven allá; el monolito sabe que la cuenta está
+    // vinculada por pagos.cuenta-mp.vinculada/desvinculada (el buscador y la reserva lo exigen).
+    @Column(name = "mp_vinculada")
+    private Boolean mpVinculada;
 
     @Column(name = "google_access_token_encrypted", columnDefinition = "TEXT")
     private String googleAccessTokenEncrypted;
@@ -471,6 +501,9 @@ public class Usuario {
 
     @PrePersist
     protected void onCreate() {
+        if (version == null) {
+            version = 0;
+        }
         if (fechaRegistro == null) {
             fechaRegistro = LocalDateTime.now();
         }
@@ -486,6 +519,10 @@ public class Usuario {
     // the same address (just differing by case/whitespace) impossible going forward.
     @PreUpdate
     protected void onUpdate() {
+        if (version == null) {
+            version = 0;
+        }
+        version++;
         normalizeEmail();
     }
 
