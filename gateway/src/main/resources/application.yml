@@ -144,7 +144,7 @@ spring:
                 key-resolver: "#{@userOrIpKeyResolver}"
 
         # Fase 6: también "Mis turnos" del paciente (en el monolito estaba en ClinicalController); el resto de
-        # /api/pacientes (la historia clínica) sigue en el monolito por la regla general.
+        # /api/pacientes (la historia clínica) va a la regla `clinica` (Fase 7).
         - id: turnos
           uri: ${tranqui.services.turnos.uri:${tranqui.services.monolito.uri}}
           predicates:
@@ -479,12 +479,42 @@ spring:
                 rate-limiter: "#{@tranquiRateLimiter}"
                 key-resolver: "#{@userOrIpKeyResolver}"
 
-        # Lo demás de /api/medicos (las estadísticas del panel), los documentos de la API de conceptos, las
-        # recetas y la historia clínica siguen en el monolito (decisiones 1 y 3 de la Fase 5).
+        # Fase 7: historia clínica, recetas y documentos de conceptos al servicio de profesionales (o al monolito
+        # en la vuelta atrás). /api/pacientes/me/turnos se resuelve antes por la regla `turnos`.
+        - id: clinica
+          uri: ${tranqui.services.clinica.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/api/pacientes/**,/api/recetas/**,/api/conceptos/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: profesionales
+                fallbackUri: forward:/fallback/profesionales
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        # Lo demás de /api/medicos (las estadísticas del panel) sigue en el monolito (Fase 5 y Fase 7).
         - id: profesionales-monolito
           uri: ${tranqui.services.monolito.uri}
           predicates:
-            - Path=/api/medicos/**,/api/conceptos/**,/api/recetas/**,/api/clinical/**
+            - Path=/api/medicos/**
           filters:
             - name: CircuitBreaker
               args:
@@ -656,6 +686,12 @@ tranqui:
     # PROFESIONALES_EXTERNO=false en el monolito.
     profesionales:
       uri: ${TRANQUI_SERVICES_PROFESIONALES_URI:${tranqui.services.monolito.uri}}
+    # Fase 7: lb://profesionales cuando el servicio cargó la historia clínica y recetas (corte con
+    # PROFESIONALES_CLINICA=true). Lleva /api/pacientes (menos /me/turnos), /api/recetas y /api/conceptos.
+    # Por defecto va al monolito; en el corte se pone TRANQUI_SERVICES_CLINICA_URI=lb://profesionales.
+    # Vuelta atrás: sacar la variable (o apuntar al monolito) y CLINICA_EXTERNO=false en el monolito.
+    clinica:
+      uri: ${TRANQUI_SERVICES_CLINICA_URI:${tranqui.services.monolito.uri}}
     # Fase 6: lb://turnos cuando el servicio está desplegado (docker-compose). Lleva /api/turnos, los horarios
     # libres y "Mis turnos" del profesional y del paciente, y /internal/turnos. Vuelta atrás: sacar la variable,
     # TURNOS_EXTERNO=false en el monolito y scripts/fase6-devolver-turnos.mjs.
