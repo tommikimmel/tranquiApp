@@ -28,6 +28,46 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:tranqui}
+    password: ${SPRING_RABBITMQ_PASSWORD:tranqui-local}
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+
+management:
+  # Actuator en un puerto propio que no se publica fuera de la red de Docker: lo usa
+  # VictoriaMetrics para leer /actuator/prometheus (igual que el gateway).
+  server:
+    port: 8082
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+eventos:
+  relay:
+    enabled: ${EVENTOS_RELAY_ENABLED:false}
+    backup-poll-ms: ${EVENTOS_RELAY_BACKUP_POLL_MS:30000}
+  cleaner:
+    enabled: ${EVENTOS_CLEANER_ENABLED:true}
+    cron: ${EVENTOS_CLEANER_CRON:0 0 3 * * ?}
 
 google:
   client-id: ${GOOGLE_CLIENT_ID:dummy-client-id}
@@ -92,3 +132,37 @@ novedades:
 resend:
   api-key: ${RESEND_API_KEY:}
   from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}
+
+jwt:
+  secret: ${JWT_SECRET:}
+
+# Fase 1: con false los mails y las notificaciones con evento los manda el servicio de
+# notificaciones; true vuelve al envío directo desde el monolito (vuelta atrás).
+notificaciones:
+  envio-directo: ${NOTIFICACIONES_ENVIO_DIRECTO:false}
+
+# Fase 3: con true, Google Calendar lo maneja el servicio de calendario (eventos y Meet por eventos,
+# disponibilidad por /internal/calendario). Vuelta atrás: false y la ruta del gateway al monolito.
+calendario:
+  externo: ${CALENDARIO_EXTERNO:false}
+
+# Fase 4: con true, Mercado Pago lo maneja el servicio de pagos (checkout, webhooks, reembolsos y
+# cuentas de los profesionales, por eventos). Las suscripciones siguen acá hasta la Fase 8.
+# Vuelta atrás: false y la ruta del gateway al monolito.
+pagos:
+  externo: ${PAGOS_EXTERNO:false}
+
+# Fase 5: con true, el perfil, la disponibilidad, las tarifas y el buscador los administra el servicio de
+# profesionales; el monolito guarda una copia (turnos lee de ahí) que se actualiza con sus eventos y con una
+# resincronización cada resincronizacion-minutos. La identidad, la verificación y la suscripción siguen acá.
+profesionales:
+  externo: ${PROFESIONALES_EXTERNO:false}
+  resincronizacion-minutos: ${PROFESIONALES_RESINCRONIZACION_MINUTOS:15}
+
+tranqui:
+  jwt:
+    # JWT de servicio (sección 4.2) para las rutas /internal/** que consultan otros servicios.
+    service-secret: ${SERVICE_JWT_KEY:}
+  gateway:
+    # Fase 2: consultas internas a otros servicios (resumen de chat). Vacío: usa las tablas propias.
+    url: ${TRANQUI_GATEWAY_URL:}
