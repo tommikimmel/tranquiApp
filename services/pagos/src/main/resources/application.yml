@@ -98,6 +98,23 @@ mercadopago:
     access-token: ${MP_ADMIN_ACCESS_TOKEN:}
     public-key: ${MP_ADMIN_PUBLIC_KEY:}
 
+# Facturación Electrónica ARCA (ex-AFIP) (Fase 8, S2c).
+# Apagada por defecto hasta que se defina la numeración y los reintentos (ver docs/cambios-a-futuro.md, punto 4).
+# El certificado y la clave privada se leen por archivo; nunca se versionan en el repositorio.
+arca:
+  enabled: ${ARCA_ENABLED:false}
+  environment: ${ARCA_ENVIRONMENT:homologacion}
+  cuit-emisor: ${ARCA_CUIT_EMISOR:20384910294}
+  punto-venta: ${ARCA_PUNTO_VENTA:1}
+  cert-path: ${ARCA_CERT_PATH:}
+  key-path: ${ARCA_KEY_PATH:}
+  cert-content: ${ARCA_CERT_CONTENT:}
+  key-content: ${ARCA_KEY_CONTENT:}
+  razon-social: ${ARCA_RAZON_SOCIAL:TRANQUI SALUD}
+  domicilio-fiscal: ${ARCA_DOMICILIO_FISCAL:Av. Corrientes 1234, CABA}
+  condicion-iva-emisor: ${ARCA_CONDICION_IVA_EMISOR:Responsable Monotributo}
+  inicio-actividades: ${ARCA_INICIO_ACTIVIDADES:01/08/2026}
+
 payment:
   simulation:
     enabled: ${PAYMENT_SIMULATION_ENABLED:false}

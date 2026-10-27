@@ -5,7 +5,9 @@ import com.tranqui.pagos.datos.EventosSuscripcion;
 import com.tranqui.pagos.datos.PagosSuscripcion;
 import com.tranqui.pagos.datos.Planes;
 import com.tranqui.pagos.datos.Suscripciones;
+import com.tranqui.pagos.datos.Facturas;
 import com.tranqui.pagos.datos.Suscriptores;
+import com.tranqui.pagos.facturacion.InvoiceService;
 import com.tranqui.pagos.mp.MercadoPagoAdminApi;
 import com.tranqui.pagos.seguridad.FiltroAutenticacionUsuario;
 import com.tranqui.pagos.seguridad.UsuarioJwt;
@@ -49,6 +51,7 @@ public class AdminSubscriptionController {
     private final AvisoSuscripcionPublisher avisoSuscripcionPublisher;
     private final MercadoPagoAdminApi mercadoPagoAdminApi;
     private final SubscriptionReconciliationScheduler reconciliationScheduler;
+    private final InvoiceService invoiceService;
 
     public AdminSubscriptionController(
             Suscripciones suscripciones,
@@ -59,7 +62,8 @@ public class AdminSubscriptionController {
             SuscripcionService suscripcionService,
             AvisoSuscripcionPublisher avisoSuscripcionPublisher,
             MercadoPagoAdminApi mercadoPagoAdminApi,
-            SubscriptionReconciliationScheduler reconciliationScheduler
+            SubscriptionReconciliationScheduler reconciliationScheduler,
+            InvoiceService invoiceService
     ) {
         this.suscripciones = suscripciones;
         this.planes = planes;
@@ -70,6 +74,7 @@ public class AdminSubscriptionController {
         this.avisoSuscripcionPublisher = avisoSuscripcionPublisher;
         this.mercadoPagoAdminApi = mercadoPagoAdminApi;
         this.reconciliationScheduler = reconciliationScheduler;
+        this.invoiceService = invoiceService;
     }
 
     private UsuarioJwt.Usuario validarAdmin(HttpServletRequest request) {
@@ -363,5 +368,56 @@ public class AdminSubscriptionController {
         validarAdmin(request);
         reconciliationScheduler.runDailyReconciliation();
         return ResponseEntity.ok(Map.of("message", "Reconciliación diaria ejecutada correctamente"));
+    }
+
+    /**
+     * Listado de todas las facturas y comprobantes emitidos (§10.5).
+     */
+    @GetMapping("/invoices")
+    public ResponseEntity<List<Dtos.InvoiceResponseDto>> getAllInvoices(HttpServletRequest request) {
+        validarAdmin(request);
+        List<Facturas.Factura> invoices = invoiceService.getAllInvoices();
+        List<Dtos.InvoiceResponseDto> dtos = invoices.stream().map(inv -> new Dtos.InvoiceResponseDto(
+                inv.id(),
+                inv.paymentId(),
+                inv.cbteTipo(),
+                inv.cbteTipo() != null && inv.cbteTipo() == 13 ? "Nota de Crédito C" : "Factura C",
+                inv.puntoVenta(),
+                inv.cbteNumero(),
+                inv.cae(),
+                inv.caeVencimiento(),
+                inv.receptorNombre(),
+                inv.receptorDocNro(),
+                inv.receptorCondicionIva(),
+                inv.importeTotal(),
+                inv.fechaEmision(),
+                inv.pdfUrl(),
+                inv.status(),
+                inv.lastError(),
+                inv.comprobanteAsociadoId(),
+                inv.issuedAt()
+        )).toList();
+        return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Emisión de Nota de Crédito C para anular una Factura C ya emitida (§10.5).
+     */
+    @PostMapping("/invoices/{id}/credit-note")
+    public ResponseEntity<?> emitirNotaDeCredito(
+            @PathVariable("id") Long id,
+            HttpServletRequest request,
+            @RequestBody(required = false) Dtos.CreditNoteRequestDto req
+    ) {
+        UsuarioJwt.Usuario admin = validarAdmin(request);
+        Long adminId = suscriptores.porEmail(admin.email()).map(Suscriptores.Suscriptor::id).orElse(1L);
+        try {
+            String reason = (req != null && req.reason() != null && !req.reason().isBlank())
+                    ? req.reason() : "Anulación administrativa";
+            Facturas.Factura nc = invoiceService.emitirNotaDeCredito(id, reason, adminId);
+            return ResponseEntity.ok(nc);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }

@@ -153,6 +153,12 @@ public class Facturas {
                 id);
     }
 
+
+    @Transactional
+    public void actualizarEstado(Long id, String status) {
+        jdbc.update("UPDATE invoices SET status = ? WHERE id = ?", status, id);
+    }
+
     @Transactional
     public void insertar(Factura f) {
         jdbc.update("INSERT INTO invoices (" + COLUMNAS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
