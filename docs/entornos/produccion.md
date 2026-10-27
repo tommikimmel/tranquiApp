@@ -193,9 +193,10 @@ vacías. Antes de insertar nada, verifica unicidad por profesional: si existen d
    > **Si la carga aborta por duplicados:** revisar los logs de `pagos` para identificar el `profesionalId` y
    > los ids de suscripción involucrados. Para resolverlo hay que volver `SUSCRIPCIONES_EXTERNO=false` mientras
    > se corrige en el monolito (o corregirlo por SQL en el monolito con aprobación), y repetir desde el paso 2.
-5. Reiniciar el monolito otra vez para que resincronice su copia del acceso ya con el servicio listo:
+5. Reiniciar el monolito otra vez para que resincronice su copia del acceso ya con el servicio listo
+   (se usa `restart` porque `up -d` no reinicia el contenedor si su configuración no cambió en el `.env`):
    ```bash
-   docker compose -p app up -d tranqui-backend
+   docker compose -p app restart tranqui-backend
    ```
    Esperar en sus logs:
    "Resincronización de suscripciones completada: N profesionales actualizados."
