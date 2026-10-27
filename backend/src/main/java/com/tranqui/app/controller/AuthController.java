@@ -21,12 +21,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.transaction.annotation.Transactional;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.CodigoVerificacionGeneradoData;
+import com.tranqui.eventos.data.UsuarioRegistradoData;
 import com.tranqui.app.repository.UsuarioRepository;
 import jakarta.persistence.EntityNotFoundException;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+
+    @Autowired
+    private OutboxPublisher outboxPublisher;
 
     @Autowired
     private GoogleAuthService googleAuthService;
@@ -39,6 +47,9 @@ public class AuthController {
 
     @Autowired
     private com.tranqui.app.repository.SubscriptionRepository subscriptionRepository;
+
+    @org.springframework.beans.factory.annotation.Value("${suscripciones.externo:false}")
+    private boolean suscripcionesExterno;
 
     @Autowired
     private JwtService jwtService;
@@ -72,6 +83,7 @@ public class AuthController {
         return trimmed;
     }
 
+    @Transactional
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody com.tranqui.app.model.dto.RegisterRequestDto registerRequestDto) {
         String emailClean = registerRequestDto.getEmail() != null ? registerRequestDto.getEmail().trim().toLowerCase() : "";
@@ -185,7 +197,7 @@ public class AuthController {
             usuario = usuarioRepository.save(usuario);
 
             // Si es un profesional de la salud, inicializar registro de suscripción (§6)
-            if (usuario.getRol() == Rol.PSIQUIATRA || usuario.getProfession() != null) {
+            if (!suscripcionesExterno && (usuario.getRol() == Rol.PSIQUIATRA || usuario.getProfession() != null)) {
                 String planCode = "psiquiatra".equalsIgnoreCase(usuario.getProfession()) ? "clinico" : "consultorio";
                 com.tranqui.app.model.Plan plan = planRepository.findByCode(planCode).orElse(null);
                 if (plan != null) {
@@ -209,6 +221,32 @@ public class AuthController {
             // same "already registered" message instead of letting it bubble up as a 500.
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El email ya está registrado");
         }
+
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new UsuarioRegistradoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        usuario.getNombre(),
+                        usuario.getApellido(),
+                        usuario.getRol() != null ? usuario.getRol().name() : null
+                )
+        );
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new CodigoVerificacionGeneradoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        codigoVerificacion,
+                        "REGISTRO",
+                        usuario.getNombre()
+                )
+        );
+
         resendEmailService.enviarCodigoVerificacion(usuario.getEmail(), usuario.getNombre(), codigoVerificacion);
 
         java.util.Map<String, Object> response = new java.util.HashMap<>();
@@ -248,6 +286,7 @@ public class AuthController {
         return ResponseEntity.ok("Email verificado correctamente. Ya podés iniciar sesión.");
     }
 
+    @Transactional
     @PostMapping("/resend-code")
     public ResponseEntity<?> resendCode(@RequestBody com.tranqui.app.model.dto.VerifyEmailDto dto) {
         String cleanEmail = dto.getEmail() != null ? dto.getEmail().trim().toLowerCase() : "";
@@ -265,12 +304,26 @@ public class AuthController {
         String nuevoCodigo = String.format("%06d", new java.util.Random().nextInt(1000000));
         usuario.setCodigoVerificacion(nuevoCodigo);
         usuario.setCodigoVerificacionExpiresAt(java.time.LocalDateTime.now().plusMinutes(15));
-        usuarioRepository.save(usuario);
+        usuarioRepository.saveAndFlush(usuario);
+
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new CodigoVerificacionGeneradoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        nuevoCodigo,
+                        "EMAIL_VERIFICATION",
+                        usuario.getNombre()
+                )
+        );
 
         resendEmailService.enviarCodigoVerificacion(usuario.getEmail(), usuario.getNombre(), nuevoCodigo);
         return ResponseEntity.ok("Código reenviado a tu correo.");
     }
 
+    @Transactional
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody com.tranqui.app.model.dto.ForgotPasswordDto dto) {
         String cleanEmail = dto.getEmail() != null ? dto.getEmail().trim().toLowerCase() : "";
@@ -284,7 +337,20 @@ public class AuthController {
         String resetCode = String.format("%06d", new java.util.Random().nextInt(1000000));
         usuario.setResetPasswordCode(resetCode);
         usuario.setResetPasswordExpiresAt(java.time.LocalDateTime.now().plusMinutes(15));
-        usuarioRepository.save(usuario);
+        usuarioRepository.saveAndFlush(usuario);
+
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new CodigoVerificacionGeneradoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        resetCode,
+                        "PASSWORD_RESET",
+                        usuario.getNombre()
+                )
+        );
 
         resendEmailService.enviarCodigoRecuperacion(usuario.getEmail(), usuario.getNombre(), resetCode);
         return ResponseEntity.ok("Si el correo está registrado, recibirás las instrucciones en tu bandeja de entrada.");
@@ -418,6 +484,7 @@ public class AuthController {
     // from the "complete your profile" prompt shown on the main screen while
     // usuario.perfilCompleto is false — see GoogleAuthService.getOrCreateUsuario.
     @PostMapping("/complete-profile")
+    @Transactional
     public ResponseEntity<?> completeProfile(
             @RequestBody com.tranqui.app.model.dto.CompleteProfileDto dto,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -453,7 +520,22 @@ public class AuthController {
         usuario.setObraSocial(dto.getObraSocial());
         usuario.setNumAfiliado(dto.getNumAfiliado());
         usuario.setPerfilCompleto(true);
-        usuarioRepository.save(usuario);
+        usuarioRepository.saveAndFlush(usuario);
+        // Notificaciones (contactos) y, desde la Fase 5, el servicio de profesionales copian estos datos.
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new com.tranqui.eventos.data.UsuarioActualizadoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        usuario.getNombre(),
+                        usuario.getApellido(),
+                        usuario.getTelefono(),
+                        usuario.getRol() != null ? usuario.getRol().name() : null,
+                        usuario.isNotificacionesEmailHabilitadas()
+                )
+        );
 
         return ResponseEntity.ok(toUserResponseDto(usuario));
     }
