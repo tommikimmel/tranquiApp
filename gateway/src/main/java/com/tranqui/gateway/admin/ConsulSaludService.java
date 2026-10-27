@@ -28,7 +28,7 @@ public class ConsulSaludService {
             "profesionales",
             "turnos",
             "pagos",
-            "suscripciones",
+            // Suscripciones vive en el servicio de pagos (Fase 8, decisión 1): no es un servicio aparte en Consul
             "notificaciones",
             "chat",
             "calendario"

@@ -43,6 +43,7 @@ class PaywallServiciosTest {
 
     private static WireMockServer monolito;
     private static WireMockServer chat;
+    private static WireMockServer suscripciones;
 
     @Autowired
     private WebTestClient webTestClient;
@@ -52,14 +53,18 @@ class PaywallServiciosTest {
         monolito = new WireMockServer(WireMockConfiguration.wireMockConfig().dynamicPort());
         chat = new WireMockServer(WireMockConfiguration.wireMockConfig().dynamicPort());
         monolito.start();
+        suscripciones = new WireMockServer(WireMockConfiguration.wireMockConfig().dynamicPort());
         chat.start();
+        suscripciones.start();
     }
 
     @BeforeEach
     void stubs() {
         monolito.resetAll();
         chat.resetAll();
+        suscripciones.resetAll();
         chat.stubFor(any(urlPathMatching("/.*")).willReturn(json("{\"desde\":\"chat\"}")));
+        suscripciones.stubFor(any(urlPathMatching("/.*")).willReturn(json("{\"desde\":\"suscripciones\"}")));
         monolito.stubFor(any(urlPathMatching("/api/.*")).willReturn(json("{\"desde\":\"monolito\"}")));
         monolito.stubFor(get(urlPathEqualTo(ACCESO)).withQueryParam("email", equalTo("sin@mail.com"))
                 .willReturn(json("{\"permitido\":false}")));
@@ -73,12 +78,14 @@ class PaywallServiciosTest {
     static void parar() {
         monolito.stop();
         chat.stop();
+        suscripciones.stop();
     }
 
     @DynamicPropertySource
     static void propiedades(DynamicPropertyRegistry registry) {
         registry.add("tranqui.services.monolito.uri", () -> "http://localhost:" + monolito.port());
         registry.add("tranqui.services.chat.uri", () -> "http://localhost:" + chat.port());
+        registry.add("tranqui.services.suscripciones.uri", () -> "http://localhost:" + suscripciones.port());
     }
 
     private static com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder json(String cuerpo) {
@@ -126,6 +133,23 @@ class PaywallServiciosTest {
     @Test
     void monolitoSinResponder_dejaPasar() {
         pedir("/api/chat/canales", sesion("caido@mail.com", "PSIQUIATRA")).expectStatus().isOk();
+    }
+
+    @Test
+    void psiquiatraSinAcceso_checkoutPasaAlServicioYOtraRutaDa403() {
+        String tokenSinAcceso = sesion("sin@mail.com", "PSIQUIATRA");
+
+        // Otra ruta de servicio da 403 SUBSCRIPTION_REQUIRED
+        pedir("/api/chat/canales", tokenSinAcceso)
+                .expectStatus().isForbidden()
+                .expectBody().jsonPath("$.error").isEqualTo("SUBSCRIPTION_REQUIRED");
+
+        // /api/subscriptions/checkout pasa al servicio porque está en SIN_PAYWALL
+        webTestClient.post().uri("/api/subscriptions/checkout")
+                .cookie("SESSION-TOKEN", tokenSinAcceso)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$.desde").isEqualTo("suscripciones");
     }
 
     @Test
