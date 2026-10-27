@@ -78,8 +78,9 @@ management:
       percentiles:
         http.server.requests: 0.5, 0.95, 0.99
 
-# Eventos (libs/eventos): consume pagos.eventos (turnos, conceptos e identidad) y publica por su outbox
-# los pagos.* (checkout, pagos, reembolsos y cuentas).
+# Eventos (libs/eventos): consume pagos.eventos (turnos, conceptos e identidad para participantes y
+# suscriptores) y publica por su outbox los pagos.* (checkout, pagos, reembolsos y cuentas; en S2b también
+# suscripciones y avisos programados).
 eventos:
   consumo:
     servicio: pagos
@@ -105,6 +106,13 @@ app:
 pagos:
   carga-inicial:
     habilitada: true
+  suscripciones:
+    # Fase 8 (S2a): activa las suscripciones en el servicio de pagos. Se prende en el corte, en la
+    # ventana de mantenimiento, junto con SUSCRIPCIONES_EXTERNO del monolito; antes de eso el monolito
+    # sigue escribiendo y no hay que copiar.
+    habilitada: ${PAGOS_SUSCRIPCIONES:false}
+    # Frecuencia de la resincronización periódica de la copia de suscriptores contra el monolito.
+    resincronizacion-suscriptores-minutos: ${PAGOS_RESINCRONIZACION_SUSCRIPTORES_MINUTOS:15}
 
 jwt:
   # Misma clave que identidad (hoy el monolito) usa para firmar los JWT de usuario. Sin default.
