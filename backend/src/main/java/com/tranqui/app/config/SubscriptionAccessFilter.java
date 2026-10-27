@@ -4,6 +4,7 @@ import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.service.SubscriptionService;
+import com.tranqui.app.service.AccesoSuscripciones;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,6 +36,9 @@ public class SubscriptionAccessFilter extends OncePerRequestFilter {
 
     @Autowired
     private SubscriptionService subscriptionService;
+
+    @Autowired
+    private AccesoSuscripciones accesoSuscripciones;
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -90,7 +94,7 @@ public class SubscriptionAccessFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (subscriptionService.isAccessAllowed(usuario.getId())) {
+        if (accesoSuscripciones.acceso(usuario.getId())) {
             filterChain.doFilter(request, response);
             return;
         }
