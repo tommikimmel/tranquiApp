@@ -472,6 +472,52 @@ class SuscripcionesS2bIntegracionTest {
         assertThat(primero.get("planCode").asText()).isEqualTo("consultorio");
         assertThat(primero.get("acceso").asBoolean()).isTrue();
         assertThat(primero.get("puedeRecetar").asBoolean()).isFalse(); // Psicólogo
+        assertThat(primero.get("version").asLong()).isEqualTo(2L); // aggregateVersion() = 1 + 1 = 2
+    }
+
+    @Test
+    void cambioEstado_versionOutboxYVersionRutaInternaSonIguales() throws Exception {
+        LocalDateTime ahora = LocalDateTime.now();
+        Long profesionalId = 20L;
+        String tokenAdmin = token("admin@mail.com", "ADMIN");
+
+        Long subId = suscripciones.insertarNuevo(new Suscripciones.Suscripcion(null, 1, profesionalId, 1L, "ACTIVE", 1,
+                "MERCADOPAGO", "MP-PRE-VER", new BigDecimal("15000.00"), "monthly",
+                ahora.plusMonths(1), ahora.minusDays(5), ahora.plusDays(25), null,
+                false, null, false, ahora, ahora));
+
+        // Disparamos un cambio de estado de ACTIVE a PAST_DUE
+        ResponseEntity<String> resPatch = pedir(HttpMethod.PATCH, "/api/admin/subscriptions/" + subId + "/status",
+                tokenAdmin, Map.of("status", "PAST_DUE", "reason", "Falta de pago de prueba"));
+        assertThat(resPatch.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // Esperamos que se publique el evento de cambio de estado en el outbox
+        esperar(() -> jdbc.queryForObject(
+                "SELECT count(*) FROM outbox WHERE topic = 'suscripciones.suscripcion.cambio-estado.v2'", Long.class) > 0);
+
+        String payloadOutbox = jdbc.queryForObject(
+                "SELECT payload::text FROM outbox WHERE topic = 'suscripciones.suscripcion.cambio-estado.v2' ORDER BY id DESC LIMIT 1",
+                String.class);
+        JsonNode eventoOutbox = mapper.readTree(payloadOutbox);
+        long versionOutbox = eventoOutbox.get("aggregateVersion").asLong();
+
+        // Consultamos la ruta interna para ese profesional
+        ResponseEntity<String> resInterno = pedirInterno(HttpMethod.GET, "/internal/suscripciones/estado", null);
+        assertThat(resInterno.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        JsonNode items = mapper.readTree(resInterno.getBody());
+        JsonNode estadoProfesional = null;
+        for (JsonNode item : items) {
+            if (item.get("professionalId").asLong() == profesionalId) {
+                estadoProfesional = item;
+                break;
+            }
+        }
+        assertThat(estadoProfesional).isNotNull();
+        long versionRutaInterna = estadoProfesional.get("version").asLong();
+
+        // Tras el cambio de estado, la versión en outbox y la de la ruta interna son exactamente iguales
+        assertThat(versionRutaInterna).isEqualTo(versionOutbox);
     }
 
     // ==========================================
