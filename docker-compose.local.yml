@@ -128,6 +128,9 @@ services:
       # Fase 7: la historia clínica, las recetas y los conceptos los administra el servicio de profesionales.
       # "false" vuelve la clínica al monolito (vuelta atrás).
       CLINICA_EXTERNO: "true"
+      # Fase 8: las suscripciones las administra el servicio de pagos.
+      # "false" vuelve las suscripciones al monolito (vuelta atrás).
+      SUSCRIPCIONES_EXTERNO: "true"
       EVENTOS_CONSUMO_SERVICIO: monolito
     ports:
       - "127.0.0.1:8081:8080"
@@ -302,6 +305,19 @@ services:
       # Como el monolito en local: Mercado Pago simulado (perfil local) y el webhook entra por el gateway.
       APP_PUBLIC_URL: http://localhost:8080
       FRONTEND_URL: http://localhost:5173
+      # Fase 8: suscripciones habilitadas en local.
+      PAGOS_SUSCRIPCIONES: "true"
+      # Fase 8: Mercado Pago de plataforma y facturación ARCA (simulada/deshabilitada en local como en el monolito).
+      MP_ADMIN_ACCESS_TOKEN: ""
+      MP_ADMIN_PUBLIC_KEY: ""
+      ARCA_ENABLED: "false"
+      ARCA_ENVIRONMENT: homologacion
+      ARCA_CUIT_EMISOR: "20384910294"
+      ARCA_PUNTO_VENTA: "1"
+      ARCA_CERT_PATH: ""
+      ARCA_KEY_PATH: ""
+      ARCA_CERT_CONTENT: ""
+      ARCA_KEY_CONTENT: ""
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
       interval: 10s
@@ -418,6 +434,8 @@ services:
       TRANQUI_SERVICES_TURNOS_URI: lb://turnos
       # Fase 7: /api/pacientes (menos /me/turnos), /api/recetas y /api/conceptos al servicio de profesionales.
       TRANQUI_SERVICES_CLINICA_URI: lb://profesionales
+      # Fase 8: /api/subscriptions/** y /api/admin/subscriptions/** al servicio de pagos.
+      TRANQUI_SERVICES_SUSCRIPCIONES_URI: lb://pagos
       SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
       JWT_SECRET: local-dev-encryption-key-32chars
       VICTORIAMETRICS_URL: http://victoriametrics:8428

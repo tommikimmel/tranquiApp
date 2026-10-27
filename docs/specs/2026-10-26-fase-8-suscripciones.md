@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-26
 - **Tipo:** feature
 - **Sprint:** sprint-02
-- **Estado:** aprobada (2026-10-27)
+- **Estado:** aprobada; S1 a S4 implementados (#70 a #75), S5 postergada
 - **Rama / PR:** una rama y un PR a `develop` por tarea, encadenadas sobre la Fase 7
 - **Plan:** [microservicios.md, Fase 8](../arquitectura/microservicios.md#fase-8-suscripciones)
 - **Forma de trabajo:** solo cambiar la arquitectura; sin buildear imágenes ni levantar el stack. Tests con Maven,
@@ -79,6 +79,7 @@ Pago y no suma un contenedor.
   cambian**.
 - Rutas internas para la carga inicial (las ocho tablas, paginadas y con sus ids) y
   `/internal/monolito/suscriptores/{id}` con los datos fiscales, la profesión, el rol y la verificación.
+- **Hecho en S1:** eventos cambio-estado.v2 y verificacion-resuelta.v1 en el catálogo; flag SUSCRIPCIONES_EXTERNO con SuscripcionesExternoFilter (409), apagado de crons y @PostConstruct; tabla copia suscripcion_acceso en el monolito alimentada por v2 y resincronización; rutas internas paginadas para la carga inicial y suscriptores.
 
 ### S2a — Datos y carga inicial en el servicio de pagos
 - Flyway nuevo en la base `pagos`: las ocho tablas con los mismos ids y sus secuencias, `professional_id` único
@@ -86,6 +87,7 @@ Pago y no suma un contenedor.
   `/internal/monolito/suscriptores/{id}` con los eventos de identidad y una resincronización.
 - Carga inicial con `PAGOS_SUSCRIPCIONES=true`: solo con las tablas vacías, todo o nada, secuencias arriba del
   máximo id; **aborta si hay dos suscripciones del mismo profesional** (para que el admin decida antes del corte).
+- **Hecho en S2a:** migración Flyway V2__suscripciones.sql en base pagos con las 8 tablas, secuencias y professional_id único; clases JDBC en paquete datos; copia de suscriptores al día con eventos y resincronización; carga inicial CargaInicialSuscripciones transaccional con control estricto de duplicados, gateada por PAGOS_SUSCRIPCIONES.
 
 ### S2b — Suscripciones, Mercado Pago y reconciliación
 - Mismas rutas y JSON: `/api/subscriptions/**` y `/api/admin/subscriptions/**`.
@@ -99,18 +101,21 @@ Pago y no suma un contenedor.
 - Los dos crons de reconciliación, con las mismas reglas. Publica `cambio-estado.v2` y
   `suscripciones.aviso.programado` por outbox (los mails siguen en notificaciones).
 - `/internal/suscripciones/estado` paginado, para la resincronización del monolito.
+- **Hecho en S2b:** rutas de suscripciones y administración en el servicio de pagos, checkout y cancelación con Mercado Pago de la plataforma, webhooks procesados en el servicio, crons de reconciliación y publicación de cambio-estado.v2 y aviso programado.
 
 ### S2c — Facturación ARCA
 - **Se mueve tal cual (decisión 4):** factura C y nota de crédito con CAE, el PDF y la misma configuración
   `ARCA_*` (certificado y clave por archivo, nunca en el repo), apagada (`ARCA_ENABLED=false`) como hoy. ARCA
   todavía no está definida: la numeración y los reintentos no cambian y quedan anotados en
   [cambios-a-futuro.md](../cambios-a-futuro.md).
+- **Hecho en S2c:** facturación ARCA (factura C y nota de crédito con CAE) movida tal cual al servicio de pagos, apagada (ARCA_ENABLED=false), con certificado y clave por archivo o variables.
 
 ### S3 — Gateway
 - Regla `suscripciones` con su propia variable `TRANQUI_SERVICES_SUSCRIPCIONES_URI`, por defecto al monolito hasta
   el corte (como la clínica en la Fase 7), y su propio circuito.
 - El reenvío de webhooks de suscripción del servicio de pagos al monolito queda para la vuelta atrás (con el flag
   de pagos en `false`).
+- **Hecho en S3:** regla suscripciones en el gateway con variable propia TRANQUI_SERVICES_SUSCRIPCIONES_URI (por defecto al monolito hasta el corte o vuelta atrás) y circuito propio en Resilience4J.
 
 ### S4 — Infraestructura, corte, vuelta atrás y conciliación
 - Compose: `SUSCRIPCIONES_EXTERNO`, `PAGOS_SUSCRIPCIONES`, `TRANQUI_SERVICES_SUSCRIPCIONES_URI`, y las variables
@@ -118,6 +123,7 @@ Pago y no suma un contenedor.
 - **Corte en mantenimiento**, como turnos y la clínica: hay plata y numeración fiscal.
 - Script de vuelta atrás (las ocho tablas al monolito con sus ids, `invoice_sequences` incluida y nunca para
   abajo) y de conciliación (cantidades, estados, montos, números de factura y CAE).
+- **Hecho en S4:** compose (docker-compose.yml y docker-compose.local.yml) sin contenedor nuevo; variables SUSCRIPCIONES_EXTERNO, PAGOS_SUSCRIPCIONES y TRANQUI_SERVICES_SUSCRIPCIONES_URI con defaults por fase, y MP_ADMIN_* y ARCA_* en pagos; corte en mantenimiento y vuelta atrás documentados en produccion.md y local.md; scripts fase8-devolver-suscripciones.mjs (con chequeo estricto de conflictos, professional_id único y ajuste de secuencias) y fase8-conciliar-suscripciones.mjs (comparación de las ocho tablas sin imprimir datos fiscales ni PDFs).
 
 ### S5 — Verificación de punta a punta (postergada)
 Checkout con Mercado Pago simulado y su webhook, cancelación, pago manual,

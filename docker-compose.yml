@@ -244,6 +244,11 @@ services:
       # 409 prematuros). Vuelta atrás: CLINICA_EXTERNO=false en el .env, sacar TRANQUI_SERVICES_CLINICA_URI y
       # correr scripts/fase7-devolver-clinica.mjs.
       CLINICA_EXTERNO: ${CLINICA_EXTERNO:-false}
+      # Fase 8: las suscripciones las administra el servicio de pagos. Default false hasta el corte en mantenimiento
+      # (hay plata y comprobantes fiscales; el corte sincroniza y pasa la titularidad). Vuelta atrás:
+      # SUSCRIPCIONES_EXTERNO=false en el .env, sacar TRANQUI_SERVICES_SUSCRIPCIONES_URI y correr
+      # scripts/fase8-devolver-suscripciones.mjs.
+      SUSCRIPCIONES_EXTERNO: ${SUSCRIPCIONES_EXTERNO:-false}
       EVENTOS_CONSUMO_SERVICIO: monolito
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || exit 1"]
@@ -301,6 +306,10 @@ services:
       # hasta el corte (o en vuelta atrás sin definir). En el corte se define TRANQUI_SERVICES_CLINICA_URI=lb://profesionales.
       # Vuelta atrás: sacar la variable (o apuntar al monolito) y CLINICA_EXTERNO=false.
       TRANQUI_SERVICES_CLINICA_URI: ${TRANQUI_SERVICES_CLINICA_URI:-http://tranqui-backend:8080}
+      # Fase 8: /api/subscriptions/** y /api/admin/subscriptions/** al servicio de pagos. Por defecto al monolito
+      # hasta el corte (o en vuelta atrás sin definir). En el corte se define TRANQUI_SERVICES_SUSCRIPCIONES_URI=lb://pagos.
+      # Vuelta atrás: sacar la variable (o apuntar al monolito) y SUSCRIPCIONES_EXTERNO=false.
+      TRANQUI_SERVICES_SUSCRIPCIONES_URI: ${TRANQUI_SERVICES_SUSCRIPCIONES_URI:-http://tranqui-backend:8080}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
       # Fase 3 (G1): el gateway aplica el portón del sitio y el paywall a las rutas de los servicios.
@@ -533,6 +542,8 @@ services:
       dockerfile: services/pagos/Dockerfile
     container_name: tranqui-pagos
     restart: always
+    # Fase 8: las suscripciones y facturación viven acá dentro del límite de 288 MB (no se agrega contenedor).
+    # La memoria y el trabajo de facturación se miden en la verificación de punta a punta (riesgo de la spec).
     mem_limit: 288m
     cpus: 0.5
     environment:
@@ -563,6 +574,25 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       # La misma clave que el monolito: los tokens de Mercado Pago se leen en los dos.
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Falta ENCRYPTION_KEY en .env}
+      # Fase 8: carga inicial y atención de suscripciones, planes y facturación. Default false hasta el corte en mantenimiento.
+      PAGOS_SUSCRIPCIONES: ${PAGOS_SUSCRIPCIONES:-false}
+      # Fase 8: Mercado Pago de la plataforma para suscripciones (mismas variables y defaults que el monolito).
+      MP_ADMIN_ACCESS_TOKEN: ${MP_ADMIN_ACCESS_TOKEN:-}
+      MP_ADMIN_PUBLIC_KEY: ${MP_ADMIN_PUBLIC_KEY:-}
+      # Fase 8: facturación ARCA (las mismas variables y defaults que el monolito; sigue apagada).
+      ARCA_ENABLED: ${ARCA_ENABLED:-false}
+      ARCA_ENVIRONMENT: ${ARCA_ENVIRONMENT:-homologacion}
+      ARCA_CUIT_EMISOR: ${ARCA_CUIT_EMISOR:-20384910294}
+      ARCA_PUNTO_VENTA: ${ARCA_PUNTO_VENTA:-1}
+      ARCA_CERT_PATH: ${ARCA_CERT_PATH:-}
+      ARCA_KEY_PATH: ${ARCA_KEY_PATH:-}
+      ARCA_CERT_CONTENT: ${ARCA_CERT_CONTENT:-}
+      ARCA_KEY_CONTENT: ${ARCA_KEY_CONTENT:-}
+    # Volumen para certificados ARCA: el monolito no monta volumen en producción (resuelve por variables
+    # o paths locales); cuando se defina la ubicación definitiva en producción se montará acá de solo lectura
+    # (ver docs/cambios-a-futuro.md punto 4).
+    # volumes:
+    #   - /etc/tranqui/arca:/etc/tranqui/arca:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
       interval: 10s

@@ -28,7 +28,7 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 | `tranqui-notificaciones` | `notificaciones` | Servicio de notificaciones (Fase 1): mails y avisos en la app a partir de eventos, base propia `notificaciones` | 288 MB | 0.5 |
 | `tranqui-chat` | `chat` | Servicio de chat (Fase 2): mensajería en vivo por `/ws-tranqui` e historial, base propia `chat` | 288 MB | 0.5 |
 | `tranqui-calendario` | `calendario` | Servicio de calendario (Fase 3): Google Calendar y Meet, eventos de los turnos y horarios ocupados, base propia `calendario` | 288 MB | 0.5 |
-| `tranqui-pagos` | `pagos` | Servicio de pagos (Fase 4): Mercado Pago de turnos y documentos (checkout, webhooks, reembolsos y cuentas de los profesionales), base propia `pagos` | 288 MB | 0.5 |
+| `tranqui-pagos` | `pagos` | Servicio de pagos (Fase 4 y Fase 8): Mercado Pago de turnos y documentos (Fase 4), suscripciones, planes y facturación ARCA (Fase 8), base propia `pagos` | 288 MB | 0.5 |
 | `tranqui-profesionales` | `profesionales` | Servicio de profesionales (Fase 5 y Fase 7): perfil, buscador, tarifas, disponibilidad, historia clínica y recetas (Fase 7), base propia `profesionales` | 288 MB | 0.5 |
 | `tranqui-turnos` | `turnos` | Servicio de turnos (Fase 6): reservas, agenda, cancelación, reprogramación, asistencia y documentos, base propia `turnos` | 288 MB | 0.5 |
 | `tranqui-db-servicios` | `db-servicios` | Contenedor de una sola ejecución: crea la base y el usuario de cada servicio (`infra/postgres/crear-bases-servicios.sh`) y termina | 32 MB | 0.2 |
@@ -36,11 +36,11 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 
 ### Presupuesto de memoria (RAM)
 
-- **Total suma `mem_limit` Docker Compose (Fase 6 y Fase 7):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 288 + 288 + 288 + 288 + 288 + 288 = 3.840 MB` (~3,84 GB; `db-servicios` corre unos segundos al arrancar y no suma). La Fase 7 no agrega ningún contenedor (la historia clínica y recetas viven en `profesionales`, decisión 1), por lo que la suma de límites se mantiene idéntica.
+- **Total suma `mem_limit` Docker Compose (Fase 6, Fase 7 y Fase 8):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 288 + 288 + 288 + 288 + 288 + 288 = 3.840 MB` (~3,84 GB; `db-servicios` corre unos segundos al arrancar y no suma). Las Fases 7 y 8 no agregan ningún contenedor (historia clínica en `profesionales`, suscripciones en `pagos`, decisión 1), por lo que la suma de límites se mantiene idéntica en 3.840 MB y ~5,0 GB proyectados. El consumo y trabajo de facturación (SOAP de ARCA y PDF) se mide en la verificación de punta a punta.
 - **Traefik y bot de WhatsApp:** ~112 MB.
 - **Sistema operativo y buffers mínimos:** ~1 GB.
 - **Consumo proyectado total en VPS:** **~5,0 GB**, por encima del techo de **~4,8 GB** de la sección 9.1, con
-  ~3 GB de margen libre en el VPS de 8 GB para picos y caché de disco de PostgreSQL. Decisión de las Fases 6 y 7: se
+  ~3 GB de margen libre en el VPS de 8 GB para picos y caché de disco de PostgreSQL. Decisión de las Fases 6, 7 y 8: se
   acepta y se mide el consumo real en el VPS antes del deploy (los servicios usan bastante menos que su límite:
   pagos ~175 MB de 288). Si hace falta, se baja el monolito a 384 MB o los servicios chicos a 256 MB.
 
@@ -146,6 +146,93 @@ define dependencias escalonadas con `condition: service_healthy`:
    docker compose -p app ps
    curl -fsS https://tranquisalud.com/api/health
    ```
+
+## Fase 8: suscripciones, planes y facturación en el servicio de pagos
+
+Las suscripciones (`/api/subscriptions/**`), los planes, las features, la administración de suscripciones
+(`/api/admin/subscriptions/**`), los pagos de suscripciones y la facturación con ARCA viven en el contenedor
+`pagos`, sobre su base propia `pagos`.
+
+- **Sin contenedor nuevo:** las suscripciones y la facturación se alojan en el servicio de pagos (decisión 1).
+  No suma memoria al presupuesto del VPS (se mantiene el límite de 288 MB). El impacto del trabajo de facturación
+  (SOAP de ARCA y PDFs) se evalúa en la verificación de punta a punta (riesgo de la spec).
+- **Facturación con ARCA:** la integración se migró tal cual y sigue apagada (`ARCA_ENABLED=false`), ya que
+  todavía no está definida en producción (ver [docs/cambios-a-futuro.md](../cambios-a-futuro.md), punto 4).
+- **Mercado Pago de plataforma:** usa las credenciales de la cuenta administradora (`MP_ADMIN_ACCESS_TOKEN` y
+  `MP_ADMIN_PUBLIC_KEY`), tomadas del `.env` igual que en el monolito.
+- **Acceso a suscripciones y recetas:** el monolito mantiene una copia local en `suscripcion_acceso` alimentada
+  por el evento `suscripciones.suscripcion.cambio-estado.v2` y una resincronización periódica cada 15 minutos
+  contra `/internal/suscripciones/estado`. Con esto, el portón del gateway y el servicio de profesionales siguen
+  consultando al monolito sin cambios en esta fase.
+
+**Variables en `/srv/tranqui/.env`:** `SUSCRIPCIONES_EXTERNO=true` en el monolito, `PAGOS_SUSCRIPCIONES=true` en
+el servicio de pagos y `TRANQUI_SERVICES_SUSCRIPCIONES_URI=lb://pagos` en el gateway. Las credenciales de
+`MP_ADMIN_*` y `ARCA_*` ya existían en el `.env`.
+
+**Primer arranque / carga inicial:** con `PAGOS_SUSCRIPCIONES=true`, el servicio copia del monolito las ocho
+tablas (`plans`, `features`, `plan_features`, `subscriptions`, `subscription_events`, `subscription_payments`,
+`invoices` e `invoice_sequences`) con sus mismos ids y numeración correlativa, únicamente si las ocho tablas están
+vacías. Antes de insertar nada, verifica unicidad por profesional: si existen dos suscripciones para el mismo
+`professional_id`, la carga aborta sin insertar nada.
+
+**El corte va con la app en mantenimiento** (hay plata y numeración de comprobantes fiscales):
+
+1. `npm run mantenimiento -- on "Volvemos en unos minutos"`.
+2. En `/srv/tranqui/.env`: agregar o configurar:
+   - `PAGOS_SUSCRIPCIONES=true`
+3. Reiniciar el servicio de pagos para ejecutar la carga inicial:
+   ```bash
+   docker compose -p app up -d pagos
+   ```
+4. Esperar que `pagos` esté sano y en sus logs figure:
+   `Carga inicial de suscripciones completada:`
+   > **Si la carga aborta por suscripciones duplicadas:** revisar los logs de `pagos` para identificar el
+   > `profesionalId` y los ids de suscripción involucrados. Resolver la duplicación directamente en el monolito
+   > (conservando la suscripción vigente y eliminando o corrigiendo la duplicada) y volver a reiniciar `pagos`
+   > antes de continuar con el corte.
+5. En `/srv/tranqui/.env`: configurar el flag en el monolito y la ruta en el gateway:
+   - `SUSCRIPCIONES_EXTERNO=true`
+   - `TRANQUI_SERVICES_SUSCRIPCIONES_URI=lb://pagos`
+6. Reiniciar el monolito (que al arrancar resincroniza su copia de acceso desde el servicio) y el gateway:
+   ```bash
+   docker compose -p app up -d tranqui-backend
+   docker compose -p app up -d gateway
+   ```
+7. Conciliar las ocho tablas y, si da sin diferencias, desactivar mantenimiento:
+   ```bash
+   node scripts/fase8-conciliar-suscripciones.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+   npm run mantenimiento -- off
+   ```
+   Igual que con turnos y clínica, la conciliación se corre justo después del corte y tras una vuelta atrás.
+
+**Vuelta atrás de la Fase 8:**
+
+1. `npm run mantenimiento -- on "Mantenimiento por actualización"`.
+2. Devolver al monolito todas las suscripciones, eventos, pagos, facturas y secuencias creados o modificados en
+   el servicio, con validación estricta de conflictos (aborta si difiere algún campo inmutable como el profesional,
+   monto de un pago o número/CAE de una factura emitida) y ajuste de secuencias:
+   ```bash
+   node scripts/fase8-devolver-suscripciones.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+   ```
+3. En `/srv/tranqui/.env`: `SUSCRIPCIONES_EXTERNO=false`, `PAGOS_SUSCRIPCIONES=false` y sacar
+   `TRANQUI_SERVICES_SUSCRIPCIONES_URI` (o apuntarla a `http://tranqui-backend:8080`).
+   Al poner `PAGOS_SUSCRIPCIONES=false`, el servicio de pagos vuelve a reenviar los webhooks de suscripción
+   recibidos de Mercado Pago al monolito, como hacía antes del corte.
+4. Reiniciar monolito, pagos y gateway:
+   ```bash
+   docker compose -p app up -d tranqui-backend gateway pagos
+   ```
+5. Conciliar (`node scripts/fase8-conciliar-suscripciones.mjs ...`).
+6. `npm run mantenimiento -- off`.
+
+**Volver a cortar después de una vuelta atrás:**
+Como la carga inicial de suscripciones solo corre con las ocho tablas vacías, antes de volver a cortar hay que vaciar
+en la base `pagos` las ocho tablas (después de haber devuelto y conciliado sin diferencias).
+> **Advertencia:** ejecutar este vaciado únicamente si la conciliación anterior finalizó sin diferencias:
+```bash
+docker compose -p app exec tranqui-db psql -U <DB_USER> -d pagos -c "TRUNCATE TABLE plans, features, plan_features, subscriptions, subscription_events, subscription_payments, invoices, invoice_sequences RESTART IDENTITY CASCADE;"
+```
+Luego repetir los pasos del corte.
 
 ## Fase 7: historia clínica y recetas en el servicio de profesionales
 
