@@ -42,7 +42,11 @@ public class SuscripcionesInternoController {
             boolean acceso = suscripcionService.isAccessAllowed(sub.professionalId());
             boolean puedeRecetar = suscripcionService.hasFeature(sub.professionalId(), "recetas_electronicas");
             String planCode = planes.porId(sub.planId()).map(Planes.Plan::code).orElse(null);
-            Long version = sub.version() != null ? sub.version().longValue() : 0L;
+            // Usamos aggregateVersion() (version + 1) para que coincida exactamente con la versión
+            // publicada en los eventos outbox (suscripciones.suscripcion.cambio-estado.v2). De lo contrario,
+            // la resincronización en el monolito (suscripcion_acceso) descartaría la actualización
+            // por ser <= a la versión guardada tras el último evento.
+            Long version = (long) sub.aggregateVersion();
 
             return new Dtos.EstadoSuscripcionDto(
                     sub.professionalId(),
