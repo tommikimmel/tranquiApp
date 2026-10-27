@@ -1,7 +1,7 @@
 package com.tranqui.app.service;
 
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import com.tranqui.eventos.jwt.ServiceJwt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +15,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -39,8 +39,8 @@ public class ResincronizacionSuscripciones {
             String planCode,
             boolean acceso,
             boolean puedeRecetar,
-            @JsonSerialize(using = LocalDateSerializer.class) LocalDate periodoHasta,
-            @JsonSerialize(using = LocalDateSerializer.class) LocalDate graciaHasta,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDateTime periodoHasta,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDateTime graciaHasta,
             Long version
     ) {}
 

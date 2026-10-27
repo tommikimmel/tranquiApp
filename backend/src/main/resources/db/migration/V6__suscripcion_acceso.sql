@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS suscripcion_acceso (
     plan_code VARCHAR(50),
     acceso BOOLEAN NOT NULL DEFAULT FALSE,
     puede_recetar BOOLEAN NOT NULL DEFAULT FALSE,
-    periodo_hasta DATE,
-    gracia_hasta DATE,
+    periodo_hasta TIMESTAMP,
+    gracia_hasta TIMESTAMP,
     version BIGINT NOT NULL DEFAULT 0,
     actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

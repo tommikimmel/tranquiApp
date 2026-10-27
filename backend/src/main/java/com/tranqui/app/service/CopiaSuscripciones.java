@@ -9,7 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
+
 import java.time.LocalDateTime;
 
 /**
@@ -45,7 +45,7 @@ public class CopiaSuscripciones {
 
     @Transactional
     public void upsert(Long professionalId, String estado, String planCode, boolean acceso,
-                       boolean puedeRecetar, LocalDate periodoHasta, LocalDate graciaHasta, long version) {
+                       boolean puedeRecetar, LocalDateTime periodoHasta, LocalDateTime graciaHasta, long version) {
         if (!suscripcionesExterno) {
             return;
         }
