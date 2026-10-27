@@ -290,6 +290,21 @@ class ContratoEventosTest {
     }
 
     @Test
+    void roundtrip_suscripcionCambioEstadoV2Data() throws Exception {
+        SuscripcionCambioEstadoV2Data data = new SuscripcionCambioEstadoV2Data(
+                80L, 10L, "PENDIENTE", "ACTIVA", LocalDate.of(2026, 12, 1),
+                "profesional-plus", true, true, LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 15)
+        );
+        probarRoundtrip(data, SuscripcionCambioEstadoV2Data.class);
+    }
+
+    @Test
+    void roundtrip_verificacionResueltaData() throws Exception {
+        VerificacionResueltaData data = new VerificacionResueltaData(10L, "VERIFICADO");
+        probarRoundtrip(data, VerificacionResueltaData.class);
+    }
+
+    @Test
     void roundtrip_meetCreadoData() throws Exception {
         MeetCreadoData data = new MeetCreadoData(100L, "https://meet.google.com/abc-defg-hij", "g-event-1234");
         probarRoundtrip(data, MeetCreadoData.class);

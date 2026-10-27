@@ -6,6 +6,7 @@ import com.tranqui.app.eventos.OutboxPublisher;
 import com.tranqui.eventos.Topicos;
 import com.tranqui.eventos.data.SuscripcionAvisoData;
 import com.tranqui.eventos.data.SuscripcionCambioEstadoData;
+import com.tranqui.eventos.data.SuscripcionCambioEstadoV2Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import jakarta.annotation.PostConstruct;
@@ -57,6 +58,9 @@ public class SubscriptionService {
 
     @Autowired
     private MercadoPagoService mercadoPagoService;
+
+    @Value("${suscripciones.externo:false}")
+    private boolean suscripcionesExterno;
 
     @Autowired
     private com.tranqui.app.service.arca.ArcaConfig arcaConfig;
@@ -154,7 +158,7 @@ public class SubscriptionService {
      * Checks whether a professional has access to a particular system feature (Gate 1).
      */
     public boolean hasFeature(Long professionalId, String featureKey) {
-        if (professionalId == null) return false;
+        if (professionalId == null || usuarioRepository == null) return false;
 
         Usuario usuario = usuarioRepository.findById(professionalId).orElse(null);
         if (usuario == null) return false;
@@ -208,7 +212,7 @@ public class SubscriptionService {
      * finalización de su período pagado (currentPeriodEnd).
      */
     public boolean isAccessAllowed(Long userId) {
-        if (userId == null) return false;
+        if (userId == null || usuarioRepository == null) return false;
 
         Usuario usuario = usuarioRepository.findById(userId).orElse(null);
         if (usuario == null) return false;
@@ -248,6 +252,10 @@ public class SubscriptionService {
     @PostConstruct
     @Transactional
     public void migrateExistingVerifiedProfessionalsOnStartup() {
+        if (suscripcionesExterno) {
+            log.info("suscripciones.externo=true: no se ejecuta la migración de profesionales existentes en el monolito.");
+            return;
+        }
         try {
             List<Usuario> psiquiatras = usuarioRepository.findByRol(Rol.PSIQUIATRA);
             LocalDateTime now = LocalDateTime.now();
@@ -832,16 +840,26 @@ public class SubscriptionService {
                 }
                 java.time.LocalDate vencimiento = sub.getCurrentPeriodEnd() != null ? sub.getCurrentPeriodEnd().toLocalDate() : null;
                 Long profId = sub.getProfessional() != null ? sub.getProfessional().getId() : null;
+                boolean acceso = isAccessAllowed(profId);
+                boolean puedeRecetar = hasFeature(profId, "recetas_electronicas");
+                String planCode = sub.getPlan() != null ? sub.getPlan().getCode() : null;
+                java.time.LocalDate periodoHasta = vencimiento;
+                java.time.LocalDate graciaHasta = sub.getGraceUntil() != null ? sub.getGraceUntil().toLocalDate() : null;
                 outboxPublisher.publicar(
-                        Topicos.SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1,
+                        Topicos.SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V2,
                         String.valueOf(sub.getId()),
                         sub.getAggregateVersion(),
-                        new SuscripcionCambioEstadoData(
+                        new SuscripcionCambioEstadoV2Data(
                                 sub.getId(),
                                 profId,
                                 previousStatus,
                                 newStatus,
-                                vencimiento
+                                vencimiento,
+                                planCode,
+                                acceso,
+                                puedeRecetar,
+                                periodoHasta,
+                                graciaHasta
                         )
                 );
             });

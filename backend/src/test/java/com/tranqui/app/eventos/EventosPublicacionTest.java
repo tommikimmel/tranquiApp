@@ -89,7 +89,7 @@ class EventosPublicacionTest {
     }
 
     @Test
-    @DisplayName("SubscriptionService.logEvent publica SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1")
+    @DisplayName("SubscriptionService.logEvent publica SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V2")
     void subscriptionService_logEvent_publicaEvento() {
         SubscriptionService service = new SubscriptionService();
         ReflectionTestUtils.setField(service, "outboxPublisher", outboxPublisher);
@@ -102,15 +102,15 @@ class EventosPublicacionTest {
 
         service.logEvent(10L, "ACTIVATED", "INACTIVE", "ACTIVE", "SYSTEM", "system", "Pago exitoso");
 
-        ArgumentCaptor<SuscripcionCambioEstadoData> captor = ArgumentCaptor.forClass(SuscripcionCambioEstadoData.class);
+        ArgumentCaptor<SuscripcionCambioEstadoV2Data> captor = ArgumentCaptor.forClass(SuscripcionCambioEstadoV2Data.class);
         verify(outboxPublisher, times(1)).publicar(
-                eq(Topicos.SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1),
+                eq(Topicos.SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V2),
                 eq("10"),
                 anyInt(),
                 captor.capture()
         );
 
-        SuscripcionCambioEstadoData data = captor.getValue();
+        SuscripcionCambioEstadoV2Data data = captor.getValue();
         assertThat(data.suscripcionId()).isEqualTo(10L);
         assertThat(data.profesionalId()).isEqualTo(99L);
         assertThat(data.estadoNuevo()).isEqualTo("ACTIVE");

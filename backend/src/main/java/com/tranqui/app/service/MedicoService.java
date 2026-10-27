@@ -47,6 +47,9 @@ public class MedicoService {
     private SubscriptionService subscriptionService;
 
     @Autowired
+    private AccesoSuscripciones accesoSuscripciones;
+
+    @Autowired
     private OutboxPublisher outboxPublisher;
 
     // Same flag MedicoController/MercadoPagoService use to know whether MP is really wired up
@@ -107,7 +110,7 @@ public class MedicoService {
         // que es un concepto distinto de si está al día con el pago.
         List<Usuario> medicos = usuarioRepository.findByRol(Rol.PSIQUIATRA).stream()
                 .filter(this::isMedicoVerificado)
-                .filter(m -> subscriptionService.isAccessAllowed(m.getId()))
+                .filter(m -> accesoSuscripciones.acceso(m.getId()))
                 .collect(Collectors.toList());
 
         if (medicos.isEmpty()) {
@@ -293,7 +296,7 @@ public class MedicoService {
             // se fuerza acá server-side, no solo en el selector del frontend, para que no se pueda
             // saltear llamando a la API directo. Mismo gate que RecetaService/SubscriptionService
             // usan para emitir una receta real.
-            boolean puedeRecetar = subscriptionService.hasFeature(medico.getId(), "recetas_electronicas");
+            boolean puedeRecetar = accesoSuscripciones.puedeRecetar(medico.getId());
 
             for (MedicoDto.TarifaDto tDto : dto.getTariffs()) {
                 // A service "requiere obra social" if it has a specific obra social assigned
@@ -373,7 +376,7 @@ public class MedicoService {
             tarifasDb = new ArrayList<>();
             // Un psicólogo no debe arrancar con el default "Receta fuera de turno" habilitado �
             // su plan no incluye recetas_electronicas. Mismo gate que actualizarPerfil.
-            boolean puedeRecetar = subscriptionService.hasFeature(m.getId(), "recetas_electronicas");
+            boolean puedeRecetar = accesoSuscripciones.puedeRecetar(m.getId());
             for (MedicoDto.TarifaDto def : DEFAULT_TARIFFS) {
                 boolean esRecetaDefault = def.isEsReceta() && puedeRecetar;
                 TarifaMedico t = TarifaMedico.builder()

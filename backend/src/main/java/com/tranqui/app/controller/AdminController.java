@@ -9,6 +9,7 @@ import com.tranqui.app.service.TicketService;
 import com.tranqui.app.eventos.OutboxPublisher;
 import com.tranqui.eventos.Topicos;
 import com.tranqui.eventos.data.ProfesionalVisibilidadCambiadaData;
+import com.tranqui.eventos.data.VerificacionResueltaData;
 import com.tranqui.eventos.data.UsuarioActualizadoData;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -42,6 +43,9 @@ public class AdminController {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @org.springframework.beans.factory.annotation.Value("${suscripciones.externo:false}")
+    private boolean suscripcionesExterno;
 
     @GetMapping("/users")
     public ResponseEntity<List<Usuario>> getUsers() {
@@ -116,9 +120,15 @@ public class AdminController {
                 usuario.getAggregateVersion(),
                 new ProfesionalVisibilidadCambiadaData(usuario.getId(), true, "Verificado por admin")
         );
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_PROFESIONAL_VERIFICACION_RESUELTA_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new VerificacionResueltaData(usuario.getId(), "VERIFICADO")
+        );
 
         // Actualizar estado en la m�quina de estados de suscripci�n (�6)
-        if (subscriptionRepository != null) {
+        if (!suscripcionesExterno && subscriptionRepository != null) {
             subscriptionRepository.findByProfessionalId(usuario.getId()).ifPresent(sub -> {
                 if (sub.getStatus() == com.tranqui.app.model.SubscriptionStatus.PENDING_VERIFICATION || sub.getStatus() == com.tranqui.app.model.SubscriptionStatus.REGISTERED) {
                     com.tranqui.app.model.SubscriptionStatus oldStatus = sub.getStatus();
@@ -152,8 +162,14 @@ public class AdminController {
                     usuario.getAggregateVersion(),
                     new ProfesionalVisibilidadCambiadaData(usuario.getId(), false, "Verificaci�n rechazada por admin")
             );
+            outboxPublisher.publicar(
+                    Topicos.IDENTIDAD_PROFESIONAL_VERIFICACION_RESUELTA_V1,
+                    String.valueOf(usuario.getId()),
+                    usuario.getAggregateVersion(),
+                    new VerificacionResueltaData(usuario.getId(), "RECHAZADO")
+            );
 
-        if (subscriptionRepository != null) {
+        if (!suscripcionesExterno && subscriptionRepository != null) {
             subscriptionRepository.findByProfessionalId(usuario.getId()).ifPresent(sub -> {
                 com.tranqui.app.model.SubscriptionStatus oldStatus = sub.getStatus();
                 sub.setStatus(com.tranqui.app.model.SubscriptionStatus.REJECTED);

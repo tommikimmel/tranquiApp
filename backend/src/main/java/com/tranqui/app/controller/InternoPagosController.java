@@ -53,10 +53,13 @@ public class InternoPagosController {
     private final TurnoRepository turnoRepository;
     private final SolicitudDocumentoRepository solicitudRepository;
     private final WebhookController webhookController;
+    private final boolean suscripcionesExterno;
 
     public InternoPagosController(UsuarioRepository usuarioRepository, PagoRepository pagoRepository,
                                   TurnoRepository turnoRepository, SolicitudDocumentoRepository solicitudRepository,
-                                  WebhookController webhookController) {
+                                  WebhookController webhookController,
+                                  @org.springframework.beans.factory.annotation.Value("${suscripciones.externo:false}") boolean suscripcionesExterno) {
+        this.suscripcionesExterno = suscripcionesExterno;
         this.usuarioRepository = usuarioRepository;
         this.pagoRepository = pagoRepository;
         this.turnoRepository = turnoRepository;
@@ -114,6 +117,9 @@ public class InternoPagosController {
     @PostMapping("/notificacion-suscripcion")
     public ResponseEntity<Void> notificacionSuscripcion(@RequestParam(name = "dataId", required = false) String dataId,
                                                         @RequestBody String body) {
+        if (suscripcionesExterno) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build();
+        }
         webhookController.procesarNotificacion(body, dataId, true);
         return ResponseEntity.ok().build();
     }

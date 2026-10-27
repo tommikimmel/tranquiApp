@@ -48,6 +48,9 @@ public class AuthController {
     @Autowired
     private com.tranqui.app.repository.SubscriptionRepository subscriptionRepository;
 
+    @org.springframework.beans.factory.annotation.Value("${suscripciones.externo:false}")
+    private boolean suscripcionesExterno;
+
     @Autowired
     private JwtService jwtService;
 
@@ -194,7 +197,7 @@ public class AuthController {
             usuario = usuarioRepository.save(usuario);
 
             // Si es un profesional de la salud, inicializar registro de suscripción (§6)
-            if (usuario.getRol() == Rol.PSIQUIATRA || usuario.getProfession() != null) {
+            if (!suscripcionesExterno && (usuario.getRol() == Rol.PSIQUIATRA || usuario.getProfession() != null)) {
                 String planCode = "psiquiatra".equalsIgnoreCase(usuario.getProfession()) ? "clinico" : "consultorio";
                 com.tranqui.app.model.Plan plan = planRepository.findByCode(planCode).orElse(null);
                 if (plan != null) {

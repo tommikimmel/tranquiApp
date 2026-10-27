@@ -172,6 +172,14 @@ turnos:
 clinica:
   externo: ${CLINICA_EXTERNO:false}
 
+# Fase 8: con true, las suscripciones las administra el servicio de pagos (planes, suscripciones,
+# webhooks, pagos, facturación y reconciliación); las rutas del monolito responden 409 (SuscripcionesExternoFilter).
+# El monolito guarda una copia en suscripcion_acceso que se actualiza con
+# suscripciones.suscripcion.cambio-estado.v2 y una resincronización cada resincronizacion-minutos.
+suscripciones:
+  externo: ${SUSCRIPCIONES_EXTERNO:false}
+  resincronizacion-minutos: ${SUSCRIPCIONES_RESINCRONIZACION_MINUTOS:15}
+
 tranqui:
   jwt:
     # JWT de servicio (sección 4.2) para las rutas /internal/** que consultan otros servicios.

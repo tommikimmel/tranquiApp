@@ -16,6 +16,7 @@ import com.tranqui.eventos.Topicos;
 import com.tranqui.eventos.data.DisponibilidadProfesionalData;
 import com.tranqui.eventos.data.PerfilProfesionalData;
 import com.tranqui.eventos.data.TarifasProfesionalData;
+import com.tranqui.app.service.AccesoSuscripciones;
 import com.tranqui.eventos.data.UsuarioActualizadoData;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.PageRequest;
@@ -74,10 +75,12 @@ public class InternoProfesionalesController {
     private final SubscriptionRepository subscriptionRepository;
     private final SubscriptionService subscriptionService;
     private final OutboxPublisher outboxPublisher;
+    private final AccesoSuscripciones accesoSuscripciones;
 
     public InternoProfesionalesController(UsuarioRepository usuarioRepository, DisponibilidadRepository disponibilidadRepository,
                                           TarifaMedicoRepository tarifaRepository, SubscriptionRepository subscriptionRepository,
-                                          SubscriptionService subscriptionService, OutboxPublisher outboxPublisher) {
+                                          SubscriptionService subscriptionService, OutboxPublisher outboxPublisher, AccesoSuscripciones accesoSuscripciones) {
+        this.accesoSuscripciones = accesoSuscripciones;
         this.usuarioRepository = usuarioRepository;
         this.disponibilidadRepository = disponibilidadRepository;
         this.tarifaRepository = tarifaRepository;
@@ -175,9 +178,9 @@ public class InternoProfesionalesController {
                 u.getTipoDocumento(), u.getNumeroDocumento(),
                 conFoto ? u.getFotoUrl() : null, CopiaProfesionales.hashFoto(u.getFotoUrl()),
                 u.getVerificadoAdmin(), u.tieneMercadoPagoVinculado(),
-                sub != null && sub.getStatus() != null ? sub.getStatus().name() : null,
-                sub != null ? sub.getCurrentPeriodEnd() : null,
-                subscriptionService.hasFeature(u.getId(), "recetas_electronicas"),
+                accesoSuscripciones.estado(u.getId()),
+                accesoSuscripciones.periodoHasta(u.getId()),
+                accesoSuscripciones.puedeRecetar(u.getId()),
                 completo ? CopiaProfesionales.perfilDe(u) : null, franjas, tarifas);
     }
 

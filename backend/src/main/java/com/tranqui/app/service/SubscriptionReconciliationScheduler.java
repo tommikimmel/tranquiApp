@@ -49,6 +49,9 @@ public class SubscriptionReconciliationScheduler {
     @Autowired
     private com.tranqui.app.repository.UsuarioRepository usuarioRepository;
 
+    @org.springframework.beans.factory.annotation.Value("${suscripciones.externo:false}")
+    private boolean suscripcionesExterno;
+
     // Las alertas que requieren acción humana no pueden quedar solo en el log (nadie lo mira
     // todos los días): se mandan por mail a todos los administradores.
     private void notificarAdmins(String titulo, String mensaje) {
@@ -75,6 +78,10 @@ public class SubscriptionReconciliationScheduler {
      */
     @Scheduled(cron = "0 0 4 * * ?")
     public void runDailyReconciliation() {
+        if (suscripcionesExterno) {
+            log.info("suscripciones.externo=true: no se ejecuta la reconciliación diaria en el monolito.");
+            return;
+        }
         log.info("Iniciando job diario de reconciliación de suscripciones y facturación...");
 
         checkUpcomingRenewals();
@@ -96,6 +103,10 @@ public class SubscriptionReconciliationScheduler {
     @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
     @Transactional
     public void runHourlyAlertsCheck() {
+        if (suscripcionesExterno) {
+            log.info("suscripciones.externo=true: no se ejecuta la verificación horaria de alertas en el monolito.");
+            return;
+        }
         try {
             log.info("Ejecutando verificación de preavisos de renovación y cancelaciones diferidas...");
             checkUpcomingRenewals();
