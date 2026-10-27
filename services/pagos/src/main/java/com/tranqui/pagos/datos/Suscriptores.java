@@ -35,7 +35,28 @@ public class Suscriptores {
             String dni,
             Integer numeroDocumento,
             LocalDateTime actualizadoEn
-    ) {}
+    ) {
+
+        public String taxIdEfectivo() {
+            if (taxId != null && !taxId.isBlank()) return taxId;
+            if (cuit != null && !cuit.isBlank()) return cuit;
+            if (cuil != null) return String.valueOf(cuil);
+            if (dni != null && !dni.isBlank()) return dni;
+            if (numeroDocumento != null) return String.valueOf(numeroDocumento);
+            return null;
+        }
+
+        public Integer condicionIvaEfectiva() {
+            if (ivaConditionId != null) return ivaConditionId;
+            return 6; // Default to Monotributo (6) for Argentina health professionals
+        }
+
+        public String nombreLegalEfectivo() {
+            if (legalName != null && !legalName.isBlank()) return legalName;
+            String full = ((nombre != null ? nombre : "") + " " + (apellido != null ? apellido : "")).trim();
+            return full.isEmpty() ? (email != null ? email : "-") : full;
+        }
+    }
 
     private static final String COLUMNAS = "id, email, nombre, apellido, rol, profession, verificado_admin, "
             + "version, tax_id_type, tax_id, legal_name, iva_condition_id, fiscal_address, cuit, cuil, "
@@ -66,6 +87,12 @@ public class Suscriptores {
 
     public Suscriptores(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+    }
+
+    public Optional<Suscriptor> porEmail(String email) {
+        if (email == null) return Optional.empty();
+        return jdbc.query("SELECT " + COLUMNAS + " FROM suscriptor WHERE lower(email) = lower(?)", mapeo, email)
+                .stream().findFirst();
     }
 
     public Optional<Suscriptor> porId(Long id) {
