@@ -139,6 +139,12 @@ public class Suscripciones {
                 mapeo, Timestamp.valueOf(now));
     }
 
+    public List<Suscripcion> paginadasOrdenadasPorProfesional(int pagina, int tamanio) {
+        int offset = pagina * tamanio;
+        return jdbc.query("SELECT " + COLUMNAS + " FROM subscriptions ORDER BY professional_id ASC LIMIT ? OFFSET ?",
+                mapeo, tamanio, offset);
+    }
+
     public List<Suscripcion> todas() {
         return jdbc.query("SELECT " + COLUMNAS + " FROM subscriptions ORDER BY id", mapeo);
     }
