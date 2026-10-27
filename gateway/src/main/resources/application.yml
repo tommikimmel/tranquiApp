@@ -702,8 +702,13 @@ tranqui:
     # atrás: sacar la variable y PAGOS_EXTERNO=false en el monolito.
     pagos:
       uri: ${TRANQUI_SERVICES_PAGOS_URI:${tranqui.services.monolito.uri}}
+    # Fase 8: lb://pagos cuando el servicio cargó las suscripciones (corte con PAGOS_SUSCRIPCIONES=true).
+    # Lleva /api/subscriptions/** y /api/admin/subscriptions/**. Por defecto va al monolito; en el corte se
+    # pone TRANQUI_SERVICES_SUSCRIPCIONES_URI=lb://pagos. Vuelta atrás: sacar la variable (o apuntar al
+    # monolito) y SUSCRIPCIONES_EXTERNO=false en el monolito. Tiene que ser una variable propia y no usar
+    # la de pagos para no desviar las suscripciones antes del corte cuando el servicio todavía no tiene los datos.
     suscripciones:
-      uri: ${tranqui.services.monolito.uri}
+      uri: ${TRANQUI_SERVICES_SUSCRIPCIONES_URI:${tranqui.services.monolito.uri}}
     # Fase 1: lb://notificaciones cuando el servicio está desplegado (docker-compose).
     # Vuelta atrás: sacar la variable y la ruta vuelve al monolito.
     notificaciones:
