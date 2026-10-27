@@ -843,8 +843,8 @@ public class SubscriptionService {
                 boolean acceso = isAccessAllowed(profId);
                 boolean puedeRecetar = hasFeature(profId, "recetas_electronicas");
                 String planCode = sub.getPlan() != null ? sub.getPlan().getCode() : null;
-                java.time.LocalDate periodoHasta = vencimiento;
-                java.time.LocalDate graciaHasta = sub.getGraceUntil() != null ? sub.getGraceUntil().toLocalDate() : null;
+                LocalDateTime periodoHasta = sub.getCurrentPeriodEnd();
+                LocalDateTime graciaHasta = sub.getGraceUntil();
                 outboxPublisher.publicar(
                         Topicos.SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V2,
                         String.valueOf(sub.getId()),

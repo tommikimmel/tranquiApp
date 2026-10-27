@@ -1,14 +1,11 @@
 package com.tranqui.app.model;
 
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.*;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -36,13 +33,11 @@ public class SuscripcionAcceso {
     @Column(name = "puede_recetar", nullable = false)
     private boolean puedeRecetar;
 
-    @JsonSerialize(using = LocalDateSerializer.class)
     @Column(name = "periodo_hasta")
-    private LocalDate periodoHasta;
+    private LocalDateTime periodoHasta;
 
-    @JsonSerialize(using = LocalDateSerializer.class)
     @Column(name = "gracia_hasta")
-    private LocalDate graciaHasta;
+    private LocalDateTime graciaHasta;
 
     @Column(name = "version", nullable = false)
     private Long version;

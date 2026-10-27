@@ -12,7 +12,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -98,6 +97,8 @@ class AccesoSuscripcionesTest {
             AccesoSuscripciones accesos = build();
             SuscripcionAcceso sa = SuscripcionAcceso.builder()
                     .professionalId(42L)
+                    .estado("ACTIVE")
+                    .periodoHasta(LocalDateTime.now().plusDays(10))
                     .acceso(true)
                     .build();
             when(suscripcionAccesoRepository.findById(42L)).thenReturn(Optional.of(sa));
@@ -114,6 +115,106 @@ class AccesoSuscripcionesTest {
 
             assertThat(accesos.acceso(99L)).isFalse();
             verify(suscripcionAccesoRepository).findById(99L);
+        }
+
+        @Test
+        void acceso_cancelledConPeriodoEnFuturo_tieneAcceso() {
+            AccesoSuscripciones accesos = build();
+            SuscripcionAcceso sa = SuscripcionAcceso.builder()
+                    .professionalId(42L)
+                    .estado("CANCELLED")
+                    .periodoHasta(LocalDateTime.now().plusDays(5))
+                    .acceso(true)
+                    .build();
+            when(suscripcionAccesoRepository.findById(42L)).thenReturn(Optional.of(sa));
+
+            assertThat(accesos.acceso(42L)).isTrue();
+        }
+
+        @Test
+        void acceso_cancelledConPeriodoEnPasado_noTieneAcceso() {
+            AccesoSuscripciones accesos = build();
+            SuscripcionAcceso sa = SuscripcionAcceso.builder()
+                    .professionalId(42L)
+                    .estado("CANCELLED")
+                    .periodoHasta(LocalDateTime.now().minusSeconds(5))
+                    .acceso(true)
+                    .build();
+            when(suscripcionAccesoRepository.findById(42L)).thenReturn(Optional.of(sa));
+
+            assertThat(accesos.acceso(42L)).isFalse();
+        }
+
+        @Test
+        void acceso_activeConPeriodoEnFuturo_tieneAcceso() {
+            AccesoSuscripciones accesos = build();
+            SuscripcionAcceso sa = SuscripcionAcceso.builder()
+                    .professionalId(42L)
+                    .estado("ACTIVE")
+                    .periodoHasta(LocalDateTime.now().plusDays(1))
+                    .acceso(true)
+                    .build();
+            when(suscripcionAccesoRepository.findById(42L)).thenReturn(Optional.of(sa));
+
+            assertThat(accesos.acceso(42L)).isTrue();
+        }
+
+        @Test
+        void acceso_activeConPeriodoEnPasado_noTieneAcceso() {
+            AccesoSuscripciones accesos = build();
+            SuscripcionAcceso sa = SuscripcionAcceso.builder()
+                    .professionalId(42L)
+                    .estado("ACTIVE")
+                    .periodoHasta(LocalDateTime.now().minusSeconds(5))
+                    .acceso(true)
+                    .build();
+            when(suscripcionAccesoRepository.findById(42L)).thenReturn(Optional.of(sa));
+
+            assertThat(accesos.acceso(42L)).isFalse();
+        }
+
+        @Test
+        void acceso_graciaNoOtorgaAccesoSiPeriodoVencio() {
+            // isAccessAllowed solo evalúa que el período pago esté vigente; graceUntil no otorga acceso por sí mismo
+            AccesoSuscripciones accesos = build();
+            SuscripcionAcceso sa = SuscripcionAcceso.builder()
+                    .professionalId(42L)
+                    .estado("ACTIVE")
+                    .periodoHasta(LocalDateTime.now().minusDays(1))
+                    .graciaHasta(LocalDateTime.now().plusDays(5))
+                    .acceso(true)
+                    .build();
+            when(suscripcionAccesoRepository.findById(42L)).thenReturn(Optional.of(sa));
+
+            assertThat(accesos.acceso(42L)).isFalse();
+        }
+
+        @Test
+        void acceso_siAccesoGuardadoEsFalse_noTieneAccesoAunquePeriodoEsteVigente() {
+            AccesoSuscripciones accesos = build();
+            SuscripcionAcceso sa = SuscripcionAcceso.builder()
+                    .professionalId(42L)
+                    .estado("ACTIVE")
+                    .periodoHasta(LocalDateTime.now().plusDays(10))
+                    .acceso(false)
+                    .build();
+            when(suscripcionAccesoRepository.findById(42L)).thenReturn(Optional.of(sa));
+
+            assertThat(accesos.acceso(42L)).isFalse();
+        }
+
+        @Test
+        void acceso_estadoNoPermitido_noTieneAcceso() {
+            AccesoSuscripciones accesos = build();
+            SuscripcionAcceso sa = SuscripcionAcceso.builder()
+                    .professionalId(42L)
+                    .estado("SUSPENDED")
+                    .periodoHasta(LocalDateTime.now().plusDays(10))
+                    .acceso(true)
+                    .build();
+            when(suscripcionAccesoRepository.findById(42L)).thenReturn(Optional.of(sa));
+
+            assertThat(accesos.acceso(42L)).isFalse();
         }
 
         @Test
@@ -145,16 +246,16 @@ class AccesoSuscripcionesTest {
         }
 
         @Test
-        void periodoHasta_convierteLocalDateDeCopiaLocal() {
+        void periodoHasta_leeLocalDateTimeDeCopiaLocal() {
             AccesoSuscripciones accesos = build();
-            LocalDate fecha = LocalDate.of(2026, 12, 31);
+            LocalDateTime fechaHora = LocalDateTime.of(2026, 12, 31, 23, 59, 59);
             SuscripcionAcceso sa = SuscripcionAcceso.builder()
                     .professionalId(42L)
-                    .periodoHasta(fecha)
+                    .periodoHasta(fechaHora)
                     .build();
             when(suscripcionAccesoRepository.findById(42L)).thenReturn(Optional.of(sa));
 
-            assertThat(accesos.periodoHasta(42L)).isEqualTo(fecha.atStartOfDay());
+            assertThat(accesos.periodoHasta(42L)).isEqualTo(fechaHora);
             verify(suscripcionAccesoRepository).findById(42L);
             verifyNoInteractions(subscriptionRepository);
         }

@@ -11,7 +11,9 @@ import org.springframework.context.annotation.Configuration;
  * Fase 8: la copia del monolito del estado de acceso a suscripciones.
  * Descarta versiones viejas; la resincronización periódica
  * ({@link com.tranqui.app.service.ResincronizacionSuscripciones}) corrige un evento perdido.
- * Se prende con {@code EVENTOS_CONSUMO_SERVICIO=monolito}.
+ *
+ * <p>El consumo se prende solo con {@code EVENTOS_CONSUMO_SERVICIO=monolito} (los compose); sin esa
+ * variable este handler no se registra en ningún consumidor.
  */
 @Configuration
 public class ManejadoresSuscripciones {

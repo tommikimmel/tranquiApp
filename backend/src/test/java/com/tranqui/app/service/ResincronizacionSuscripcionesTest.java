@@ -11,7 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -85,8 +85,8 @@ class ResincronizacionSuscripcionesTest {
                     "planCode": "PRO",
                     "acceso": true,
                     "puedeRecetar": true,
-                    "periodoHasta": "2026-12-31",
-                    "graciaHasta": "2027-01-07",
+                    "periodoHasta": "2026-12-31T23:59:59",
+                    "graciaHasta": "2027-01-07T23:59:59",
                     "version": 3
                   }
                 ]
@@ -113,7 +113,7 @@ class ResincronizacionSuscripcionesTest {
         assertThat(ultimoAuth.get()).startsWith("Bearer ");
         verify(copia).upsert(
                 eq(10L), eq("ACTIVE"), eq("PRO"), eq(true), eq(true),
-                eq(LocalDate.of(2026, 12, 31)), eq(LocalDate.of(2027, 1, 7)), eq(3L)
+                eq(LocalDateTime.of(2026, 12, 31, 23, 59, 59)), eq(LocalDateTime.of(2027, 1, 7, 23, 59, 59)), eq(3L)
         );
     }
 

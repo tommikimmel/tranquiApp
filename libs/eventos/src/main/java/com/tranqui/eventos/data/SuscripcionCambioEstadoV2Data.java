@@ -3,6 +3,7 @@ package com.tranqui.eventos.data;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * Datos del evento suscripciones.suscripcion.cambio-estado.v2.
@@ -19,7 +20,7 @@ public record SuscripcionCambioEstadoV2Data(
     boolean acceso,
     boolean puedeRecetar,
     @JsonFormat(shape = JsonFormat.Shape.STRING)
-    LocalDate periodoHasta,
+    LocalDateTime periodoHasta,
     @JsonFormat(shape = JsonFormat.Shape.STRING)
-    LocalDate graciaHasta
+    LocalDateTime graciaHasta
 ) {}

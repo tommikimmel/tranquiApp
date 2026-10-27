@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,11 +22,15 @@ class CopiaSuscripcionesTest {
 
         SuscripcionCambioEstadoV2Data data = new SuscripcionCambioEstadoV2Data(
                 1L, 10L, "PENDING", "ACTIVE", LocalDate.of(2026, 12, 1),
-                "consultorio", true, true, LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 15)
+                "consultorio", true, true,
+                LocalDateTime.of(2026, 12, 1, 12, 0),
+                LocalDateTime.of(2026, 12, 15, 12, 0)
         );
 
         copia.aplicarEvento(data, 1);
-        copia.upsert(10L, "ACTIVE", "consultorio", true, true, LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 15), 1);
+        copia.upsert(10L, "ACTIVE", "consultorio", true, true,
+                LocalDateTime.of(2026, 12, 1, 12, 0),
+                LocalDateTime.of(2026, 12, 15, 12, 0), 1);
 
         verifyNoInteractions(repo);
     }
@@ -39,7 +44,9 @@ class CopiaSuscripcionesTest {
 
         SuscripcionCambioEstadoV2Data data = new SuscripcionCambioEstadoV2Data(
                 1L, 10L, "PENDING", "ACTIVE", LocalDate.of(2026, 12, 1),
-                "clinico", true, true, LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 15)
+                "clinico", true, true,
+                LocalDateTime.of(2026, 12, 1, 18, 30),
+                LocalDateTime.of(2026, 12, 15, 18, 30)
         );
 
         copia.aplicarEvento(data, 2);
@@ -53,8 +60,8 @@ class CopiaSuscripcionesTest {
         assertThat(guardado.getPlanCode()).isEqualTo("clinico");
         assertThat(guardado.isAcceso()).isTrue();
         assertThat(guardado.isPuedeRecetar()).isTrue();
-        assertThat(guardado.getPeriodoHasta()).isEqualTo(LocalDate.of(2026, 12, 1));
-        assertThat(guardado.getGraciaHasta()).isEqualTo(LocalDate.of(2026, 12, 15));
+        assertThat(guardado.getPeriodoHasta()).isEqualTo(LocalDateTime.of(2026, 12, 1, 18, 30));
+        assertThat(guardado.getGraciaHasta()).isEqualTo(LocalDateTime.of(2026, 12, 15, 18, 30));
         assertThat(guardado.getVersion()).isEqualTo(2L);
         assertThat(guardado.getActualizadoEn()).isNotNull();
     }
@@ -73,7 +80,7 @@ class CopiaSuscripcionesTest {
         when(repo.findById(10L)).thenReturn(Optional.of(existente));
 
         CopiaSuscripciones copia = new CopiaSuscripciones(repo, true);
-        copia.upsert(10L, "ACTIVE", "clinico", true, true, LocalDate.of(2026, 12, 1), null, 3);
+        copia.upsert(10L, "ACTIVE", "clinico", true, true, LocalDateTime.of(2026, 12, 1, 23, 59), null, 3);
 
         verify(repo).save(existente);
         assertThat(existente.getEstado()).isEqualTo("ACTIVE");
@@ -81,6 +88,7 @@ class CopiaSuscripcionesTest {
         assertThat(existente.isAcceso()).isTrue();
         assertThat(existente.isPuedeRecetar()).isTrue();
         assertThat(existente.getVersion()).isEqualTo(3L);
+        assertThat(existente.getPeriodoHasta()).isEqualTo(LocalDateTime.of(2026, 12, 1, 23, 59));
     }
 
     @Test

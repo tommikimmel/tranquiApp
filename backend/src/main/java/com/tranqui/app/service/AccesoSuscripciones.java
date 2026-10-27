@@ -38,10 +38,37 @@ public class AccesoSuscripciones {
         }
         if (suscripcionesExterno) {
             return suscripcionAccesoRepository.findById(profesionalId)
-                    .map(SuscripcionAcceso::isAcceso)
+                    .map(this::evaluarAccesoCopia)
                     .orElse(false);
         }
         return subscriptionService.isAccessAllowed(profesionalId);
+    }
+
+    /**
+     * Con el flag activo, evalúa el acceso sobre los datos de la copia local.
+     * El acceso final combina el booleano guardado (que refleja condiciones como rol, verificado, etc.)
+     * con la misma regla temporal de {@link SubscriptionService#isAccessAllowed(Long)}:
+     * - Status válido: ACTIVE, o CANCELLED con período pago vigente.
+     * - Período hasta no nulo y en el futuro (periodoHasta > now).
+     * En SubscriptionService.isAccessAllowed la gracia (graceUntil) no otorga acceso, por lo que no se usa acá.
+     */
+    private boolean evaluarAccesoCopia(SuscripcionAcceso sa) {
+        if (!sa.isAcceso()) {
+            return false;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        boolean periodoVigente = sa.getPeriodoHasta() != null && sa.getPeriodoHasta().isAfter(now);
+        String estado = sa.getEstado();
+        boolean statusValido = "ACTIVE".equalsIgnoreCase(estado)
+                || ("CANCELLED".equalsIgnoreCase(estado) && periodoVigente);
+
+        if (!statusValido) {
+            return false;
+        }
+        if (sa.getPeriodoHasta() == null) {
+            return false;
+        }
+        return periodoVigente;
     }
 
     public boolean puedeRecetar(Long profesionalId) {
@@ -76,7 +103,7 @@ public class AccesoSuscripciones {
         }
         if (suscripcionesExterno) {
             return suscripcionAccesoRepository.findById(profesionalId)
-                    .map(sa -> sa.getPeriodoHasta() != null ? sa.getPeriodoHasta().atStartOfDay() : null)
+                    .map(SuscripcionAcceso::getPeriodoHasta)
                     .orElse(null);
         }
         return subscriptionRepository.findByProfessionalId(profesionalId)
