@@ -178,27 +178,34 @@ vacías. Antes de insertar nada, verifica unicidad por profesional: si existen d
 **El corte va con la app en mantenimiento** (hay plata y numeración de comprobantes fiscales):
 
 1. `npm run mantenimiento -- on "Volvemos en unos minutos"`.
-2. En `/srv/tranqui/.env`: agregar o configurar:
-   - `PAGOS_SUSCRIPCIONES=true`
-3. Reiniciar el servicio de pagos para ejecutar la carga inicial:
+2. En `/srv/tranqui/.env`: `SUSCRIPCIONES_EXTERNO=true` y reiniciar SOLO el monolito:
+   ```bash
+   docker compose -p app up -d tranqui-backend
+   ```
+   Desde acá el monolito no escribe suscripciones: sus rutas responden 409, no corren sus crons, y los webhooks
+   de suscripción que le reenvía pagos reciben 409. Pagos responde 500 y Mercado Pago los reintenta más tarde,
+   así que no se pierden. Su copia de acceso queda vacía hasta el paso 5; no importa porque está en mantenimiento.
+3. En `/srv/tranqui/.env`: `PAGOS_SUSCRIPCIONES=true` y reiniciar pagos:
    ```bash
    docker compose -p app up -d pagos
    ```
-4. Esperar que `pagos` esté sano y en sus logs figure:
-   `Carga inicial de suscripciones completada:`
-   > **Si la carga aborta por suscripciones duplicadas:** revisar los logs de `pagos` para identificar el
-   > `profesionalId` y los ids de suscripción involucrados. Resolver la duplicación directamente en el monolito
-   > (conservando la suscripción vigente y eliminando o corrigiendo la duplicada) y volver a reiniciar `pagos`
-   > antes de continuar con el corte.
-5. En `/srv/tranqui/.env`: configurar el flag en el monolito y la ruta en el gateway:
-   - `SUSCRIPCIONES_EXTERNO=true`
-   - `TRANQUI_SERVICES_SUSCRIPCIONES_URI=lb://pagos`
-6. Reiniciar el monolito (que al arrancar resincroniza su copia de acceso desde el servicio) y el gateway:
+4. Esperar que `pagos` esté sano y el log "Carga inicial de suscripciones completada"
+   > **Si la carga aborta por duplicados:** revisar los logs de `pagos` para identificar el `profesionalId` y
+   > los ids de suscripción involucrados. Para resolverlo hay que volver `SUSCRIPCIONES_EXTERNO=false` mientras
+   > se corrige en el monolito (o corregirlo por SQL en el monolito con aprobación), y repetir desde el paso 2.
+5. Reiniciar el monolito otra vez para que resincronice su copia del acceso ya con el servicio listo:
    ```bash
    docker compose -p app up -d tranqui-backend
+   ```
+   Esperar en sus logs:
+   "Resincronización de suscripciones completada: N profesionales actualizados."
+   con `N` mayor que cero si hay suscripciones. Sin esto, al salir de mantenimiento el portón del gateway y el
+   buscador verían a todos los profesionales sin acceso hasta la resincronización automática (hasta 15 minutos).
+6. En `/srv/tranqui/.env`: `TRANQUI_SERVICES_SUSCRIPCIONES_URI=lb://pagos` y reiniciar el gateway:
+   ```bash
    docker compose -p app up -d gateway
    ```
-7. Conciliar las ocho tablas y, si da sin diferencias, desactivar mantenimiento:
+7. Conciliar y, sin diferencias, mantenimiento off:
    ```bash
    node scripts/fase8-conciliar-suscripciones.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
    npm run mantenimiento -- off
@@ -208,27 +215,36 @@ vacías. Antes de insertar nada, verifica unicidad por profesional: si existen d
 **Vuelta atrás de la Fase 8:**
 
 1. `npm run mantenimiento -- on "Mantenimiento por actualización"`.
-2. Devolver al monolito todas las suscripciones, eventos, pagos, facturas y secuencias creados o modificados en
-   el servicio, con validación estricta de conflictos (aborta si difiere algún campo inmutable como el profesional,
-   monto de un pago o número/CAE de una factura emitida) y ajuste de secuencias:
+2. En `/srv/tranqui/.env`: `PAGOS_SUSCRIPCIONES=false` y reiniciar pagos:
+   ```bash
+   docker compose -p app up -d pagos
+   ```
+   El servicio deja de procesar y vuelve a reenviar los webhooks de suscripción al monolito. El monolito todavía
+   tiene `SUSCRIPCIONES_EXTERNO=true`, así que responde 409 y Mercado Pago reintenta después: nada se pierde.
+3. Correr `fase8-devolver-suscripciones.mjs` para devolver al monolito todas las suscripciones, eventos, pagos,
+   facturas y secuencias creados o modificados en el servicio, con validación estricta de conflictos (aborta si
+   difiere algún campo inmutable como el profesional, monto de un pago o número/CAE de una factura emitida) y
+   ajuste de secuencias:
    ```bash
    node scripts/fase8-devolver-suscripciones.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
    ```
-3. En `/srv/tranqui/.env`: `SUSCRIPCIONES_EXTERNO=false`, `PAGOS_SUSCRIPCIONES=false` y sacar
-   `TRANQUI_SERVICES_SUSCRIPCIONES_URI` (o apuntarla a `http://tranqui-backend:8080`).
-   Al poner `PAGOS_SUSCRIPCIONES=false`, el servicio de pagos vuelve a reenviar los webhooks de suscripción
-   recibidos de Mercado Pago al monolito, como hacía antes del corte.
-4. Reiniciar monolito, pagos y gateway:
+4. En `/srv/tranqui/.env`: `SUSCRIPCIONES_EXTERNO=false`, sacar `TRANQUI_SERVICES_SUSCRIPCIONES_URI` (o apuntarla
+   a `http://tranqui-backend:8080`) y reiniciar monolito y gateway:
    ```bash
-   docker compose -p app up -d tranqui-backend gateway pagos
+   docker compose -p app up -d tranqui-backend gateway
    ```
-5. Conciliar (`node scripts/fase8-conciliar-suscripciones.mjs ...`).
+5. Conciliar:
+   ```bash
+   node scripts/fase8-conciliar-suscripciones.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+   ```
 6. `npm run mantenimiento -- off`.
 
 **Volver a cortar después de una vuelta atrás:**
 Como la carga inicial de suscripciones solo corre con las ocho tablas vacías, antes de volver a cortar hay que vaciar
-en la base `pagos` las ocho tablas (después de haber devuelto y conciliado sin diferencias).
-> **Advertencia:** ejecutar este vaciado únicamente si la conciliación anterior finalizó sin diferencias:
+en la base `pagos` las ocho tablas (después de haber devuelto y conciliado sin diferencias). La copia `suscriptor`
+**no se vacía** (es una copia de identidad que se mantiene sola).
+> **Advertencia:** ejecutar este vaciado (`TRUNCATE`) únicamente si la conciliación anterior finalizó sin
+> diferencias y con la app en mantenimiento (`npm run mantenimiento -- on`):
 ```bash
 docker compose -p app exec tranqui-db psql -U <DB_USER> -d pagos -c "TRUNCATE TABLE plans, features, plan_features, subscriptions, subscription_events, subscription_payments, invoices, invoice_sequences RESTART IDENTITY CASCADE;"
 ```
