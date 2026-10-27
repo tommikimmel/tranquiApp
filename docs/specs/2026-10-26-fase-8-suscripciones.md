@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-26
 - **Tipo:** feature
 - **Sprint:** sprint-02
-- **Estado:** propuesta
+- **Estado:** aprobada (2026-10-27)
 - **Rama / PR:** una rama y un PR a `develop` por tarea, encadenadas sobre la Fase 7
 - **Plan:** [microservicios.md, Fase 8](../arquitectura/microservicios.md#fase-8-suscripciones)
 - **Forma de trabajo:** solo cambiar la arquitectura; sin buildear imágenes ni levantar el stack. Tests con Maven,
@@ -101,12 +101,10 @@ Pago y no suma un contenedor.
 - `/internal/suscripciones/estado` paginado, para la resincronización del monolito.
 
 ### S2c — Facturación ARCA
-- Factura C y nota de crédito con CAE, el PDF y la misma configuración `ARCA_*` (certificado y clave por archivo,
-  nunca en el repo); simulado en local.
-- **Numeración (pregunta 4):** antes de pedir cada CAE, consulta `FECompUltimoAutorizado` y usa el mayor entre
-  ese número y la secuencia local, más uno. Un CAE fallido se reintenta con la misma factura y el mismo número, no
-  arma otra.
-- Un solo emisor: el lock pesimista de la secuencia (ya existe) alcanza entre réplicas de la misma base.
+- **Se mueve tal cual (decisión 4):** factura C y nota de crédito con CAE, el PDF y la misma configuración
+  `ARCA_*` (certificado y clave por archivo, nunca en el repo), apagada (`ARCA_ENABLED=false`) como hoy. ARCA
+  todavía no está definida: la numeración y los reintentos no cambian y quedan anotados en
+  [cambios-a-futuro.md](../cambios-a-futuro.md).
 
 ### S3 — Gateway
 - Regla `suscripciones` con su propia variable `TRANQUI_SERVICES_SUSCRIPCIONES_URI`, por defecto al monolito hasta
@@ -122,7 +120,7 @@ Pago y no suma un contenedor.
   abajo) y de conciliación (cantidades, estados, montos, números de factura y CAE).
 
 ### S5 — Verificación de punta a punta (postergada)
-Checkout con Mercado Pago simulado y su webhook, cancelación, pago manual con factura simulada, nota de crédito,
+Checkout con Mercado Pago simulado y su webhook, cancelación, pago manual,
 la reconciliación, el portón y el buscador con una suscripción vencida, la verificación y el rechazo de un
 profesional, el servicio caído y la vuelta atrás.
 
@@ -144,7 +142,6 @@ profesional, el servicio caído y la vuelta atrás.
 - **Memoria del servicio de pagos:** la facturación (SOAP de ARCA y el PDF con OpenPDF) le suma trabajo en 288 MB.
   Se mide en S5; si no alcanza, se sube el límite (sin contenedor nuevo, igual queda por debajo de un servicio
   aparte).
-- **Cambio de comportamiento:** la numeración consulta a ARCA antes de cada CAE (pregunta 4).
 
 ## Preguntas
 
@@ -168,3 +165,19 @@ profesional, el servicio caído y la vuelta atrás.
    que se guarda pero no tiene ruta. **Recomiendo dejarlos para después**, anotados.
 7. Un PR a `develop` por tarea, Java 17, sin deploy ni pruebas con el stack, implementado por workers (como máximo
    cuatro a la vez).
+
+## Decisiones (2026-10-27)
+
+1. Las suscripciones van al servicio de pagos, con sus tablas aparte (sin servicio nuevo).
+2. Copia del acceso en el monolito alimentada por `suscripciones.suscripcion.cambio-estado.v2`; el gateway y el
+   servicio de profesionales no cambian en esta fase.
+3. Evento nuevo `identidad.profesional.verificacion-resuelta.v1` para VERIFIED o REJECTED.
+4. ARCA no está definida todavía: la facturación se mueve tal cual, apagada, sin cambiar la numeración. Lo que
+   falta definir queda en [cambios-a-futuro.md](../cambios-a-futuro.md).
+5. Una única suscripción por profesional (psicólogo o psiquiatra): índice único y la carga inicial aborta si hay
+   duplicados.
+6. Los webhooks sin deduplicar, el cobro doble posible y la ruta del PDF quedan anotados en
+   [cambios-a-futuro.md](../cambios-a-futuro.md), junto con el resto de los cambios a futuro de la migración.
+7. Igual que la Fase 7: un PR a `develop` por tarea, encadenados, Java 17, sin deploy ni pruebas con el stack,
+   implementado por workers (como máximo cuatro a la vez). Las dudas se resuelven primero con lo que ya está
+   implementado.
