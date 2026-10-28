@@ -26,6 +26,6 @@ public final class JwtUsuario {
     );
 
     public static boolean esRolValido(String rol) {
-        return rol != null && ROLES_VALIDOS.contains(rol.trim().toUpperCase());
+        return rol != null && ROLES_VALIDOS.contains(rol.trim());
     }
 }

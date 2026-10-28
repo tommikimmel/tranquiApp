@@ -2,6 +2,8 @@ package com.tranqui.app.service;
 
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.Usuario;
+import com.tranqui.eventos.jwt.UsuarioToken;
+import com.tranqui.eventos.jwt.VerificadorJwtUsuario;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +29,7 @@ class JwtServiceTest {
         jwtService = new JwtService();
         ReflectionTestUtils.setField(jwtService, "secretKey", "mysecuresecretkeythatmustbelongenoughfor256bitsHS256");
         ReflectionTestUtils.setField(jwtService, "jwtExpiration", 3600000L); // 1 hour
+        jwtService.validateSecret();
     }
 
     @Test
@@ -43,7 +46,13 @@ class JwtServiceTest {
         assertNotNull(token);
         assertTrue(jwtService.validateToken(token));
         assertEquals("juan@test.com", jwtService.extractEmail(token));
-        assertEquals(99, ((Number) jwtService.extractClaim(token, claims -> claims.get("uid"))).intValue());
+
+        VerificadorJwtUsuario verificador = new VerificadorJwtUsuario((String) null, "mysecuresecretkeythatmustbelongenoughfor256bitsHS256", true);
+        UsuarioToken ut = verificador.validar(token).orElseThrow();
+        assertEquals(99L, ut.uid());
+        assertEquals("PACIENTE", ut.rol());
+        assertEquals("Juan Test", ut.nombre());
+        assertEquals("juan@test.com", ut.email());
     }
 
     @Test
@@ -83,8 +92,11 @@ class JwtServiceTest {
         assertNotNull(token);
         assertTrue(jwtService.validateToken(token));
         assertEquals("juan@test.com", jwtService.extractEmail(token));
-        assertEquals("PACIENTE", jwtService.extractClaim(token, claims -> claims.get("rol")));
-        assertEquals("Juan Test", jwtService.extractClaim(token, claims -> claims.get("nombre")));
+
+        VerificadorJwtUsuario verificador = new VerificadorJwtUsuario((String) null, "mysecuresecretkeythatmustbelongenoughfor256bitsHS256", true);
+        UsuarioToken ut = verificador.validar(token).orElseThrow();
+        assertEquals("PACIENTE", ut.rol());
+        assertEquals("Juan Test", ut.nombre());
     }
 
     @Test
@@ -98,7 +110,7 @@ class JwtServiceTest {
         // waiting out a real 1h token — validateToken must reject it even though the signature
         // itself is genuine (it's a boundary on isTokenExpired, not on signature verification,
         // which whenInvalidToken_thenValidateShouldReturnFalse above already covers).
-        ReflectionTestUtils.setField(jwtService, "jwtExpiration", -1000L);
+        ReflectionTestUtils.setField(jwtService, "jwtExpiration", -120000L);
         Usuario usuario = Usuario.builder()
                 .nombre("Vencido Test")
                 .email("vencido@test.com")

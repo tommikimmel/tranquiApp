@@ -55,8 +55,8 @@ public class EmisorJwtUsuario {
         Instant expiracion = ahora.plus(vigencia);
 
         return Jwts.builder()
-                .setSubject(email.trim().toLowerCase())
-                .claim(JwtUsuario.CLAIM_ROL, rol.trim().toUpperCase())
+                .setSubject(email.trim())
+                .claim(JwtUsuario.CLAIM_ROL, rol.trim())
                 .claim(JwtUsuario.CLAIM_NOMBRE, nombre != null ? nombre.trim() : null)
                 .claim(JwtUsuario.CLAIM_UID, uid)
                 .setIssuer(JwtUsuario.EMISOR)
