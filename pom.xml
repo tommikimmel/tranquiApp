@@ -32,6 +32,7 @@
 		<module>services/pagos</module>
 		<module>services/profesionales</module>
 		<module>services/turnos</module>
+		<module>services/identidad</module>
 	</modules>
 
 	<dependencyManagement>
