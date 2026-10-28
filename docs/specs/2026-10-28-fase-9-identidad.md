@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-28
 - **Tipo:** feature
 - **Sprint:** sprint-02
-- **Estado:** borrador, esperando aprobación
+- **Estado:** aprobada (2026-10-28)
 - **Rama / PR:** una rama y un PR a `develop` por tarea, encadenadas sobre la Fase 8
 - **Plan:** [microservicios.md, Fase 9](../arquitectura/microservicios.md#fase-9-identidad-y-retiro-del-monolito)
 - **Forma de trabajo:** igual que las Fases 7 y 8: solo cambiar la arquitectura, sin buildear imágenes ni levantar
@@ -61,8 +61,10 @@ Lo que encontré y el plan no resolvía:
 
 ## Solución propuesta (con las recomendaciones de las Preguntas)
 
-La Fase 9 mueve identidad a su servicio y saca al monolito del camino de todo; **el apagado y el archivo de su base
-van en una Fase 10 aparte** (pregunta 2). Requiere la Fase 8 cortada (el paywall pasa a leer de pagos).
+La Fase 9 mueve identidad a su servicio y deja todo listo para que el monolito quede sin tráfico, **pero no lo apaga**
+(decisión 2): después vienen la Fase 10 (tests y validación de datos) y la Fase 11 (comparación con `main`), y el
+apagado y el archivo de su base quedan para una fase posterior. Requiere la Fase 8 cortada (el paywall pasa a leer de
+pagos).
 
 ### I1 — Catálogo, JWT y monolito
 - **JWT nuevo (pregunta 3):** RS256 con el par de claves de identidad (`JWT_PRIVATE_KEY` solo en identidad,
@@ -76,6 +78,9 @@ van en una Fase 10 aparte** (pregunta 2). Requiere la Fase 8 cortada (el paywall
   verificación.
 - Flag `identidad.externo` (`IDENTIDAD_EXTERNO`) en el monolito: con `true`, sus rutas de identidad responden 409 y
   no corre `DataInitializer`. Con `false` (vuelta atrás), todo como hoy.
+- **Sin el login falso también en el monolito** (decisión 1): `mock-` solo con `google.simulado=true` (por defecto
+  `false`), y `/api/admin/users` con un DTO sin hashes, códigos ni tokens. Los dos mails directos pasan a los
+  eventos nuevos cuando `envio-directo=false`, como el código de verificación.
 - Rutas internas para la carga inicial: `usuario` (solo las columnas de identidad, con `version`), `ticket`,
   `ticket_mensaje` y `novedades_envio`, paginadas y con sus ids.
 
@@ -183,3 +188,26 @@ vuelta atrás.
    **Recomiendo dejarlos para después.**
 8. Igual que la Fase 8: un PR a `develop` por tarea, encadenados, Java 17, sin deploy ni pruebas con el stack,
    implementado por workers (como máximo cuatro a la vez).
+
+## Decisiones (2026-10-28)
+
+1. No se hace el arreglo en `main`: la app no está en producción al 100 %. El login falso y la fuga de
+   `/api/admin/users` se corrigen en el monolito (I1) y en identidad (I2b), dentro de la cadena a `develop`.
+2. La Fase 9 deja todo listo para la migración, **sin apagar el monolito**: hay que validar el funcionamiento y
+   compararlo con lo que hace hoy. El apagado, el borrado del código de vuelta atrás y el archivo de la base van en
+   una fase posterior, con su spec.
+3. JWT RS256 con verificador único, `uid` y siete días de doble validación.
+4. Rutas `/internal/identidad/...` con el mismo JSON que las del monolito.
+5. El paywall del gateway pregunta a pagos.
+6. El portón y las novedades, a identidad; `/api/medicos/stats`, a turnos; `/api/health`, al gateway; los mails
+   directos, por eventos a notificaciones.
+7. La revocación de tokens, la cancelación de turnos al eliminar una cuenta y el evento de cambio de mail quedan en
+   [cambios-a-futuro.md](../cambios-a-futuro.md).
+8. Igual que la Fase 8: un PR a `develop` por tarea, encadenados, Java 17, sin deploy ni pruebas con el stack,
+   implementado por workers (como máximo cuatro a la vez).
+9. Se agregan dos fases antes del apagado (cada una con su spec):
+   - **Fase 10 — Tests y validación de datos:** tests unitarios, de integración y de punta a punta, y que cada
+     servicio valide todo lo que recibe de otro (eventos, respuestas internas y encabezados): nunca se confía en lo
+     que manda otro servicio.
+   - **Fase 11 — Comparación con `main`:** recorrer el frontend y el backend de `main` contra todo lo que está en
+     los PR, para que ninguna funcionalidad quede afuera, sin código o deje de existir.
