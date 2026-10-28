@@ -125,6 +125,7 @@ pagos).
 - `/api/medicos/stats` a turnos.
 - Validación con el verificador de I1.
 - `/api/health` lo responde el propio gateway (pregunta 6).
+- **Hecho en I4:** `UserJwtVerifier` en el gateway delega en `VerificadorJwtUsuario` con `jwt.public-key`, `jwt.secret` y `jwt.hs256-aceptado`, retornando `UsuarioToken` adaptado a `PortonesGlobalFilter`, `AdminAuthValidator` y `UserOrIpKeyResolver`; regla `identidad` con variable `TRANQUI_SERVICES_IDENTIDAD_URI` (por defecto al monolito) para `/api/auth/**`, `/api/tickets/**`, `/api/soporte/**`, `/api/admin/users/**`, `/api/admin/tickets/**` y `/api/site-access/**`, manteniendo `/api/admin/subscriptions/**` en suscripciones; rutas internas `/internal/identidad/**` (con `TRANQUI_SERVICES_IDENTIDAD_INTERNO_URI`) e `/internal/pagos/**` protegidas con JWT de servicio; regla `turnos-stats` para `/api/medicos/stats` hacia turnos; `HealthController` del gateway atendiendo directamente `/api/health`; paywall en `AccesoSuscripcionCliente` con soporte para fuente `pagos` (`TRANQUI_PAYWALL_FUENTE`) consultando `/internal/suscripciones/acceso` con `@LoadBalanced` y validación estricta del campo booleano `permitido`; filtros de portones alineados con las excepciones del monolito; y suite de tests completa migrada a RS256 y ampliada con pruebas de ruteo, paywall, transicion HS256 y salud.
 
 ### I5 — Infraestructura, corte, vuelta atrás y conciliación
 - Compose: contenedor `identidad` (base nueva en `db-servicios`), `IDENTIDAD_EXTERNO`, `IDENTIDAD_CARGA`,
