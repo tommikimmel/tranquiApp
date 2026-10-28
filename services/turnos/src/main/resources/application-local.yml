@@ -1,0 +1,14 @@
+# Perfil local (docker-compose.local.yml): claves de desarrollo y Mercado Pago simulado, como el monolito.
+jwt:
+  secret: ${JWT_SECRET:local-dev-encryption-key-32chars}
+
+tranqui:
+  jwt:
+    service-secret: ${SERVICE_JWT_KEY:local-service-jwt-secret-key-32chars}
+
+mercadopago:
+  enabled: false
+
+payment:
+  simulation:
+    enabled: true

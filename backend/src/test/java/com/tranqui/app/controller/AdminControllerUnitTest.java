@@ -2,6 +2,7 @@ package com.tranqui.app.controller;
 
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.Usuario;
+import com.tranqui.app.model.dto.UsuarioAdminDto;
 import com.tranqui.app.repository.UsuarioRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ class AdminControllerUnitTest {
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private com.tranqui.app.repository.SubscriptionRepository subscriptionRepository;
     @Mock private com.tranqui.app.service.SubscriptionService subscriptionService;
+    @Mock private com.tranqui.app.eventos.OutboxPublisher outboxPublisher;
 
     @InjectMocks
     private AdminController controller;
@@ -34,7 +36,7 @@ class AdminControllerUnitTest {
     void getUsers_shouldReturnAllUsers() {
         when(usuarioRepository.findAll()).thenReturn(List.of(Usuario.builder().id(1L).build()));
 
-        ResponseEntity<List<Usuario>> response = controller.getUsers();
+        ResponseEntity<List<UsuarioAdminDto>> response = controller.getUsers();
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(1, response.getBody().size());
@@ -69,7 +71,7 @@ class AdminControllerUnitTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(Rol.PSIQUIATRA, usuario.getRol());
         assertEquals(Boolean.TRUE, usuario.getVerificadoAdmin());
-        verify(usuarioRepository).save(usuario);
+        verify(usuarioRepository).saveAndFlush(usuario);
     }
 
     @Test
