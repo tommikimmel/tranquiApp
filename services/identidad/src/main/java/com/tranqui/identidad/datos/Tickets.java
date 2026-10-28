@@ -91,7 +91,7 @@ public class Tickets {
     }
 
     @Transactional
-    public void actualizar(Ticket t) {
+    public Ticket actualizar(Ticket t) {
         int filas = jdbc.update("""
                 UPDATE ticket SET
                     version = version + 1,
@@ -115,6 +115,9 @@ public class Tickets {
             throw new OptimisticLockingFailureException(
                     "Conflicto de versión optimista al actualizar ticket id=" + t.id() + " con versión " + t.version());
         }
+        // La fila como quedó (versión subida): los eventos usan esa versión + 1, como el monolito.
+        return new Ticket(t.id(), (t.version() != null ? t.version() : 0) + 1, t.creadorId(), t.asunto(), t.estado(),
+                t.fechaCreacion(), t.fechaActualizacion());
     }
 
     public long cantidad() {

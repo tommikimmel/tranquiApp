@@ -13,7 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -21,8 +21,9 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Semilla de cuentas base y de prueba de identidad (Fase 9, I2b).
- * Espera a que termine la carga inicial antes de correr.
+ * Semilla de cuentas base y de prueba de identidad (Fase 9, I2b/I2c).
+ * Corre en segundo plano esperando que la carga inicial termine antes de sembrar,
+ * sin bloquear el arranque del servicio ni dejar una transacción abierta durante la espera.
  * Publica identidad.usuario.registrado.v1 por cada usuario creado.
  */
 @Component
@@ -34,29 +35,47 @@ public class DataInitializer implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final OutboxPublisher outboxPublisher;
     private final ObjectProvider<EsperaAntesDeConsumir> esperas;
+    private final TransactionTemplate tx;
     private final boolean seedTestAccounts;
     private final String adminInitialPassword;
+    private volatile boolean listo = false;
 
     public DataInitializer(
             Usuarios usuarios,
             PasswordEncoder passwordEncoder,
             OutboxPublisher outboxPublisher,
             ObjectProvider<EsperaAntesDeConsumir> esperas,
+            TransactionTemplate tx,
             @Value("${app.seed-test-accounts:false}") boolean seedTestAccounts,
             @Value("${app.admin-initial-password:}") String adminInitialPassword) {
         this.usuarios = usuarios;
         this.passwordEncoder = passwordEncoder;
         this.outboxPublisher = outboxPublisher;
         this.esperas = esperas;
+        this.tx = tx;
         this.seedTestAccounts = seedTestAccounts;
         this.adminInitialPassword = adminInitialPassword;
     }
 
     @Override
-    @Transactional
     public void run(String... args) throws Exception {
+        Thread hilo = new Thread(this::ejecutarSemilla, "semilla-identidad");
+        hilo.setDaemon(true);
+        hilo.start();
+    }
+
+    public void ejecutarSemilla() {
         esperarCargaInicial();
-        inicializarCuentas();
+        tx.executeWithoutResult(estado -> inicializarCuentas());
+        listo = true;
+    }
+
+    public void ejecutarSincronico() {
+        ejecutarSemilla();
+    }
+
+    public boolean estaListo() {
+        return listo;
     }
 
     private void esperarCargaInicial() {

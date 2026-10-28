@@ -100,6 +100,29 @@ jwt:
 app:
   seed-test-accounts: ${SEED_TEST_ACCOUNTS:false}
   admin-initial-password: ${ADMIN_INITIAL_PASSWORD:}
+  # Links del mail de novedades (Mi Cuenta y "Ir a Tranqui App").
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+
+# Portón del sitio: mientras haya contraseña, se pide antes de mostrar el sitio (la cookie la exige el gateway).
+site:
+  access:
+    password: ${SITE_ACCESS_PASSWORD:}
+
+# Novedades: mail masivo al terminar un mantenimiento (Broadcasts de Resend). El token protege
+# /internal/identidad/novedades; solo vive en el .env del VPS. Ver docs/novedades.md.
+novedades:
+  token: ${NOVEDADES_TOKEN:}
+  segmento-pacientes: Tranqui App - Pacientes
+  segmento-profesionales: Tranqui App - Profesionales
+
+# "resend" (producción) o "smtp" (local con Mailpit). Solo lo usan las novedades: el resto de los mails los manda
+# notificaciones.
+mail:
+  transport: ${MAIL_TRANSPORT:resend}
+
+resend:
+  api-key: ${RESEND_API_KEY:}
+  from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}
 
 tranqui:
   gateway:

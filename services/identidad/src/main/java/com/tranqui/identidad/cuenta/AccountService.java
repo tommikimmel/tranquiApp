@@ -77,8 +77,8 @@ public class AccountService {
                 .fotoUrl(dto.getFotoUrl())
                 .build();
 
-        usuarios.actualizar(actualizado);
-        publicarUsuarioActualizado(u);
+        actualizado = usuarios.actualizar(actualizado);
+        publicarUsuarioActualizado(actualizado);
         return construirDto(actualizado);
     }
 
@@ -91,8 +91,8 @@ public class AccountService {
                 .notificacionesEmailHabilitadas(emailHabilitado)
                 .build();
 
-        usuarios.actualizar(actualizado);
-        publicarUsuarioActualizado(u);
+        actualizado = usuarios.actualizar(actualizado);
+        publicarUsuarioActualizado(actualizado);
         return construirDto(actualizado);
     }
 
@@ -189,12 +189,12 @@ public class AccountService {
                 .anonimizadoEn(LocalDateTime.now())
                 .build();
 
-        usuarios.actualizar(actualizado);
+        actualizado = usuarios.actualizar(actualizado);
         outboxPublisher.publicar(
                 Topicos.IDENTIDAD_USUARIO_ELIMINADO_V1,
                 "usuario",
                 String.valueOf(u.id()),
-                u.aggregateVersion(),
+                actualizado.aggregateVersion(),
                 new UsuarioEliminadoData(
                         u.id(),
                         "solicitud_usuario"

@@ -36,7 +36,9 @@ public class FiltroAutenticacionUsuario extends OncePerRequestFilter {
             "/api/auth/forgot-password",
             "/api/auth/reset-password",
             "/api/auth/login",
-            "/api/auth/google"
+            "/api/auth/google",
+            "/api/site-access/estado",
+            "/api/site-access/verificar"
     );
 
     private final VerificadorJwtUsuario verificador;

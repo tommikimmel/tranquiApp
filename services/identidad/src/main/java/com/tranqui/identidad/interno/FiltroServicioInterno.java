@@ -32,7 +32,8 @@ public class FiltroServicioInterno extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith("/internal/");
+        String uri = request.getRequestURI();
+        return !uri.startsWith("/internal/") || uri.startsWith("/internal/identidad/novedades");
     }
 
     @Override

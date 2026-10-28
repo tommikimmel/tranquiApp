@@ -371,6 +371,8 @@ class IdentidadIntegracionTest {
     void busquedaUsuarios_porRol_y_suscriptores() {
         Map<String, Object> u1 = usuarioValidoMap(1L, "psi@tranqui.com", "PSIQUIATRA");
         Map<String, Object> u2 = usuarioValidoMap(2L, "pac@tranqui.com", "PACIENTE");
+        // Suscriptor = rol PSIQUIATRA o con profesión cargada: el paciente no tiene profesión.
+        u2.put("profession", null);
         when(interno.usuarios(eq(0), anyInt())).thenReturn(List.of(
                 new ClienteInterno.UsuarioMonolito(u1),
                 new ClienteInterno.UsuarioMonolito(u2)
@@ -1098,7 +1100,7 @@ class IdentidadIntegracionTest {
 
     @Test
     void semilla_creaCuentasYPublicaEventos() throws Exception {
-        dataInitializer.run();
+        dataInitializer.ejecutarSincronico();
 
         assertThat(usuarios.buscarPorEmail("admin@tranqui.com")).isPresent();
         assertThat(usuarios.buscarPorEmail("medico.verificado@gmail.com")).isPresent();
@@ -1136,7 +1138,9 @@ class IdentidadIntegracionTest {
 
         List<JsonNode> actEvents = buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1);
         assertThat(actEvents).hasSize(1);
-        assertThat(actEvents.get(0).get("aggregateVersion").asInt()).isEqualTo(1);
+        // El evento lleva la versión guardada + 1, como el monolito (que publica después de saveAndFlush): así las
+        // copias no descartan el primer evento de identidad después del corte.
+        assertThat(actEvents.get(0).get("aggregateVersion").asInt()).isEqualTo(2);
 
         // 2ª actualización: /mi-cuenta/notificaciones
         restTemplate.exchange("/api/auth/mi-cuenta/notificaciones", HttpMethod.PUT, new HttpEntity<>(new PreferenciasNotificacionDto(false), headers), MiCuentaDto.class);
@@ -1146,7 +1150,7 @@ class IdentidadIntegracionTest {
 
         List<JsonNode> actEvents2 = buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1);
         assertThat(actEvents2).hasSize(2);
-        assertThat(actEvents2.get(1).get("aggregateVersion").asInt()).isEqualTo(2);
+        assertThat(actEvents2.get(1).get("aggregateVersion").asInt()).isEqualTo(3);
 
         // 3ª actualización: /mi-cuenta/eliminar
         restTemplate.exchange("/api/auth/mi-cuenta/eliminar", HttpMethod.POST, new HttpEntity<>(new EliminarCuentaDto("Pass1234"), headers), String.class);
@@ -1156,6 +1160,6 @@ class IdentidadIntegracionTest {
 
         List<JsonNode> elimEvents = buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_ELIMINADO_V1);
         assertThat(elimEvents).hasSize(1);
-        assertThat(elimEvents.get(0).get("aggregateVersion").asInt()).isEqualTo(3);
+        assertThat(elimEvents.get(0).get("aggregateVersion").asInt()).isEqualTo(4);
     }
 }
