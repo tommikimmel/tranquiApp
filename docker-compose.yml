@@ -249,6 +249,17 @@ services:
       # SUSCRIPCIONES_EXTERNO=false en el .env, sacar TRANQUI_SERVICES_SUSCRIPCIONES_URI y correr
       # scripts/fase8-devolver-suscripciones.mjs.
       SUSCRIPCIONES_EXTERNO: ${SUSCRIPCIONES_EXTERNO:-false}
+      # Fase 9: autenticación, registro, usuarios y soporte los administra el servicio de identidad.
+      # Default false hasta el corte en mantenimiento (las rutas de identidad responden 409). Vuelta atrás:
+      # IDENTIDAD_EXTERNO=false en el .env, sacar TRANQUI_SERVICES_IDENTIDAD_URI y correr
+      # scripts/fase9-devolver-identidad.mjs.
+      IDENTIDAD_EXTERNO: ${IDENTIDAD_EXTERNO:-false}
+      # Fase 9: clave pública RSA de identidad para validar tokens RS256 en la transición.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      # Fase 9: aceptar tokens HS256 además de RS256 durante la transición de 7 días.
+      JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
+      # Fase 9: solo true en desarrollo local para simular login con Google.
+      GOOGLE_SIMULADO: ${GOOGLE_SIMULADO:-false}
       EVENTOS_CONSUMO_SERVICIO: monolito
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || exit 1"]
@@ -310,8 +321,21 @@ services:
       # hasta el corte (o en vuelta atrás sin definir). En el corte se define TRANQUI_SERVICES_SUSCRIPCIONES_URI=lb://pagos.
       # Vuelta atrás: sacar la variable (o apuntar al monolito) y SUSCRIPCIONES_EXTERNO=false.
       TRANQUI_SERVICES_SUSCRIPCIONES_URI: ${TRANQUI_SERVICES_SUSCRIPCIONES_URI:-http://tranqui-backend:8080}
+      # Fase 9: /api/auth/**, /api/tickets/**, /api/soporte/**, /api/admin/users/**, /api/admin/tickets/**,
+      # /api/site-access/** y /internal/identidad/** al servicio de identidad. Por defecto al monolito
+      # hasta el corte (o en vuelta atrás sin definir). En el corte se define TRANQUI_SERVICES_IDENTIDAD_URI=lb://identidad.
+      # Vuelta atrás: sacar la variable (o apuntar al monolito) e IDENTIDAD_EXTERNO=false.
+      TRANQUI_SERVICES_IDENTIDAD_URI: ${TRANQUI_SERVICES_IDENTIDAD_URI:-http://tranqui-backend:8080}
+      # Fase 9: rutas internas de identidad derivadas siempre al servicio identidad.
+      TRANQUI_SERVICES_IDENTIDAD_INTERNO_URI: ${TRANQUI_SERVICES_IDENTIDAD_INTERNO_URI:-lb://identidad}
+      # Fase 9: fuente de consulta de paywall para el gateway (monolito hasta el corte; pagos en el corte).
+      TRANQUI_PAYWALL_FUENTE: ${TRANQUI_PAYWALL_FUENTE:-monolito}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      # Fase 9: clave pública RSA de identidad para verificación unificada de JWT RS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      # Fase 9: aceptar tokens HS256 además de RS256 durante la transición de 7 días.
+      JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
       # Fase 3 (G1): el gateway aplica el portón del sitio y el paywall a las rutas de los servicios.
       SITE_ACCESS_PASSWORD: ${SITE_ACCESS_PASSWORD:-}
       VICTORIAMETRICS_URL: http://victoriametrics:8428
@@ -352,13 +376,14 @@ services:
       PGUSER: ${DB_USER:-tomaskimmel}
       PGPASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
       PGDATABASE: ${DB_NAME:-tranqui_app}
-      SERVICIOS: notificaciones chat calendario pagos profesionales turnos
+      SERVICIOS: notificaciones chat calendario pagos profesionales turnos identidad
       DB_PASSWORD_NOTIFICACIONES: ${NOTIFICACIONES_DB_PASSWORD:?Falta NOTIFICACIONES_DB_PASSWORD en .env}
       DB_PASSWORD_CHAT: ${CHAT_DB_PASSWORD:?Falta CHAT_DB_PASSWORD en .env}
       DB_PASSWORD_CALENDARIO: ${CALENDARIO_DB_PASSWORD:?Falta CALENDARIO_DB_PASSWORD en .env}
       DB_PASSWORD_PAGOS: ${PAGOS_DB_PASSWORD:?Falta PAGOS_DB_PASSWORD en .env}
       DB_PASSWORD_PROFESIONALES: ${PROFESIONALES_DB_PASSWORD:?Falta PROFESIONALES_DB_PASSWORD en .env}
       DB_PASSWORD_TURNOS: ${TURNOS_DB_PASSWORD:?Falta TURNOS_DB_PASSWORD en .env}
+      DB_PASSWORD_IDENTIDAD: ${IDENTIDAD_DB_PASSWORD:?Falta IDENTIDAD_DB_PASSWORD en .env}
     volumes:
       - ./infra/postgres:/infra:ro
     mem_limit: 32m
@@ -396,6 +421,9 @@ services:
       CONSUL_HOST: consul
       CONSUL_PORT: "8500"
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      # Fase 9: verificación unificada de JWT (RS256 con clave pública y transición HS256).
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       TRANQUI_GATEWAY_URL: http://gateway:8080
       TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
@@ -449,6 +477,9 @@ services:
       CONSUL_HOST: consul
       CONSUL_PORT: "8500"
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      # Fase 9: verificación unificada de JWT (RS256 con clave pública y transición HS256).
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       TRANQUI_GATEWAY_URL: http://gateway:8080
       TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
@@ -500,6 +531,9 @@ services:
       CONSUL_HOST: consul
       CONSUL_PORT: "8500"
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      # Fase 9: verificación unificada de JWT (RS256 con clave pública y transición HS256).
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       TRANQUI_GATEWAY_URL: http://gateway:8080
       TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
@@ -561,6 +595,9 @@ services:
       CONSUL_HOST: consul
       CONSUL_PORT: "8500"
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      # Fase 9: verificación unificada de JWT (RS256 con clave pública y transición HS256).
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       TRANQUI_GATEWAY_URL: http://gateway:8080
       TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
@@ -576,6 +613,8 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Falta ENCRYPTION_KEY en .env}
       # Fase 8: carga inicial y atención de suscripciones, planes y facturación. Default false hasta el corte en mantenimiento.
       PAGOS_SUSCRIPCIONES: ${PAGOS_SUSCRIPCIONES:-false}
+      # Fase 9: fuente de identidad para consultas internas (monolito hasta el corte, identidad en el corte).
+      TRANQUI_FUENTE_IDENTIDAD: ${TRANQUI_FUENTE_IDENTIDAD:-monolito}
       # Fase 8: Mercado Pago de la plataforma para suscripciones (mismas variables y defaults que el monolito).
       MP_ADMIN_ACCESS_TOKEN: ${MP_ADMIN_ACCESS_TOKEN:-}
       MP_ADMIN_PUBLIC_KEY: ${MP_ADMIN_PUBLIC_KEY:-}
@@ -641,6 +680,9 @@ services:
       CONSUL_HOST: consul
       CONSUL_PORT: "8500"
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      # Fase 9: verificación unificada de JWT (RS256 con clave pública y transición HS256).
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       TRANQUI_GATEWAY_URL: http://gateway:8080
       TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
@@ -648,6 +690,8 @@ services:
       MERCADOPAGO_ENABLED: ${MERCADOPAGO_ENABLED:-false}
       # Fase 7: carga inicial y atención de historia clínica y recetas. Default false hasta el corte en mantenimiento.
       PROFESIONALES_CLINICA: ${PROFESIONALES_CLINICA:-false}
+      # Fase 9: fuente de identidad para consultas internas (monolito hasta el corte, identidad en el corte).
+      TRANQUI_FUENTE_IDENTIDAD: ${TRANQUI_FUENTE_IDENTIDAD:-monolito}
       # Fase 7: QBI2 para recetas electrónicas (las mismas variables y defaults que el monolito).
       QBI2_RECIPE_ENABLED: ${QBI2_RECIPE_ENABLED:-false}
       QBI2_RECIPE_ENV: ${QBI2_RECIPE_ENV:-hml}
@@ -700,6 +744,9 @@ services:
       CONSUL_HOST: consul
       CONSUL_PORT: "8500"
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      # Fase 9: verificación unificada de JWT (RS256 con clave pública y transición HS256).
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       TRANQUI_GATEWAY_URL: http://gateway:8080
       TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
@@ -708,6 +755,8 @@ services:
       MERCADOPAGO_ENABLED: ${MERCADOPAGO_ENABLED:-false}
       PAYMENT_SIMULATION_ENABLED: ${PAYMENT_SIMULATION_ENABLED:-false}
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:8081}
+      # Fase 9: fuente de identidad para consultas internas (monolito hasta el corte, identidad en el corte).
+      TRANQUI_FUENTE_IDENTIDAD: ${TRANQUI_FUENTE_IDENTIDAD:-monolito}
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
       interval: 10s
@@ -730,6 +779,76 @@ services:
       tranqui-network:
         aliases:
           - tranqui-turnos
+
+  # Fase 9: servicio de identidad (autenticación, registro, perfil, soporte y administración).
+  identidad:
+    image: ghcr.io/tommikimmel/tranqui-identidad:${TRANQUI_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: services/identidad/Dockerfile
+    container_name: tranqui-identidad
+    restart: always
+    mem_limit: 288m
+    cpus: 0.5
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+      JAVA_TOOL_OPTIONS: "-XX:+UseSerialGC -XX:MinRAMPercentage=30 -XX:MaxRAMPercentage=30 -Xss256k -XX:ReservedCodeCacheSize=32m -XX:MaxMetaspaceSize=128m -XX:TieredStopAtLevel=1"
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://tranqui-db:5432/identidad
+      SPRING_DATASOURCE_USERNAME: identidad
+      SPRING_DATASOURCE_PASSWORD: ${IDENTIDAD_DB_PASSWORD:?Falta IDENTIDAD_DB_PASSWORD en .env}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-tranqui}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD en .env}
+      SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/}
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      # Fase 9: clave privada RSA para firma de JWT (solo acá) y clave pública para validación.
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      # Fase 9: aceptar tokens HS256 además de RS256 durante la transición de 7 días.
+      JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
+      SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+      TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
+      # Fase 9: carga inicial desde el monolito. Default false hasta el corte en mantenimiento.
+      IDENTIDAD_CARGA: ${IDENTIDAD_CARGA:-false}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-}
+      SEED_TEST_ACCOUNTS: ${SEED_TEST_ACCOUNTS:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-224301140079-2pa672f7sqcner9nut04j0g99md88n3p.apps.googleusercontent.com}
+      SITE_ACCESS_PASSWORD: ${SITE_ACCESS_PASSWORD:-}
+      NOVEDADES_TOKEN: ${NOVEDADES_TOKEN:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-onboarding@resend.dev}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:8081}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+    ports:
+      # Puerto 8084 publicado en 127.0.0.1 en el VPS exclusivamente para novedades (scripts/mantenimiento.mjs)
+      - "127.0.0.1:8084:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    # Arranque escalonado (sección 9.3): después de turnos.
+    depends_on:
+      db-servicios:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+      turnos:
+        condition: service_healthy
+    networks:
+      tranqui-network:
+        aliases:
+          - tranqui-identidad
 
   tranqui-frontend:
     image: ghcr.io/tommikimmel/tranqui-frontend:${TRANQUI_VERSION:-latest}

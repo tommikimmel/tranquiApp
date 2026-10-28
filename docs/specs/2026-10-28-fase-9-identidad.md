@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-28
 - **Tipo:** feature
 - **Sprint:** sprint-02
-- **Estado:** aprobada (2026-10-28)
+- **Estado:** aprobada (2026-10-28); I1 a I5 implementados, I6 postergada
 - **Rama / PR:** una rama y un PR a `develop` por tarea, encadenadas sobre la Fase 8
 - **Plan:** [microservicios.md, Fase 9](../arquitectura/microservicios.md#fase-9-identidad-y-retiro-del-monolito)
 - **Forma de trabajo:** igual que las Fases 7 y 8: solo cambiar la arquitectura, sin buildear imágenes ni levantar
@@ -136,6 +136,8 @@ pagos).
 - Script de vuelta atrás (las cuatro tablas al monolito con sus ids) y de conciliación (cantidades, mails, roles y
   hashes comparados sin imprimirlos).
 - Memoria medida en la sección de producción.
+
+- **Hecho en I5:** contenedor `identidad` en los dos compose (producción con todo apagado o al monolito hasta el corte; local todo cortado), base en `db-servicios`, variables de la Fase 9 en el monolito, el gateway y los seis servicios, `127.0.0.1:8084` para el script de novedades (`scripts/mantenimiento.mjs` elige identidad con `IDENTIDAD_EXTERNO=true`), `.env.template`, imagen en el CI y el deploy, `scripts/fase9-devolver-identidad.mjs` y `fase9-conciliar-identidad.mjs`, y la sección Fase 9 de `produccion.md` (claves, corte, siete días de transición, vuelta atrás) y de `local.md`.
 
 ### I6 — Verificación de punta a punta (postergada)
 Registro, verificación de mail, login con contraseña y con Google, recuperación, Mi Cuenta y eliminación, tickets,

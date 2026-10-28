@@ -47,6 +47,24 @@ terminal interactiva, aborta y lista los puertos ocupados.
 A partir de la Fase 0 ([Plan de migración a microservicios](../arquitectura/microservicios.md)), el
 entorno local incluye la infraestructura de soporte para la arquitectura distribuida:
 
+- **Identidad en su propio servicio (`identidad`, Fase 9):** registro, login (JWT RS256), Mi Cuenta, tickets, soporte,
+  administración de usuarios, portón del sitio y novedades, con base propia `identidad`. En local va **todo cortado**:
+  `IDENTIDAD_EXTERNO: "true"` en el backend, `IDENTIDAD_CARGA: "true"` (copia del monolito con las tablas vacías),
+  `TRANQUI_FUENTE_IDENTIDAD: identidad` en pagos, profesionales y turnos, y en el gateway
+  `TRANQUI_SERVICES_IDENTIDAD_URI` y `TRANQUI_SERVICES_IDENTIDAD_INTERNO_URI` en `lb://identidad` y
+  `TRANQUI_PAYWALL_FUENTE: pagos`. El login con Google acepta tokens `mock-` solo acá (`IDENTIDAD_GOOGLE_SIMULADO`).
+  Publica `127.0.0.1:8084` para el script de novedades.
+  - **Claves RSA (una vez):** el compose local las lee del `.env` y no arranca sin ellas. Generarlas así y pegar las dos
+    líneas en el `.env` (nunca se versionan):
+    ```bash
+    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/jwt-privada.pem
+    echo "JWT_PRIVATE_KEY=$(openssl pkcs8 -topk8 -nocrypt -in /tmp/jwt-privada.pem -outform DER | base64 -w0)"
+    echo "JWT_PUBLIC_KEY=$(openssl rsa -in /tmp/jwt-privada.pem -pubout -outform DER | base64 -w0)"
+    rm /tmp/jwt-privada.pem
+    ```
+  - **Volver al monolito:** sacar las variables de la Fase 9 del gateway y de los servicios, poner
+    `IDENTIDAD_EXTERNO: "false"` en el backend, frenar identidad y correr `node scripts/fase9-devolver-identidad.mjs`.
+    `node scripts/fase9-conciliar-identidad.mjs` compara las cuatro tablas.
 - **Suscripciones, planes y facturación en el servicio de pagos (`pagos`, Fase 8):** suscripciones, planes,
   features, pagos de suscripción, historial de eventos y facturas con ARCA (deshabilitada/simulada). No agrega
   contenedor nuevo. Su esquema lo crea Flyway en la base `pagos` y copia las ocho tablas iniciales del monolito

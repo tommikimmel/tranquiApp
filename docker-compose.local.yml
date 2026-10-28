@@ -131,6 +131,15 @@ services:
       # Fase 8: las suscripciones las administra el servicio de pagos.
       # "false" vuelve las suscripciones al monolito (vuelta atrás).
       SUSCRIPCIONES_EXTERNO: "true"
+      # Fase 9: autenticación, registro, perfil, soporte y usuarios en el servicio de identidad.
+      # "false" vuelve la identidad al monolito (vuelta atrás).
+      IDENTIDAD_EXTERNO: "true"
+      # Fase 9: clave pública RSA de identidad leída del .env local (opcional en local si no se define).
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      # Fase 9: aceptar tokens HS256 además de RS256 en la transición.
+      JWT_HS256_ACEPTADO: "true"
+      # Fase 9: login simulado con Google en local.
+      GOOGLE_SIMULADO: "true"
       EVENTOS_CONSUMO_SERVICIO: monolito
     ports:
       - "127.0.0.1:8081:8080"
@@ -152,13 +161,14 @@ services:
       PGUSER: tranqui
       PGPASSWORD: tranqui-local
       PGDATABASE: tranqui_local
-      SERVICIOS: notificaciones chat calendario pagos profesionales turnos
+      SERVICIOS: notificaciones chat calendario pagos profesionales turnos identidad
       DB_PASSWORD_NOTIFICACIONES: notificaciones-local
       DB_PASSWORD_CHAT: chat-local
       DB_PASSWORD_CALENDARIO: calendario-local
       DB_PASSWORD_PAGOS: pagos-local
       DB_PASSWORD_PROFESIONALES: profesionales-local
       DB_PASSWORD_TURNOS: turnos-local
+      DB_PASSWORD_IDENTIDAD: identidad-local
     volumes:
       - ./infra/postgres:/infra:ro
     depends_on:
@@ -186,6 +196,9 @@ services:
       SPRING_MAIL_HOST: mailpit
       SPRING_MAIL_PORT: "1025"
       JWT_SECRET: local-dev-encryption-key-32chars
+      # Fase 9: clave pública RSA de identidad leída del .env local y transición HS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: "true"
       SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
       TRANQUI_GATEWAY_URL: http://gateway:8080
       FRONTEND_URL: http://localhost:5173
@@ -224,6 +237,9 @@ services:
       CONSUL_HOST: consul
       CONSUL_PORT: "8500"
       JWT_SECRET: local-dev-encryption-key-32chars
+      # Fase 9: clave pública RSA de identidad leída del .env local y transición HS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: "true"
       SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
       TRANQUI_GATEWAY_URL: http://gateway:8080
     healthcheck:
@@ -259,6 +275,9 @@ services:
       CONSUL_HOST: consul
       CONSUL_PORT: "8500"
       JWT_SECRET: local-dev-encryption-key-32chars
+      # Fase 9: clave pública RSA de identidad leída del .env local y transición HS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: "true"
       SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
       # La misma clave que el monolito: los tokens de Google se leen en los dos.
       ENCRYPTION_KEY: local-dev-encryption-key-32chars
@@ -298,6 +317,9 @@ services:
       CONSUL_HOST: consul
       CONSUL_PORT: "8500"
       JWT_SECRET: local-dev-encryption-key-32chars
+      # Fase 9: clave pública RSA de identidad leída del .env local y transición HS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: "true"
       SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
       # La misma clave que el monolito: los tokens de Mercado Pago se leen en los dos.
       ENCRYPTION_KEY: local-dev-encryption-key-32chars
@@ -307,6 +329,8 @@ services:
       FRONTEND_URL: http://localhost:5173
       # Fase 8: suscripciones habilitadas en local.
       PAGOS_SUSCRIPCIONES: "true"
+      # Fase 9: fuente de identidad cortada al servicio identidad en local.
+      TRANQUI_FUENTE_IDENTIDAD: identidad
       # Fase 8: Mercado Pago de plataforma y facturación ARCA (simulada/deshabilitada en local como en el monolito).
       MP_ADMIN_ACCESS_TOKEN: ""
       MP_ADMIN_PUBLIC_KEY: ""
@@ -350,10 +374,15 @@ services:
       CONSUL_HOST: consul
       CONSUL_PORT: "8500"
       JWT_SECRET: local-dev-encryption-key-32chars
+      # Fase 9: clave pública RSA de identidad leída del .env local y transición HS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: "true"
       SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
       TRANQUI_GATEWAY_URL: http://gateway:8080
       # Fase 7: historia clínica y recetas habilitadas en local.
       PROFESIONALES_CLINICA: "true"
+      # Fase 9: fuente de identidad cortada al servicio identidad en local.
+      TRANQUI_FUENTE_IDENTIDAD: identidad
       # Fase 7: QBI2 apagado / simulado en local, como en el monolito.
       QBI2_RECIPE_ENABLED: "false"
       QBI2_RECIPE_ENV: hml
@@ -391,10 +420,68 @@ services:
       CONSUL_HOST: consul
       CONSUL_PORT: "8500"
       JWT_SECRET: local-dev-encryption-key-32chars
+      # Fase 9: clave pública RSA de identidad leída del .env local y transición HS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: "true"
       SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
       TRANQUI_GATEWAY_URL: http://gateway:8080
       # Los links de los mails de asistencia entran por el gateway, como en el monolito local.
       APP_PUBLIC_URL: http://localhost:8080
+      # Fase 9: fuente de identidad cortada al servicio identidad en local.
+      TRANQUI_FUENTE_IDENTIDAD: identidad
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    depends_on:
+      db-servicios:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    mem_limit: 288m
+
+  # Fase 9: el servicio de identidad (cuenta, sesión, soporte, administración de usuarios, portón y novedades).
+  # Las claves RSA no se versionan: se generan una vez y van en el .env local (ver docs/entornos/local.md).
+  identidad:
+    build:
+      context: .
+      dockerfile: services/identidad/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/identidad
+      SPRING_DATASOURCE_USERNAME: identidad
+      SPRING_DATASOURCE_PASSWORD: identidad-local
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: tranqui
+      SPRING_RABBITMQ_PASSWORD: tranqui-local
+      SPRING_RABBITMQ_VIRTUAL_HOST: /
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      JWT_SECRET: local-dev-encryption-key-32chars
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?Falta JWT_PRIVATE_KEY en .env (ver docs/entornos/local.md)}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?Falta JWT_PUBLIC_KEY en .env (ver docs/entornos/local.md)}
+      JWT_HS256_ACEPTADO: "true"
+      SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Fase 9: en local todo cortado: la carga inicial copia del monolito con las tablas vacías.
+      IDENTIDAD_CARGA: "true"
+      # Login simulado con Google (tokens mock-), solo en local.
+      IDENTIDAD_GOOGLE_SIMULADO: "true"
+      SEED_TEST_ACCOUNTS: ${SEED_TEST_ACCOUNTS:-true}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-}
+      SITE_ACCESS_PASSWORD: ${SITE_ACCESS_PASSWORD:-}
+      NOVEDADES_TOKEN: ${NOVEDADES_TOKEN:-local-novedades-token}
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: "1025"
+      FRONTEND_URL: http://localhost:5173
+    ports:
+      # Solo para el script de novedades (scripts/mantenimiento.mjs), como en el VPS.
+      - "127.0.0.1:8084:8080"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
       interval: 10s
@@ -436,8 +523,16 @@ services:
       TRANQUI_SERVICES_CLINICA_URI: lb://profesionales
       # Fase 8: /api/subscriptions/** y /api/admin/subscriptions/** al servicio de pagos.
       TRANQUI_SERVICES_SUSCRIPCIONES_URI: lb://pagos
+      # Fase 9: cuenta, soporte, administración de usuarios, portón y /internal/identidad al servicio de identidad,
+      # y el paywall consulta a pagos.
+      TRANQUI_SERVICES_IDENTIDAD_URI: lb://identidad
+      TRANQUI_SERVICES_IDENTIDAD_INTERNO_URI: lb://identidad
+      TRANQUI_PAYWALL_FUENTE: pagos
       SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
       JWT_SECRET: local-dev-encryption-key-32chars
+      # Fase 9: clave pública RSA de identidad leída del .env local y transición HS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: "true"
       VICTORIAMETRICS_URL: http://victoriametrics:8428
     ports:
       - "127.0.0.1:8080:8080"
