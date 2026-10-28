@@ -573,7 +573,24 @@ fase el sistema completo funciona en producción.
 - **Qué:** registro, login, Mi Cuenta, tickets. El gateway pasa a validar el JWT con la clave
   pública de identidad.
 - **Datos:** credenciales y datos personales de `usuario`.
-- **Salida:** ninguna ruta va al monolito; se apaga y se archiva su base.
+- **Salida:** ninguna ruta va al monolito, pero **no se apaga** (decidido en la Fase 9): primero van las Fases 10
+  y 11.
+
+### Fase 10: tests y validación de datos
+
+- **Qué:** tests unitarios, de integración y de punta a punta de todo el sistema (incluidas las verificaciones
+  postergadas de las Fases 5 a 9), y validación propia de todo lo que un servicio recibe de otro: eventos,
+  respuestas de rutas internas y encabezados. Nunca se confía en lo que manda otro servicio.
+
+### Fase 11: comparación con `main`
+
+- **Qué:** recorrer el frontend y el backend de `main` contra la migración, para que ninguna funcionalidad quede
+  afuera, sin código o deje de existir.
+
+### Fase posterior: apagado del monolito
+
+- **Qué:** apagar el monolito, borrar el código de vuelta atrás y archivar su base, con su propia spec, cuando todo
+  lleve un tiempo estable en producción.
 
 ### Migración de datos en cada fase
 
