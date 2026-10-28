@@ -70,7 +70,7 @@ pagos).
 - **JWT nuevo (pregunta 3):** RS256 con el par de claves de identidad (`JWT_PRIVATE_KEY` solo en identidad,
   `JWT_PUBLIC_KEY` en el gateway y los servicios; ambas en el `.env` del VPS, nunca en el repo). Mismos claims y
   cookie, más `uid` (id del usuario).
-  - Un verificador único en `libs/comun` que reemplaza los seis `UsuarioJwt` y el del gateway: acepta RS256 y,
+  - Un verificador único en `libs/eventos` (junto a `ServiceJwt`, donde ya está jjwt) que reemplaza los seis `UsuarioJwt` y el del gateway: acepta RS256 y,
     mientras `JWT_HS256_ACEPTADO=true`, también los HS256 de hoy, así nadie pierde la sesión en el corte. Siete días
     después del corte se apaga.
 - **Eventos nuevos (pregunta 6):** `identidad.password-temporal.generada.v1` y
