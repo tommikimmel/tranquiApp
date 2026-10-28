@@ -306,6 +306,23 @@ class ContratoEventosTest {
     }
 
     @Test
+    void roundtrip_passwordTemporalGeneradaData() throws Exception {
+        PasswordTemporalGeneradaData data = new PasswordTemporalGeneradaData(
+                15L, "paciente@tranqui.com", "Juan Perez", "TempPass123"
+        );
+        probarRoundtrip(data, PasswordTemporalGeneradaData.class);
+    }
+
+    @Test
+    void roundtrip_solicitudDatosData() throws Exception {
+        SolicitudDatosData data = new SolicitudDatosData(
+                20L, "Dra. Ana Gomez", "ana@tranqui.com", "PSIQUIATRA"
+        );
+        probarRoundtrip(data, SolicitudDatosData.class);
+    }
+
+
+    @Test
     void roundtrip_meetCreadoData() throws Exception {
         MeetCreadoData data = new MeetCreadoData(100L, "https://meet.google.com/abc-defg-hij", "g-event-1234");
         probarRoundtrip(data, MeetCreadoData.class);

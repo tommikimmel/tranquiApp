@@ -30,6 +30,47 @@ class JwtServiceTest {
     }
 
     @Test
+    void whenGenerateToken_incluyeClaimUid() {
+        Usuario usuario = Usuario.builder()
+                .id(99L)
+                .nombre("Juan Test")
+                .email("juan@test.com")
+                .rol(Rol.PACIENTE)
+                .build();
+
+        String token = jwtService.generateToken(usuario);
+
+        assertNotNull(token);
+        assertTrue(jwtService.validateToken(token));
+        assertEquals("juan@test.com", jwtService.extractEmail(token));
+        assertEquals(99, ((Number) jwtService.extractClaim(token, claims -> claims.get("uid"))).intValue());
+    }
+
+    @Test
+    void tokenRs256DeIdentidad_esAceptadoPorMonolito() throws Exception {
+        java.security.KeyPairGenerator kpg = java.security.KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        java.security.KeyPair kp = kpg.generateKeyPair();
+        String pubBase64 = java.util.Base64.getEncoder().encodeToString(kp.getPublic().getEncoded());
+        String privBase64 = java.util.Base64.getEncoder().encodeToString(kp.getPrivate().getEncoded());
+
+        com.tranqui.eventos.jwt.EmisorJwtUsuario emisor = new com.tranqui.eventos.jwt.EmisorJwtUsuario(
+                privBase64, java.time.Duration.ofDays(7)
+        );
+        String tokenRs256 = emisor.emitir("usuario.identidad@tranqui.com", "PSIQUIATRA", "Dr. Identidad", 77L);
+
+        // Monolito con JWT_PUBLIC_KEY configurada
+        JwtService serviceConRsa = new JwtService();
+        ReflectionTestUtils.setField(serviceConRsa, "secretKey", "mysecuresecretkeythatmustbelongenoughfor256bitsHS256");
+        ReflectionTestUtils.setField(serviceConRsa, "publicKey", pubBase64);
+        ReflectionTestUtils.setField(serviceConRsa, "jwtExpiration", 3600000L);
+        serviceConRsa.validateSecret();
+
+        assertTrue(serviceConRsa.validateToken(tokenRs256));
+        assertEquals("usuario.identidad@tranqui.com", serviceConRsa.extractEmail(tokenRs256));
+    }
+
+    @Test
     void whenGenerateToken_thenShouldBeValid() {
         Usuario usuario = Usuario.builder()
                 .nombre("Juan Test")

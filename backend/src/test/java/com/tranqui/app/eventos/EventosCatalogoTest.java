@@ -22,6 +22,8 @@ class EventosCatalogoTest {
             Map.entry(Topicos.IDENTIDAD_TICKET_CREADO_V1, List.of("TicketService#crearTicket")),
             Map.entry(Topicos.IDENTIDAD_TICKET_MENSAJE_RECIBIDO_V1, List.of("TicketService#agregarMensaje")),
             Map.entry(Topicos.IDENTIDAD_PROFESIONAL_VERIFICACION_RESUELTA_V1, List.of("AdminController#verifyProfessional", "AdminController#rejectProfessional")),
+            Map.entry(Topicos.IDENTIDAD_PASSWORD_TEMPORAL_GENERADA_V1, List.of("AdminController#resetPassword")),
+            Map.entry(Topicos.IDENTIDAD_SOPORTE_SOLICITUD_DATOS_V1, List.of("SoporteController#solicitarCopiaDatos")),
             Map.entry(Topicos.PROFESIONALES_PROFESIONAL_ACTUALIZADO_V1, List.of("MedicoService#actualizarPerfil", "MedicoService#actualizarConfigAgenda", "servicio de profesionales (Fase 5)")),
             Map.entry(Topicos.PROFESIONALES_PROFESIONAL_VISIBILIDAD_CAMBIADA_V1, List.of("AdminController#verifyProfessional", "AdminController#rejectProfessional")),
             Map.entry(Topicos.PROFESIONALES_TARIFA_ACTUALIZADA_V1, List.of("MedicoService#actualizarPerfil")),
@@ -62,7 +64,7 @@ class EventosCatalogoTest {
     void todosLosTopicosTienenProductorAsignado() {
         List<String> todosLosTopicos = Topicos.TODOS_LOS_TOPICOS;
         assertThat(todosLosTopicos).isNotEmpty();
-        assertThat(todosLosTopicos).hasSize(41);
+        assertThat(todosLosTopicos).hasSize(43);
 
         for (String topico : todosLosTopicos) {
             assertThat(Topicos.esValido(topico))

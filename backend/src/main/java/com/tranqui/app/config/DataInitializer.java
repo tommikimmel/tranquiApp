@@ -64,11 +64,18 @@ public class DataInitializer implements CommandLineRunner {
     // Password inicial de admin@tranqui.com, solo se usa si la cuenta todavía no existe (base
     // nueva). Nunca un default conocido: sin ADMIN_INITIAL_PASSWORD no se crea el admin, salvo en
     // local con cuentas de prueba, donde se usa admin123 como el resto de las cuentas sembradas.
+    @org.springframework.beans.factory.annotation.Value("${identidad.externo:false}")
+    private boolean identidadExterno;
+
     @org.springframework.beans.factory.annotation.Value("${app.admin-initial-password:}")
     private String adminInitialPassword;
 
     @Override
     public void run(String... args) throws Exception {
+        if (identidadExterno) {
+            log.info("identidad.externo=true: no se inicializan cuentas ni datos de identidad en el monolito.");
+            return;
+        }
         log.info("Initializing base accounts...");
 
         // Default Admin account
