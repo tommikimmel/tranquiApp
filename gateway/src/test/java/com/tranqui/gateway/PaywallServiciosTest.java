@@ -2,9 +2,7 @@ package com.tranqui.gateway;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
+import com.tranqui.eventos.jwt.EmisorJwtUsuario;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,9 +15,11 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Date;
-import java.util.Map;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPrivateKey;
+import java.time.Duration;
+import java.util.Base64;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.any;
@@ -38,7 +38,20 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 @ActiveProfiles("test")
 class PaywallServiciosTest {
 
-    private static final String CLAVE_JWT = "test-jwt-secret-key-must-be-at-least-32-chars-long!";
+    private static final KeyPair KEY_PAIR;
+    private static final EmisorJwtUsuario EMISOR;
+
+    static {
+        try {
+            KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+            kpg.initialize(2048);
+            KEY_PAIR = kpg.generateKeyPair();
+            EMISOR = new EmisorJwtUsuario((RSAPrivateKey) KEY_PAIR.getPrivate(), Duration.ofHours(1));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private static final String ACCESO = "/internal/monolito/suscripciones/acceso";
 
     private static WireMockServer monolito;
@@ -86,6 +99,7 @@ class PaywallServiciosTest {
         registry.add("tranqui.services.monolito.uri", () -> "http://localhost:" + monolito.port());
         registry.add("tranqui.services.chat.uri", () -> "http://localhost:" + chat.port());
         registry.add("tranqui.services.suscripciones.uri", () -> "http://localhost:" + suscripciones.port());
+        registry.add("jwt.public-key", () -> Base64.getEncoder().encodeToString(KEY_PAIR.getPublic().getEncoded()));
     }
 
     private static com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder json(String cuerpo) {
@@ -93,10 +107,7 @@ class PaywallServiciosTest {
     }
 
     private static String sesion(String email, String rol) {
-        return Jwts.builder().setClaims(Map.of("rol", rol)).setSubject(email)
-                .setIssuedAt(new Date()).setExpiration(new Date(System.currentTimeMillis() + 600_000))
-                .signWith(Keys.hmacShaKeyFor(CLAVE_JWT.getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256)
-                .compact();
+        return EMISOR.emitir(email, rol, "Usuario Test", 1L);
     }
 
     private WebTestClient.ResponseSpec pedir(String ruta, String token) {

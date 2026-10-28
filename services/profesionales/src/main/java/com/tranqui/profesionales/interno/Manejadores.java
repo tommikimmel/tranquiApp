@@ -1,9 +1,13 @@
 package com.tranqui.profesionales.interno;
 
 import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.consumo.EventoInvalidoException;
 import com.tranqui.eventos.consumo.ManejadorEvento;
 import com.tranqui.eventos.data.ConceptoAprobadoData;
+import com.tranqui.eventos.data.CuentaMpDesvinculadaData;
+import com.tranqui.eventos.data.CuentaMpVinculadaData;
 import com.tranqui.eventos.data.ProfesionalVisibilidadCambiadaData;
+import com.tranqui.eventos.data.SuscripcionCambioEstadoV2Data;
 import com.tranqui.eventos.data.TurnoActualizadoData;
 import com.tranqui.eventos.data.UsuarioActualizadoData;
 import com.tranqui.eventos.data.UsuarioEliminadoData;
@@ -80,6 +84,62 @@ public class Manejadores {
         } catch (RuntimeException ex) {
             log.warn("No se pudo refrescar al profesional {} desde el monolito; lo corrige la sincronización: {}", id, ex.getMessage());
         }
+    }
+
+    // ------------------------------------------------------------------ Mercado Pago y suscripción (Fase 9)
+
+    // Con la fuente de identidad, Mercado Pago y la suscripción llegan de pagos: antes, del monolito por /estado, así
+    // que con la fuente del monolito estos eventos se descartan (la vuelta atrás no cambia nada).
+
+    @Bean
+    ManejadorEvento<CuentaMpVinculadaData> profesionalMpVinculada(ClienteInterno interno) {
+        return ManejadorEvento.de("profesional-mp-vinculada", Topicos.PAGOS_CUENTA_MP_VINCULADA_V1, CuentaMpVinculadaData.class,
+                e -> {
+                    if (interno.fuenteIdentidad()) {
+                        profesionales.guardarMercadoPago(idValido(e.data().profesionalId()), true, versionValida(e.aggregateVersion()));
+                    }
+                });
+    }
+
+    @Bean
+    ManejadorEvento<CuentaMpDesvinculadaData> profesionalMpDesvinculada(ClienteInterno interno) {
+        return ManejadorEvento.de("profesional-mp-desvinculada", Topicos.PAGOS_CUENTA_MP_DESVINCULADA_V1,
+                CuentaMpDesvinculadaData.class, e -> {
+                    if (interno.fuenteIdentidad()) {
+                        profesionales.guardarMercadoPago(idValido(e.data().profesionalId()), false, versionValida(e.aggregateVersion()));
+                    }
+                });
+    }
+
+    @Bean
+    ManejadorEvento<SuscripcionCambioEstadoV2Data> profesionalSuscripcion(ClienteInterno interno) {
+        return ManejadorEvento.de("profesional-suscripcion", Topicos.SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V2,
+                SuscripcionCambioEstadoV2Data.class, e -> {
+                    if (!interno.fuenteIdentidad()) {
+                        return;
+                    }
+                    SuscripcionCambioEstadoV2Data d = e.data();
+                    if (d.estadoNuevo() == null || d.estadoNuevo().isBlank()) {
+                        throw new EventoInvalidoException("Cambio de estado de suscripción sin estado nuevo");
+                    }
+                    profesionales.guardarSuscripcion(idValido(d.profesionalId()), d.estadoNuevo(), d.periodoHasta(),
+                            d.puedeRecetar(), versionValida(e.aggregateVersion()));
+                });
+    }
+
+    // Nunca se confía en lo que manda otro servicio: un id o una versión inválidos mandan el evento a la DLQ.
+    private static Long idValido(Long id) {
+        if (id == null || id <= 0) {
+            throw new EventoInvalidoException("Evento con un id de profesional inválido: " + id);
+        }
+        return id;
+    }
+
+    private static long versionValida(int version) {
+        if (version < 0) {
+            throw new EventoInvalidoException("Evento con una versión inválida: " + version);
+        }
+        return version;
     }
 
     // ------------------------------------------------------------------ personas (copia)

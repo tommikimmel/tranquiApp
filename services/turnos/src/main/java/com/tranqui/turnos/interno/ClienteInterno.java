@@ -52,6 +52,14 @@ public class ClienteInterno {
                                       List<DisponibilidadProfesionalData.Franja> disponibilidad,
                                       List<TarifasProfesionalData.Tarifa> tarifas) {}
 
+    /** {@code InternoController.ProfesionalServicio} del servicio de profesionales. */
+    public record ProfesionalServicio(Long profesionalId, int version, PerfilProfesionalData perfil,
+                                      List<DisponibilidadProfesionalData.Franja> disponibilidad,
+                                      List<TarifasProfesionalData.Tarifa> tarifas) {}
+
+    /** {@code CuentasMp.CuentaMpResumenDto} del servicio de pagos. */
+    public record CuentaMp(Long profesionalId, boolean vinculada, long version) {}
+
     /** Un intervalo ocupado en el Google Calendar del profesional; {@code todoElDia} bloquea el día. */
     public record Intervalo(LocalTime inicio, LocalTime fin, boolean todoElDia) {}
 
@@ -62,8 +70,13 @@ public class ClienteInterno {
     private final RestClient rapido;
     private final ServiceJwt serviceJwt;
 
+    // /internal/monolito o /internal/identidad (ver rutaIdentidad).
+    private final String baseIdentidad;
+
     public ClienteInterno(@Value("${tranqui.gateway.url}") String gatewayUrl,
-                          @Value("${tranqui.jwt.service-secret}") String claveServicio) {
+                          @Value("${tranqui.jwt.service-secret}") String claveServicio,
+                          @Value("${tranqui.fuente-identidad:monolito}") String fuenteIdentidad) {
+        this.baseIdentidad = rutaIdentidad(fuenteIdentidad);
         if (claveServicio == null || claveServicio.isBlank()) {
             throw new IllegalStateException("Falta SERVICE_JWT_KEY: el servicio no puede hacer consultas internas.");
         }
@@ -77,6 +90,25 @@ public class ClienteInterno {
         corta.setReadTimeout(3_000);
         this.rapido = RestClient.builder().baseUrl(gatewayUrl).requestFactory(corta).build();
         this.serviceJwt = new ServiceJwt(claveServicio);
+    }
+
+    /**
+     * De dónde se leen los datos de usuario (Fase 9): {@code monolito} (por defecto, hasta el corte) o
+     * {@code identidad}. Volver atrás es sacar la variable {@code TRANQUI_FUENTE_IDENTIDAD}.
+     */
+    static String rutaIdentidad(String fuente) {
+        String f = fuente == null ? "" : fuente.trim().toLowerCase();
+        return switch (f) {
+            case "", "monolito" -> "/internal/monolito";
+            case "identidad" -> "/internal/identidad";
+            default -> throw new IllegalStateException(
+                    "TRANQUI_FUENTE_IDENTIDAD tiene que ser 'monolito' o 'identidad', no '" + fuente + "'.");
+        };
+    }
+
+    /** Si los datos de usuario se leen del servicio de identidad (y lo que no es suyo, de su dueño). */
+    public boolean fuenteIdentidad() {
+        return "/internal/identidad".equals(baseIdentidad);
     }
 
     private <T> T get(RestClient cliente, String uri, ParameterizedTypeReference<T> tipo, Object... variables) {
@@ -106,12 +138,12 @@ public class ClienteInterno {
     }
 
     public PacienteMonolito paciente(Long id) {
-        return get(http, "/internal/monolito/pacientes/{id}", new ParameterizedTypeReference<>() {}, id);
+        return get(http, baseIdentidad + "/pacientes/{id}", new ParameterizedTypeReference<>() {}, id);
     }
 
     /** "Buscar o crear paciente" de la reserva. Si el monolito no responde, tira la excepción. */
     public PacienteMonolito buscarOCrearPaciente(BuscarOCrearPaciente pedido) {
-        return post("/internal/monolito/pacientes", pedido, PacienteMonolito.class);
+        return post(baseIdentidad + "/pacientes", pedido, PacienteMonolito.class);
     }
 
     public List<TurnoMonolito> turnos(int pagina, int tamanio) {
@@ -124,6 +156,22 @@ public class ClienteInterno {
     public List<ProfesionalMonolito> profesionales(int pagina, int tamanio) {
         List<ProfesionalMonolito> r = get(http, "/internal/monolito/profesionales?pagina={p}&tamanio={t}&foto=false",
                 new ParameterizedTypeReference<>() {}, pagina, tamanio);
+        return r != null ? r : List.of();
+    }
+
+    /**
+     * Fase 9, con la fuente de identidad: la agenda, la disponibilidad y las tarifas de los profesionales salen de su
+     * dueño ({@code /internal/profesionales/profesionales}, la misma que usaba el monolito para su copia).
+     */
+    public List<ProfesionalServicio> profesionalesDelServicio() {
+        List<ProfesionalServicio> r = get(http, "/internal/profesionales/profesionales", new ParameterizedTypeReference<>() {});
+        return r != null ? r : List.of();
+    }
+
+    /** Fase 9, con la fuente de identidad: si cada profesional tiene Mercado Pago vinculado, de pagos (su dueño). */
+    public List<CuentaMp> cuentasMp(int pagina, int tamanio) {
+        List<CuentaMp> r = get(http, "/internal/pagos/cuentas-mp?pagina={p}&tamanio={t}", new ParameterizedTypeReference<>() {},
+                pagina, tamanio);
         return r != null ? r : List.of();
     }
 

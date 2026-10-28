@@ -135,7 +135,12 @@ pagos:
     resincronizacion-suscriptores-minutos: ${PAGOS_RESINCRONIZACION_SUSCRIPTORES_MINUTOS:15}
 
 jwt:
-  # Misma clave que identidad (hoy el monolito) usa para firmar los JWT de usuario. Sin default.
+  # Clave pública de identidad para validar JWT de usuario en formato RS256 (vacía por defecto).
+  public-key: ${JWT_PUBLIC_KEY:}
+  # Durante la transición valen los dos: tokens HS256 del monolito y RS256 de identidad. Siete días
+  # después del corte se desactiva con JWT_HS256_ACEPTADO=false.
+  hs256-aceptado: ${JWT_HS256_ACEPTADO:true}
+  # Secreto HS256 histórico del monolito. Ya no es obligatorio si hs256-aceptado=false.
   secret: ${JWT_SECRET:}
 
 security:
@@ -145,6 +150,10 @@ security:
     key: ${ENCRYPTION_KEY:}
 
 tranqui:
+  # Fase 9: de dónde se leen los datos de usuario. "monolito" (por defecto) hasta el corte; en el corte, con el
+  # servicio de identidad ya cargado, "identidad" (y lo que no es de identidad, de su dueño: pagos, turnos,
+  # profesionales). Vuelta atrás: sacar la variable.
+  fuente-identidad: ${TRANQUI_FUENTE_IDENTIDAD:monolito}
   gateway:
     # Las consultas internas (carga inicial y el reenvío de las suscripciones) pasan por el gateway.
     url: ${TRANQUI_GATEWAY_URL:http://gateway:8080}

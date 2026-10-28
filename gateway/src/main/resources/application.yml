@@ -309,7 +309,7 @@ spring:
         - id: identidad
           uri: ${tranqui.services.identidad.uri:${tranqui.services.monolito.uri}}
           predicates:
-            - Path=/api/auth/**,/api/tickets/**,/api/soporte/**
+            - Path=/api/auth/**,/api/tickets/**,/api/soporte/**,/api/site-access/**,/api/admin/users/**,/api/admin/tickets/**
           filters:
             - name: CircuitBreaker
               args:
@@ -510,6 +510,36 @@ spring:
                 rate-limiter: "#{@tranquiRateLimiter}"
                 key-resolver: "#{@userOrIpKeyResolver}"
 
+        # Fase 9: estadísticas de turnos para el panel del médico (turnos). Antes de profesionales-monolito.
+        - id: turnos-stats
+          uri: ${tranqui.services.turnos.uri}
+          predicates:
+            - Path=/api/medicos/stats
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: turnos
+                fallbackUri: forward:/fallback/turnos
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
         # Lo demás de /api/medicos (las estadísticas del panel) sigue en el monolito (Fase 5 y Fase 7).
         - id: profesionales-monolito
           uri: ${tranqui.services.monolito.uri}
@@ -639,6 +669,36 @@ spring:
                 rate-limiter: "#{@tranquiRateLimiter}"
                 key-resolver: "#{@serviceKeyResolver}"
 
+        # Fase 9: rutas internas del servicio de identidad (carga inicial, pacientes, profesionales y suscriptores).
+        - id: internal-identidad
+          uri: ${TRANQUI_SERVICES_IDENTIDAD_INTERNO_URI:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/internal/identidad/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: identidad
+                fallbackUri: forward:/fallback/internal
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@serviceKeyResolver}"
+
+        # Fase 9: consultas internas al servicio de pagos.
+        - id: internal-pagos
+          uri: ${tranqui.services.pagos.uri}
+          predicates:
+            - Path=/internal/pagos/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: pagos
+                fallbackUri: forward:/fallback/internal
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@serviceKeyResolver}"
+
         # --- RUTA INTERNA ENTRE SERVICIOS ---
         - id: internal
           uri: ${tranqui.services.internal.uri:${tranqui.services.monolito.uri}}
@@ -694,8 +754,12 @@ tranqui:
   services:
     monolito:
       uri: ${TRANQUI_SERVICES_MONOLITO_URI:http://localhost:8081}
+    # Fase 9: lb://identidad cuando el servicio está desplegado (docker-compose). Lleva /api/auth/**,
+    # /api/tickets/**, /api/soporte/**, /api/admin/users/**, /api/admin/tickets/** y /api/site-access/**.
+    # Por defecto va al monolito; en el corte se pone TRANQUI_SERVICES_IDENTIDAD_URI=lb://identidad.
+    # Vuelta atrás: sacar la variable (o apuntar al monolito) e IDENTIDAD_EXTERNO=false en el monolito.
     identidad:
-      uri: ${tranqui.services.monolito.uri}
+      uri: ${TRANQUI_SERVICES_IDENTIDAD_URI:${tranqui.services.monolito.uri}}
     # Fase 5: lb://profesionales cuando el servicio está desplegado (docker-compose). Lleva el buscador,
     # /api/medicos/perfil, la disponibilidad y /internal/profesionales. Vuelta atrás: sacar la variable y
     # PROFESIONALES_EXTERNO=false en el monolito.
@@ -742,16 +806,22 @@ tranqui:
     internal:
       uri: ${tranqui.services.monolito.uri}
   # Fase 3 (G1): portón del sitio para las rutas que van a servicios (vacío = apagado, como en el
-  # monolito). El paywall no lleva configuración: consulta al monolito.
+  # monolito). Fase 9: fuente de consulta de suscripciones para el paywall (monolito por defecto, o pagos).
   portones:
     sitio-password: ${SITE_ACCESS_PASSWORD:}
+    acceso:
+      fuente: ${TRANQUI_PAYWALL_FUENTE:monolito}
   jwt:
     service-secret: ${SERVICE_JWT_KEY:}
   victoriametrics:
     url: ${VICTORIAMETRICS_URL:http://localhost:8428}
 
 jwt:
+  public-key: ${JWT_PUBLIC_KEY:}
   secret: ${JWT_SECRET:}
+  # Fase 9 (I1/I4): transición de siete días después del corte para aceptar tokens HS256 emitidos por el monolito.
+  # Cumplidos los siete días, se apaga (JWT_HS256_ACEPTADO=false).
+  hs256-aceptado: ${JWT_HS256_ACEPTADO:true}
 
 management:
   server:
