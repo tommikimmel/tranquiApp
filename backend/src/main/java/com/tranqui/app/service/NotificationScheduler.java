@@ -17,6 +17,10 @@ public class NotificationScheduler {
     @Autowired
     private TurnoService turnoService;
 
+    // Fase 6: con el flag, los recordatorios los manda el servicio de turnos.
+    @org.springframework.beans.factory.annotation.Value("${turnos.externo:false}")
+    private boolean turnosExterno;
+
     // Cron se ejecuta cada 1 hora para eliminar notificaciones enviadas hace más de 24 horas
     @Scheduled(cron = "0 0 * * * ?")
     @Transactional
@@ -33,6 +37,9 @@ public class NotificationScheduler {
     // tenga tiempo de avisar si no va a poder ir. Ver TurnoService#enviarRecordatoriosConfirmacionAsistencia.
     @Scheduled(cron = "0 0 9 * * ?", zone = "America/Argentina/Cordoba")
     public void enviarRecordatoriosConfirmacionAsistencia() {
+        if (turnosExterno) {
+            return;
+        }
         try {
             turnoService.enviarRecordatoriosConfirmacionAsistencia();
         } catch (Exception e) {
