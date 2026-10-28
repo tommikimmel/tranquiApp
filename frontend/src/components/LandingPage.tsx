@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react'
 import { Icon } from './Icon'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import '../styles/landing.css'
-import { api } from '../api/api'
+import { api, getBackendOrigin, ENDPOINTS_AVISOS_EN_VIVO } from '../api/api'
 import { useChat } from '../hooks/useChat'
 import { useAlert } from '../context/AlertContext'
 import { Client } from '@stomp/stompjs'
@@ -895,13 +895,15 @@ export default function LandingPage({
   useEffect(() => {
     if (!currentUser || currentUser.rol !== 'PACIENTE') return
 
-    let client: Client | null = null;
-    
-    if (currentUser.id) {
-      const socketUrl = window.location.protocol === 'https:' ? `https://${window.location.host}/ws-tranqui` : `http://${window.location.hostname}:8081/ws-tranqui`;
-      const socket = new SockJS(socketUrl, null, { withCredentials: true } as any)
-      client = new Client({
-        webSocketFactory: () => socket,
+    const clients: Client[] = [];
+
+    // Mismo canal en los dos endpoints: ver ENDPOINTS_AVISOS_EN_VIVO.
+    if (currentUser.id) for (const endpoint of ENDPOINTS_AVISOS_EN_VIVO) {
+      const socketUrl = `${getBackendOrigin()}${endpoint}`;
+      const client: Client = new Client({
+        // Un SockJS nuevo en cada intento: con el mismo objeto, la reconexión (reconnectDelay) reusaba
+        // un socket cerrado y nunca volvía a conectar (por ejemplo, al reiniciarse el servicio de chat).
+        webSocketFactory: () => new SockJS(socketUrl, null, { withCredentials: true } as any),
         reconnectDelay: 5000,
         onConnect: () => {
           console.log("WebSocket de Notificaciones conectado para Paciente ID:", currentUser.id)
@@ -929,10 +931,11 @@ export default function LandingPage({
         }
       })
       client.activate()
+      clients.push(client)
     }
 
     return () => {
-      client?.deactivate()
+      clients.forEach((c) => c.deactivate())
     }
     // Deliberately keyed on the stable id/rol pair, not the whole `currentUser` object (a new
     // reference on every parent re-render) or the unrelated `loading` state (the médicos list

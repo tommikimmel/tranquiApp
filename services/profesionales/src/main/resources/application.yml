@@ -1,0 +1,131 @@
+spring:
+  application:
+    name: profesionales
+  # Sección 6.7: al apagarse termina lo que está procesando, hasta 20 s.
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/profesionales}
+    username: ${SPRING_DATASOURCE_USERNAME:profesionales}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    hikari:
+      # Sección 9.2: pools chicos.
+      maximum-pool-size: 5
+  flyway:
+    enabled: true
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:tranqui}
+    password: ${SPRING_RABBITMQ_PASSWORD:}
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/}
+    # La outbox (libs/eventos) publica con confirmación del broker.
+    publisher-confirm-type: correlated
+    publisher-returns: true
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      discovery:
+        enabled: ${CONSUL_DISCOVERY_ENABLED:true}
+        service-name: profesionales
+        instance-id: ${spring.application.name}:${random.value}
+        # Chequeo por TTL, como los demás servicios: se vuelve a registrar solo después de una baja.
+        health-check-critical-timeout: 1m
+        heartbeat:
+          enabled: true
+          ttl: 30s
+          reregister-service-on-failure: true
+        # Registro por IP: el gateway lo alcanza en la red de Docker sin resolver el hostname del contenedor.
+        prefer-ip-address: true
+        tags: version=${TRANQUI_VERSION:dev}
+
+server:
+  port: 8080
+  tomcat:
+    threads:
+      max: 50
+  shutdown: graceful
+
+management:
+  server:
+    port: 8082
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+      group:
+        readiness:
+          include: readinessState,db,rabbit
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      servicio: profesionales
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+# Eventos (libs/eventos): consume profesionales.eventos (identidad, la verificación del administrador y turnos) y
+# publica por su outbox profesional.actualizado, disponibilidad.actualizada.v2 y tarifa.actualizada.v2.
+eventos:
+  consumo:
+    servicio: profesionales
+  outbox:
+    habilitada: true
+
+# El mismo flag que el monolito (MedicoService#isMedicoVerificado): con Mercado Pago real, el buscador
+# exige la cuenta vinculada.
+mercadopago:
+  enabled: ${MERCADOPAGO_ENABLED:false}
+
+# Fase 7: recetas electrónicas con QBI2/Innovamed, las mismas variables que el monolito. Deshabilitado usa el
+# cliente simulado (Qbi2RecipeClientMock).
+qbi2:
+  recipe:
+    enabled: ${QBI2_RECIPE_ENABLED:false}
+    environment: ${QBI2_RECIPE_ENV:hml}
+    base-url-hml: https://apirecipe.hml.qbitos.com
+    base-url-prod: https://apirecipe.qbitos.com
+    cliente-app-id: ${QBI2_CLIENTE_APP_ID:}
+    token: ${QBI2_RECIPE_TOKEN:}
+
+profesionales:
+  carga-inicial:
+    habilitada: true
+  # Identidad, verificación, suscripción y Mercado Pago son del monolito: el servicio los copia cada tanto.
+  sincronizacion-segundos: ${PROFESIONALES_SINCRONIZACION_SEGUNDOS:60}
+  clinica:
+    # Se prende en el corte, en la ventana de mantenimiento, junto con CLINICA_EXTERNO del monolito;
+    # antes de eso el monolito sigue escribiendo y no hay que copiar.
+    habilitada: ${PROFESIONALES_CLINICA:false}
+    resincronizacion-turnos-minutos: ${PROFESIONALES_RESINCRONIZACION_TURNOS_MINUTOS:15}
+
+jwt:
+  # Clave pública de identidad para validar JWT de usuario en formato RS256 (vacía por defecto).
+  public-key: ${JWT_PUBLIC_KEY:}
+  # Durante la transición valen los dos: tokens HS256 del monolito y RS256 de identidad. Siete días
+  # después del corte se desactiva con JWT_HS256_ACEPTADO=false.
+  hs256-aceptado: ${JWT_HS256_ACEPTADO:true}
+  # Secreto HS256 histórico del monolito. Ya no es obligatorio si hs256-aceptado=false.
+  secret: ${JWT_SECRET:}
+
+tranqui:
+  gateway:
+    # Las consultas internas al monolito (carga inicial, sincronización e identidad) pasan por el gateway.
+    url: ${TRANQUI_GATEWAY_URL:http://gateway:8080}
+  jwt:
+    service-secret: ${SERVICE_JWT_KEY:}
+
+logging:
+  level:
+    root: INFO

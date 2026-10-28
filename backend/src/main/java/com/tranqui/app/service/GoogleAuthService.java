@@ -7,9 +7,13 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.repository.UsuarioRepository;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.UsuarioRegistradoData;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.Collections;
@@ -18,10 +22,16 @@ import java.util.Collections;
 public class GoogleAuthService {
 
     @Autowired
+    private OutboxPublisher outboxPublisher;
+
+    @Autowired
     private UsuarioRepository usuarioRepository;
 
     @Value("${google.client-id:dummy-client-id}")
     private String clientId;
+
+    @Value("${google.simulado:false}")
+    private boolean googleSimulado;
 
     private GoogleIdTokenVerifier verifier;
 
@@ -35,7 +45,7 @@ public class GoogleAuthService {
     }
 
     public GoogleIdToken.Payload verifyGoogleToken(String tokenString) {
-        if ("mock-token".equals(tokenString) || (tokenString != null && tokenString.startsWith("mock-"))) {
+        if (googleSimulado && ("mock-token".equals(tokenString) || (tokenString != null && tokenString.startsWith("mock-")))) {
             GoogleIdToken.Payload mockPayload = new GoogleIdToken.Payload();
             String email = "paula@tranqui.com";
             String name = "Lic. María Paula Rossi";
@@ -64,6 +74,7 @@ public class GoogleAuthService {
         return null;
     }
 
+    @Transactional
     public Usuario getOrCreateUsuario(GoogleIdToken.Payload payload) {
         // Must match the trim().toLowerCase() normalization AuthController.register/login use,
         // otherwise a Google sign-in for "John@Gmail.com" and a password registration for
@@ -87,7 +98,21 @@ public class GoogleAuthService {
                             .emailVerificado(true)
                             .perfilCompleto(false)
                             .build();
-                    return usuarioRepository.save(nuevo);
+                    nuevo = usuarioRepository.save(nuevo);
+                    outboxPublisher.publicar(
+                            Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1,
+                            "usuario",
+                            String.valueOf(nuevo.getId()),
+                            nuevo.getAggregateVersion(),
+                            new UsuarioRegistradoData(
+                                    nuevo.getId(),
+                                    nuevo.getEmail(),
+                                    nuevo.getNombre(),
+                                    nuevo.getApellido(),
+                                    nuevo.getRol() != null ? nuevo.getRol().name() : null
+                            )
+                    );
+                    return nuevo;
                 });
     }
 }

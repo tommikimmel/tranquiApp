@@ -1,0 +1,161 @@
+spring:
+  application:
+    name: pagos
+  # Sección 6.7: al apagarse termina lo que está procesando, hasta 20 s.
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/pagos}
+    username: ${SPRING_DATASOURCE_USERNAME:pagos}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    hikari:
+      # Sección 9.2: pools chicos.
+      maximum-pool-size: 5
+  flyway:
+    enabled: true
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:tranqui}
+    password: ${SPRING_RABBITMQ_PASSWORD:}
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/}
+    # La outbox (libs/eventos) publica con confirmación del broker.
+    publisher-confirm-type: correlated
+    publisher-returns: true
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      discovery:
+        enabled: ${CONSUL_DISCOVERY_ENABLED:true}
+        service-name: pagos
+        instance-id: ${spring.application.name}:${random.value}
+        # Chequeo por TTL: el servicio le manda a Consul su salud del actuator cada 20 s. Si sigue
+        # crítico más de un minuto (caído, o con la base caída) Consul lo da de baja, y en cuanto se
+        # recupera el próximo latido lo vuelve a registrar. Con el chequeo HTTP de antes se registraba
+        # una sola vez al arrancar: después de una baja seguía andando pero el gateway respondía 503.
+        health-check-critical-timeout: 1m
+        heartbeat:
+          enabled: true
+          ttl: 30s
+          reregister-service-on-failure: true
+        # Registro por IP: el gateway lo alcanza en la red de Docker sin resolver el hostname del contenedor.
+        prefer-ip-address: true
+        tags: version=${TRANQUI_VERSION:dev}
+
+server:
+  port: 8080
+  tomcat:
+    threads:
+      max: 50
+  shutdown: graceful
+
+management:
+  server:
+    port: 8082
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+      group:
+        readiness:
+          include: readinessState,db,rabbit
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      servicio: pagos
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+# Eventos (libs/eventos): consume pagos.eventos (turnos, conceptos e identidad para participantes y
+# suscriptores) y publica por su outbox los pagos.* (checkout, pagos, reembolsos y cuentas; en S2b también
+# suscripciones y avisos programados).
+eventos:
+  consumo:
+    servicio: pagos
+  outbox:
+    habilitada: true
+
+# Las mismas propiedades que el monolito (MercadoPago*, WebhookController): misma aplicación de Mercado
+# Pago, mismas URLs públicas (el webhook y el callback pasan por el gateway) y los mismos flags.
+mercadopago:
+  enabled: ${MERCADOPAGO_ENABLED:false}
+  client-id: ${MERCADOPAGO_CLIENT_ID:}
+  client-secret: ${MERCADOPAGO_CLIENT_SECRET:}
+  webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
+  admin:
+    access-token: ${MP_ADMIN_ACCESS_TOKEN:}
+    public-key: ${MP_ADMIN_PUBLIC_KEY:}
+
+# Facturación Electrónica ARCA (ex-AFIP) (Fase 8, S2c).
+# Apagada por defecto hasta que se defina la numeración y los reintentos (ver docs/cambios-a-futuro.md, punto 4).
+# El certificado y la clave privada se leen por archivo; nunca se versionan en el repositorio.
+arca:
+  enabled: ${ARCA_ENABLED:false}
+  environment: ${ARCA_ENVIRONMENT:homologacion}
+  cuit-emisor: ${ARCA_CUIT_EMISOR:20384910294}
+  punto-venta: ${ARCA_PUNTO_VENTA:1}
+  cert-path: ${ARCA_CERT_PATH:}
+  key-path: ${ARCA_KEY_PATH:}
+  cert-content: ${ARCA_CERT_CONTENT:}
+  key-content: ${ARCA_KEY_CONTENT:}
+  razon-social: ${ARCA_RAZON_SOCIAL:TRANQUI SALUD}
+  domicilio-fiscal: ${ARCA_DOMICILIO_FISCAL:Av. Corrientes 1234, CABA}
+  condicion-iva-emisor: ${ARCA_CONDICION_IVA_EMISOR:Responsable Monotributo}
+  inicio-actividades: ${ARCA_INICIO_ACTIVIDADES:01/08/2026}
+
+payment:
+  simulation:
+    enabled: ${PAYMENT_SIMULATION_ENABLED:false}
+
+app:
+  public-url: ${APP_PUBLIC_URL:http://localhost:8081}
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+
+pagos:
+  carga-inicial:
+    habilitada: true
+  suscripciones:
+    # Fase 8 (S2a): activa las suscripciones en el servicio de pagos. Se prende en el corte, en la
+    # ventana de mantenimiento, junto con SUSCRIPCIONES_EXTERNO del monolito; antes de eso el monolito
+    # sigue escribiendo y no hay que copiar.
+    habilitada: ${PAGOS_SUSCRIPCIONES:false}
+    # Frecuencia de la resincronización periódica de la copia de suscriptores contra el monolito.
+    resincronizacion-suscriptores-minutos: ${PAGOS_RESINCRONIZACION_SUSCRIPTORES_MINUTOS:15}
+
+jwt:
+  # Clave pública de identidad para validar JWT de usuario en formato RS256 (vacía por defecto).
+  public-key: ${JWT_PUBLIC_KEY:}
+  # Durante la transición valen los dos: tokens HS256 del monolito y RS256 de identidad. Siete días
+  # después del corte se desactiva con JWT_HS256_ACEPTADO=false.
+  hs256-aceptado: ${JWT_HS256_ACEPTADO:true}
+  # Secreto HS256 histórico del monolito. Ya no es obligatorio si hs256-aceptado=false.
+  secret: ${JWT_SECRET:}
+
+security:
+  encryption:
+    # La misma ENCRYPTION_KEY que el monolito: cifra los tokens de Mercado Pago y firma el state del
+    # OAuth (Cifrado). Obligatoria, sin default.
+    key: ${ENCRYPTION_KEY:}
+
+tranqui:
+  gateway:
+    # Las consultas internas (carga inicial y el reenvío de las suscripciones) pasan por el gateway.
+    url: ${TRANQUI_GATEWAY_URL:http://gateway:8080}
+  jwt:
+    service-secret: ${SERVICE_JWT_KEY:}
+
+logging:
+  level:
+    root: INFO
