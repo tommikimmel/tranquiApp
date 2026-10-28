@@ -624,6 +624,21 @@ spring:
                 rate-limiter: "#{@tranquiRateLimiter}"
                 key-resolver: "#{@serviceKeyResolver}"
 
+        # Fase 8: la resincronización de la copia del acceso del monolito (pagos).
+        - id: internal-suscripciones
+          uri: ${tranqui.services.pagos.uri}
+          predicates:
+            - Path=/internal/suscripciones/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: pagos
+                fallbackUri: forward:/fallback/internal
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@serviceKeyResolver}"
+
         # --- RUTA INTERNA ENTRE SERVICIOS ---
         - id: internal
           uri: ${tranqui.services.internal.uri:${tranqui.services.monolito.uri}}
