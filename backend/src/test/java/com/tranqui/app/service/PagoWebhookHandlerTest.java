@@ -21,7 +21,9 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.contains;
+import com.tranqui.app.eventos.OutboxPublisher;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -35,6 +37,7 @@ class PagoWebhookHandlerTest {
     @Mock private GoogleCalendarService calendarService;
     @Mock private NotificacionService notificacionService;
     @Mock private ResendEmailService resendEmailService;
+    @Mock private OutboxPublisher outboxPublisher;
 
     @InjectMocks
     private PagoWebhookHandler handler;
@@ -98,7 +101,7 @@ class PagoWebhookHandlerTest {
 
         assertEquals(EstadoTurno.CONFIRMADO, turno.getEstado());
         assertEquals("https://meet.google.com/xyz", turno.getTelemedicinaUrl());
-        verify(turnoRepository).save(turno);
+        verify(turnoRepository).saveAndFlush(turno);
 
         ArgumentCaptor<Pago> pagoCaptor = ArgumentCaptor.forClass(Pago.class);
         verify(pagoRepository).save(pagoCaptor.capture());
@@ -260,5 +263,107 @@ class PagoWebhookHandlerTest {
         handler.procesarAprobacionTurno(52L, "tx-optout");
 
         verify(resendEmailService, never()).enviarTurnoConfirmadoPaciente(any(), any(), any(), any(), any(), anyBoolean(), any(), any(), any(), any());
+    }
+
+    // ── Fase 4: eventos del servicio de pagos ────────────────────────
+
+    private Turno turnoPendiente(Long id) {
+        return Turno.builder()
+                .id(id).medico(medico()).paciente(paciente())
+                .fecha(LocalDate.now().plusDays(3))
+                .horaInicio(LocalTime.of(10, 0)).horaFin(LocalTime.of(10, 45))
+                .tipo(TipoTurno.PARTICULAR).estado(EstadoTurno.PENDIENTE_PAGO)
+                .modalidad(Modalidad.ONLINE)
+                .precio(new BigDecimal("60000"))
+                .build();
+    }
+
+    @Test
+    void aplicarPagoAprobado_confirmaYGuardaLaCopiaSinVolverAPublicarElPago() {
+        Turno turno = turnoPendiente(20L);
+        when(turnoRepository.findById(20L)).thenReturn(Optional.of(turno));
+
+        handler.aplicarPagoAprobado(new com.tranqui.eventos.data.PagoAprobadoData(7L, 20L, "mp-555", new BigDecimal("60000"), "mercadopago"));
+
+        assertEquals(EstadoTurno.CONFIRMADO, turno.getEstado());
+        ArgumentCaptor<Pago> pago = ArgumentCaptor.forClass(Pago.class);
+        verify(pagoRepository).save(pago.capture());
+        assertEquals("mp-555", pago.getValue().getTransactionId());
+        verify(outboxPublisher, never()).publicar(eq(com.tranqui.eventos.Topicos.PAGOS_PAGO_APROBADO_V1), anyString(), anyInt(), any());
+        verify(outboxPublisher).publicar(eq(com.tranqui.eventos.Topicos.TURNOS_TURNO_CONFIRMADO_V1), anyString(), anyInt(), any());
+    }
+
+    @Test
+    void aplicarPagoAprobado_esIdempotenteYToleraUnTurnoQueNoExiste() {
+        Turno confirmado = turnoPendiente(21L);
+        confirmado.setEstado(EstadoTurno.CONFIRMADO);
+        when(turnoRepository.findById(21L)).thenReturn(Optional.of(confirmado));
+        when(turnoRepository.findById(99L)).thenReturn(Optional.empty());
+
+        handler.aplicarPagoAprobado(new com.tranqui.eventos.data.PagoAprobadoData(7L, 21L, "mp-1", BigDecimal.TEN, "mercadopago"));
+        handler.aplicarPagoAprobado(new com.tranqui.eventos.data.PagoAprobadoData(8L, 99L, "mp-2", BigDecimal.TEN, "mercadopago"));
+
+        verify(pagoRepository, never()).save(any());
+        verifyNoInteractions(outboxPublisher);
+    }
+
+    @Test
+    void aplicarPagoRechazado_guardaLaCopiaUnaSolaVez() {
+        Turno turno = turnoPendiente(22L);
+        when(turnoRepository.findById(22L)).thenReturn(Optional.of(turno));
+        when(pagoRepository.findByTransactionId("mp-r1")).thenReturn(Optional.empty());
+        when(pagoRepository.findByTransactionId("mp-r2")).thenReturn(Optional.of(new Pago()));
+
+        handler.aplicarPagoRechazado(new com.tranqui.eventos.data.PagoRechazadoData(1L, 22L, "mp-r1", "rejected"));
+        handler.aplicarPagoRechazado(new com.tranqui.eventos.data.PagoRechazadoData(2L, 22L, "mp-r2", "rejected"));
+
+        ArgumentCaptor<Pago> pago = ArgumentCaptor.forClass(Pago.class);
+        verify(pagoRepository).save(pago.capture());
+        assertEquals(EstadoPago.RECHAZADO, pago.getValue().getEstado());
+        verifyNoInteractions(outboxPublisher);
+    }
+
+    @Test
+    void aplicarReembolsoRealizado_marcaLaCopiaDelPago() {
+        Turno turno = turnoPendiente(23L);
+        Pago pago = Pago.builder().turno(turno).transactionId("mp-9").estado(EstadoPago.APROBADO).build();
+        turno.setPago(pago);
+        when(turnoRepository.findById(23L)).thenReturn(Optional.of(turno));
+
+        handler.aplicarReembolsoRealizado(new com.tranqui.eventos.data.ReembolsoRealizadoData(1L, 1L, 23L, BigDecimal.TEN, "x"));
+
+        assertEquals(EstadoPago.REEMBOLSADO, pago.getEstado());
+        verify(pagoRepository).save(pago);
+    }
+
+    @Test
+    void aplicarConceptoAprobado_marcaLaSolicitudSinPublicarNiEmpujar() {
+        SolicitudDocumento solicitud = SolicitudDocumento.builder()
+                .id(5L).paciente(paciente()).medico(medico()).tipoConcepto(TipoConcepto.CERTIFICADO)
+                .estado(EstadoPago.PENDIENTE).build();
+        when(solicitudRepository.existsById(5L)).thenReturn(true);
+        when(solicitudRepository.findById(5L)).thenReturn(Optional.of(solicitud));
+
+        handler.aplicarConceptoAprobado(new com.tranqui.eventos.data.ConceptoAprobadoData(5L, 1L, 2L, "CERTIFICADO", "mp-doc"));
+
+        assertEquals(EstadoPago.APROBADO, solicitud.getEstado());
+        assertEquals("mp-doc", solicitud.getTransactionId());
+        verifyNoInteractions(outboxPublisher, messagingTemplate);
+    }
+
+    @Test
+    void aplicarPagoAprobado_despuesDeUnRechazo_reusaElPagoDelTurno() {
+        Turno turno = turnoPendiente(24L);
+        Pago rechazado = Pago.builder().id(3L).turno(turno).transactionId("mp-rechazado").estado(EstadoPago.RECHAZADO).build();
+        turno.setPago(rechazado);
+        when(turnoRepository.findById(24L)).thenReturn(Optional.of(turno));
+
+        handler.aplicarPagoAprobado(new com.tranqui.eventos.data.PagoAprobadoData(9L, 24L, "mp-aprobado", new BigDecimal("60000"), "mercadopago"));
+        handler.aplicarPagoRechazado(new com.tranqui.eventos.data.PagoRechazadoData(10L, 24L, "mp-otro", "rejected"));
+
+        assertEquals(EstadoTurno.CONFIRMADO, turno.getEstado());
+        assertEquals(EstadoPago.APROBADO, rechazado.getEstado());
+        assertEquals("mp-aprobado", rechazado.getTransactionId());
+        verify(pagoRepository, times(1)).save(rechazado);
     }
 }
