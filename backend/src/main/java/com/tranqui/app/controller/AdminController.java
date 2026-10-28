@@ -2,6 +2,8 @@ package com.tranqui.app.controller;
 
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.Usuario;
+import com.tranqui.app.model.dto.UsuarioAdminDto;
+import com.tranqui.eventos.data.PasswordTemporalGeneradaData;
 import com.tranqui.app.model.dto.CambiarEstadoTicketDto;
 import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.service.ResendEmailService;
@@ -48,9 +50,10 @@ public class AdminController {
     private boolean suscripcionesExterno;
 
     @GetMapping("/users")
-    public ResponseEntity<List<Usuario>> getUsers() {
-        return ResponseEntity.ok(usuarioRepository.findAll());
+    public ResponseEntity<List<UsuarioAdminDto>> getUsers() {
+        return ResponseEntity.ok(usuarioRepository.findAll().stream().map(UsuarioAdminDto::desde).toList());
     }
+
 
     @PutMapping("/users/{id}/rol")
     @Transactional
@@ -67,7 +70,7 @@ public class AdminController {
             }
             usuarioRepository.saveAndFlush(usuario);
             publicarContactoActualizado(usuario);
-            return ResponseEntity.ok(usuario);
+            return ResponseEntity.ok(UsuarioAdminDto.desde(usuario));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body("Rol inválido");
         }
@@ -141,7 +144,7 @@ public class AdminController {
             });
         }
 
-        return ResponseEntity.ok(usuario);
+        return ResponseEntity.ok(UsuarioAdminDto.desde(usuario));
     }
 
     @PostMapping("/users/{id}/reject")
@@ -180,7 +183,7 @@ public class AdminController {
             });
         }
 
-        return ResponseEntity.ok(usuario);
+        return ResponseEntity.ok(UsuarioAdminDto.desde(usuario));
     }
 
     // Genera una contraseña temporal segura, la guarda hasheada, marca mustChangePassword para
@@ -188,6 +191,7 @@ public class AdminController {
     // AuthController#setNewPassword), y se la manda por mail al usuario. No queda persistida en
     // texto plano en ningún lado � se la devolvemos al admin acá para que la tenga como respaldo
     // (por si el mail tarda o se pierde), pero solo en esta única respuesta.
+    @Transactional
     @PostMapping("/users/{id}/reset-password")
     public ResponseEntity<?> resetPassword(@PathVariable Long id) {
         Usuario usuario = usuarioRepository.findById(id)
@@ -200,7 +204,19 @@ public class AdminController {
         String passwordTemporal = generarPasswordTemporal();
         usuario.setPassword(passwordEncoder.encode(passwordTemporal));
         usuario.setMustChangePassword(true);
-        usuarioRepository.save(usuario);
+        usuarioRepository.saveAndFlush(usuario);
+
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_PASSWORD_TEMPORAL_GENERADA_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new PasswordTemporalGeneradaData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        usuario.getNombre(),
+                        passwordTemporal
+                )
+        );
 
         resendEmailService.enviarPasswordTemporal(usuario.getEmail(), usuario.getNombre(), passwordTemporal);
 

@@ -72,6 +72,7 @@ eventos:
 google:
   client-id: ${GOOGLE_CLIENT_ID:dummy-client-id}
   client-secret: ${GOOGLE_CLIENT_SECRET:}
+  simulado: ${GOOGLE_SIMULADO:false}
   calendar:
     enabled: ${GOOGLE_CALENDAR_ENABLED:false}
     watch:
@@ -135,6 +136,7 @@ resend:
 
 jwt:
   secret: ${JWT_SECRET:}
+  public-key: ${JWT_PUBLIC_KEY:}
 
 # Fase 1: con false los mails y las notificaciones con evento los manda el servicio de
 # notificaciones; true vuelve al envío directo desde el monolito (vuelta atrás).
@@ -179,6 +181,12 @@ clinica:
 suscripciones:
   externo: ${SUSCRIPCIONES_EXTERNO:false}
   resincronizacion-minutos: ${SUSCRIPCIONES_RESINCRONIZACION_MINUTOS:15}
+
+# Fase 9: con true, la identidad (cuentas, sesiones, soporte, administración de usuarios y portón) la administra
+# el servicio de identidad; las rutas del monolito responden 409 (IdentidadExternoFilter) y no corren los seeders.
+# Vuelta atrás: false.
+identidad:
+  externo: ${IDENTIDAD_EXTERNO:false}
 
 tranqui:
   jwt:

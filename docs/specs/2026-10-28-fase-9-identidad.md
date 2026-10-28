@@ -83,6 +83,7 @@ pagos).
   eventos nuevos cuando `envio-directo=false`, como el código de verificación.
 - Rutas internas para la carga inicial: `usuario` (solo las columnas de identidad, con `version`), `ticket`,
   `ticket_mensaje` y `novedades_envio`, paginadas y con sus ids.
+- **Hecho en I1:** Catálogo ampliado con eventos outbox `identidad.password-temporal.generada.v1` y `identidad.soporte.solicitud-datos.v1` y sus DTOs de contrato. Paquete `jwt` en `libs/eventos` con `UsuarioToken`, `JwtUsuario`, `ClavesRsa`, `EmisorJwtUsuario` y `VerificadorJwtUsuario` (validación de tokens RS256 de identidad y transición HS256 del monolito con mitigación contra confusión de algoritmo y rechazo de claves débiles). En el monolito: `JwtService` genera tokens con claim `uid` y valida con `VerificadorJwtUsuario`; flag `identidad.externo` con filtro 409 (`IdentidadExternoFilter`) e inhibición de `DataInitializer`/`LocalDemoSeeder`; deshabilitado login falso de Google salvo `google.simulado=true`; `/api/admin/users` serializado vía `UsuarioAdminDto` sin datos sensibles; mails de reseteo y soporte emitidos por outbox cuando `envio-directo=false`; rutas internas paginadas de carga inicial en `/internal/identidad/carga/*`; y validación estricta de roles en `AuthController.register` permitiendo únicamente `PACIENTE` o `PSIQUIATRA`.
 
 ### I2a — Servicio `identidad`: datos y carga inicial
 - Módulo `services/identidad` y base `identidad`. Flyway desde cero: `usuario` (solo identidad), `ticket`,
