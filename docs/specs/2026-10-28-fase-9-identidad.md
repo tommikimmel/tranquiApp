@@ -117,6 +117,7 @@ pagos).
   - el paywall del gateway pregunta a pagos (`/internal/suscripciones/acceso`, misma caché y deja pasar si falla;
     pregunta 5). Cierra el punto 8 de [cambios-a-futuro.md](../cambios-a-futuro.md).
 - `/api/medicos/stats` pasa a turnos, que tiene los datos (pregunta 6).
+- **Hecho en I3a:** Los seis microservicios (calendario, chat, notificaciones, pagos, profesionales y turnos) migran su clase `seguridad/UsuarioJwt` para delegar en `VerificadorJwtUsuario` de `libs/eventos`, incorporando `jwt.public-key` (`JWT_PUBLIC_KEY`) y `jwt.hs256-aceptado` (`JWT_HS256_ACEPTADO`, default `true`) con soporte de arranque condicional sin secreto cuando HS256 está deshabilitado. El record `UsuarioJwt.Usuario` incorpora el campo `Long uid` (usar `uid` en lugar de resolver por mail queda para la Fase 10). Las suites de test de los seis servicios emiten tokens RS256 con `EmisorJwtUsuario` y claves generadas en el test, manteniendo la verificación de la transición HS256, el rechazo con 401 con `jwt.hs256-aceptado=false` y el rechazo con 401 ante tokens RS256 firmados con otra clave.
 
 ### I4 — Gateway
 - Regla `identidad` con su propia variable `TRANQUI_SERVICES_IDENTIDAD_URI`, por defecto al monolito hasta el corte,

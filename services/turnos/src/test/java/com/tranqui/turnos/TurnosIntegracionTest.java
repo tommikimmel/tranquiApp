@@ -23,6 +23,9 @@ import com.tranqui.turnos.turnos.Programadas;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import com.tranqui.turnos.seguridad.JwtTestHelper;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.MessageBuilder;
@@ -83,8 +86,13 @@ import static org.mockito.Mockito.when;
 })
 class TurnosIntegracionTest {
 
-    static final String CLAVE_JWT = "clave-de-test-de-al-menos-32-bytes-ok";
+    static final String CLAVE_JWT = JwtTestHelper.CLAVE_JWT;
     static final String CLAVE_SERVICIO = "clave-servicio-test-de-32-bytes-ok";
+
+    @DynamicPropertySource
+    static void registrarJwt(DynamicPropertyRegistry registry) {
+        JwtTestHelper.registrarPropiedades(registry);
+    }
     static final long MEDICO = 16L;
     static final long PACIENTE = 30L;
 
@@ -191,10 +199,7 @@ class TurnosIntegracionTest {
     }
 
     private static String token(String email, String rol) {
-        return Jwts.builder().setClaims(Map.of("rol", rol)).setSubject(email).setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 60_000))
-                .signWith(Keys.hmacShaKeyFor(CLAVE_JWT.getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256)
-                .compact();
+        return JwtTestHelper.tokenRs256(email, rol);
     }
 
     private ResponseEntity<String> pedir(HttpMethod metodo, String ruta, String token, String cuerpo) {
@@ -496,5 +501,17 @@ class TurnosIntegracionTest {
         assertThat(uno.get("version").asInt()).isEqualTo(5);
         assertThat(uno.get("turno").get("fecha").asText()).isEqualTo(fecha.toString());
         assertThat(r.getBody()).doesNotContain("reserva-110");
+    }
+
+    @Test
+    void transicion_tokenHs256_esAceptado() {
+        String tokenHs = JwtTestHelper.tokenHs256("lucia@mail.com", "PSIQUIATRA");
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/turnos", tokenHs, null).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void rutasDeTurnos_conTokenRs256FirmadoConOtraClave_devuelve401() {
+        String tokenOtra = JwtTestHelper.tokenRs256OtraClave("lucia@mail.com", "PSIQUIATRA");
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/turnos", tokenOtra, null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 }
