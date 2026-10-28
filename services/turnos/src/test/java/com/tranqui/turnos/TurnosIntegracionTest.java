@@ -112,6 +112,7 @@ class TurnosIntegracionTest {
     @Autowired Cobros cobros;
     @Autowired Programadas programadas;
     @Autowired CargaInicial cargaInicial;
+    @Autowired com.tranqui.turnos.interno.Copias copias;
     @Autowired JdbcTemplate jdbc;
     @Autowired TestRestTemplate http;
     @Autowired RabbitTemplate rabbit;
@@ -546,5 +547,22 @@ class TurnosIntegracionTest {
         assertThat(stats.get("activePatients").asInt()).isEqualTo(1);
         assertThat(stats.get("noShowsThisMonth").asInt()).isEqualTo(0);
         assertThat(stats.get("noShowsChange").asText()).isEqualTo("igual que ayer");
+    }
+
+    @Test
+    void fuenteIdentidad_laAgendaSaleDeProfesionalesYMercadoPagoDePagos() {
+        when(interno.fuenteIdentidad()).thenReturn(true);
+        when(interno.profesionalesDelServicio()).thenReturn(List.of(
+                new ClienteInterno.ProfesionalServicio(MEDICO, 5, perfil(),
+                        List.of(new DisponibilidadProfesionalData.Franja(2, "10:00", "11:00", null)), List.of()),
+                // Nunca se confía en lo que manda otro servicio: una fila sin id válido se saltea.
+                new ClienteInterno.ProfesionalServicio(-1L, 1, perfil(), List.of(), List.of())));
+        when(interno.cuentasMp(eq(0), anyInt())).thenReturn(List.of(new ClienteInterno.CuentaMp(MEDICO, true, 9L)));
+
+        assertThat(copias.copiarProfesionales()).isEqualTo(1);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM disponibilidad", Integer.class)).isEqualTo(1);
+        assertThat(personas.porId(MEDICO).orElseThrow().mpVinculada()).isTrue();
+        org.mockito.Mockito.verify(interno, org.mockito.Mockito.never()).profesionales(anyInt(), anyInt());
     }
 }

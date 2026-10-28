@@ -150,6 +150,10 @@ security:
     key: ${ENCRYPTION_KEY:}
 
 tranqui:
+  # Fase 9: de dónde se leen los datos de usuario. "monolito" (por defecto) hasta el corte; en el corte, con el
+  # servicio de identidad ya cargado, "identidad" (y lo que no es de identidad, de su dueño: pagos, turnos,
+  # profesionales). Vuelta atrás: sacar la variable.
+  fuente-identidad: ${TRANQUI_FUENTE_IDENTIDAD:monolito}
   gateway:
     # Las consultas internas (carga inicial y el reenvío de las suscripciones) pasan por el gateway.
     url: ${TRANQUI_GATEWAY_URL:http://gateway:8080}

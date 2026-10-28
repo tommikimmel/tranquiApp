@@ -26,12 +26,17 @@ import java.util.stream.Collectors;
  * eventos de identidad y de verificación refrescan a uno solo enseguida ({@link #refrescar}).
  *
  * <p>La foto (base64, puede pesar varios MB) no viaja en el estado: se pide aparte cuando cambia su hash.
+ *
+ * <p>Fase 9, con la fuente de identidad ({@code TRANQUI_FUENTE_IDENTIDAD=identidad}): la identidad y la verificación
+ * salen del servicio de identidad, y Mercado Pago y la suscripción de pagos (su dueño), por eventos
+ * ({@link Manejadores}) y por la resincronización de cada pasada. Ningún dato de pagos se pisa con lo de identidad.
  */
 @Component
 public class SincronizacionMonolito {
 
     private static final Logger log = LoggerFactory.getLogger(SincronizacionMonolito.class);
     static final String ROL_PROFESIONAL = "PSIQUIATRA";
+    static final int PAGINA_PAGOS = 200;
 
     private final ClienteInterno interno;
     private final Profesionales profesionales;
@@ -59,10 +64,51 @@ public class SincronizacionMonolito {
         try {
             int cambios = sincronizarEstado(interno.estado());
             if (cambios > 0) {
-                log.info("Sincronización con el monolito: {} profesionales actualizados", cambios);
+                log.info("Sincronización de identidad: {} profesionales actualizados", cambios);
             }
         } catch (RuntimeException e) {
-            log.warn("El monolito no respondió la sincronización de profesionales; se reintenta en la próxima pasada: {}",
+            log.warn("No respondió la sincronización de identidad de profesionales; se reintenta en la próxima pasada: {}",
+                    e.getMessage());
+        }
+        if (interno.fuenteIdentidad()) {
+            sincronizarPagos();
+        }
+    }
+
+    /** Fase 9: Mercado Pago y la suscripción de cada profesional, de pagos (su dueño). */
+    void sincronizarPagos() {
+        int cambios = 0;
+        try {
+            for (int pagina = 0; ; pagina++) {
+                List<ClienteInterno.CuentaMp> lote = interno.cuentasMp(pagina, PAGINA_PAGOS);
+                for (ClienteInterno.CuentaMp c : lote) {
+                    // Nunca se confía en lo que manda otro servicio: una fila inválida se saltea.
+                    if (c == null || c.profesionalId() == null || c.profesionalId() <= 0 || c.version() < 0) {
+                        log.warn("Resincronización de Mercado Pago: se saltea una fila inválida");
+                        continue;
+                    }
+                    if (profesionales.guardarMercadoPago(c.profesionalId(), c.vinculada(), c.version())) cambios++;
+                }
+                if (lote.size() < PAGINA_PAGOS) break;
+            }
+            for (int pagina = 0; ; pagina++) {
+                List<ClienteInterno.EstadoSuscripcion> lote = interno.estadoSuscripciones(pagina, PAGINA_PAGOS);
+                for (ClienteInterno.EstadoSuscripcion e : lote) {
+                    if (e == null || e.professionalId() == null || e.professionalId() <= 0 || e.version() == null
+                            || e.version() < 0 || e.estado() == null || e.estado().isBlank()) {
+                        log.warn("Resincronización de suscripciones: se saltea una fila inválida");
+                        continue;
+                    }
+                    if (profesionales.guardarSuscripcion(e.professionalId(), e.estado(), e.periodoHasta(), e.puedeRecetar(),
+                            e.version())) cambios++;
+                }
+                if (lote.size() < PAGINA_PAGOS) break;
+            }
+            if (cambios > 0) {
+                log.info("Sincronización con pagos: {} datos de Mercado Pago o suscripción actualizados", cambios);
+            }
+        } catch (RuntimeException e) {
+            log.warn("Pagos no respondió la sincronización de Mercado Pago y suscripciones; se reintenta en la próxima pasada: {}",
                     e.getMessage());
         }
     }
@@ -85,7 +131,7 @@ public class SincronizacionMonolito {
                     refrescar(p.id());
                     cambios++;
                 } else if (distinto(local, p)) {
-                    profesionales.guardarDatosMonolito(p.datos());
+                    guardar(p);
                     cambios++;
                 }
             } catch (RuntimeException e) {
@@ -124,13 +170,25 @@ public class SincronizacionMonolito {
         }
         boolean existe = profesionales.porId(id).isPresent();
         if (existe) {
-            profesionales.guardarDatosMonolito(p.datos());
+            guardar(p);
         } else if (ROL_PROFESIONAL.equals(p.rol())) {
             alta(p);
         }
     }
 
-    /** Alta con lo que tenía el monolito: así su copia y la del servicio arrancan iguales. */
+    /** Con la fuente de identidad, solo lo de identidad: Mercado Pago y la suscripción son de pagos. */
+    private void guardar(ClienteInterno.ProfesionalMonolito p) {
+        if (interno.fuenteIdentidad()) {
+            profesionales.guardarDatosIdentidad(p.datos());
+        } else {
+            profesionales.guardarDatosMonolito(p.datos());
+        }
+    }
+
+    /**
+     * Alta con lo que tenía el monolito: así su copia y la del servicio arrancan iguales. Con la fuente de identidad,
+     * el perfil es el que cargó al registrarse y Mercado Pago y la suscripción llegan después de pagos.
+     */
     void alta(ClienteInterno.ProfesionalMonolito p) {
         tx.executeWithoutResult(estado -> {
             profesionales.alta(p.datos(), p.perfil());
@@ -145,15 +203,19 @@ public class SincronizacionMonolito {
         });
     }
 
-    private static boolean distinto(Profesionales.Profesional l, ClienteInterno.ProfesionalMonolito p) {
-        return l.version() < p.version()
+    private boolean distinto(Profesionales.Profesional l, ClienteInterno.ProfesionalMonolito p) {
+        boolean identidad = l.version() < p.version()
                 || !Objects.equals(l.email(), p.email()) || !Objects.equals(l.rol(), p.rol())
                 || !Objects.equals(l.profession(), p.profession()) || !Objects.equals(l.nombre(), p.nombre())
                 || !Objects.equals(l.apellido(), p.apellido()) || !Objects.equals(l.telefono(), p.telefono())
                 || !Objects.equals(l.sexo(), p.sexo()) || !Objects.equals(l.fechaNacimiento(), p.fechaNacimiento())
                 || !Objects.equals(l.cuil(), p.cuil()) || !Objects.equals(l.tipoDocumento(), p.tipoDocumento())
                 || !Objects.equals(l.numeroDocumento(), p.numeroDocumento())
-                || !Objects.equals(l.verificadoAdmin(), p.verificadoAdmin()) || l.mpVinculada() != p.mpVinculada()
+                || !Objects.equals(l.verificadoAdmin(), p.verificadoAdmin());
+        if (interno.fuenteIdentidad()) {
+            return identidad;
+        }
+        return identidad || l.mpVinculada() != p.mpVinculada()
                 || !Objects.equals(l.suscripcionEstado(), p.suscripcionEstado())
                 || !Objects.equals(l.suscripcionPeriodoHasta(), p.suscripcionPeriodoHasta())
                 || l.puedeRecetar() != p.puedeRecetar();
