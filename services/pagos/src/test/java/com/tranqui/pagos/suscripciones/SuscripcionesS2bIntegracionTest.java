@@ -9,6 +9,7 @@ import com.tranqui.eventos.Topicos;
 import com.tranqui.eventos.data.UsuarioRegistradoData;
 import com.tranqui.eventos.data.VerificacionResueltaData;
 import com.tranqui.eventos.jwt.ServiceJwt;
+import com.tranqui.pagos.datos.CuentasMp;
 import com.tranqui.pagos.datos.EventosSuscripcion;
 import com.tranqui.pagos.datos.PagosSuscripcion;
 import com.tranqui.pagos.datos.Planes;
@@ -16,6 +17,7 @@ import com.tranqui.pagos.datos.Suscripciones;
 import com.tranqui.pagos.datos.Suscriptores;
 import com.tranqui.pagos.interno.CargaInicialSuscripciones;
 import com.tranqui.pagos.interno.ClienteInterno;
+import com.tranqui.pagos.mp.Vinculacion;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -119,6 +121,8 @@ class SuscripcionesS2bIntegracionTest {
     @Autowired RabbitTemplate rabbit;
     @Autowired RabbitAdmin admin;
     @Autowired TestRestTemplate http;
+    @Autowired CuentasMp cuentas;
+    @Autowired Vinculacion vinculacion;
 
     private final ObjectMapper mapper = EventObjectMapperFactory.create();
     private ServiceJwt serviceJwt;
@@ -523,6 +527,148 @@ class SuscripcionesS2bIntegracionTest {
 
         // Tras el cambio de estado, la versión en outbox y la de la ruta interna son exactamente iguales
         assertThat(versionRutaInterna).isEqualTo(versionOutbox);
+    }
+
+    @Test
+    void rutaInterna_acceso_casosYValidacion() throws Exception {
+        // 1. 401 sin JWT de servicio
+        ResponseEntity<String> resSinJwt = http.getForEntity("/internal/suscripciones/acceso?email=psiquiatra@mail.com", String.class);
+        assertThat(resSinJwt.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        // 2. Mail inválido o vacío -> 400
+        assertThat(pedirInterno(HttpMethod.GET, "/internal/suscripciones/acceso", null).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(pedirInterno(HttpMethod.GET, "/internal/suscripciones/acceso?email=", null).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(pedirInterno(HttpMethod.GET, "/internal/suscripciones/acceso?email=invalido", null).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(pedirInterno(HttpMethod.GET, "/internal/suscripciones/acceso?email=sin@dominio", null).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        // 3. Mail desconocido -> permitido = true
+        ResponseEntity<String> resDesconocido = pedirInterno(HttpMethod.GET, "/internal/suscripciones/acceso?email=nadie@mail.com", null);
+        assertThat(resDesconocido.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode jsonDesconocido = mapper.readTree(resDesconocido.getBody());
+        assertThat(jsonDesconocido.get("permitido").asBoolean()).isTrue();
+
+        // 4. Profesional sin suscripción -> permitido = true
+        ResponseEntity<String> resSinSub = pedirInterno(HttpMethod.GET, "/internal/suscripciones/acceso?email=psiquiatra@mail.com", null);
+        assertThat(resSinSub.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(mapper.readTree(resSinSub.getBody()).get("permitido").asBoolean()).isTrue();
+
+        // 5. Suscripción ACTIVE vigente -> permitido = true
+        LocalDateTime ahora = LocalDateTime.now();
+        Long subId = suscripciones.insertarNuevo(new Suscripciones.Suscripcion(null, 1, 11L, 2L, "ACTIVE", 1,
+                "MERCADOPAGO", "PRE-11", new BigDecimal("25000.00"), "monthly",
+                ahora.plusMonths(1), ahora.minusDays(5), ahora.plusDays(25), ahora.plusDays(32),
+                false, null, false, ahora, ahora));
+
+        ResponseEntity<String> resActive = pedirInterno(HttpMethod.GET, "/internal/suscripciones/acceso?email=psiquiatra@mail.com", null);
+        assertThat(resActive.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(mapper.readTree(resActive.getBody()).get("permitido").asBoolean()).isTrue();
+
+        // 6. CANCELLED vigente -> permitido = true
+        Suscripciones.Suscripcion subActual = suscripciones.porId(subId).orElseThrow();
+        suscripciones.actualizar(new Suscripciones.Suscripcion(subId, subActual.version(), 11L, 2L, "CANCELLED", 1,
+                "MERCADOPAGO", "PRE-11", new BigDecimal("25000.00"), "monthly",
+                ahora.plusMonths(1), ahora.minusDays(5), ahora.plusDays(10), ahora.plusDays(17),
+                true, ahora, false, ahora, ahora));
+
+        ResponseEntity<String> resCancelledVigente = pedirInterno(HttpMethod.GET, "/internal/suscripciones/acceso?email=psiquiatra@mail.com", null);
+        assertThat(resCancelledVigente.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(mapper.readTree(resCancelledVigente.getBody()).get("permitido").asBoolean()).isTrue();
+
+        // 7. CANCELLED vencida -> permitido = false
+        subActual = suscripciones.porId(subId).orElseThrow();
+        suscripciones.actualizar(new Suscripciones.Suscripcion(subId, subActual.version(), 11L, 2L, "CANCELLED", 1,
+                "MERCADOPAGO", "PRE-11", new BigDecimal("25000.00"), "monthly",
+                ahora.minusDays(1), ahora.minusDays(30), ahora.minusDays(1), ahora.plusDays(6),
+                true, ahora.minusDays(5), false, ahora, ahora));
+
+        ResponseEntity<String> resCancelledVencida = pedirInterno(HttpMethod.GET, "/internal/suscripciones/acceso?email=psiquiatra@mail.com", null);
+        assertThat(resCancelledVencida.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(mapper.readTree(resCancelledVencida.getBody()).get("permitido").asBoolean()).isFalse();
+
+        // 8. ACTIVE vencida pero dentro de gracia -> permitido = true
+        subActual = suscripciones.porId(subId).orElseThrow();
+        suscripciones.actualizar(new Suscripciones.Suscripcion(subId, subActual.version(), 11L, 2L, "ACTIVE", 1,
+                "MERCADOPAGO", "PRE-11", new BigDecimal("25000.00"), "monthly",
+                ahora.minusDays(1), ahora.minusDays(30), ahora.minusDays(1), ahora.plusDays(6),
+                false, null, false, ahora, ahora));
+
+        ResponseEntity<String> resActiveGracia = pedirInterno(HttpMethod.GET, "/internal/suscripciones/acceso?email=psiquiatra@mail.com", null);
+        assertThat(resActiveGracia.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(mapper.readTree(resActiveGracia.getBody()).get("permitido").asBoolean()).isTrue();
+    }
+
+    @Test
+    void rutaInterna_cuentasMp_casosYValidacion() throws Exception {
+        // 1. 401 sin JWT de servicio
+        ResponseEntity<String> resSinJwt = http.getForEntity("/internal/pagos/cuentas-mp", String.class);
+        assertThat(resSinJwt.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        // 2. Parámetros inválidos -> 400
+        assertThat(pedirInterno(HttpMethod.GET, "/internal/pagos/cuentas-mp?pagina=-1", null).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(pedirInterno(HttpMethod.GET, "/internal/pagos/cuentas-mp?tamanio=0", null).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(pedirInterno(HttpMethod.GET, "/internal/pagos/cuentas-mp?tamanio=1001", null).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        // 3. Vincular cuenta profesional 10 -> outbox publica evento con versión
+        vinculacion.simularConexion(10L);
+        esperar(() -> jdbc.queryForObject("SELECT count(*) FROM outbox WHERE topic = 'pagos.cuenta-mp.vinculada.v1'", Long.class) > 0);
+
+        String payloadVinculada = jdbc.queryForObject(
+                "SELECT payload::text FROM outbox WHERE topic = 'pagos.cuenta-mp.vinculada.v1' ORDER BY id DESC LIMIT 1",
+                String.class);
+        long versionEventoVinculada = mapper.readTree(payloadVinculada).get("aggregateVersion").asLong();
+
+        // 4. Vincular y luego desvincular profesional 11 -> outbox publica desvinculada.v1
+        vinculacion.simularConexion(11L);
+        vinculacion.desvincular(11L);
+        esperar(() -> jdbc.queryForObject("SELECT count(*) FROM outbox WHERE topic = 'pagos.cuenta-mp.desvinculada.v1'", Long.class) > 0);
+
+        String payloadDesvinculada = jdbc.queryForObject(
+                "SELECT payload::text FROM outbox WHERE topic = 'pagos.cuenta-mp.desvinculada.v1' ORDER BY id DESC LIMIT 1",
+                String.class);
+        long versionEventoDesvinculada = mapper.readTree(payloadDesvinculada).get("aggregateVersion").asLong();
+
+        // 5. Consultar ruta interna: lista plana ordenada por profesionalId, con vinculada y version
+        ResponseEntity<String> res = pedirInterno(HttpMethod.GET, "/internal/pagos/cuentas-mp?pagina=0&tamanio=10", null);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        JsonNode items = mapper.readTree(res.getBody());
+        assertThat(items.isArray()).isTrue();
+        assertThat(items.size()).isEqualTo(2);
+
+        JsonNode c1 = items.get(0);
+        assertThat(c1.get("profesionalId").asLong()).isEqualTo(10L);
+        assertThat(c1.get("vinculada").asBoolean()).isTrue();
+        assertThat(c1.get("version").asLong()).isEqualTo(versionEventoVinculada);
+
+        JsonNode c2 = items.get(1);
+        assertThat(c2.get("profesionalId").asLong()).isEqualTo(11L);
+        assertThat(c2.get("vinculada").asBoolean()).isFalse();
+        assertThat(c2.get("version").asLong()).isEqualTo(versionEventoDesvinculada);
+
+        // 6. Paginado
+        ResponseEntity<String> p0 = pedirInterno(HttpMethod.GET, "/internal/pagos/cuentas-mp?pagina=0&tamanio=1", null);
+        assertThat(p0.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode itemsP0 = mapper.readTree(p0.getBody());
+        assertThat(itemsP0.size()).isEqualTo(1);
+        assertThat(itemsP0.get(0).get("profesionalId").asLong()).isEqualTo(10L);
+
+        ResponseEntity<String> p1 = pedirInterno(HttpMethod.GET, "/internal/pagos/cuentas-mp?pagina=1&tamanio=1", null);
+        assertThat(p1.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode itemsP1 = mapper.readTree(p1.getBody());
+        assertThat(itemsP1.size()).isEqualTo(1);
+        assertThat(itemsP1.get(0).get("profesionalId").asLong()).isEqualTo(11L);
+
+        ResponseEntity<String> p2 = pedirInterno(HttpMethod.GET, "/internal/pagos/cuentas-mp?pagina=2&tamanio=1", null);
+        assertThat(p2.getStatusCode()).isEqualTo(HttpStatus.OK);
+        JsonNode itemsP2 = mapper.readTree(p2.getBody());
+        assertThat(itemsP2.size()).isEqualTo(0);
     }
 
     // ==========================================
