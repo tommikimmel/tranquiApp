@@ -14,7 +14,9 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /** Los turnos (JDBC). Las consultas son las de {@code TurnoRepository} del monolito. */
 @Repository
@@ -137,6 +139,21 @@ public class Turnos {
 
     public List<Turno> dePaciente(Long pacienteId) {
         return jdbc.query("SELECT " + COLUMNAS + " FROM turno WHERE paciente_id = ? AND estado <> 'CANCELADO'", mapeo, pacienteId);
+    }
+
+    /** Todos los turnos del médico entre dos fechas (para estadísticas del dashboard). */
+    public List<Turno> entreFechas(Long medicoId, LocalDate desde, LocalDate hasta) {
+        return jdbc.query("SELECT " + COLUMNAS + " FROM turno WHERE medico_id = ? AND fecha BETWEEN ? AND ?",
+                mapeo, medicoId, Date.valueOf(desde), Date.valueOf(hasta));
+    }
+
+    /** Primera fecha de turno no cancelado por cada paciente del médico (para pacientes nuevos). */
+    public Map<Long, LocalDate> primeraFechaPorPaciente(Long medicoId) {
+        return jdbc.query("SELECT paciente_id, MIN(fecha) AS primera_fecha FROM turno WHERE medico_id = ? AND estado <> 'CANCELADO' GROUP BY paciente_id",
+                (rs, i) -> Map.entry(rs.getLong("paciente_id"), rs.getObject("primera_fecha", LocalDate.class)),
+                medicoId)
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     /** {@code existsActiveTurnoByPacienteEmail}: un turno de agenda desde hoy que no esté cancelado ni vencido. */

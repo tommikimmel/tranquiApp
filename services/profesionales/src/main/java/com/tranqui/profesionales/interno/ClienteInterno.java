@@ -64,6 +64,14 @@ public class ClienteInterno {
         }
     }
 
+    /** {@code CuentasMp.CuentaMpResumenDto} del servicio de pagos. */
+    public record CuentaMp(Long profesionalId, boolean vinculada, long version) {}
+
+    /** {@code Dtos.EstadoSuscripcionDto} del servicio de pagos (el mismo dato que suscripciones.suscripcion.cambio-estado.v2). */
+    public record EstadoSuscripcion(Long professionalId, String estado, String planCode, boolean acceso,
+                                    boolean puedeRecetar, LocalDateTime periodoHasta, LocalDateTime graciaHasta,
+                                    Long version) {}
+
     /** {@code InternoProfesionalesController.IdentidadDto} del monolito. */
     public record Identidad(String nombre, String apellido, String telefono, String sexo, LocalDate fechaNacimiento,
                             Long cuil, String tipoDocumento, Integer numeroDocumento, String fotoUrl) {}
@@ -193,8 +201,13 @@ public class ClienteInterno {
     private final RestClient httpRapido;
     private final ServiceJwt serviceJwt;
 
+    // /internal/monolito o /internal/identidad (ver rutaIdentidad).
+    private final String baseIdentidad;
+
     public ClienteInterno(@Value("${tranqui.gateway.url}") String gatewayUrl,
-                          @Value("${tranqui.jwt.service-secret}") String claveServicio) {
+                          @Value("${tranqui.jwt.service-secret}") String claveServicio,
+                          @Value("${tranqui.fuente-identidad:monolito}") String fuenteIdentidad) {
+        this.baseIdentidad = rutaIdentidad(fuenteIdentidad);
         if (claveServicio == null || claveServicio.isBlank()) {
             throw new IllegalStateException("Falta SERVICE_JWT_KEY: el servicio no puede hacer consultas internas.");
         }
@@ -208,6 +221,25 @@ public class ClienteInterno {
         fabricaRapida.setReadTimeout(5_000);
         this.httpRapido = RestClient.builder().baseUrl(gatewayUrl).requestFactory(fabricaRapida).build();
         this.serviceJwt = new ServiceJwt(claveServicio);
+    }
+
+    /**
+     * De dónde se leen los datos de usuario (Fase 9): {@code monolito} (por defecto, hasta el corte) o
+     * {@code identidad}. Volver atrás es sacar la variable {@code TRANQUI_FUENTE_IDENTIDAD}.
+     */
+    static String rutaIdentidad(String fuente) {
+        String f = fuente == null ? "" : fuente.trim().toLowerCase();
+        return switch (f) {
+            case "", "monolito" -> "/internal/monolito";
+            case "identidad" -> "/internal/identidad";
+            default -> throw new IllegalStateException(
+                    "TRANQUI_FUENTE_IDENTIDAD tiene que ser 'monolito' o 'identidad', no '" + fuente + "'.");
+        };
+    }
+
+    /** Si los datos de usuario se leen del servicio de identidad (y lo que no es suyo, de su dueño). */
+    public boolean fuenteIdentidad() {
+        return "/internal/identidad".equals(baseIdentidad);
     }
 
     private <T> T get(String uri, ParameterizedTypeReference<T> tipo, Object... variables) {
@@ -228,18 +260,18 @@ public class ClienteInterno {
 
     /** Un usuario completo (puede haber dejado de ser profesional: ver {@code rol}). */
     public ProfesionalMonolito profesional(Long id) {
-        return get("/internal/monolito/profesionales/{id}", new ParameterizedTypeReference<>() {}, id);
+        return get(baseIdentidad + "/profesionales/{id}", new ParameterizedTypeReference<>() {}, id);
     }
 
     /** Identidad sin la foto, verificación, Mercado Pago y suscripción de todos los profesionales. */
     public List<ProfesionalMonolito> estado() {
-        List<ProfesionalMonolito> r = get("/internal/monolito/profesionales/estado", new ParameterizedTypeReference<>() {});
+        List<ProfesionalMonolito> r = get(baseIdentidad + "/profesionales/estado", new ParameterizedTypeReference<>() {});
         return r != null ? r : List.of();
     }
 
     /** La parte de identidad del perfil. Si el monolito no responde, tira la excepción: no se guarda nada. */
     public ProfesionalMonolito guardarIdentidad(Long id, Identidad identidad) {
-        return http.put().uri("/internal/monolito/profesionales/{id}/identidad", id)
+        return http.put().uri(baseIdentidad + "/profesionales/{id}/identidad", id)
                 .contentType(MediaType.APPLICATION_JSON)
                 .headers(h -> {
                     h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
@@ -259,7 +291,7 @@ public class ClienteInterno {
     /** Un usuario por id (para refrescar la copia tras eventos de identidad). */
     /** Actualiza la ficha de un paciente en el monolito (dueño de identidad). */
     public PacienteMonolito actualizarPaciente(Long id, Object body) {
-        return http.put().uri("/internal/monolito/pacientes/{id}", id)
+        return http.put().uri(baseIdentidad + "/pacientes/{id}", id)
                 .contentType(MediaType.APPLICATION_JSON)
                 .headers(h -> {
                     h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
@@ -270,12 +302,35 @@ public class ClienteInterno {
     }
 
     public PacienteMonolito paciente(Long id) {
-        return get("/internal/monolito/pacientes/{id}", new ParameterizedTypeReference<>() {}, id);
+        return get(baseIdentidad + "/pacientes/{id}", new ParameterizedTypeReference<>() {}, id);
     }
 
     /** Todos los turnos, paginados por id (para carga inicial y resincronización periódica). */
     public List<TurnoMonolito> turnos(int pagina, int tamanio) {
         List<TurnoMonolito> r = get("/internal/monolito/turnos?pagina={p}&tamanio={t}",
+                new ParameterizedTypeReference<>() {}, pagina, tamanio);
+        return r != null ? r : List.of();
+    }
+
+    /**
+     * Fase 9, con la fuente de identidad: los turnos salen de su dueño ({@code /internal/turnos/turnos}, la misma ruta
+     * que usaba el monolito para su copia), sin paginar.
+     */
+    public List<TurnoMonolito> turnosDelServicio() {
+        List<TurnoMonolito> r = get("/internal/turnos/turnos", new ParameterizedTypeReference<>() {});
+        return r != null ? r : List.of();
+    }
+
+    /** Fase 9, con la fuente de identidad: Mercado Pago vinculado de cada profesional, de pagos (su dueño). */
+    public List<CuentaMp> cuentasMp(int pagina, int tamanio) {
+        List<CuentaMp> r = get("/internal/pagos/cuentas-mp?pagina={p}&tamanio={t}", new ParameterizedTypeReference<>() {},
+                pagina, tamanio);
+        return r != null ? r : List.of();
+    }
+
+    /** Fase 9, con la fuente de identidad: el estado de la suscripción de cada profesional, de pagos (su dueño). */
+    public List<EstadoSuscripcion> estadoSuscripciones(int pagina, int tamanio) {
+        List<EstadoSuscripcion> r = get("/internal/suscripciones/estado?pagina={p}&tamanio={t}",
                 new ParameterizedTypeReference<>() {}, pagina, tamanio);
         return r != null ? r : List.of();
     }

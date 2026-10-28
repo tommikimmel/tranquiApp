@@ -68,8 +68,14 @@ public class Copias {
         }
     }
 
-    /** La agenda, la disponibilidad, las tarifas y Mercado Pago de todos los profesionales del monolito. */
+    /**
+     * La agenda, la disponibilidad, las tarifas y Mercado Pago de todos los profesionales: del monolito, o con la fuente
+     * de identidad (Fase 9) de sus dueños (profesionales y pagos).
+     */
     public int copiarProfesionales() {
+        if (interno.fuenteIdentidad()) {
+            return copiarProfesionalesDeSusDuenos();
+        }
         int total = 0;
         for (int pagina = 0; ; pagina++) {
             List<ClienteInterno.ProfesionalMonolito> lote = interno.profesionales(pagina, PAGINA);
@@ -82,6 +88,36 @@ public class Copias {
                 personas.mercadoPago(p.id(), p.mpVinculada());
             }
             total += lote.size();
+            if (lote.size() < PAGINA) {
+                return total;
+            }
+        }
+    }
+
+    private int copiarProfesionalesDeSusDuenos() {
+        int total = 0;
+        for (ClienteInterno.ProfesionalServicio p : interno.profesionalesDelServicio()) {
+            // Nunca se confía en lo que manda otro servicio: una fila sin id válido se saltea.
+            if (p == null || p.profesionalId() == null || p.profesionalId() <= 0) {
+                log.warn("Resincronización de profesionales: se saltea una fila sin id válido");
+                continue;
+            }
+            if (p.perfil() != null) {
+                profesionales.guardarPerfil(p.profesionalId(), p.perfil());
+            }
+            profesionales.reemplazarDisponibilidad(p.profesionalId(), p.disponibilidad() != null ? p.disponibilidad() : List.of());
+            profesionales.reemplazarTarifas(p.profesionalId(), p.tarifas() != null ? p.tarifas() : List.of());
+            total++;
+        }
+        for (int pagina = 0; ; pagina++) {
+            List<ClienteInterno.CuentaMp> lote = interno.cuentasMp(pagina, PAGINA);
+            for (ClienteInterno.CuentaMp c : lote) {
+                if (c == null || c.profesionalId() == null || c.profesionalId() <= 0 || c.version() < 0) {
+                    log.warn("Resincronización de Mercado Pago: se saltea una fila inválida");
+                    continue;
+                }
+                personas.mercadoPago(c.profesionalId(), c.vinculada());
+            }
             if (lote.size() < PAGINA) {
                 return total;
             }

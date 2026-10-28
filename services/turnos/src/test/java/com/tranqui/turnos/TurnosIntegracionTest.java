@@ -23,6 +23,9 @@ import com.tranqui.turnos.turnos.Programadas;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import com.tranqui.turnos.seguridad.JwtTestHelper;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.MessageBuilder;
@@ -83,8 +86,13 @@ import static org.mockito.Mockito.when;
 })
 class TurnosIntegracionTest {
 
-    static final String CLAVE_JWT = "clave-de-test-de-al-menos-32-bytes-ok";
+    static final String CLAVE_JWT = JwtTestHelper.CLAVE_JWT;
     static final String CLAVE_SERVICIO = "clave-servicio-test-de-32-bytes-ok";
+
+    @DynamicPropertySource
+    static void registrarJwt(DynamicPropertyRegistry registry) {
+        JwtTestHelper.registrarPropiedades(registry);
+    }
     static final long MEDICO = 16L;
     static final long PACIENTE = 30L;
 
@@ -104,6 +112,7 @@ class TurnosIntegracionTest {
     @Autowired Cobros cobros;
     @Autowired Programadas programadas;
     @Autowired CargaInicial cargaInicial;
+    @Autowired com.tranqui.turnos.interno.Copias copias;
     @Autowired JdbcTemplate jdbc;
     @Autowired TestRestTemplate http;
     @Autowired RabbitTemplate rabbit;
@@ -191,10 +200,7 @@ class TurnosIntegracionTest {
     }
 
     private static String token(String email, String rol) {
-        return Jwts.builder().setClaims(Map.of("rol", rol)).setSubject(email).setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 60_000))
-                .signWith(Keys.hmacShaKeyFor(CLAVE_JWT.getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256)
-                .compact();
+        return JwtTestHelper.tokenRs256(email, rol);
     }
 
     private ResponseEntity<String> pedir(HttpMethod metodo, String ruta, String token, String cuerpo) {
@@ -496,5 +502,67 @@ class TurnosIntegracionTest {
         assertThat(uno.get("version").asInt()).isEqualTo(5);
         assertThat(uno.get("turno").get("fecha").asText()).isEqualTo(fecha.toString());
         assertThat(r.getBody()).doesNotContain("reserva-110");
+    }
+
+    @Test
+    void transicion_tokenHs256_esAceptado() {
+        String tokenHs = JwtTestHelper.tokenHs256("lucia@mail.com", "PSIQUIATRA");
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/turnos", tokenHs, null).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void rutasDeTurnos_conTokenRs256FirmadoConOtraClave_devuelve401() {
+        String tokenOtra = JwtTestHelper.tokenRs256OtraClave("lucia@mail.com", "PSIQUIATRA");
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/turnos", tokenOtra, null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void stats_seguridadValidacionYMetricas() throws Exception {
+        // 1. Sin autenticación -> 401
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/stats", null, null).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        // 2. Rol PACIENTE -> 403
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/stats", token("martina@mail.com", "PACIENTE"), null).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        // 3. Rol PSIQUIATRA pero período inválido -> 400
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/stats?periodo=TRIMESTRAL", token("lucia@mail.com", "PSIQUIATRA"), null).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        // 4. Con datos reales: hoy un confirmado de $60000 y ayer uno confirmado de $60000
+        LocalDate hoy = LocalDate.now();
+        LocalDate ayer = hoy.minusDays(1);
+        turnoGuardado(201, Turno.CONFIRMADO, hoy, LocalTime.of(10, 0), "APROBADO", LocalDateTime.now());
+        turnoGuardado(202, Turno.CONFIRMADO, ayer, LocalTime.of(10, 0), "APROBADO", LocalDateTime.now());
+
+        ResponseEntity<String> res = pedir(HttpMethod.GET, "/api/medicos/stats?periodo=DIARIO", token("lucia@mail.com", "PSIQUIATRA"), null);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        JsonNode stats = mapper.readTree(res.getBody());
+        assertThat(stats.get("sessionsToday").asInt()).isEqualTo(1);
+        assertThat(stats.get("sessionsTodayChange").asText()).isEqualTo("igual que ayer");
+        assertThat(stats.get("earningsThisWeek").decimalValue()).isEqualByComparingTo(new BigDecimal("60000"));
+        assertThat(stats.get("earningsThisWeekChange").asText()).isEqualTo("0% vs ayer");
+        assertThat(stats.get("activePatients").asInt()).isEqualTo(1);
+        assertThat(stats.get("noShowsThisMonth").asInt()).isEqualTo(0);
+        assertThat(stats.get("noShowsChange").asText()).isEqualTo("igual que ayer");
+    }
+
+    @Test
+    void fuenteIdentidad_laAgendaSaleDeProfesionalesYMercadoPagoDePagos() {
+        when(interno.fuenteIdentidad()).thenReturn(true);
+        when(interno.profesionalesDelServicio()).thenReturn(List.of(
+                new ClienteInterno.ProfesionalServicio(MEDICO, 5, perfil(),
+                        List.of(new DisponibilidadProfesionalData.Franja(2, "10:00", "11:00", null)), List.of()),
+                // Nunca se confía en lo que manda otro servicio: una fila sin id válido se saltea.
+                new ClienteInterno.ProfesionalServicio(-1L, 1, perfil(), List.of(), List.of())));
+        when(interno.cuentasMp(eq(0), anyInt())).thenReturn(List.of(new ClienteInterno.CuentaMp(MEDICO, true, 9L)));
+
+        assertThat(copias.copiarProfesionales()).isEqualTo(1);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM disponibilidad", Integer.class)).isEqualTo(1);
+        assertThat(personas.porId(MEDICO).orElseThrow().mpVinculada()).isTrue();
+        org.mockito.Mockito.verify(interno, org.mockito.Mockito.never()).profesionales(anyInt(), anyInt());
     }
 }

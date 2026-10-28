@@ -14,6 +14,7 @@ COPY services/calendario/pom.xml services/calendario/
 COPY services/pagos/pom.xml services/pagos/
 COPY services/profesionales/pom.xml services/profesionales/
 COPY services/turnos/pom.xml services/turnos/
+COPY services/identidad/pom.xml services/identidad/
 
 # Copiar código fuente de las librerías y del servicio
 COPY libs/comun/src libs/comun/src
