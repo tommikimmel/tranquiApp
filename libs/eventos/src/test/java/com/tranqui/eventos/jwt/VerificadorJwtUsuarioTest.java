@@ -236,6 +236,33 @@ class VerificadorJwtUsuarioTest {
     }
 
     @Test
+    void rolAdminEnMinusculas_esInvalido() {
+        String token = Jwts.builder()
+                .setSubject("admin@tranqui.com")
+                .claim("rol", "admin")
+                .claim("uid", 10L)
+                .setIssuer(JwtUsuario.EMISOR)
+                .setExpiration(new Date(System.currentTimeMillis() + 3600000))
+                .signWith(keyPair2048.getPrivate(), SignatureAlgorithm.RS256)
+                .compact();
+
+        VerificadorJwtUsuario verificador = new VerificadorJwtUsuario(clavePublicaBase64, SECRETO_HS256, true);
+        assertThat(verificador.validar(token)).isEmpty();
+    }
+
+    @Test
+    void mailConMayusculas_vuelveIgualSinPasarAMinusculas() {
+        EmisorJwtUsuario emisor = new EmisorJwtUsuario(clavePrivadaBase64, Duration.ofDays(7));
+        String token = emisor.emitir("Usuario.Con.Mayusculas@Tranqui.COM", "PACIENTE", "Juan", 15L);
+
+        VerificadorJwtUsuario verificador = new VerificadorJwtUsuario(clavePublicaBase64, SECRETO_HS256, false);
+        Optional<UsuarioToken> res = verificador.validar(token);
+
+        assertThat(res).isPresent();
+        assertThat(res.get().email()).isEqualTo("Usuario.Con.Mayusculas@Tranqui.COM");
+    }
+
+    @Test
     void rs256_sinIss_oConOtroIss_esRechazado() {
         VerificadorJwtUsuario verificador = new VerificadorJwtUsuario(clavePublicaBase64, SECRETO_HS256, true);
 

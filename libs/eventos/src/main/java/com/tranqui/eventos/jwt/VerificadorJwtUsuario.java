@@ -29,60 +29,13 @@ public class VerificadorJwtUsuario {
     private final JwtParser parser;
 
     public VerificadorJwtUsuario(String clavePublicaTexto, String secretoHs256, boolean aceptarHs256) {
-        RSAPublicKey pub = null;
-        if (clavePublicaTexto != null && !clavePublicaTexto.trim().isEmpty()) {
-            pub = ClavesRsa.leerClavePublica(clavePublicaTexto);
-        }
-
-        SecretKey hmac = null;
-        if (secretoHs256 != null && !secretoHs256.trim().isEmpty()) {
-            byte[] bytes = secretoHs256.trim().getBytes(StandardCharsets.UTF_8);
-            if (bytes.length < 32) {
-                throw new IllegalStateException("El secreto HS256 debe tener al menos 32 bytes.");
-            }
-            hmac = Keys.hmacShaKeyFor(bytes);
-        }
-
-        boolean hmacUsable = aceptarHs256 && hmac != null;
-        if (pub == null && !hmacUsable) {
-            throw new IllegalStateException("No hay ninguna clave de verificación usable configurada.");
-        }
-
-        this.clavePublica = pub;
-        this.claveHs256 = hmac;
-        this.aceptarHs256 = aceptarHs256;
-
-        this.parser = Jwts.parserBuilder()
-                .setAllowedClockSkewSeconds(30)
-                .setSigningKeyResolver(new SigningKeyResolverAdapter() {
-                    @Override
-                    public Key resolveSigningKey(JwsHeader header, Claims claims) {
-                        return resolverClave(header);
-                    }
-
-                    @Override
-                    public Key resolveSigningKey(JwsHeader header, String plaintext) {
-                        return resolverClave(header);
-                    }
-
-                    private Key resolverClave(JwsHeader header) {
-                        String alg = header != null ? header.getAlgorithm() : null;
-                        if ("RS256".equals(alg)) {
-                            if (clavePublica != null) {
-                                return clavePublica;
-                            }
-                            throw new JwtException("RS256 no configurado o no aceptado");
-                        }
-                        if ("HS256".equals(alg)) {
-                            if (aceptarHs256 && claveHs256 != null) {
-                                return claveHs256;
-                            }
-                            throw new JwtException("HS256 no configurado o no aceptado");
-                        }
-                        throw new JwtException("Algoritmo no permitido: " + alg);
-                    }
-                })
-                .build();
+        this(
+                (clavePublicaTexto != null && !clavePublicaTexto.trim().isEmpty())
+                        ? ClavesRsa.leerClavePublica(clavePublicaTexto)
+                        : null,
+                secretoHs256,
+                aceptarHs256
+        );
     }
 
     public VerificadorJwtUsuario(RSAPublicKey clavePublica, String secretoHs256, boolean aceptarHs256) {
@@ -183,7 +136,7 @@ public class VerificadorJwtUsuario {
             }
 
             String nombre = claims.get(JwtUsuario.CLAIM_NOMBRE, String.class);
-            return Optional.of(new UsuarioToken(email.trim().toLowerCase(), rol.trim().toUpperCase(), uid, nombre));
+            return Optional.of(new UsuarioToken(email.trim(), rol.trim(), uid, nombre));
         } catch (Exception e) {
             return Optional.empty();
         }
