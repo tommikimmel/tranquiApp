@@ -1,14 +1,18 @@
 package com.tranqui.app.controller;
 
+import com.tranqui.app.eventos.OutboxPublisher;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.service.ResendEmailService;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.SolicitudDatosData;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,6 +30,10 @@ public class SoporteController {
     @Autowired
     private ResendEmailService resendEmailService;
 
+    @Autowired
+    private OutboxPublisher outboxPublisher;
+
+    @Transactional
     @PostMapping("/solicitud-datos")
     @PreAuthorize("hasAnyRole('PACIENTE', 'PSIQUIATRA')")
     public ResponseEntity<Void> solicitarCopiaDatos(@AuthenticationPrincipal UserDetails userDetails) {
@@ -35,6 +43,18 @@ public class SoporteController {
         String nombreCompleto = (usuario.getNombre() != null ? usuario.getNombre() : "") +
                 (usuario.getApellido() != null ? " " + usuario.getApellido() : "");
         String rol = usuario.getRol() != null ? usuario.getRol().toString() : "USUARIO";
+
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_SOPORTE_SOLICITUD_DATOS_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new SolicitudDatosData(
+                        usuario.getId(),
+                        nombreCompleto.trim(),
+                        usuario.getEmail(),
+                        rol
+                )
+        );
 
         resendEmailService.enviarSolicitudCopiaDatos(nombreCompleto.trim(), usuario.getEmail(), rol);
 

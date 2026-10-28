@@ -64,7 +64,7 @@ class AuthControllerUnitTest {
         // UnnecessaryStubbingException before this fix.
         when(usuarioRepository.findByEmail("ya@existe.com")).thenReturn(Optional.of(Usuario.builder().build()));
 
-        RegisterRequestDto dto = RegisterRequestDto.builder().email("ya@existe.com").password("Secret123").build();
+        RegisterRequestDto dto = RegisterRequestDto.builder().email("ya@existe.com").password("Secret123").rol(Rol.PACIENTE).build();
         ResponseEntity<?> response = authController.register(dto);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
