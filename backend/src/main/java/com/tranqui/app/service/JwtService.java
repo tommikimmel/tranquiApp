@@ -5,10 +5,12 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
@@ -18,14 +20,30 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    @Value("${jwt.secret:defaultsecretkeymustbe32byteslongforhs256algorithm!}")
+    @Value("${jwt.secret:}")
     private String secretKey;
 
     @Value("${jwt.expiration:604800000}") // 7 days in ms
     private long jwtExpiration;
 
+    @PostConstruct
+    public void validateSecret() {
+        if (secretKey == null || secretKey.trim().isEmpty()) {
+            throw new IllegalStateException("JWT secret is not configured. Missing JWT_SECRET environment variable.");
+        }
+        if (secretKey.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("JWT secret must be at least 32 bytes (256 bits) long.");
+        }
+    }
+
     private Key getSigningKey() {
-        byte[] keyBytes = secretKey.getBytes();
+        if (secretKey == null || secretKey.trim().isEmpty()) {
+            throw new IllegalStateException("JWT secret is not configured. Missing JWT_SECRET environment variable.");
+        }
+        byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT secret must be at least 32 bytes (256 bits) long.");
+        }
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
