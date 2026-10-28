@@ -117,6 +117,7 @@ pagos).
   - el paywall del gateway pregunta a pagos (`/internal/suscripciones/acceso`, misma caché y deja pasar si falla;
     pregunta 5). Cierra el punto 8 de [cambios-a-futuro.md](../cambios-a-futuro.md).
 - `/api/medicos/stats` pasa a turnos, que tiene los datos (pregunta 6).
+- **Hecho en I3c:** Mails de contraseña temporal y solicitud de copia de datos en notificaciones vía manejadores de eventos outbox (`identidad.password-temporal.generada.v1` e `identidad.soporte.solicitud-datos.v1`) con validación estricta y derivación a DLQ; endpoint `GET /api/medicos/stats` en turnos portado con ventanas temporales y métricas de negocio del dashboard para psiquiatras; rutas internas `GET /internal/suscripciones/acceso` (evaluación de paywall) y `GET /internal/pagos/cuentas-mp` (resincronización de cuentas con versión sincronizada y migración Flyway V3) en pagos protegidas por JWT de servicio.
 
 ### I4 — Gateway
 - Regla `identidad` con su propia variable `TRANQUI_SERVICES_IDENTIDAD_URI`, por defecto al monolito hasta el corte,

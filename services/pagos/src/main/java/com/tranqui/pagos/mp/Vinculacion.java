@@ -75,8 +75,9 @@ public class Vinculacion {
                 + "&client_secret=" + codificar(clientSecret)
                 + "&code=" + codificar(code)
                 + "&redirect_uri=" + codificar(redirectUri()));
-        guardar(profesionalId, tokens);
-        publicarVinculada(profesionalId);
+        long v = siguienteVersion(profesionalId);
+        guardar(profesionalId, tokens, v);
+        publicarVinculada(profesionalId, v);
     }
 
     /**
@@ -85,18 +86,20 @@ public class Vinculacion {
      */
     @Transactional
     public void simularConexion(Long profesionalId) {
+        long v = siguienteVersion(profesionalId);
         cuentas.guardar(new CuentasMp.Cuenta(profesionalId,
                 cifrado.cifrar("TEST-dev-mock-access-token-" + profesionalId),
                 cifrado.cifrar("TEST-dev-mock-refresh-token-" + profesionalId),
-                LocalDateTime.now().plusMonths(6), "999999999"));
-        publicarVinculada(profesionalId);
+                LocalDateTime.now().plusMonths(6), "999999999", true, v));
+        publicarVinculada(profesionalId, v);
     }
 
     @Transactional
     public void desvincular(Long profesionalId) {
-        cuentas.borrar(profesionalId);
+        long v = siguienteVersion(profesionalId);
+        cuentas.desvincular(profesionalId, v);
         outbox.publicar(Topicos.PAGOS_CUENTA_MP_DESVINCULADA_V1, "profesional", String.valueOf(profesionalId),
-                version(), new CuentaMpDesvinculadaData(profesionalId));
+                (int) v, new CuentaMpDesvinculadaData(profesionalId));
     }
 
     /**
@@ -117,7 +120,7 @@ public class Vinculacion {
                         + "&client_id=" + codificar(clientId)
                         + "&client_secret=" + codificar(clientSecret)
                         + "&refresh_token=" + codificar(cifrado.descifrar(c.refreshTokenCifrado())));
-                guardar(profesionalId, tokens);
+                guardar(profesionalId, tokens, c.version());
                 return Optional.of(tokens.accessToken());
             } catch (Exception e) {
                 // Se usa el que había: el pedido a Mercado Pago va a mostrar el error real.
@@ -132,24 +135,26 @@ public class Vinculacion {
         return accessToken.startsWith("dummy") || accessToken.startsWith("TEST-dev-mock") || accessToken.equals("test-token");
     }
 
-    private void guardar(Long profesionalId, MercadoPagoApi.TokensOAuth t) {
+    private void guardar(Long profesionalId, MercadoPagoApi.TokensOAuth t, long version) {
         cuentas.guardar(new CuentasMp.Cuenta(profesionalId, cifrado.cifrar(t.accessToken()),
                 t.refreshToken() != null ? cifrado.cifrar(t.refreshToken()) : null,
-                t.expiraEnSegundos() > 0 ? LocalDateTime.now().plusSeconds(t.expiraEnSegundos()) : null, t.userId()));
+                t.expiraEnSegundos() > 0 ? LocalDateTime.now().plusSeconds(t.expiraEnSegundos()) : null, t.userId(),
+                true, version));
     }
 
-    private void publicarVinculada(Long profesionalId) {
+    private void publicarVinculada(Long profesionalId, long version) {
         String mpUserId = cuentas.buscar(profesionalId).map(CuentasMp.Cuenta::mpUserId).orElse(null);
-        outbox.publicar(Topicos.PAGOS_CUENTA_MP_VINCULADA_V1, "profesional", String.valueOf(profesionalId), version(),
+        outbox.publicar(Topicos.PAGOS_CUENTA_MP_VINCULADA_V1, "profesional", String.valueOf(profesionalId), (int) version,
                 new CuentaMpVinculadaData(profesionalId, mpUserId));
     }
 
     /**
-     * Versión del agregado: el momento, así un vincular/desvincular posterior siempre tiene una mayor (el
-     * monolito publicaba la versión del usuario, que este servicio no tiene).
+     * Versión del agregado calculada a partir del momento o incrementando la versión anterior,
+     * persistida en cuenta_mp y publicada en el evento outbox con el mismo valor (I3c).
      */
-    private static int version() {
-        return (int) (System.currentTimeMillis() / 1000);
+    private long siguienteVersion(Long profesionalId) {
+        long anterior = cuentas.buscarCualquiera(profesionalId).map(CuentasMp.Cuenta::version).orElse(0L);
+        return Math.max(System.currentTimeMillis() / 1000, anterior + 1);
     }
 
     private static String codificar(String valor) {

@@ -497,4 +497,37 @@ class TurnosIntegracionTest {
         assertThat(uno.get("turno").get("fecha").asText()).isEqualTo(fecha.toString());
         assertThat(r.getBody()).doesNotContain("reserva-110");
     }
+
+    @Test
+    void stats_seguridadValidacionYMetricas() throws Exception {
+        // 1. Sin autenticación -> 401
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/stats", null, null).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        // 2. Rol PACIENTE -> 403
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/stats", token("martina@mail.com", "PACIENTE"), null).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        // 3. Rol PSIQUIATRA pero período inválido -> 400
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/stats?periodo=TRIMESTRAL", token("lucia@mail.com", "PSIQUIATRA"), null).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        // 4. Con datos reales: hoy un confirmado de $60000 y ayer uno confirmado de $60000
+        LocalDate hoy = LocalDate.now();
+        LocalDate ayer = hoy.minusDays(1);
+        turnoGuardado(201, Turno.CONFIRMADO, hoy, LocalTime.of(10, 0), "APROBADO", LocalDateTime.now());
+        turnoGuardado(202, Turno.CONFIRMADO, ayer, LocalTime.of(10, 0), "APROBADO", LocalDateTime.now());
+
+        ResponseEntity<String> res = pedir(HttpMethod.GET, "/api/medicos/stats?periodo=DIARIO", token("lucia@mail.com", "PSIQUIATRA"), null);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        JsonNode stats = mapper.readTree(res.getBody());
+        assertThat(stats.get("sessionsToday").asInt()).isEqualTo(1);
+        assertThat(stats.get("sessionsTodayChange").asText()).isEqualTo("igual que ayer");
+        assertThat(stats.get("earningsThisWeek").decimalValue()).isEqualByComparingTo(new BigDecimal("60000"));
+        assertThat(stats.get("earningsThisWeekChange").asText()).isEqualTo("0% vs ayer");
+        assertThat(stats.get("activePatients").asInt()).isEqualTo(1);
+        assertThat(stats.get("noShowsThisMonth").asInt()).isEqualTo(0);
+        assertThat(stats.get("noShowsChange").asText()).isEqualTo("igual que ayer");
+    }
 }
