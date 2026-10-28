@@ -106,6 +106,7 @@ pagos).
   profesionales, profesionales/{id}, profesionales/estado, suscriptores, suscriptores/{id}}`, `POST /pacientes`,
   `PUT /pacientes/{id}` y `PUT /profesionales/{id}/identidad`. `profesionales/estado` lleva solo la verificación;
   Mercado Pago y la suscripción salen de pagos (I3).
+- **Hecho en I2b:** rutas de cuenta y sesión en `/api/auth/**` (registro restringido a PACIENTE/PSIQUIATRA con `perfil_registro` [Flyway `V2__perfil_registro.sql`], verificación de mail, reenvío y recuperación de contraseña con `SecureRandom`, login, Google con simulación restringida a `identidad.google.simulado=true`, completar perfil, términos, me, mi cuenta y eliminación con anonimización y punto de extensión para Resend); sesión y JWT RS256 (`EmisorJwtUsuario`, cookie `SESSION-TOKEN` con atributos dev/prod idénticos al monolito, filtro de autenticación con `VerificadorJwtUsuario` y transición HS256); eventos outbox en la misma transacción (`usuario.registrado`, `actualizado`, `eliminado`, `codigo-verificacion`); semilla `DataInitializer` sincronizada con la carga inicial publicando `usuario.registrado`; suite de integración con 26 tests en verde.
 
 ### I3 — Los servicios dejan de leer del monolito
 - **Identidad:** pagos, profesionales y turnos leen de `/internal/identidad/...` en lugar de `/internal/monolito/...`,
