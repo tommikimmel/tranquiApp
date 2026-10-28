@@ -1,14 +1,10 @@
 package com.tranqui.app.service;
 
 import com.tranqui.app.model.Usuario;
-import com.tranqui.eventos.jwt.ClavesRsa;
 import com.tranqui.eventos.jwt.UsuarioToken;
 import com.tranqui.eventos.jwt.VerificadorJwtUsuario;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwsHeader;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.SigningKeyResolverAdapter;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.Cookie;
@@ -21,7 +17,6 @@ import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 
 @Service
 public class JwtService {
@@ -48,13 +43,6 @@ public class JwtService {
         this.verificador = new VerificadorJwtUsuario(publicKey, secretKey, true);
     }
 
-    private VerificadorJwtUsuario getVerificador() {
-        if (this.verificador == null) {
-            this.verificador = new VerificadorJwtUsuario(publicKey, secretKey, true);
-        }
-        return this.verificador;
-    }
-
     private Key getSigningKey() {
         if (secretKey == null || secretKey.trim().isEmpty()) {
             throw new IllegalStateException("JWT secret is not configured. Missing JWT_SECRET environment variable.");
@@ -77,65 +65,28 @@ public class JwtService {
     }
 
     public String generateToken(Map<String, Object> extraClaims, String email) {
-        long ttl = jwtExpiration < 0 ? (jwtExpiration - 35000L) : jwtExpiration;
         return Jwts.builder()
                 .setClaims(extraClaims)
                 .setSubject(email)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + ttl))
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
     public String extractEmail(String token) {
-        if (token == null || token.isBlank()) {
+        if (token == null || token.isBlank() || verificador == null) {
             return null;
         }
-        return getVerificador().validar(token).map(UsuarioToken::email).orElse(null);
-    }
-
-    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-        final Claims claims = extractAllClaims(token);
-        return claimsResolver.apply(claims);
-    }
-
-    private Claims extractAllClaims(String token) {
-        if (publicKey != null && !publicKey.trim().isEmpty()) {
-            return Jwts.parserBuilder()
-                    .setAllowedClockSkewSeconds(30)
-                    .setSigningKeyResolver(new SigningKeyResolverAdapter() {
-                        @Override
-                        public Key resolveSigningKey(JwsHeader header, Claims claims) {
-                            String alg = header != null ? header.getAlgorithm() : null;
-                            if ("RS256".equals(alg)) {
-                                return ClavesRsa.leerClavePublica(publicKey);
-                            }
-                            return getSigningKey();
-                        }
-                    })
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody();
-        }
-        return Jwts.parserBuilder()
-                .setAllowedClockSkewSeconds(30)
-                .setSigningKeyResolver(new SigningKeyResolverAdapter() {
-                    @Override
-                    public Key resolveSigningKey(JwsHeader header, Claims claims) {
-                        return getSigningKey();
-                    }
-                })
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+        return verificador.validar(token).map(UsuarioToken::email).orElse(null);
     }
 
     public boolean validateToken(String token) {
-        if (token == null || token.isBlank()) {
+        if (token == null || token.isBlank() || verificador == null) {
             return false;
         }
         try {
-            return getVerificador().validar(token).isPresent();
+            return verificador.validar(token).isPresent();
         } catch (Exception e) {
             return false;
         }
