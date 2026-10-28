@@ -89,6 +89,7 @@ pagos).
   `ticket_mensaje`, `novedades_envio`, outbox e inbox, con los mismos ids y secuencias.
 - Carga inicial con `IDENTIDAD_CARGA=true`: solo con las tablas vacías, todo o nada, secuencias arriba del máximo
   id, conservando `version` (hallazgo 6).
+- **Hecho en I2a:** servicio `identidad` (módulo Maven, Flyway `V1__esquema_identidad.sql` con `usuario` [57 columnas], `ticket`, `ticket_mensaje`, `novedades_envio`, outbox e inbox, secuencias numéricas y clases JDBC en paquete `datos` con control de versión optimista); carga inicial `CargaInicialIdentidad` transaccional con validación exhaustiva de contrato y datos antes de insertar, gateada por `IDENTIDAD_CARGA`; tests de integración con Testcontainers en verde.
 
 ### I2b — Servicio `identidad`: rutas
 - Las mismas rutas y JSON: `/api/auth/**` (incluida Mi Cuenta), `/api/tickets/**`, `/api/soporte/**`,
