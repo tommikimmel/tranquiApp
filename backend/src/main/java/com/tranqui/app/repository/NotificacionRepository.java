@@ -15,6 +15,9 @@ public interface NotificacionRepository extends JpaRepository<Notificacion, Long
 
     List<Notificacion> findByUsuarioIdAndFechaCreacionAfterOrderByFechaCreacionDesc(Long usuarioId, java.time.LocalDateTime cutoff);
 
+    // Fase 1: carga inicial de las notificaciones vigentes en el servicio de notificaciones.
+    List<Notificacion> findByFechaCreacionAfterOrderByIdAsc(java.time.LocalDateTime desde);
+
     long countByUsuarioIdAndLeidoFalse(Long usuarioId);
 
     @Modifying
