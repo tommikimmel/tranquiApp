@@ -2,6 +2,7 @@ package com.tranqui.gateway;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.tranqui.eventos.jwt.ServiceJwt;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -128,6 +129,19 @@ public class RuteoSuscripcionesTest {
             cbPagos.transitionToClosedState();
         }
     }
+
+    @Test
+    void rutaInternaSuscripciones_vaAServicioDePagos() {
+        String token = "Bearer " + new ServiceJwt("test-service-jwt-secret-key-32chars").emitirToken("monolito");
+        webTestClient.get().uri("/internal/suscripciones/estado")
+                .header("Authorization", token).exchange()
+                .expectStatus().isOk().expectBody().jsonPath("$.desde").isEqualTo("pagos");
+        webTestClient.get().uri("/internal/suscripciones/estado")
+                .exchange().expectStatus().isUnauthorized();
+        webTestClient.get().uri("/internal/monolito/prueba")
+                .header("Authorization", token).exchange()
+                .expectStatus().isOk().expectBody().jsonPath("$.desde").isEqualTo("monolito");
+    }
 }
 
 /**
@@ -239,5 +253,24 @@ class RuteoSuscripcionesSoloPagosTest {
         va("GET", "/api/payments/checkout/63", "pagos");
         va("POST", "/api/payments/verificar?externalReference=63", "pagos");
         va("GET", "/api/medicos/mercadopago/status", "pagos");
+    }
+
+    @Test
+    void rutaInternaSuscripciones_conSoloPagos_vaAPagosAunSinVariableSuscripciones() {
+        String token = "Bearer " + new ServiceJwt("test-service-jwt-secret-key-32chars").emitirToken("monolito");
+        // /internal/suscripciones/estado con JWT de servicio va a la URI de pagos (y no al monolito),
+        // aun cuando TRANQUI_SERVICES_SUSCRIPCIONES_URI no está definida
+        webTestClient.get().uri("/internal/suscripciones/estado")
+                .header("Authorization", token).exchange()
+                .expectStatus().isOk().expectBody().jsonPath("$.desde").isEqualTo("pagos");
+
+        // sin JWT de servicio, 401
+        webTestClient.get().uri("/internal/suscripciones/estado")
+                .exchange().expectStatus().isUnauthorized();
+
+        // otro /internal/... sin regla propia sigue yendo al monolito
+        webTestClient.get().uri("/internal/monolito/prueba")
+                .header("Authorization", token).exchange()
+                .expectStatus().isOk().expectBody().jsonPath("$.desde").isEqualTo("monolito");
     }
 }
