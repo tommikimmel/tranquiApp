@@ -1,9 +1,14 @@
 package com.tranqui.app.service;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.eventos.data.DisponibilidadProfesionalData;
 import com.tranqui.eventos.data.PerfilProfesionalData;
 import com.tranqui.eventos.data.TarifasProfesionalData;
 import com.tranqui.eventos.jwt.ServiceJwt;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -36,9 +41,10 @@ public class ResincronizacionProfesionales {
     private static final long MARGEN_MINUTOS = 2;
 
     /** Lo que devuelve {@code GET /internal/profesionales/profesionales}: el estado actual de un profesional. */
-    public record ProfesionalServicio(Long profesionalId, int version, PerfilProfesionalData perfil,
-                                      List<DisponibilidadProfesionalData.Franja> disponibilidad,
-                                      List<TarifasProfesionalData.Tarifa> tarifas) {}
+    public record ProfesionalServicio(@NotNull @Positive Long profesionalId, @PositiveOrZero int version,
+                                      @Valid PerfilProfesionalData perfil,
+                                      @Valid List<DisponibilidadProfesionalData.Franja> disponibilidad,
+                                      @Valid List<TarifasProfesionalData.Tarifa> tarifas) {}
 
     private final CopiaProfesionales copia;
     private final RestClient http;
@@ -74,7 +80,8 @@ public class ResincronizacionProfesionales {
         OffsetDateTime desde = ultimaPasada != null ? ultimaPasada.minusMinutes(MARGEN_MINUTOS) : null;
         List<ProfesionalServicio> cambios;
         try {
-            cambios = http.get()
+            // Fase 10: no se confía en lo que manda el servicio; las filas inválidas se saltean.
+            cambios = ValidadorEventos.respuesta(http.get()
                     .uri(u -> {
                         u.path("/internal/profesionales/profesionales");
                         if (desde != null) {
@@ -88,7 +95,7 @@ public class ResincronizacionProfesionales {
                         h.set("X-Correlation-Id", correlacion != null ? correlacion : UUID.randomUUID().toString());
                     })
                     .retrieve()
-                    .body(new ParameterizedTypeReference<List<ProfesionalServicio>>() {});
+                    .body(new ParameterizedTypeReference<List<ProfesionalServicio>>() {}), "/internal/profesionales/profesionales");
         } catch (RuntimeException e) {
             log.warn("El servicio de profesionales no respondió la resincronización; la copia sigue como está: {}", e.getMessage());
             return;

@@ -67,7 +67,7 @@ public class ClienteInterno {
     public record CuentaMp(@NotNull @Positive Long profesionalId, boolean vinculada, long version) {}
 
     /** Un intervalo ocupado en el Google Calendar del profesional; {@code todoElDia} bloquea el día. */
-    public record Intervalo(LocalTime inicio, LocalTime fin, boolean todoElDia) {}
+    public record Intervalo(@NotNull LocalTime inicio, @NotNull LocalTime fin, boolean todoElDia) {}
 
     public record DocumentoAdjunto(@Email String email, String pacienteNombre, String medicoNombre, String tipoDocumento,
                                    String archivoDataUri, String archivoNombre) {}

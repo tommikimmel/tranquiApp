@@ -1,7 +1,11 @@
 package com.tranqui.app.service;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.eventos.data.TurnoActualizadoData;
 import com.tranqui.eventos.jwt.ServiceJwt;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -33,7 +37,7 @@ public class ResincronizacionTurnos {
     private static final long MARGEN_MINUTOS = 2;
 
     /** Lo que devuelve {@code GET /internal/turnos/turnos}: el turno como está en el servicio, con su versión. */
-    public record TurnoServicio(int version, TurnoActualizadoData turno) {}
+    public record TurnoServicio(@PositiveOrZero int version, @NotNull @Valid TurnoActualizadoData turno) {}
 
     private final CopiaTurnos copia;
     private final RestClient http;
@@ -69,7 +73,8 @@ public class ResincronizacionTurnos {
         OffsetDateTime desde = ultimaPasada != null ? ultimaPasada.minusMinutes(MARGEN_MINUTOS) : null;
         List<TurnoServicio> cambios;
         try {
-            cambios = http.get()
+            // Fase 10: no se confía en lo que manda el servicio; las filas inválidas se saltean.
+            cambios = ValidadorEventos.respuesta(http.get()
                     .uri(u -> {
                         u.path("/internal/turnos/turnos");
                         if (desde != null) {
@@ -83,7 +88,7 @@ public class ResincronizacionTurnos {
                         h.set("X-Correlation-Id", correlacion != null ? correlacion : UUID.randomUUID().toString());
                     })
                     .retrieve()
-                    .body(new ParameterizedTypeReference<List<TurnoServicio>>() {});
+                    .body(new ParameterizedTypeReference<List<TurnoServicio>>() {}), "/internal/turnos/turnos");
         } catch (RuntimeException e) {
             log.warn("El servicio de turnos no respondió la resincronización; la copia sigue como está: {}", e.getMessage());
             return;
