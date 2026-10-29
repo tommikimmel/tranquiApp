@@ -211,4 +211,48 @@ class ManejadoresIdentidadTest {
 
         verify(mails, times(1)).enviarSolicitudCopiaDatos("Laura", "laura@mail.com", "PSIQUIATRA");
     }
+
+    // ------------------------------------------------------------------ Códigos y tickets
+
+    @Test
+    void codigo_verificacionORecuperacion_conElNombreDelEventoODeLaCopia() {
+        Contacto copia = new Contacto(4L, "ana@mail.com");
+        copia.setNombre("Ana de la copia");
+        when(contactos.buscarPorEmail("ana@mail.com")).thenReturn(Optional.of(copia));
+        manejadores.mailCodigoVerificacion(avisos, mails, contactos).manejar(evento(
+                new com.tranqui.eventos.data.CodigoVerificacionGeneradoData(4L, "ana@mail.com", "123456", "EMAIL_VERIFICATION", "Ana")));
+        manejadores.mailCodigoVerificacion(avisos, mails, contactos).manejar(evento(
+                new com.tranqui.eventos.data.CodigoVerificacionGeneradoData(4L, "ana@mail.com", "654321", "PASSWORD_RESET")));
+        verify(mails).enviarCodigoVerificacion("ana@mail.com", "Ana", "123456");
+        verify(mails).enviarCodigoRecuperacion("ana@mail.com", "Ana de la copia", "654321");
+    }
+
+    @Test
+    void ticketRespondido_notificaYMandaElMail() {
+        Contacto creador = new Contacto(4L, "ana@mail.com");
+        creador.setNombre("Ana");
+        when(avisos.contacto(4L)).thenReturn(creador);
+        manejadores.notifTicketRespondido(avisos).manejar(evento(
+                new com.tranqui.eventos.data.TicketRespondidoData(1L, 4L, null, "No puedo pagar", "Listo")));
+        manejadores.mailTicketRespondido(avisos, mails).manejar(evento(
+                new com.tranqui.eventos.data.TicketRespondidoData(1L, 4L, null, "No puedo pagar", "Listo")));
+        manejadores.mailTicketRespondido(avisos, mails).manejar(evento(
+                new com.tranqui.eventos.data.TicketRespondidoData(1L, 4L, "otro@mail.com", "No puedo pagar", "Listo")));
+        verify(avisos).notificar(creador, "Respondieron tu ticket", "Soporte respondió: \"No puedo pagar\"", "TICKET_RESPUESTA");
+        verify(mails).enviarRespuestaTicket("ana@mail.com", "Ana", "No puedo pagar", "Listo");
+        verify(mails).enviarRespuestaTicket("otro@mail.com", "Ana", "No puedo pagar", "Listo");
+    }
+
+    @Test
+    void ticketNuevoYMensaje_avisanACadaAdministrador() {
+        Contacto a1 = new Contacto(8L, "admin1@mail.com");
+        Contacto a2 = new Contacto(9L, "admin2@mail.com");
+        when(avisos.administradores()).thenReturn(java.util.List.of(a1, a2));
+        manejadores.notifTicketCreado(avisos).manejar(evento(new com.tranqui.eventos.data.TicketCreadoData(1L, 4L, "Ana", "Pago")));
+        manejadores.notifTicketMensajeRecibido(avisos).manejar(evento(
+                new com.tranqui.eventos.data.TicketMensajeRecibidoData(1L, 4L, "Ana", "Pago")));
+        verify(avisos).notificar(a1, "Nuevo ticket de soporte", "Ana abrió un ticket: Pago", "TICKET_NUEVO");
+        verify(avisos).notificar(a2, "Nueva respuesta en un ticket", "Ana respondió: \"Pago\"", "TICKET_RESPUESTA");
+        verify(avisos, times(4)).notificar(any(), anyString(), anyString(), anyString());
+    }
 }
