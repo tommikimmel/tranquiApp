@@ -1,5 +1,8 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.LocalDate;
@@ -13,9 +16,9 @@ import java.time.LocalDate;
  * de Google con su duración.
  */
 public record TurnoReprogramadoData(
-    Long turnoId,
-    Long pacienteId,
-    Long profesionalId,
+    @NotNull @Positive Long turnoId,
+    @Positive Long pacienteId,
+    @Positive Long profesionalId,
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     LocalDate fechaAnterior,
     String horaInicioAnterior,

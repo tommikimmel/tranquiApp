@@ -225,6 +225,9 @@ services:
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       # Fase 2: el resumen de chat de la lista de pacientes se pide al servicio por el gateway.
       TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Fase 10: validación del data de los eventos. "loguear" la primera semana en producción (avisa y deja pasar);
+      # después, EVENTOS_VALIDACION_MODO=rechazar en el .env (un evento inválido va a la DLQ). Ver produccion.md.
+      EVENTOS_VALIDACION_MODO: ${EVENTOS_VALIDACION_MODO:-loguear}
       # Fase 3: Google Calendar lo maneja el servicio de calendario; el monolito guarda el Meet que le
       # avisa. Vuelta atrás: CALENDARIO_EXTERNO=false en el .env, junto con la ruta del gateway.
       CALENDARIO_EXTERNO: ${CALENDARIO_EXTERNO:-true}
@@ -426,6 +429,9 @@ services:
       JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Fase 10: validación del data de los eventos. "loguear" la primera semana en producción (avisa y deja pasar);
+      # después, EVENTOS_VALIDACION_MODO=rechazar en el .env (un evento inválido va a la DLQ). Ver produccion.md.
+      EVENTOS_VALIDACION_MODO: ${EVENTOS_VALIDACION_MODO:-loguear}
       TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-onboarding@resend.dev}
@@ -482,6 +488,9 @@ services:
       JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Fase 10: validación del data de los eventos. "loguear" la primera semana en producción (avisa y deja pasar);
+      # después, EVENTOS_VALIDACION_MODO=rechazar en el .env (un evento inválido va a la DLQ). Ver produccion.md.
+      EVENTOS_VALIDACION_MODO: ${EVENTOS_VALIDACION_MODO:-loguear}
       TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
@@ -536,6 +545,9 @@ services:
       JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Fase 10: validación del data de los eventos. "loguear" la primera semana en producción (avisa y deja pasar);
+      # después, EVENTOS_VALIDACION_MODO=rechazar en el .env (un evento inválido va a la DLQ). Ver produccion.md.
+      EVENTOS_VALIDACION_MODO: ${EVENTOS_VALIDACION_MODO:-loguear}
       TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
       # Las mismas variables de Google que tenía el monolito (mismo cliente OAuth y mismas URLs públicas).
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-224301140079-2pa672f7sqcner9nut04j0g99md88n3p.apps.googleusercontent.com}
@@ -600,6 +612,9 @@ services:
       JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Fase 10: validación del data de los eventos. "loguear" la primera semana en producción (avisa y deja pasar);
+      # después, EVENTOS_VALIDACION_MODO=rechazar en el .env (un evento inválido va a la DLQ). Ver produccion.md.
+      EVENTOS_VALIDACION_MODO: ${EVENTOS_VALIDACION_MODO:-loguear}
       TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
       # Las mismas variables de Mercado Pago que tenía el monolito (misma aplicación y mismo webhook).
       MERCADOPAGO_ENABLED: ${MERCADOPAGO_ENABLED:-false}
@@ -685,6 +700,9 @@ services:
       JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Fase 10: validación del data de los eventos. "loguear" la primera semana en producción (avisa y deja pasar);
+      # después, EVENTOS_VALIDACION_MODO=rechazar en el .env (un evento inválido va a la DLQ). Ver produccion.md.
+      EVENTOS_VALIDACION_MODO: ${EVENTOS_VALIDACION_MODO:-loguear}
       TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
       # El mismo flag que el monolito: con Mercado Pago real, el buscador exige la cuenta vinculada.
       MERCADOPAGO_ENABLED: ${MERCADOPAGO_ENABLED:-false}
@@ -749,6 +767,9 @@ services:
       JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Fase 10: validación del data de los eventos. "loguear" la primera semana en producción (avisa y deja pasar);
+      # después, EVENTOS_VALIDACION_MODO=rechazar en el .env (un evento inválido va a la DLQ). Ver produccion.md.
+      EVENTOS_VALIDACION_MODO: ${EVENTOS_VALIDACION_MODO:-loguear}
       TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
       # Los mismos que el monolito: la reserva exige Mercado Pago vinculado (salvo con el pago simulado) y los
       # links de los mails de asistencia van a la URL pública.
@@ -812,6 +833,9 @@ services:
       JWT_HS256_ACEPTADO: ${JWT_HS256_ACEPTADO:-true}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Fase 10: validación del data de los eventos. "loguear" la primera semana en producción (avisa y deja pasar);
+      # después, EVENTOS_VALIDACION_MODO=rechazar en el .env (un evento inválido va a la DLQ). Ver produccion.md.
+      EVENTOS_VALIDACION_MODO: ${EVENTOS_VALIDACION_MODO:-loguear}
       TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
       # Fase 9: carga inicial desde el monolito. Default false hasta el corte en mantenimiento.
       IDENTIDAD_CARGA: ${IDENTIDAD_CARGA:-false}

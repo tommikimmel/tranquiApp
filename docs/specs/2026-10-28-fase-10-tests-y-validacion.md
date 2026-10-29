@@ -44,6 +44,8 @@ confíe en lo que le manda otro**. Lo que hay hoy:
 - El publicador valida lo mismo antes de escribir en la outbox: un evento inválido falla en origen, no en destino.
 - Tests por record (válido, cada regla rota) y del consumidor (inválido a la DLQ, válido al manejador).
 
+- **Hecho en V1:** Bean Validation en los 44 records de `libs/eventos/data` (ids que identifican el evento obligatorios y positivos, mails, montos no negativos, roles y estados contra sus valores en `Valores`), `ValidadorEventos` único usado por el consumidor (data inválido a la DLQ antes del manejador) y por la outbox de la librería y la del monolito (no se publica), con `eventos.validacion.modo` (`rechazar` por defecto; `loguear` en el compose de producción la primera semana). Los mensajes nombran campo y regla, nunca el valor. Test reflexivo que cubre todos los records (122 reglas).
+
 ### V2 — Validación de las rutas internas
 - **Del lado del que llama:** cada record de respuesta de `ClienteInterno` con las mismas anotaciones, y un
   validador en el cliente: una respuesta inválida se trata como falla (reintento o fila salteada con log del id).

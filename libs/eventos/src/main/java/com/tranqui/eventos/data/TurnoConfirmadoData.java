@@ -1,5 +1,9 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.math.BigDecimal;
@@ -17,14 +21,14 @@ import java.time.LocalDate;
  * <p>Fase 3: {@code horaFin} (opcional), para que el calendario arme el evento de Google con su duración.
  */
 public record TurnoConfirmadoData(
-    Long turnoId,
-    Long pacienteId,
-    Long profesionalId,
+    @NotNull @Positive Long turnoId,
+    @Positive Long pacienteId,
+    @Positive Long profesionalId,
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     LocalDate fecha,
     String horaInicio,
     String modalidad,
-    BigDecimal precio,
+    @PositiveOrZero BigDecimal precio,
     Boolean ocupaAgenda,
     String tipoLabel,
     String tipoDocumentoLabel,

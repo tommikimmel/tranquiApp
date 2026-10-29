@@ -678,12 +678,12 @@ class SuscripcionesS2bIntegracionTest {
     @Test
     void eventos_altaUsuario_creaSuscripcionPendingVerification() throws Exception {
         LocalDateTime ahora = LocalDateTime.now();
-        // Alta de nuevo usuario psicólogo (id 70)
+        // Alta de nuevo usuario psicólogo (id 70): se registra con rol PSIQUIATRA y el plan sale de la profesión.
         suscriptores.guardar(new Suscriptores.Suscriptor(70L, "nuevo.psico@mail.com", "Mariana", "Lopez",
-                "PROFESIONAL", "Psicólogo", true, 1, null, null, null, null, null, null, null, null, null, ahora));
+                "PSIQUIATRA", "Psicólogo", true, 1, null, null, null, null, null, null, null, null, null, ahora));
 
         publicar(Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1, "70",
-                new UsuarioRegistradoData(70L, "nuevo.psico@mail.com", "Mariana", "Lopez", "PROFESIONAL"));
+                new UsuarioRegistradoData(70L, "nuevo.psico@mail.com", "Mariana", "Lopez", "PSIQUIATRA"));
 
         esperar(() -> suscripciones.porProfesionalId(70L).isPresent());
         Suscripciones.Suscripcion sub = suscripciones.porProfesionalId(70L).orElseThrow();

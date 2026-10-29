@@ -151,6 +151,20 @@ define dependencias escalonadas con `condition: service_healthy`:
    curl -fsS https://tranquisalud.com/api/health
    ```
 
+## Fase 10: validación de los eventos
+
+Cada servicio y el monolito validan el data de los eventos contra las reglas de su record (ids, mails, montos,
+estados), al publicar y al consumir: nunca se confía en lo que manda otro servicio. `EVENTOS_VALIDACION_MODO`:
+
+- `loguear` (por defecto en el compose de producción, la primera semana después del deploy): un evento inválido se
+  publica y se procesa igual, con un aviso en el log que nombra el tópico, el campo y la regla (nunca el valor).
+- `rechazar` (después de revisar los logs de esa semana): un evento inválido no se publica y, si llega, va a la DLQ
+  del servicio sin tocar ninguna copia. En local y en los tests ya es así.
+
+Para revisar la semana: `docker compose -p app logs --since 168h | grep "data inválido"`. Si no aparece nada (o lo que
+aparece se corrigió), poner `EVENTOS_VALIDACION_MODO=rechazar` en `/srv/tranqui/.env` y reiniciar el monolito y los
+servicios.
+
 ## Fase 9: identidad en su propio servicio
 
 La cuenta y la sesión (`/api/auth/**`, incluida Mi Cuenta), los tickets (`/api/tickets/**`, `/api/admin/tickets/**`),

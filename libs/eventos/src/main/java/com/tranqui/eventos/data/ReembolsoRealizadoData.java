@@ -1,5 +1,9 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.math.BigDecimal;
@@ -15,13 +19,13 @@ import java.time.LocalDate;
  * cancelación y su mail ya lo dice, por eso no lo marca.
  */
 public record ReembolsoRealizadoData(
-    Long reembolsoId,
-    Long pagoId,
-    Long turnoId,
-    BigDecimal monto,
+    @Positive Long reembolsoId,
+    @Positive Long pagoId,
+    @NotNull @Positive Long turnoId,
+    @PositiveOrZero BigDecimal monto,
     String motivo,
-    Long pacienteId,
-    Long profesionalId,
+    @Positive Long pacienteId,
+    @Positive Long profesionalId,
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     LocalDate fecha,
     String horaInicio,

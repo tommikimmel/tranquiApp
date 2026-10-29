@@ -1,5 +1,8 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.LocalDate;
@@ -11,9 +14,9 @@ import java.time.LocalDate;
  * mandaba en el mail de cancelación cuando el reembolso fallaba).
  */
 public record ReembolsoFallidoData(
-    Long turnoId,
-    Long pacienteId,
-    Long profesionalId,
+    @NotNull @Positive Long turnoId,
+    @Positive Long pacienteId,
+    @Positive Long profesionalId,
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     LocalDate fecha,
     String horaInicio,

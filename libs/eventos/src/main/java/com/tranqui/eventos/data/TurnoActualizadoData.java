@@ -1,5 +1,10 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
 
@@ -19,18 +24,18 @@ import java.time.LocalTime;
  * serializa LocalDate como dd/MM/yyyy.
  */
 public record TurnoActualizadoData(
-    Long turnoId,
-    Long pacienteId,
-    Long profesionalId,
+    @NotNull @Positive Long turnoId,
+    @Positive Long pacienteId,
+    @Positive Long profesionalId,
     @JsonSerialize(using = LocalDateSerializer.class)
     LocalDate fecha,
     LocalTime horaInicio,
     LocalTime horaFin,
     String tipo,
     String modalidad,
-    String estado,
-    String asistencia,
-    BigDecimal precio,
+    @Pattern(regexp = Valores.ESTADOS_TURNO) String estado,
+    @Pattern(regexp = Valores.ASISTENCIAS) String asistencia,
+    @PositiveOrZero BigDecimal precio,
     String metadataAfiliado,
     String servicioId,
     boolean ocupaAgenda,

@@ -1,5 +1,9 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.Valid;
+
 import java.util.List;
 
 /**
@@ -8,8 +12,8 @@ import java.util.List;
  * {@code modalidad} null es una franja vieja, válida para las dos modalidades (como en el monolito).
  */
 public record DisponibilidadProfesionalData(
-    Long profesionalId,
-    List<Franja> franjas
+    @NotNull @Positive Long profesionalId,
+    @Valid List<Franja> franjas
 ) {
     public record Franja(int diaSemana, String horaInicio, String horaFin, String modalidad) {}
 }

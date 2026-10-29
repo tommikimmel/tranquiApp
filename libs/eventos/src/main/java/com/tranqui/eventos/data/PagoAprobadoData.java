@@ -1,5 +1,9 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+
 import java.math.BigDecimal;
 
 /**
@@ -7,9 +11,9 @@ import java.math.BigDecimal;
  * Consumido por turnos (confirmación de turno) y notificaciones (comprobante/aviso).
  */
 public record PagoAprobadoData(
-    Long pagoId,
-    Long turnoId,
+    @NotNull @Positive Long pagoId,
+    @Positive Long turnoId,
     String mpPaymentId,
-    BigDecimal monto,
+    @PositiveOrZero BigDecimal monto,
     String metodoPago
 ) {}

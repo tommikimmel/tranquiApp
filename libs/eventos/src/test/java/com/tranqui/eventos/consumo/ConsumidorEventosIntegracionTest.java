@@ -53,7 +53,8 @@ class ConsumidorEventosIntegracionTest {
     @Container
     static final RabbitMQContainer RABBIT = new RabbitMQContainer("rabbitmq:3.13-management-alpine");
 
-    record DatosPrueba(Long turnoId, String nombre) {}
+    record DatosPrueba(@jakarta.validation.constraints.NotNull @jakarta.validation.constraints.Positive Long turnoId,
+                       String nombre) {}
 
     private final ObjectMapper mapper = EventObjectMapperFactory.create();
     private final List<String> procesados = new CopyOnWriteArrayList<>();
@@ -94,9 +95,13 @@ class ConsumidorEventosIntegracionTest {
     }
 
     private void arrancar(ManejadorEvento<?>... manejadores) {
+        arrancar(com.tranqui.eventos.ValidadorEventos.Modo.RECHAZAR, manejadores);
+    }
+
+    private void arrancar(com.tranqui.eventos.ValidadorEventos.Modo modo, ManejadorEvento<?>... manejadores) {
         InboxHelper inbox = new InboxHelper(jdbc);
         TransactionTemplate tx = new TransactionTemplate(new DataSourceTransactionManager(jdbc.getDataSource()));
-        ConsumidorEventos consumidor = new ConsumidorEventos(SERVICIO, List.of(manejadores), inbox, tx, mapper, null);
+        ConsumidorEventos consumidor = new ConsumidorEventos(SERVICIO, List.of(manejadores), inbox, tx, mapper, null, modo);
         new TopologiaConsumo(admin, SERVICIO).declarar(consumidor.topicos());
         contenedor = new SimpleMessageListenerContainer(conexion);
         contenedor.setQueueNames(RabbitMQConstantes.colaEventos(SERVICIO));
@@ -182,6 +187,36 @@ class ConsumidorEventosIntegracionTest {
 
         esperar(() -> mensajesEn(".dlq") == 1, Duration.ofSeconds(10));
         assertThat(procesados).isEmpty();
+    }
+
+    @Test
+    void dataQueNoCumpleSusReglas_vaALaDlqSinLlegarAlManejador() throws Exception {
+        arrancar(manejador("mail", () -> {}, false));
+
+        publicar(EventEnvelope.<DatosPrueba>builder()
+                .eventId(UUID.randomUUID()).eventType("turnos.turno.confirmado").version(1).producer("turnos")
+                .aggregateType("turno").aggregateId("10").aggregateVersion(1)
+                .data(new DatosPrueba(-5L, "Ana")).build());
+
+        esperar(() -> mensajesEn(".dlq") == 1, Duration.ofSeconds(10));
+        Message enDlq = rabbit.receive(SERVICIO + ".dlq", 2_000);
+        // El motivo nombra el campo y la regla, nunca el valor.
+        assertThat(enDlq.getMessageProperties().<String>getHeader(ConsumidorEventos.HEADER_ERROR))
+                .contains("turnoId: Positive").doesNotContain("-5");
+        assertThat(procesados).isEmpty();
+    }
+
+    @Test
+    void enModoLoguear_unDataInvalidoSeProcesaIgual() throws Exception {
+        arrancar(com.tranqui.eventos.ValidadorEventos.Modo.LOGUEAR, manejador("mail", () -> {}, false));
+
+        publicar(EventEnvelope.<DatosPrueba>builder()
+                .eventId(UUID.randomUUID()).eventType("turnos.turno.confirmado").version(1).producer("turnos")
+                .aggregateType("turno").aggregateId("10").aggregateVersion(1)
+                .data(new DatosPrueba(-5L, "Ana")).build());
+
+        esperar(() -> procesados.size() == 1, Duration.ofSeconds(10));
+        assertThat(mensajesEn(".dlq")).isZero();
     }
 
     @Test

@@ -1,5 +1,8 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 /**
  * Datos del evento pagos.concepto.aprobado.v1 (agregado en la Fase 2).
  * Se aprobó el pago de una solicitud de documento ("concepto"). Consumido por notificaciones, que
@@ -10,9 +13,9 @@ package com.tranqui.eventos.data;
  * la solicitud cuando la aprobación llega del servicio de pagos.
  */
 public record ConceptoAprobadoData(
-    Long solicitudId,
-    Long profesionalId,
-    Long pacienteId,
+    @NotNull @Positive Long solicitudId,
+    @Positive Long profesionalId,
+    @Positive Long pacienteId,
     String tipoConcepto,
     String mpPaymentId
 ) {

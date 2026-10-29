@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tranqui.eventos.EventEnvelope;
 import com.tranqui.eventos.EventObjectMapperFactory;
 import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.ValidadorEventos;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Propagation;
@@ -27,11 +30,20 @@ public class OutboxPublisher {
     private static final String INSERTAR = "INSERT INTO outbox (event_id, topic, aggregate_type, aggregate_id, payload, "
             + "created_at, attempts) VALUES (?, ?, ?, ?, CAST(? AS jsonb), ?, 0)";
 
+    private static final Logger log = LoggerFactory.getLogger(OutboxPublisher.class);
+
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper = EventObjectMapperFactory.create();
+    private final ValidadorEventos.Modo validacion;
 
     public OutboxPublisher(JdbcTemplate jdbc) {
+        this(jdbc, ValidadorEventos.Modo.RECHAZAR);
+    }
+
+    /** @param validacion con {@code RECHAZAR}, un data inválido no se publica (falla en origen); con {@code LOGUEAR}, avisa */
+    public OutboxPublisher(JdbcTemplate jdbc, ValidadorEventos.Modo validacion) {
         this.jdbc = jdbc;
+        this.validacion = validacion;
     }
 
     /** Como {@link #publicar(String, String, String, int, Object, String)}, con el tipo de agregado del tópico. */
@@ -59,6 +71,12 @@ public class OutboxPublisher {
         if (aggregateType == null || aggregateType.isBlank() || aggregateId == null || aggregateId.isBlank()) {
             throw new IllegalArgumentException("aggregateType y aggregateId son obligatorios");
         }
+        ValidadorEventos.problemas(data).ifPresent(problemas -> {
+            if (validacion == ValidadorEventos.Modo.RECHAZAR) {
+                throw new IllegalArgumentException("El data de " + topico + " no cumple sus reglas: " + problemas);
+            }
+            log.warn("Se publica {} con data inválido (modo loguear): {}", topico, problemas);
+        });
         String correlationId = MDC.get("correlationId");
         EventEnvelope<T> sobre = EventEnvelope.<T>builder()
                 .eventId(UUID.randomUUID())

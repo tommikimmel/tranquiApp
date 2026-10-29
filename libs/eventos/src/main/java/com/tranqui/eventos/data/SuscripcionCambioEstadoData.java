@@ -1,5 +1,9 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.LocalDate;
@@ -9,10 +13,10 @@ import java.time.LocalDate;
  * Consumido por profesionales (visibilidad) y notificaciones (pago, vencimiento, cancelación).
  */
 public record SuscripcionCambioEstadoData(
-    Long suscripcionId,
-    Long profesionalId,
-    String estadoAnterior,
-    String estadoNuevo,
+    @Positive Long suscripcionId,
+    @NotNull @Positive Long profesionalId,
+    @Pattern(regexp = Valores.ESTADOS_SUSCRIPCION) String estadoAnterior,
+    @Pattern(regexp = Valores.ESTADOS_SUSCRIPCION) String estadoNuevo,
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     LocalDate fechaVencimiento
 ) {}

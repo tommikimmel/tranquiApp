@@ -1,5 +1,9 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+
 import java.math.BigDecimal;
 
 /**
@@ -9,10 +13,10 @@ import java.math.BigDecimal;
  * es el del ítem de Mercado Pago, armado por quien conoce al profesional.
  */
 public record ConceptoSolicitadoData(
-    Long solicitudId,
-    Long pacienteId,
-    Long profesionalId,
+    @NotNull @Positive Long solicitudId,
+    @Positive Long pacienteId,
+    @Positive Long profesionalId,
     String tipoConcepto,
-    BigDecimal precio,
+    @PositiveOrZero BigDecimal precio,
     String titulo
 ) {}

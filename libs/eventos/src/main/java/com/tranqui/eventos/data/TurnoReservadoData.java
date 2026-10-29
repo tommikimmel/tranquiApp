@@ -1,5 +1,9 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.math.BigDecimal;
@@ -15,13 +19,13 @@ import java.time.OffsetDateTime;
  * guardar una copia de los nombres.
  */
 public record TurnoReservadoData(
-    Long turnoId,
-    Long pacienteId,
-    Long profesionalId,
+    @NotNull @Positive Long turnoId,
+    @Positive Long pacienteId,
+    @Positive Long profesionalId,
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     LocalDate fecha,
     String horaInicio,
-    BigDecimal precio,
+    @PositiveOrZero BigDecimal precio,
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     OffsetDateTime fechaExpiracion,
     String tituloCobro

@@ -1,5 +1,9 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.Valid;
+
 import java.util.List;
 
 /**
@@ -10,7 +14,7 @@ import java.util.List;
  * de profesionales; el monolito los deja en null). Con {@code perfil} el monolito actualiza su copia.
  */
 public record ProfesionalActualizadoData(
-    Long profesionalId,
+    @NotNull @Positive Long profesionalId,
     String nombre,
     String apellido,
     String especialidad,
@@ -18,7 +22,7 @@ public record ProfesionalActualizadoData(
     List<String> modalidades,
     Integer duracionTurnoMinutos,
     Integer intervaloEntreTurnosMinutos,
-    PerfilProfesionalData perfil
+    @Valid PerfilProfesionalData perfil
 ) {
     public ProfesionalActualizadoData(Long profesionalId, String nombre, String apellido, String especialidad,
                                       String fotoUrl, List<String> modalidades, Integer duracionTurnoMinutos) {

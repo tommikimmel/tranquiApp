@@ -42,6 +42,11 @@
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
 		</dependency>
+		<!-- Fase 10: validación del data de los eventos (versión del BOM de Spring Boot). -->
+		<dependency>
+			<groupId>org.hibernate.validator</groupId>
+			<artifactId>hibernate-validator</artifactId>
+		</dependency>
 
 		<!-- Consumo de eventos (paquete consumo): opcionales para que el gateway, que no consume
 		     eventos, no los herede. Cada servicio que consume declara amqp y jdbc por su cuenta. -->

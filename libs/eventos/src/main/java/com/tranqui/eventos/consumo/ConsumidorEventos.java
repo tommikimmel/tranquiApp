@@ -8,6 +8,7 @@ import com.rabbitmq.client.Channel;
 import com.tranqui.eventos.EventEnvelope;
 import com.tranqui.eventos.RabbitMQConstantes;
 import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.ValidadorEventos;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -51,9 +52,21 @@ public class ConsumidorEventos implements ChannelAwareMessageListener {
     private final TransactionTemplate transacciones;
     private final ObjectMapper mapper;
     private final MeterRegistry metricas;
+    private final ValidadorEventos.Modo validacion;
 
     public ConsumidorEventos(String servicio, List<ManejadorEvento<?>> manejadores, InboxHelper inbox,
                              TransactionTemplate transacciones, ObjectMapper mapper, MeterRegistry metricas) {
+        this(servicio, manejadores, inbox, transacciones, mapper, metricas, ValidadorEventos.Modo.RECHAZAR);
+    }
+
+    /**
+     * @param validacion con {@code RECHAZAR}, un data que no cumple las reglas de su record va a la DLQ sin llegar al
+     *                   manejador; con {@code LOGUEAR} se avisa en el log y se procesa igual (Fase 10)
+     */
+    public ConsumidorEventos(String servicio, List<ManejadorEvento<?>> manejadores, InboxHelper inbox,
+                             TransactionTemplate transacciones, ObjectMapper mapper, MeterRegistry metricas,
+                             ValidadorEventos.Modo validacion) {
+        this.validacion = validacion;
         this.servicio = servicio;
         this.inbox = inbox;
         this.transacciones = transacciones;
@@ -138,6 +151,7 @@ public class ConsumidorEventos implements ChannelAwareMessageListener {
         if (evento.eventId() == null) {
             throw new EventoInvalidoException("El evento no tiene eventId");
         }
+        validar(evento, manejador.tipoData());
         transacciones.executeWithoutResult(estado -> {
             if (!inbox.registrar(evento.eventId(), manejador.consumidor())) {
                 return;
@@ -148,6 +162,16 @@ public class ConsumidorEventos implements ChannelAwareMessageListener {
                 return;
             }
             manejador.manejar(evento);
+        });
+    }
+
+    // Nunca se confía en lo que manda otro servicio: el data se valida antes de que lo vea el manejador.
+    private void validar(EventEnvelope<?> evento, Class<?> tipoData) {
+        ValidadorEventos.problemas(evento.data()).ifPresent(problemas -> {
+            if (validacion == ValidadorEventos.Modo.RECHAZAR) {
+                throw new EventoInvalidoException("El data no cumple las reglas de " + tipoData.getSimpleName() + ": " + problemas);
+            }
+            log.warn("Evento {} en '{}' con data inválido (modo loguear, se procesa igual): {}", evento.eventId(), servicio, problemas);
         });
     }
 

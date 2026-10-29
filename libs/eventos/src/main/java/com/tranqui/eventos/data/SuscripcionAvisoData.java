@@ -1,5 +1,9 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.math.BigDecimal;
@@ -20,11 +24,11 @@ import java.time.LocalDateTime;
  * </ul>
  */
 public record SuscripcionAvisoData(
-    Long suscripcionId,
-    Long profesionalId,
+    @Positive Long suscripcionId,
+    @NotNull @Positive Long profesionalId,
     String tipo,
     String nombrePlan,
-    BigDecimal monto,
+    @PositiveOrZero BigDecimal monto,
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     LocalDateTime fecha,
     @JsonFormat(shape = JsonFormat.Shape.STRING)
