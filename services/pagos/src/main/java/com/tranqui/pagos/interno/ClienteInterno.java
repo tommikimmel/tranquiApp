@@ -1,5 +1,10 @@
 package com.tranqui.pagos.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 import com.tranqui.comun.correlation.CorrelationIdHolder;
 import com.tranqui.eventos.jwt.ServiceJwt;
 import com.tranqui.pagos.datos.EventosSuscripcion;
@@ -31,25 +36,25 @@ public class ClienteInterno {
 
     static final String SERVICIO = "pagos";
 
-    public record Contacto(Long id, String email, String nombre, String apellido, String rol, Boolean emailHabilitado) {}
+    public record Contacto(@NotNull @Positive Long id, @Email String email, String nombre, String apellido, String rol, Boolean emailHabilitado) {}
 
     /** Los tokens llegan cifrados, tal cual están en el monolito. */
-    public record Cuenta(Long profesionalId, String accessTokenCifrado, String refreshTokenCifrado,
+    public record Cuenta(@NotNull @Positive Long profesionalId, String accessTokenCifrado, String refreshTokenCifrado,
                          LocalDateTime tokenVenceEn, String mpUserId) {}
 
-    public record Pago(Long id, Long turnoId, Long solicitudId, Long profesionalId, Long pacienteId, String transactionId,
+    public record Pago(@NotNull @Positive Long id, @Positive Long turnoId, @Positive Long solicitudId, @Positive Long profesionalId, @Positive Long pacienteId, String transactionId,
                        String estado, BigDecimal monto, LocalDateTime fechaPago) {}
 
-    public record Solicitud(Long solicitudId, Long profesionalId, Long pacienteId, String tipoConcepto, BigDecimal precio,
+    public record Solicitud(@NotNull @Positive Long solicitudId, @Positive Long profesionalId, @Positive Long pacienteId, String tipoConcepto, BigDecimal precio,
                             String estado, String transactionId, String titulo) {}
 
-    public record CobroPendiente(Long turnoId, Long profesionalId, Long pacienteId, BigDecimal monto, String titulo,
+    public record CobroPendiente(@NotNull @Positive Long turnoId, @Positive Long profesionalId, @Positive Long pacienteId, BigDecimal monto, String titulo,
                                  String checkoutUrl, LocalDateTime creadoEn) {}
 
     // ------------------------------------------------------------------ DTOs de Suscripciones (Fase 8)
 
     public record PlanMonolito(
-            Long id,
+            @NotNull @Positive Long id,
             String code,
             String name,
             String description,
@@ -82,8 +87,8 @@ public class ClienteInterno {
     }
 
     public record PlanFeatureMonolito(
-            Long id,
-            Long planId,
+            @NotNull @Positive Long id,
+            @Positive Long planId,
             String featureKey,
             Integer limitValue
     ) {
@@ -93,10 +98,10 @@ public class ClienteInterno {
     }
 
     public record SubscriptionMonolito(
-            Long id,
+            @NotNull @Positive Long id,
             Integer version,
-            Long professionalId,
-            Long planId,
+            @Positive Long professionalId,
+            @Positive Long planId,
             String status,
             Integer seats,
             String billingSource,
@@ -122,8 +127,8 @@ public class ClienteInterno {
     }
 
     public record SubscriptionEventMonolito(
-            Long id,
-            Long subscriptionId,
+            @NotNull @Positive Long id,
+            @Positive Long subscriptionId,
             String eventType,
             String previousStatus,
             String newStatus,
@@ -139,9 +144,9 @@ public class ClienteInterno {
     }
 
     public record SubscriptionPaymentMonolito(
-            Long id,
-            Long subscriptionId,
-            Long professionalId,
+            @NotNull @Positive Long id,
+            @Positive Long subscriptionId,
+            @Positive Long professionalId,
             String mpPaymentId,
             String idempotencyKey,
             String method,
@@ -150,8 +155,8 @@ public class ClienteInterno {
             LocalDateTime paidAt,
             LocalDateTime periodStart,
             LocalDateTime periodEnd,
-            Long invoiceId,
-            Long registeredByAdminId,
+            @Positive Long invoiceId,
+            @Positive Long registeredByAdminId,
             String receiptReference,
             String notes,
             LocalDateTime createdAt
@@ -164,8 +169,8 @@ public class ClienteInterno {
     }
 
     public record InvoiceMonolito(
-            Long id,
-            Long paymentId,
+            @NotNull @Positive Long id,
+            @Positive Long paymentId,
             Integer cbteTipo,
             Integer puntoVenta,
             Long cbteNumero,
@@ -186,7 +191,7 @@ public class ClienteInterno {
             String lastError,
             String arcaRequestJson,
             String arcaResponseJson,
-            Long comprobanteAsociadoId,
+            @Positive Long comprobanteAsociadoId,
             LocalDateTime createdAt,
             LocalDateTime issuedAt
     ) {
@@ -199,7 +204,7 @@ public class ClienteInterno {
     }
 
     public record InvoiceSequenceMonolito(
-            Long id,
+            @NotNull @Positive Long id,
             Integer puntoVenta,
             Integer cbteTipo,
             Long lastNumber,
@@ -211,8 +216,8 @@ public class ClienteInterno {
     }
 
     public record SuscriptorMonolito(
-            Long id,
-            String email,
+            @NotNull @Positive Long id,
+            @Email String email,
             String nombre,
             String apellido,
             String rol,
@@ -276,12 +281,12 @@ public class ClienteInterno {
     }
 
     private <T> List<T> lista(String uri, ParameterizedTypeReference<List<T>> tipo, Object... variables) {
-        List<T> r = http.get().uri(uri, variables)
+        List<T> r = ValidadorEventos.respuesta(http.get().uri(uri, variables)
                 .headers(h -> {
                     h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
                     h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
                 })
-                .retrieve().body(tipo);
+                .retrieve().body(tipo), uri);
         return r != null ? r : List.of();
     }
 
@@ -370,11 +375,11 @@ public class ClienteInterno {
     }
 
     public SuscriptorMonolito suscriptor(Long id) {
-        return http.get().uri(baseIdentidad + "/suscriptores/{id}", id)
+        return ValidadorEventos.respuesta(http.get().uri(baseIdentidad + "/suscriptores/{id}", id)
                 .headers(h -> {
                     h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
                     h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
                 })
-                .retrieve().body(SuscriptorMonolito.class);
+                .retrieve().body(SuscriptorMonolito.class), baseIdentidad + "/suscriptores/{id}");
     }
 }

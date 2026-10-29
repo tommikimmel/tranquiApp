@@ -6,6 +6,11 @@ import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import org.hibernate.validator.messageinterpolation.ParameterMessageInterpolator;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -43,6 +48,8 @@ public final class ValidadorEventos {
         VALIDADOR = fabrica.getValidator();
     }
 
+    private static final Logger log = LoggerFactory.getLogger(ValidadorEventos.class);
+
     private ValidadorEventos() {
     }
 
@@ -59,6 +66,34 @@ public final class ValidadorEventos {
                 .map(ValidadorEventos::describir)
                 .sorted()
                 .collect(Collectors.joining(", ")));
+    }
+
+    /**
+     * Valida la respuesta de una ruta interna de otro servicio (Fase 10, V2): nunca se confía en lo que manda. En una
+     * lista, las filas que no cumplen se saltean con un aviso (la resincronización sigue con las demás); una respuesta
+     * suelta que no cumple es una falla, igual que si el otro servicio no hubiera respondido.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T respuesta(T respuesta, String origen) {
+        if (respuesta instanceof List<?> lista) {
+            List<Object> validas = new ArrayList<>(lista.size());
+            for (int i = 0; i < lista.size(); i++) {
+                Object fila = lista.get(i);
+                Optional<String> problemas = problemas(fila);
+                if (problemas.isPresent()) {
+                    log.warn("Respuesta de {}: se saltea la fila {} ({})", origen, i, problemas.get());
+                } else {
+                    validas.add(fila);
+                }
+            }
+            return (T) validas;
+        }
+        if (respuesta != null) {
+            problemas(respuesta).ifPresent(p -> {
+                throw new IllegalStateException("Respuesta inválida de " + origen + ": " + p);
+            });
+        }
+        return respuesta;
     }
 
     private static String describir(ConstraintViolation<?> v) {

@@ -61,6 +61,23 @@ class ValidacionDatosTest {
         assertThat(reglasProbadas).isGreaterThanOrEqualTo(120);
     }
 
+    record Fila(@NotNull @Positive Long id, @Email String email) {}
+
+    @Test
+    void respuestaInterna_enUnaListaSalteaLasFilasInvalidas() {
+        List<Fila> filas = ValidadorEventos.respuesta(List.of(new Fila(1L, "a@b.com"), new Fila(-2L, "a@b.com"),
+                new Fila(3L, "no-es-mail"), new Fila(4L, null)), "prueba");
+        assertThat(filas).extracting(Fila::id).containsExactly(1L, 4L);
+    }
+
+    @Test
+    void respuestaInterna_suelta_invalidaEsUnaFalla() {
+        assertThat(ValidadorEventos.respuesta(new Fila(1L, "a@b.com"), "prueba")).isNotNull();
+        assertThat(ValidadorEventos.<Fila>respuesta(null, "prueba")).isNull();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ValidadorEventos.respuesta(new Fila(null, "a@b.com"), "prueba"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("id: NotNull");
+    }
+
     @Test
     void sinDataEsUnProblema() {
         assertThat(ValidadorEventos.problemas(null)).isPresent();

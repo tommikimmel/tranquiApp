@@ -1,5 +1,10 @@
 package com.tranqui.chat.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 import com.tranqui.comun.correlation.CorrelationIdHolder;
 import com.tranqui.eventos.jwt.ServiceJwt;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,12 +26,12 @@ public class ClienteInterno {
 
     static final String SERVICIO = "chat";
 
-    public record Contacto(Long id, String email, String nombre, String apellido, String rol, Boolean emailHabilitado) {}
+    public record Contacto(@NotNull @Positive Long id, @Email String email, String nombre, String apellido, String rol, Boolean emailHabilitado) {}
 
-    public record MensajeMonolito(Long id, Long remitenteId, Long destinatarioId, String contenido, boolean leido,
+    public record MensajeMonolito(@NotNull @Positive Long id, @Positive Long remitenteId, @Positive Long destinatarioId, String contenido, boolean leido,
                                   LocalDateTime fechaEnvio) {}
 
-    public record TurnoConfirmado(Long turnoId, Long pacienteId, Long profesionalId, LocalDate fecha, String horaInicio) {}
+    public record TurnoConfirmado(@NotNull @Positive Long turnoId, @Positive Long pacienteId, @Positive Long profesionalId, LocalDate fecha, String horaInicio) {}
 
     private final RestClient http;
     private final ServiceJwt serviceJwt;
@@ -44,12 +49,12 @@ public class ClienteInterno {
     }
 
     private <T> T get(String uri, ParameterizedTypeReference<T> tipo, Object... variables) {
-        return http.get().uri(uri, variables)
+        return ValidadorEventos.respuesta(http.get().uri(uri, variables)
                 .headers(h -> {
                     h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
                     h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
                 })
-                .retrieve().body(tipo);
+                .retrieve().body(tipo), uri);
     }
 
     public List<Contacto> contactos(int pagina, int tamanio) {

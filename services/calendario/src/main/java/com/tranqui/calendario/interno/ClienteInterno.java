@@ -1,5 +1,10 @@
 package com.tranqui.calendario.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 import com.tranqui.comun.correlation.CorrelationIdHolder;
 import com.tranqui.eventos.jwt.ServiceJwt;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,17 +26,17 @@ public class ClienteInterno {
 
     static final String SERVICIO = "calendario";
 
-    public record Contacto(Long id, String email, String nombre, String apellido, String rol, Boolean emailHabilitado) {}
+    public record Contacto(@NotNull @Positive Long id, @Email String email, String nombre, String apellido, String rol, Boolean emailHabilitado) {}
 
     /** Los tokens llegan cifrados, tal cual están en el monolito. */
-    public record Cuenta(Long profesionalId, String accessTokenCifrado, String refreshTokenCifrado,
+    public record Cuenta(@NotNull @Positive Long profesionalId, String accessTokenCifrado, String refreshTokenCifrado,
                          LocalDateTime tokenVenceEn, String calendarId, String syncToken, String watchChannelId,
                          String watchResourceId, LocalDateTime watchVenceEn, boolean watchActivo) {}
 
-    public record EventoExterno(Long id, Long profesionalId, String googleEventId, String titulo, LocalDateTime inicio,
+    public record EventoExterno(@NotNull @Positive Long id, @Positive Long profesionalId, String googleEventId, String titulo, LocalDateTime inicio,
                                 LocalDateTime fin, boolean todoElDia, String estado) {}
 
-    public record TurnoConfirmado(Long turnoId, Long pacienteId, Long profesionalId, LocalDate fecha, String horaInicio,
+    public record TurnoConfirmado(@NotNull @Positive Long turnoId, @Positive Long pacienteId, @Positive Long profesionalId, LocalDate fecha, String horaInicio,
                                   String horaFin, String modalidad, Boolean ocupaAgenda, String googleEventId,
                                   String meetUrl) {}
 
@@ -51,12 +56,12 @@ public class ClienteInterno {
     }
 
     private <T> List<T> lista(String uri, ParameterizedTypeReference<List<T>> tipo, Object... variables) {
-        List<T> r = http.get().uri(uri, variables)
+        List<T> r = ValidadorEventos.respuesta(http.get().uri(uri, variables)
                 .headers(h -> {
                     h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
                     h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
                 })
-                .retrieve().body(tipo);
+                .retrieve().body(tipo), uri);
         return r != null ? r : List.of();
     }
 
