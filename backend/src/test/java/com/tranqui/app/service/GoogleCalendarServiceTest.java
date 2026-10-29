@@ -56,6 +56,20 @@ class GoogleCalendarServiceTest {
     }
 
     @Test
+    void conCalendarioExterno_noCreaNiSimulaElMeet() {
+        // Fase 3: el Meet lo crea el servicio de calendario y vuelve por calendario.meet.creado.
+        ReflectionTestUtils.setField(googleCalendarService, "isEnabled", false);
+        ReflectionTestUtils.setField(googleCalendarService, "externo", true);
+        Turno turno = Turno.builder().id(1L).fecha(LocalDate.now()).horaInicio(LocalTime.of(9, 0))
+                .horaFin(LocalTime.of(9, 45)).tipo(TipoTurno.PARTICULAR).build();
+
+        assertTrue(googleCalendarService.crearEventoReunion(turno).isEmpty());
+        googleCalendarService.eliminarEventoReunion(turno);
+        googleCalendarService.actualizarEventoReunion(turno);
+        verify(googleCalendarOAuthService, never()).obtenerAccessToken(any(Usuario.class));
+    }
+
+    @Test
     void testObtenerEventosDelDiaNotConnected() {
         Usuario medico = new Usuario();
         medico.setId(123L);
