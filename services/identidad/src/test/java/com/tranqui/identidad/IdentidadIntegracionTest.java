@@ -1162,4 +1162,55 @@ class IdentidadIntegracionTest {
         assertThat(elimEvents).hasSize(1);
         assertThat(elimEvents.get(0).get("aggregateVersion").asInt()).isEqualTo(4);
     }
+
+    @Test
+    void rutasDeCuenta_sinSesion_responden401() {
+        for (String[] ruta : new String[][]{{"GET", "/api/auth/me"}, {"POST", "/api/auth/aceptar-terminos"},
+                {"GET", "/api/auth/mi-cuenta"}, {"PUT", "/api/auth/mi-cuenta"}, {"PUT", "/api/auth/mi-cuenta/notificaciones"},
+                {"GET", "/api/auth/mi-cuenta/novedades"}, {"PUT", "/api/auth/mi-cuenta/novedades"},
+                {"POST", "/api/auth/mi-cuenta/password"}, {"POST", "/api/auth/set-new-password"},
+                {"POST", "/api/auth/mi-cuenta/eliminar"}, {"POST", "/api/auth/complete-profile"}}) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+            ResponseEntity<String> res = restTemplate.exchange(ruta[1], HttpMethod.valueOf(ruta[0]), new HttpEntity<>("{}", headers), String.class);
+            assertThat(res.getStatusCode()).as(ruta[0] + " " + ruta[1]).isEqualTo(HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    @Test
+    void completarPerfil_terminosYNuevaContrasena() throws Exception {
+        Long uid = usuarios.insertarNuevo(Usuario.builder().email("perfil.test@tranqui.com").password(passwordEncoder.encode("Pass1234"))
+                .rol("PACIENTE").nombre("Sin").apellido("Completar").emailVerificado(true).perfilCompleto(false).mustChangePassword(true).build());
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(emisorJwtUsuario.emitir("perfil.test@tranqui.com", "PACIENTE", null, uid));
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+
+        java.util.Map<String, Object> incompleto = new java.util.HashMap<>(java.util.Map.of("nombre", "Lara", "apellido", " "));
+        assertThat(restTemplate.exchange("/api/auth/complete-profile", HttpMethod.POST, new HttpEntity<>(incompleto, headers), String.class)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        java.util.Map<String, Object> perfil = java.util.Map.of("nombre", " Lara ", "apellido", "Diaz", "sexo", "F",
+                "fechaNacimiento", "1995-03-04", "tipoDocumento", "DNI", "numeroDocumento", 40111222, "telefono", "1155556666",
+                "obraSocial", "OSDE", "numAfiliado", "123");
+        ResponseEntity<String> completo = restTemplate.exchange("/api/auth/complete-profile", HttpMethod.POST, new HttpEntity<>(perfil, headers), String.class);
+        assertThat(completo.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Usuario guardado = usuarios.buscarPorId(uid).orElseThrow();
+        assertThat(guardado.nombre()).isEqualTo("Lara");
+        assertThat(guardado.telefono()).isEqualTo("+54 1155556666");
+        assertThat(guardado.perfilCompleto()).isTrue();
+        assertThat(buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1).stream()
+                .anyMatch(e -> e.get("aggregateId").asText().equals(String.valueOf(uid)))).isTrue();
+
+        assertThat(restTemplate.exchange("/api/auth/aceptar-terminos", HttpMethod.POST, new HttpEntity<>(headers), String.class)
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(usuarios.buscarPorId(uid).orElseThrow().terminosAceptadosEn()).isNotNull();
+
+        assertThat(restTemplate.exchange("/api/auth/set-new-password", HttpMethod.POST,
+                new HttpEntity<>(java.util.Map.of("newPassword", "debil"), headers), String.class).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(restTemplate.exchange("/api/auth/set-new-password", HttpMethod.POST,
+                new HttpEntity<>(java.util.Map.of("newPassword", "NuevaPass1"), headers), String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        Usuario conClave = usuarios.buscarPorId(uid).orElseThrow();
+        assertThat(conClave.mustChangePassword()).isFalse();
+        assertThat(passwordEncoder.matches("NuevaPass1", conClave.password())).isTrue();
+    }
 }
