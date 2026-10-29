@@ -59,7 +59,7 @@ public class ClienteInterno {
                     h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
                 })
                 .retrieve()
-                .body(new ParameterizedTypeReference<>() {}), "/internal/monolito/contactos?pagina={p}&tamanio={t}");
+                .body(new ParameterizedTypeReference<List<ContactoInterno>>() {}), "/internal/monolito/contactos?pagina={p}&tamanio={t}");
         return respuesta != null ? respuesta : List.of();
     }
 
@@ -71,7 +71,7 @@ public class ClienteInterno {
                     h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
                 })
                 .retrieve()
-                .body(new ParameterizedTypeReference<>() {}), "/internal/monolito/notificaciones-vigentes");
+                .body(new ParameterizedTypeReference<List<NotificacionInterna>>() {}), "/internal/monolito/notificaciones-vigentes");
         return respuesta != null ? respuesta : List.of();
     }
 
