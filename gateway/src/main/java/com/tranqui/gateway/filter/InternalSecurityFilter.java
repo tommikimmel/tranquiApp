@@ -34,6 +34,9 @@ public class InternalSecurityFilter implements GlobalFilter, Ordered {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getPath().pathWithinApplication().value();
 
+        // Nunca se confía en encabezados de identidad que vengan de afuera: el gateway es el único que los pone.
+        exchange = sinEncabezadosDeIdentidad(exchange);
+
         if (!path.startsWith("/internal")) {
             return chain.filter(exchange);
         }
@@ -70,6 +73,19 @@ public class InternalSecurityFilter implements GlobalFilter, Ordered {
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
+    }
+
+    static final java.util.List<String> ENCABEZADOS_DE_IDENTIDAD = java.util.List.of("X-Service-Name", "X-User-Id");
+
+    private static ServerWebExchange sinEncabezadosDeIdentidad(ServerWebExchange exchange) {
+        HttpHeaders headers = exchange.getRequest().getHeaders();
+        if (ENCABEZADOS_DE_IDENTIDAD.stream().noneMatch(headers::containsKey)) {
+            return exchange;
+        }
+        ServerHttpRequest limpio = exchange.getRequest().mutate()
+                .headers(h -> ENCABEZADOS_DE_IDENTIDAD.forEach(h::remove))
+                .build();
+        return exchange.mutate().request(limpio).build();
     }
 
     @Override
