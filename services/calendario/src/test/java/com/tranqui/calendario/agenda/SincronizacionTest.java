@@ -98,4 +98,69 @@ class SincronizacionTest {
         new Sincronizacion(cuentas, externos, turnos, tokens, google, agenda, outbox, false).incremental(2L);
         verify(google, never()).cambios(anyString(), anyString(), anyString(), any());
     }
+
+    private static CuentasGoogle.Cuenta cuenta(String syncToken) {
+        return new CuentasGoogle.Cuenta(7L, "a", "r", null, null, syncToken, null, null, null, false);
+    }
+
+    @Test
+    void incremental_recorreLasPaginasYGuardaElSyncToken() throws Exception {
+        when(cuentas.buscar(7L)).thenReturn(Optional.of(cuenta("sync-1")));
+        when(tokens.accessToken(any())).thenReturn("acc");
+        when(google.cambios("acc", "primary", "sync-1", null)).thenReturn(new GoogleCalendarApi.Pagina(null, "p2", null));
+        when(google.cambios("acc", "primary", "sync-1", "p2")).thenReturn(new GoogleCalendarApi.Pagina(
+                List.of(evento("ext-9", LocalDateTime.of(2026, 11, 3, 9, 0), LocalDateTime.of(2026, 11, 3, 10, 0))), null, "sync-2"));
+        sincronizacion.incremental(7L);
+        verify(cuentas).guardarSyncToken(7L, "sync-2");
+        verify(agenda).exportarPendientes(7L);
+        verify(outbox).publicar(eq(Topicos.CALENDARIO_HORARIO_BLOQUEADO_V1), anyString(), anyString(), org.mockito.ArgumentMatchers.anyInt(), any());
+    }
+
+    @Test
+    void incremental_syncVencido_haceLaCompleta() throws Exception {
+        when(cuentas.buscar(7L)).thenReturn(Optional.of(cuenta("sync-1")));
+        when(tokens.accessToken(any())).thenReturn("acc");
+        when(google.cambios(any(), any(), any(), any())).thenThrow(new GoogleCalendarApi.SyncTokenVencidoException("410"));
+        when(google.ventana(eq("acc"), eq("primary"), any(), any(), any())).thenReturn(new GoogleCalendarApi.Pagina(List.of(), null, "sync-3"));
+        sincronizacion.incremental(7L);
+        verify(externos).borrarDeProfesional(7L);
+        verify(cuentas).guardarSyncToken(7L, "sync-3");
+    }
+
+    @Test
+    void incremental_sinSyncTokenOErrores() throws Exception {
+        when(tokens.accessToken(any())).thenReturn("acc");
+        when(cuentas.buscar(7L)).thenReturn(Optional.of(cuenta(null)));
+        when(google.ventana(any(), any(), any(), any(), any())).thenThrow(new java.io.IOException("403"));
+        sincronizacion.incremental(7L);
+        verify(cuentas, never()).guardarSyncToken(any(), any());
+
+        when(cuentas.buscar(7L)).thenReturn(Optional.of(cuenta("sync-1")));
+        when(google.cambios(any(), any(), any(), any())).thenThrow(new java.io.IOException("500"));
+        sincronizacion.incremental(7L);
+        verify(agenda, never()).exportarPendientes(any());
+    }
+
+    @Test
+    void sinCuentaSinTokenODeshabilitado_noSincroniza() throws Exception {
+        when(cuentas.buscar(8L)).thenReturn(Optional.empty());
+        sincronizacion.incremental(8L);
+        sincronizacion.completa(8L);
+        when(cuentas.buscar(7L)).thenReturn(Optional.of(cuenta("sync-1")));
+        when(tokens.accessToken(any())).thenReturn(null);
+        sincronizacion.incremental(7L);
+        sincronizacion.completa(7L);
+        new Sincronizacion(cuentas, externos, turnos, tokens, google, agenda, outbox, false).incremental(7L);
+        verify(google, never()).cambios(any(), any(), any(), any());
+        verify(google, never()).ventana(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void completa_aPedido() throws Exception {
+        when(cuentas.buscar(7L)).thenReturn(Optional.of(cuenta("sync-1")));
+        when(tokens.accessToken(any())).thenReturn("acc");
+        when(google.ventana(any(), any(), any(), any(), any())).thenReturn(new GoogleCalendarApi.Pagina(List.of(), null, null));
+        sincronizacion.completa(7L);
+        verify(cuentas).guardarSyncToken(7L, null);
+    }
 }
