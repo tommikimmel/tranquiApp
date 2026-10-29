@@ -65,6 +65,10 @@ class RecetaServiceTest {
     @MockBean
     private SubscriptionService subscriptionService;
 
+    // Fase 7: atiende a todos por defecto (void, no hace nada); un test lo hace rechazar.
+    @MockBean
+    private AccesoPacientes accesoPacientes;
+
     private Usuario medico;
     private Usuario paciente;
     private Usuario otroPaciente;
@@ -566,6 +570,22 @@ class RecetaServiceTest {
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> recetaService.emitirReceta(medico.getEmail(), dto));
         assertTrue(ex.getMessage().contains("recetas electrónicas"));
+    }
+
+    @Test
+    void testEmitirReceta_pacienteQueNoAtiende_seRechazaSinLlamarAQbi2() {
+        doThrow(new org.springframework.security.access.AccessDeniedException("El paciente no está entre los que atendés."))
+                .when(accesoPacientes).exigirAtendido(medico.getId(), otroPaciente.getId());
+
+        RecetaDto dto = RecetaDto.builder()
+                .pacienteId(otroPaciente.getId())
+                .diagnosis("Control")
+                .medications(Arrays.asList(medicamento("Ibuprofeno", null)))
+                .build();
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> recetaService.emitirReceta(medico.getEmail(), dto));
+        verify(qbi2RecipeClient, org.mockito.Mockito.never()).generarReceta(any());
     }
 
     // ── obtenerMisRecetas desde el lado paciente ─────────────────────────────────────
