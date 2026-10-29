@@ -95,7 +95,7 @@ class ValidacionDatosTest {
 
     private static final Object SIN_REGLA = new Object();
 
-    private static List<Class<?>> records() throws IOException, ClassNotFoundException {
+    static List<Class<?>> records() throws IOException, ClassNotFoundException {
         Path dir = Path.of("src/main/java", PAQUETE.replace('.', '/'));
         List<Class<?>> lista = new ArrayList<>();
         try (Stream<Path> archivos = Files.list(dir)) {
@@ -109,7 +109,7 @@ class ValidacionDatosTest {
     }
 
     /** Una instancia válida del record, con el componente {@code indice} reemplazado por {@code valor}. */
-    private static Object instancia(Class<?> tipo, int indice, Object valor) throws Exception {
+    static Object instancia(Class<?> tipo, int indice, Object valor) throws Exception {
         RecordComponent[] componentes = tipo.getRecordComponents();
         Class<?>[] tipos = Arrays.stream(componentes).map(RecordComponent::getType).toArray(Class<?>[]::new);
         Object[] args = new Object[componentes.length];

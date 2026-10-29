@@ -1,0 +1,7 @@
+{
+  "ticketId" : 1,
+  "usuarioId" : 1,
+  "email" : "ana@mail.com",
+  "asunto" : "texto",
+  "respuesta" : "texto"
+}

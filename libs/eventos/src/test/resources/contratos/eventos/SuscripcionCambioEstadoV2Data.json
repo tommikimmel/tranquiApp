@@ -1,0 +1,12 @@
+{
+  "suscripcionId" : 1,
+  "profesionalId" : 1,
+  "estadoAnterior" : "REGISTERED",
+  "estadoNuevo" : "REGISTERED",
+  "fechaVencimiento" : "2026-11-03",
+  "planCode" : "texto",
+  "acceso" : false,
+  "puedeRecetar" : false,
+  "periodoHasta" : "2026-11-03T10:00:00",
+  "graciaHasta" : "2026-11-03T10:00:00"
+}
