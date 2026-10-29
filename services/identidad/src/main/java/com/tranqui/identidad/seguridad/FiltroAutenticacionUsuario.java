@@ -75,7 +75,10 @@ public class FiltroAutenticacionUsuario extends OncePerRequestFilter {
 
         String email = tokenValido.get().email();
         Optional<Usuario> usuarioOpt = usuarios.buscarPorEmail(email);
-        if (usuarioOpt.isEmpty() || usuarioOpt.get().isCuentaEliminada()) {
+        // Fase 10: el uid del token tiene que ser el de la cuenta (si no, es un token de otra cuenta).
+        Long uid = tokenValido.get().uid();
+        if (usuarioOpt.isEmpty() || usuarioOpt.get().isCuentaEliminada()
+                || (uid != null && !uid.equals(usuarioOpt.get().id()))) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return;
         }

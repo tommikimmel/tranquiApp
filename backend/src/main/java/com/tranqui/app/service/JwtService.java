@@ -81,6 +81,14 @@ public class JwtService {
         return verificador.validar(token).map(UsuarioToken::email).orElse(null);
     }
 
+    /** El uid del token (null en los tokens viejos que no lo traen, o si el token no es válido). */
+    public Long extractUid(String token) {
+        if (token == null || token.isBlank() || verificador == null) {
+            return null;
+        }
+        return verificador.validar(token).map(UsuarioToken::uid).orElse(null);
+    }
+
     public boolean validateToken(String token) {
         if (token == null || token.isBlank() || verificador == null) {
             return false;
