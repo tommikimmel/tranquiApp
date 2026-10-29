@@ -1108,6 +1108,13 @@ class IdentidadIntegracionTest {
 
         List<JsonNode> seededEvents = buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1);
         assertThat(seededEvents.size()).isGreaterThanOrEqualTo(3);
+
+        // Una segunda pasada (reinicio) no duplica: actualiza las cuentas de prueba que ya existen.
+        int antes = buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1).size();
+        dataInitializer.ejecutarSincronico();
+        assertThat(buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1)).hasSize(antes);
+        assertThat(dataInitializer.estaListo()).isTrue();
+        assertThat(usuarios.buscarPorEmail("admin.test@tranqui.com").orElseThrow().rol()).isEqualTo("ADMIN");
     }
 
     @Test
