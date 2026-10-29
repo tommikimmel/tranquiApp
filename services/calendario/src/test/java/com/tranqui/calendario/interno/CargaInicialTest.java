@@ -60,4 +60,45 @@ class CargaInicialTest {
         assertThat(carga.listo()).isTrue();
         verify(interno, never()).turnosConfirmados();
     }
+
+    @Test
+    void copiaEventosPaginandoPorIdYSalteaLosDocumentos() {
+        when(interno.contactos(anyInt(), anyInt())).thenReturn(List.of());
+        java.util.List<ClienteInterno.EventoExterno> pagina = new java.util.ArrayList<>();
+        for (long i = 1; i <= 500; i++) pagina.add(new ClienteInterno.EventoExterno(i, 2L, "g" + i, "t", null, null, false, "confirmed"));
+        when(interno.eventosExternos(0L, 500)).thenReturn(pagina);
+        when(interno.eventosExternos(500L, 500)).thenReturn(List.of());
+        when(interno.turnosConfirmados()).thenReturn(List.of(
+                new ClienteInterno.TurnoConfirmado(1L, 3L, 2L, java.time.LocalDate.of(2026, 11, 5), "10:00", "10:45", "ONLINE", true, "g", "m"),
+                new ClienteInterno.TurnoConfirmado(2L, 3L, 2L, java.time.LocalDate.of(2026, 11, 5), "11:00", null, "ONLINE", null, null, null),
+                new ClienteInterno.TurnoConfirmado(3L, 3L, 2L, java.time.LocalDate.of(2026, 11, 5), "12:00", null, null, false, null, null),
+                new ClienteInterno.TurnoConfirmado(4L, 3L, 2L, java.time.LocalDate.of(2026, 11, 5), null, null, null, true, null, null)));
+        carga(true).cargarConReintentos();
+        verify(externos, org.mockito.Mockito.times(500)).copiar(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any());
+        verify(turnos, org.mockito.Mockito.times(2)).guardar(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void siFallaReintentaYSiLaInterrumpenSeCorta() {
+        when(interno.contactos(anyInt(), anyInt())).thenThrow(new IllegalStateException("monolito caído")).thenReturn(List.of());
+        when(interno.eventosExternos(anyLong(), anyInt())).thenReturn(List.of());
+        CargaInicial carga = carga(true);
+        carga.cargarConReintentos();
+        assertThat(carga.listo()).isTrue();
+
+        Thread.currentThread().interrupt();
+        try {
+            CargaInicial cortada = carga(true);
+            cortada.cargarConReintentos();
+            assertThat(cortada.listo()).isFalse();
+        } finally {
+            Thread.interrupted();
+        }
+        carga(false).alArrancar();
+    }
 }
