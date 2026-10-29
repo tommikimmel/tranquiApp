@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-28
 - **Tipo:** auditoría
 - **Sprint:** sprint-02
-- **Estado:** borrador, esperando aprobación
+- **Estado:** aprobada (2026-10-29)
 - **Rama / PR:** una rama y un PR a `develop` por tarea, encadenadas sobre la Fase 10
 - **Plan:** [microservicios.md, Fase 11](../arquitectura/microservicios.md#fase-11-comparación-con-main)
 - **Forma de trabajo:** la revisión la hacen workers con un plan cerrado por dominio (como máximo cuatro a la vez);
@@ -89,3 +89,11 @@ punta). La fase termina cuando la tabla no tiene filas en esos estados.
    etc.) **se dejan como están**, solo listadas? **Recomiendo que sí.**
 5. Igual que las fases anteriores: un PR a `develop` por tarea, encadenados, Java 17, sin deploy, implementado por
    workers (como máximo cuatro a la vez).
+
+## Decisiones (2026-10-29)
+
+1. La Fase 10 va antes: su suite de punta a punta es la herramienta principal de la comparación.
+2. Se puede levantar `main` en local (proyecto aparte), de a un stack por vez.
+3. Los arreglos van dentro de la fase, un PR por dominio.
+4. Las diferencias a propósito se dejan como están, listadas con su decisión.
+5. Igual que las fases anteriores: un PR a `develop` por tarea, encadenados, Java 17, sin deploy.

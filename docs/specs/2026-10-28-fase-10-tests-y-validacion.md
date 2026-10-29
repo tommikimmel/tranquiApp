@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-28
 - **Tipo:** calidad
 - **Sprint:** sprint-02
-- **Estado:** borrador, esperando aprobación
+- **Estado:** aprobada (2026-10-29)
 - **Rama / PR:** una rama y un PR a `develop` por tarea, encadenadas sobre la Fase 9
 - **Plan:** [microservicios.md, Fase 10](../arquitectura/microservicios.md#fase-10-tests-y-validación-de-datos)
 - **Forma de trabajo:** implementan workers con un plan cerrado por tarea (como máximo cuatro a la vez). Esta fase sí
@@ -109,3 +109,13 @@ confíe en lo que le manda otro**. Lo que hay hoy:
    "solo loguear" en producción la primera semana** después del deploy (en local y en los tests, rechazar).
 5. Igual que las Fases 8 y 9: un PR a `develop` por tarea, encadenados, Java 17, sin deploy, implementado por workers
    (como máximo cuatro a la vez).
+
+## Decisiones (2026-10-29)
+
+1. Se puede levantar el stack completo en Docker para la suite de punta a punta (proyecto aparte `tranqui-local`, sin
+   tocar el stack `tranquiapp`).
+2. La suite de punta a punta corre también en el CI.
+3. **Cobertura mínima: 90 % de líneas** sobre el código nuevo o tocado.
+4. La validación estricta arranca en producción la primera semana en modo "solo loguear"; en local y en los tests,
+   rechaza.
+5. Igual que las fases anteriores: un PR a `develop` por tarea, encadenados, Java 17, sin deploy.
