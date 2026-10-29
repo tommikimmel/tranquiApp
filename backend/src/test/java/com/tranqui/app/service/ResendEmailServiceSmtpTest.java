@@ -44,6 +44,23 @@ class ResendEmailServiceSmtpTest {
         ReflectionTestUtils.setField(service, "fromEmail", "soporte@tranqui.local");
         ReflectionTestUtils.setField(service, "frontendUrl", "http://localhost:5173");
         ReflectionTestUtils.setField(service, "apiKey", "");
+        // Estos tests prueban el envío directo (vuelta atrás de la Fase 1).
+        ReflectionTestUtils.setField(service, "envioDirecto", true);
+    }
+
+    @Test
+    void sinEnvioDirecto_losMailsConEventoNoSalenDeAca_peroLosDirectosSi() throws Exception {
+        ReflectionTestUtils.setField(service, "transport", "smtp");
+        ReflectionTestUtils.setField(service, "envioDirecto", false);
+
+        service.enviarCodigoVerificacion("paciente@test.com", "Pedro", "123456");
+        service.enviarTurnoCanceladoProfesional("dra@test.com", "Dra", "Pedro", java.time.LocalDate.now(), java.time.LocalTime.NOON);
+        verify(mailSender, org.mockito.Mockito.never()).send(any(MimeMessage.class));
+
+        // Los correos con evento (código de verificación, turno cancelado, contraseña temporal)
+        // no salen de acá cuando envioDirecto=false; son despachados por el microservicio de notificaciones.
+        service.enviarPasswordTemporal("paciente@test.com", "Pedro", "Temporal123");
+        verify(mailSender, org.mockito.Mockito.never()).send(any(MimeMessage.class));
     }
 
     @Test

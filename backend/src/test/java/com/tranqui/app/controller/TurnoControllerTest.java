@@ -89,6 +89,18 @@ class TurnoControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    @WithMockUser(username = "otro@test.com", roles = "PACIENTE")
+    void testCancelarTurno_deOtro_forbidden() throws Exception {
+        org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("no"))
+                .when(turnoService).exigirDuenio(1L, "otro@test.com", false);
+
+        mockMvc.perform(post("/api/turnos/1/cancelar"))
+                .andExpect(status().isForbidden());
+
+        verify(turnoService, org.mockito.Mockito.never()).cancelarTurno(any(), any());
+    }
+
     // --- abandonar-pago (public, no role restriction) ---------------------------------------
 
     @Test
