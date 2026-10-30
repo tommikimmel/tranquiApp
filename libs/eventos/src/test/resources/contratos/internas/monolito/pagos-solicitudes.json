@@ -1,0 +1,10 @@
+[ {
+  "solicitudId" : 12,
+  "profesionalId" : 7,
+  "pacienteId" : 8,
+  "tipoConcepto" : "CERTIFICADO",
+  "precio" : 15000.0,
+  "estado" : "PAGADO",
+  "transactionId" : "MP-456",
+  "titulo" : "Certificado médico"
+} ]

@@ -1,0 +1,9 @@
+[ {
+  "turnoId" : 11,
+  "profesionalId" : 7,
+  "pacienteId" : 8,
+  "monto" : 45000.0,
+  "titulo" : "Consulta con Dra. Paz",
+  "checkoutUrl" : "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=1",
+  "creadoEn" : "2026-11-03T10:30:00"
+} ]

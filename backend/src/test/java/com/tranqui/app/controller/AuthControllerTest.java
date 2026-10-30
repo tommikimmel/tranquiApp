@@ -83,6 +83,8 @@ class AuthControllerTest {
         when(jwtService.extractTokenFromCookies(any())).thenReturn(fakeToken);
         when(jwtService.validateToken(fakeToken)).thenReturn(true);
         when(jwtService.extractEmail(fakeToken)).thenReturn(usuario.getEmail());
+        // Fase 10: el filtro cruza el uid del token con la cuenta (un mock devolvería 0).
+        when(jwtService.extractUid(fakeToken)).thenReturn(usuario.getId());
         return new Cookie("SESSION-TOKEN", fakeToken);
     }
 
@@ -386,6 +388,16 @@ class AuthControllerTest {
     }
 
     // ── mi-cuenta ────────────────────────────────────────────────────
+
+    @Test
+    void obtenerMiCuenta_conUnTokenConElUidDeOtraCuenta_noAutentica() throws Exception {
+        Usuario u = crearUsuario("uidajeno", true);
+        Cookie cookie = authCookieFor(u);
+        when(jwtService.extractUid(cookie.getValue())).thenReturn(u.getId() + 1000);
+
+        mockMvc.perform(get("/api/auth/mi-cuenta").cookie(cookie))
+                .andExpect(status().is4xxClientError());
+    }
 
     @Test
     void obtenerMiCuenta_whenAuthenticated_shouldReturnAccountData() throws Exception {

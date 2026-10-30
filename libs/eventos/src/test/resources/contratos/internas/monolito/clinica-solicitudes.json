@@ -1,0 +1,13 @@
+[ {
+  "id" : 1,
+  "pacienteId" : 2,
+  "medicoId" : 1,
+  "tipoConcepto" : "RECETA",
+  "precio" : 15000.0,
+  "estado" : "APROBADO",
+  "transactionId" : "MP-TX-999",
+  "emitido" : true,
+  "urlDescarga" : "https://descarga.com/doc.pdf",
+  "fechaEmision" : "2026-10-26T12:00:00",
+  "fechaCreacion" : "2026-10-29T20:32:40.631726"
+} ]

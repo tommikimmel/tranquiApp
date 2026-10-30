@@ -1,0 +1,16 @@
+{
+  "turnoId" : 1,
+  "pacienteId" : 1,
+  "profesionalId" : 1,
+  "fecha" : "2026-11-03",
+  "horaInicio" : "texto",
+  "modalidad" : "texto",
+  "precio" : 1,
+  "ocupaAgenda" : false,
+  "tipoLabel" : "texto",
+  "tipoDocumentoLabel" : "texto",
+  "direccion" : "texto",
+  "meetUrl" : "texto",
+  "origen" : "texto",
+  "horaFin" : "texto"
+}

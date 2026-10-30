@@ -1,0 +1,15 @@
+[
+  {
+    "id" : 1,
+    "pacienteId" : 8,
+    "medicoId" : 7,
+    "fecha" : "2026-10-25",
+    "estadoAnimo" : "Bueno",
+    "sintomas" : "Ansiedad leve",
+    "notas" : "Evolución favorable",
+    "fechaCreacion" : "2026-10-29T20:32:41.368367",
+    "estado" : "VIGENTE",
+    "motivo" : "texto-motivo",
+    "hashIntegridad" : "hash-seg-123"
+  }
+]

@@ -1,0 +1,7 @@
+{
+  "suscripcionId" : 1,
+  "profesionalId" : 1,
+  "estadoAnterior" : "REGISTERED",
+  "estadoNuevo" : "REGISTERED",
+  "fechaVencimiento" : "2026-11-03"
+}

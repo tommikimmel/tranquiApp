@@ -1,0 +1,4 @@
+{
+  "confirmarUrl" : "https://tranqui.test/api/turnos/4/confirmar-asistencia?token=asistencia-456",
+  "noAsistiraUrl" : "https://tranqui.test/api/turnos/4/no-asistira?token=asistencia-456"
+}

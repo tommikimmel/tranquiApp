@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import SockJS from 'sockjs-client'
 import { useChat } from './useChat'
 import { api } from '../api/api'
 
@@ -67,7 +68,7 @@ vi.mock('../api/api', () => ({
   api: {
     getChatHistorial: vi.fn(),
   },
-  getBackendOrigin: () => 'http://localhost:8081',
+  getBackendOrigin: () => 'http://localhost:8080',
 }))
 
 const mockedApi = vi.mocked(api)
@@ -92,6 +93,10 @@ describe('useChat', () => {
 
   it('activates a STOMP client on mount and reflects connected state once onConnect fires', async () => {
     const { result } = renderHook(() => useChat(null))
+
+    // Cada intento de conexión crea un SockJS nuevo, con las cookies de la sesión.
+    lastClient().config.webSocketFactory()
+    expect(vi.mocked(SockJS)).toHaveBeenCalledWith(expect.stringContaining('/ws-tranqui'), null, { withCredentials: true })
 
     expect(lastClient().activateCalls).toBe(1)
     expect(result.current.connected).toBe(false)

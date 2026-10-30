@@ -1,0 +1,11 @@
+[ {
+  "id" : 3,
+  "turnoId" : 11,
+  "solicitudId" : 12,
+  "profesionalId" : 7,
+  "pacienteId" : 8,
+  "transactionId" : "MP-123",
+  "estado" : "APROBADO",
+  "monto" : 45000.0,
+  "fechaPago" : "2026-11-03T10:30:00"
+} ]

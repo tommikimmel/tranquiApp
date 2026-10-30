@@ -1,0 +1,18 @@
+[ {
+  "id" : 1,
+  "subscriptionId" : 1,
+  "professionalId" : 28,
+  "mpPaymentId" : "MP-PAGO-1",
+  "idempotencyKey" : "idem-43433582327300",
+  "method" : "MERCADO_PAGO",
+  "status" : "APPROVED",
+  "amountArs" : 25000.0,
+  "paidAt" : "2026-10-29T20:49:25.619435",
+  "periodStart" : "2026-10-29T20:49:25.619435",
+  "periodEnd" : "2026-11-29T20:49:25.619435",
+  "invoiceId" : 1,
+  "registeredByAdminId" : 1,
+  "receiptReference" : "REC-1",
+  "notes" : "pago de prueba",
+  "createdAt" : "2026-10-29T20:49:25.619435"
+} ]

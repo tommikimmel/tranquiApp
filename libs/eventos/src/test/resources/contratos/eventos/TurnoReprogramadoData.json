@@ -1,0 +1,13 @@
+{
+  "turnoId" : 1,
+  "pacienteId" : 1,
+  "profesionalId" : 1,
+  "fechaAnterior" : "2026-11-03",
+  "horaInicioAnterior" : "texto",
+  "fechaNueva" : "2026-11-03",
+  "horaInicioNueva" : "texto",
+  "modalidad" : "texto",
+  "direccion" : "texto",
+  "meetUrl" : "texto",
+  "horaFinNueva" : "texto"
+}

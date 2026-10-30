@@ -1,0 +1,7 @@
+[ {
+  "profesionalId" : 7,
+  "accessTokenCifrado" : "acceso-cifrado",
+  "refreshTokenCifrado" : "refresco-cifrado",
+  "tokenVenceEn" : "2026-11-03T10:30:00",
+  "mpUserId" : "mp-user-77"
+} ]
