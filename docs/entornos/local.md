@@ -192,6 +192,26 @@ fechas son relativas al día en que se siembran. **Contraseña de todas las cuen
   sin leer, notificaciones del profesional y tickets de soporte (uno respondido).
 - Las "Notas y pendientes" de la agenda no se siembran: se guardan en el navegador, no en la base.
 
+## Tests de punta a punta
+
+La suite de Playwright de `frontend/e2e` corre contra este entorno ya levantado (frontend en :5173, gateway en :8080,
+Mailpit en :8025):
+
+```bash
+cd frontend
+npx playwright test
+```
+
+Las pruebas de resiliencia apagan chat y notificaciones del stack, así que solo corren si se piden:
+
+```bash
+E2E_RESILIENCIA=1 E2E_COMPOSE="docker compose -p tranqui-local -f $(pwd)/../docker-compose.local.yml" npx playwright test
+```
+
+Contra otro entorno (por ejemplo `main` en la Fase 11): `E2E_URL`, `E2E_API_URL` y `E2E_MAILPIT_URL`. La suite cambia
+datos de demo (reserva y cancela turnos de Martina, edita el perfil de Lucía, crea usuarios `e2e.*`); `npm run
+local:reset` vuelve a empezar de cero.
+
 ## Problemas frecuentes
 
 - **El navegador no muestra los cambios del frontend:** Vite recarga solo; si no, recargá la página.

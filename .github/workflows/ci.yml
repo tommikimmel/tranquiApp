@@ -215,3 +215,49 @@ jobs:
           push: false
           cache-from: type=gha,scope=identidad
           cache-to: type=gha,mode=max,scope=identidad
+
+  # Fase 10, T3: el stack local completo (docker-compose.local.yml) y la suite de Playwright contra la migración,
+  # con las pruebas de resiliencia (apagan chat y notificaciones del stack del job).
+  punta-a-punta:
+    name: Punta a punta (stack local + Playwright)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      COMPOSE: docker compose -p tranqui-local --env-file /tmp/claves.env -f ${{ github.workspace }}/docker-compose.local.yml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # Claves RSA de usar y tirar, como en docs/entornos/local.md: nunca salen del runner.
+      - name: Claves del JWT
+        run: |
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/jwt.pem
+          echo "JWT_PRIVATE_KEY=$(openssl pkcs8 -topk8 -nocrypt -in /tmp/jwt.pem -outform DER | base64 -w0)" > /tmp/claves.env
+          echo "JWT_PUBLIC_KEY=$(openssl rsa -in /tmp/jwt.pem -pubout -outform DER | base64 -w0)" >> /tmp/claves.env
+          rm /tmp/jwt.pem
+      - name: Levantar el stack
+        run: $COMPOSE up -d --build
+      - name: Playwright
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          E2E_RESILIENCIA=1 E2E_COMPOSE="$COMPOSE" npx playwright test
+      - name: Logs del stack
+        if: failure()
+        run: $COMPOSE logs --no-color --tail=300 > stack.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: punta-a-punta
+          path: |
+            stack.log
+            frontend/playwright-report
+          retention-days: 7
+      - name: Bajar el stack
+        if: always()
+        run: $COMPOSE down -v

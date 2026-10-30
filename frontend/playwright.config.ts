@@ -6,10 +6,12 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  timeout: 60000,
+  // Alto por el límite de logins del gateway: un 429 espera a que se reponga el cupo.
+  timeout: 180000,
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
   use: {
-    baseURL: 'http://localhost:3000',
+    // Fase 10, T3: por defecto el stack local (Vite + gateway); en la Fase 11 se apunta a main con estas variables.
+    baseURL: process.env.E2E_URL ?? 'http://localhost:5173',
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
     video: 'off'

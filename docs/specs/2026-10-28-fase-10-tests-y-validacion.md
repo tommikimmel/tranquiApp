@@ -114,6 +114,31 @@ confíe en lo que le manda otro**. Lo que hay hoy:
 - **Esta suite también sirve para la Fase 11:** se corre contra `main` (el monolito) y contra la migración, y lo que
   pasa en uno y falla en el otro es funcionalidad perdida.
 
+- **Hecho en T3:**
+  - **Suite** en `frontend/e2e` (Playwright, de a un navegador), contra el stack local por el gateway:
+    - `paciente.spec.ts` (interfaz): login por el formulario, buscador sin la profesional vencida, reserva con pago
+      simulado, el turno en la agenda de la profesional, cancelación a más de 48 h con el mail del reembolso, Mi Cuenta.
+    - `sistema.spec.ts` (API, por el gateway): registro con el código de Mailpit, verificación de matrícula por el admin,
+      tickets, suscripción y paywall, historia clínica, perfil público. Historia clínica y recetas están "en
+      construcción" en la interfaz, por eso van por la API.
+    - `resiliencia.spec.ts` (con `E2E_RESILIENCIA=1` y `E2E_COMPOSE`): chat apagado da 503 claro y el resto anda;
+      con notificaciones apagado los eventos esperan y salen una sola vez; al final todas las DLQ vacías.
+  - **Variables:** `E2E_URL`, `E2E_API_URL`, `E2E_MAILPIT_URL` (para correrla contra `main` en la Fase 11).
+  - **Límite de logins del gateway** (ráfaga de 10 y 5 por minuto por IP): la suite no lo afloja. Hace un login por
+    cuenta, la interfaz reusa esa cookie y ante un 429 espera a que se reponga el cupo.
+  - **CI:** job `punta-a-punta` en los PR, que levanta `docker-compose.local.yml` con claves RSA de usar y tirar y corre
+    la suite completa. Si falla, sube los logs del stack y el reporte de Playwright.
+  - **Lo que encontró la suite (arreglado):**
+    - **El paywall no cortaba a nadie en la migración:** con `TRANQUI_PAYWALL_FUENTE: pagos` el gateway consultaba
+      `lb://pagos` con el WebClient balanceado, que resuelve `http://servicio`. Fallaba con "Invalid scheme [lb]" y,
+      como el paywall falla abierto, dejaba entrar a la profesional vencida. Test nuevo con pagos por discovery.
+    - **El monolito no aplicaba ningún evento versionado:** faltaba la tabla `versiones_aplicadas` en sus migraciones
+      (V3 creó solo el inbox). Las copias de turnos, profesionales y suscripciones fallaban y terminaban en
+      `monolito.dlq`. V7 la crea, y un test exige que cada tabla de `libs/eventos` esté en una migración.
+  - **Visto y no cambiado:** el calendario de la reserva pide los 31 días en paralelo; en desarrollo (StrictMode) son
+    62 pedidos y la ráfaga del gateway es 60, así que alguno da 429 y ese día se ve sin horarios. En producción son 31,
+    pero cambiar de modalidad dos veces seguidas puede pasar el límite. Conviene usar el endpoint de conteo.
+
 ### T4 — Frontend
 - Vitest para los componentes y la capa `api.ts` que no tienen tests (hoy 18 archivos de test).
 
