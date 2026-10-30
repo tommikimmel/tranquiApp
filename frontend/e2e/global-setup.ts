@@ -1,4 +1,7 @@
-async function waitFor(url: string, label: string, timeoutMs = 60000) {
+import { API } from './soporte'
+
+// En el CI el stack arranca de cero (imágenes recién construidas y npm install del frontend): hasta 10 min.
+async function waitFor(url: string, label: string, timeoutMs = 600000) {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
     try {
@@ -16,6 +19,6 @@ async function waitFor(url: string, label: string, timeoutMs = 60000) {
 }
 
 export default async function globalSetup() {
-  await waitFor('http://localhost:8081/api/health', 'backend')
-  await waitFor('http://localhost:3000/', 'frontend')
+  await waitFor(`${API}/api/health`, 'api')
+  await waitFor(process.env.E2E_URL ?? 'http://localhost:5173/', 'frontend')
 }

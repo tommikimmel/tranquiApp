@@ -1,0 +1,10 @@
+{
+  "turnoId" : 1,
+  "pacienteId" : 1,
+  "profesionalId" : 1,
+  "fecha" : "2026-11-03",
+  "horaInicio" : "texto",
+  "precio" : 1,
+  "fechaExpiracion" : "2026-11-03T10:00:00-03:00",
+  "tituloCobro" : "texto"
+}

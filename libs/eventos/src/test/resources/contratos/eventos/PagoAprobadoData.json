@@ -1,0 +1,7 @@
+{
+  "pagoId" : 1,
+  "turnoId" : 1,
+  "mpPaymentId" : "texto",
+  "monto" : 1,
+  "metodoPago" : "texto"
+}

@@ -1,0 +1,12 @@
+{
+  "reembolsoId" : 1,
+  "pagoId" : 1,
+  "turnoId" : 1,
+  "monto" : 1,
+  "motivo" : "texto",
+  "pacienteId" : 1,
+  "profesionalId" : 1,
+  "fecha" : "2026-11-03",
+  "horaInicio" : "texto",
+  "avisarPaciente" : false
+}

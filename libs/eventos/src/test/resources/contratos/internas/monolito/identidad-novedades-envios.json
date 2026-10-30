@@ -1,0 +1,10 @@
+[ {
+  "id" : "envio-test-42429495288400",
+  "titulo" : "Novedades Octubre 2026",
+  "estado" : "ENVIADO",
+  "detalle" : "Segmentos ok",
+  "creado_en" : "2026-10-29T20:32:41.532523",
+  "finalizado_en" : null,
+  "enviado_pacientes" : true,
+  "enviado_profesionales" : true
+} ]

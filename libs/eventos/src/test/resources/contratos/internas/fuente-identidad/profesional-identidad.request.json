@@ -1,0 +1,11 @@
+{
+  "nombre" : "Ana María",
+  "apellido" : "Paz",
+  "telefono" : "+54 11 5555",
+  "sexo" : "F",
+  "fechaNacimiento" : "1980-05-04",
+  "cuil" : 27123456780,
+  "tipoDocumento" : "DNI",
+  "numeroDocumento" : 12345678,
+  "fotoUrl" : "data:image/png;base64,BBBB"
+}

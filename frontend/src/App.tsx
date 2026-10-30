@@ -35,7 +35,7 @@ const TermsPage = lazy(() => import('./components/TermsPage'))
 const MiCuentaView = lazy(() => import('./components/MiCuentaView'))
 const MyTicketsView = lazy(() => import('./components/MyTicketsView'))
 const HelpFaqModal = lazy(() => import('./components/HelpFaqModal'))
-import { api, getBackendOrigin } from './api/api'
+import { api, getBackendOrigin, ENDPOINTS_AVISOS_EN_VIVO } from './api/api'
 import { useAlert } from './context/AlertContext'
 import { useDocumentTitle } from './hooks/useDocumentTitle'
 import { Client } from '@stomp/stompjs'
@@ -281,13 +281,16 @@ export default function App() {
     // profesional (o no se terminó de chequear), /api/medicos/perfil devuelve 403 — evita
     // disparar ese fetch (y el 403 ruidoso en consola) hasta que subscriptionAccess === 'allowed'.
     if (currentUser && currentUser.rol === 'PSIQUIATRA' && view === 'dashboard' && subscriptionAccess === 'allowed') {
-      let client: Client | null = null;
+      const clients: Client[] = [];
       api.getPerfil().then((perfil) => {
         if (perfil && perfil.id) {
-          const socketUrl = `${getBackendOrigin()}/ws-tranqui`;
-          const socket = new SockJS(socketUrl, null, { withCredentials: true } as any)
-          client = new Client({
-            webSocketFactory: () => socket,
+          // Mismo canal en los dos endpoints: ver ENDPOINTS_AVISOS_EN_VIVO.
+          for (const endpoint of ENDPOINTS_AVISOS_EN_VIVO) {
+          const socketUrl = `${getBackendOrigin()}${endpoint}`;
+          const client: Client = new Client({
+            // Un SockJS nuevo en cada intento: con el mismo objeto, la reconexión (reconnectDelay) reusaba
+            // un socket cerrado y nunca volvía a conectar (por ejemplo, al reiniciarse el servicio de chat).
+            webSocketFactory: () => new SockJS(socketUrl, null, { withCredentials: true } as any),
             reconnectDelay: 5000,
             onConnect: () => {
               console.log("WebSocket de Notificaciones conectado para ID:", perfil.id)
@@ -342,13 +345,13 @@ export default function App() {
             }
           })
           client.activate()
+          clients.push(client)
+          }
         }
       }).catch(err => console.error("Error fetching profile for WebSocket initialization:", err))
 
       return () => {
-        if (client) {
-          client.deactivate()
-        }
+        clients.forEach((c) => c.deactivate())
       }
     }
     // Keyed on the stable id/rol pair, not the whole `currentUser` object — a new object

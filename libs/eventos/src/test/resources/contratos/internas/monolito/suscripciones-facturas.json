@@ -1,0 +1,29 @@
+[
+  {
+    "id" : 1,
+    "paymentId" : 12345678,
+    "cbteTipo" : 11,
+    "puntoVenta" : 1,
+    "cbteNumero" : 42,
+    "cae" : "12345678901234",
+    "caeVencimiento" : "2026-11-15",
+    "receptorDocTipo" : 80,
+    "receptorDocNro" : 20123456789,
+    "receptorNombre" : "Doctor Facturado",
+    "receptorCondicionIva" : 1,
+    "importeTotal" : 25000,
+    "moneda" : "PES",
+    "cotizacion" : 1,
+    "fechaEmision" : "2026-10-26",
+    "pdfUrl" : "texto-pdfUrl",
+    "pdfBase64" : "texto-pdfBase64",
+    "status" : "ISSUED",
+    "attempts" : 1,
+    "lastError" : "texto-lastError",
+    "arcaRequestJson" : "texto-arcaRequestJson",
+    "arcaResponseJson" : "texto-arcaResponseJson",
+    "comprobanteAsociadoId" : 12345678,
+    "createdAt" : "2026-10-29T20:32:42.890837",
+    "issuedAt" : "2026-11-03T10:30:00"
+  }
+]
