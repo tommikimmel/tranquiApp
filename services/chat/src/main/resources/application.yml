@@ -1,0 +1,111 @@
+spring:
+  application:
+    name: chat
+  # Sección 6.7: al apagarse termina lo que está procesando, hasta 20 s.
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/chat}
+    username: ${SPRING_DATASOURCE_USERNAME:chat}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    hikari:
+      # Sección 9.2: pools chicos.
+      maximum-pool-size: 5
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:tranqui}
+    password: ${SPRING_RABBITMQ_PASSWORD:}
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/}
+    # La outbox (libs/eventos) publica con confirmación del broker.
+    publisher-confirm-type: correlated
+    publisher-returns: true
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      discovery:
+        enabled: ${CONSUL_DISCOVERY_ENABLED:true}
+        service-name: chat
+        instance-id: ${spring.application.name}:${random.value}
+        # Chequeo por TTL: el servicio le manda a Consul su salud del actuator cada 20 s. Si sigue
+        # crítico más de un minuto (caído, o con la base caída) Consul lo da de baja, y en cuanto se
+        # recupera el próximo latido lo vuelve a registrar. Con el chequeo HTTP de antes se registraba
+        # una sola vez al arrancar: después de una baja seguía andando pero el gateway respondía 503.
+        health-check-critical-timeout: 1m
+        heartbeat:
+          enabled: true
+          ttl: 30s
+          reregister-service-on-failure: true
+        # Registro por IP: el gateway lo alcanza en la red de Docker sin resolver el hostname del contenedor.
+        prefer-ip-address: true
+        tags: version=${TRANQUI_VERSION:dev}
+
+server:
+  port: 8080
+  tomcat:
+    threads:
+      max: 50
+  shutdown: graceful
+
+management:
+  server:
+    port: 8082
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+      group:
+        readiness:
+          include: readinessState,db,rabbit
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      servicio: chat
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+# Eventos (libs/eventos): consume chat.eventos (copias de usuarios y turnos) y publica por su outbox.
+eventos:
+  consumo:
+    servicio: chat
+  outbox:
+    habilitada: true
+
+jwt:
+  # Clave pública de identidad para validar JWT de usuario en formato RS256 (vacía por defecto).
+  public-key: ${JWT_PUBLIC_KEY:}
+  # Durante la transición valen los dos: tokens HS256 del monolito y RS256 de identidad. Siete días
+  # después del corte se desactiva con JWT_HS256_ACEPTADO=false.
+  hs256-aceptado: ${JWT_HS256_ACEPTADO:true}
+  # Secreto HS256 histórico del monolito. Ya no es obligatorio si hs256-aceptado=false.
+  secret: ${JWT_SECRET:}
+
+tranqui:
+  gateway:
+    # Las consultas internas (carga inicial de contactos, enlaces de asistencia) pasan por el
+    # gateway (sección 4.2), nunca directo a otro servicio.
+    url: ${TRANQUI_GATEWAY_URL:http://gateway:8080}
+  jwt:
+    service-secret: ${SERVICE_JWT_KEY:}
+
+logging:
+  level:
+    root: INFO

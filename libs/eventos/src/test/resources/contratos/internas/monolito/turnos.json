@@ -1,0 +1,36 @@
+[
+  {
+    "version" : 1,
+    "turno" : {
+      "turnoId" : 4,
+      "pacienteId" : 31,
+      "profesionalId" : 30,
+      "fecha" : "2026-11-02",
+      "horaInicio" : "09:00:00",
+      "horaFin" : "09:45:00",
+      "tipo" : "PARTICULAR",
+      "modalidad" : "ONLINE",
+      "estado" : "CONFIRMADO",
+      "asistencia" : "ESPERANDO",
+      "precio" : 60000,
+      "metadataAfiliado" : "texto",
+      "servicioId" : "texto",
+      "ocupaAgenda" : true,
+      "idFinanciador" : "texto",
+      "telemedicinaUrl" : "texto",
+      "googleEventId" : "texto",
+      "checkoutUrl" : "texto",
+      "documentoEnviado" : false,
+      "esReceta" : false,
+      "fechaCreacion" : "2026-10-29T20:32:43.111093",
+      "confirmacionAsistenciaEmailEnviado" : false,
+      "asistenciaConfirmadaPaciente" : false,
+      "pagoTransactionId" : "texto",
+      "pagoEstado" : "texto",
+      "pagoMonto" : 1,
+      "pagoFecha" : "2026-11-03T10:00:00"
+    },
+    "tokenReserva" : "reserva-123",
+    "tokenConfirmacionAsistencia" : "asistencia-456"
+  }
+]

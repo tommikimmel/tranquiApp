@@ -21,6 +21,9 @@ public class GoogleCalendarPollingScheduler {
     @Value("${google.calendar.enabled:false}")
     private boolean isEnabled;
 
+    @Value("${calendario.externo:false}")
+    private boolean externo;
+
     @Autowired
     private UsuarioRepository usuarioRepository;
 
@@ -29,7 +32,7 @@ public class GoogleCalendarPollingScheduler {
 
     @Scheduled(fixedRate = 300000, initialDelay = 10000) // every 5 minutes, first run 10s after boot
     public void sincronizarCalendariosConectados() {
-        if (!isEnabled) {
+        if (!isEnabled || externo) {
             return;
         }
         List<Usuario> medicosConectados = usuarioRepository.findByRolAndGoogleCalendarConnectedTrue(Rol.PSIQUIATRA);

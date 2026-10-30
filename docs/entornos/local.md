@@ -21,20 +21,120 @@ La primera vez tarda unos minutos (compila el backend e instala las dependencias
 
 ### Verificación de puertos
 
-Antes de cada rebuild, `npm run local` revisa los puertos 5433, 8081, 5173, 8025 y 1025. Si alguno
-está ocupado por algo que no es este entorno (un contenedor de otro proyecto o un proceso), te
-muestra qué es y **te pregunta si puede frenarlo** (`docker stop` para contenedores, que no borra
-sus datos). Si respondés que no, aborta sin tocar nada. Sin una terminal interactiva, aborta y
-lista los puertos ocupados.
+Antes de cada rebuild, `npm run local` revisa los puertos 5433, 8080, 8081, 5173, 8025, 1025, 5672,
+15672, 8500 y 6379. Si alguno está ocupado por algo que no es este entorno (un contenedor de otro
+proyecto o un proceso), te muestra qué es y **te pregunta si puede frenarlo** (`docker stop` para
+contenedores, que no borra sus datos). Si respondés que no, aborta sin tocar nada. Sin una
+terminal interactiva, aborta y lista los puertos ocupados.
 
 ## Servicios
 
 | Servicio | URL | Qué es |
 |---|---|---|
 | App | http://localhost:5173 | Frontend con Vite en modo desarrollo (recarga en caliente al editar `frontend/src`) |
-| Backend | http://localhost:8081 | Spring Boot con el perfil `local` |
+| Gateway | http://localhost:8080 | Spring Cloud Gateway: punto de entrada unificado para frontend y clientes |
+| Backend | http://localhost:8081 | Spring Boot con el perfil `local` (accesible directamente o vía Gateway) |
 | Mails | http://localhost:8025 | Mailpit: acá llegan todos los mails que manda la app |
 | Base | `localhost:5433` | PostgreSQL (`tranqui` / `tranqui-local`, base `tranqui_local`) |
+| RabbitMQ (panel) | http://localhost:15672 | Panel web de RabbitMQ (`tranqui` / `tranqui-local`) |
+| RabbitMQ (AMQP) | `localhost:5672` | Broker de mensajería (intercambios `tranqui.eventos`, `tranqui.reintentos`, `tranqui.dlx`) |
+| Consul | http://localhost:8500 | Service discovery: catálogo, registro de servicios y healthchecks |
+| Redis | `localhost:6379` | Almacenamiento en memoria para contadores de rate limiting del gateway |
+| VictoriaMetrics | http://127.0.0.1:8428 | Base de métricas y series temporales (PromQL, retención 15d) |
+
+### Infraestructura de microservicios y observabilidad
+
+A partir de la Fase 0 ([Plan de migración a microservicios](../arquitectura/microservicios.md)), el
+entorno local incluye la infraestructura de soporte para la arquitectura distribuida:
+
+- **Identidad en su propio servicio (`identidad`, Fase 9):** registro, login (JWT RS256), Mi Cuenta, tickets, soporte,
+  administración de usuarios, portón del sitio y novedades, con base propia `identidad`. En local va **todo cortado**:
+  `IDENTIDAD_EXTERNO: "true"` en el backend, `IDENTIDAD_CARGA: "true"` (copia del monolito con las tablas vacías),
+  `TRANQUI_FUENTE_IDENTIDAD: identidad` en pagos, profesionales y turnos, y en el gateway
+  `TRANQUI_SERVICES_IDENTIDAD_URI` y `TRANQUI_SERVICES_IDENTIDAD_INTERNO_URI` en `lb://identidad` y
+  `TRANQUI_PAYWALL_FUENTE: pagos`. El login con Google acepta tokens `mock-` solo acá (`IDENTIDAD_GOOGLE_SIMULADO`).
+  Publica `127.0.0.1:8084` para el script de novedades.
+  - **Claves RSA (una vez):** el compose local las lee del `.env` y no arranca sin ellas. Generarlas así y pegar las dos
+    líneas en el `.env` (nunca se versionan):
+    ```bash
+    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/jwt-privada.pem
+    echo "JWT_PRIVATE_KEY=$(openssl pkcs8 -topk8 -nocrypt -in /tmp/jwt-privada.pem -outform DER | base64 -w0)"
+    echo "JWT_PUBLIC_KEY=$(openssl rsa -in /tmp/jwt-privada.pem -pubout -outform DER | base64 -w0)"
+    rm /tmp/jwt-privada.pem
+    ```
+  - **Volver al monolito:** sacar las variables de la Fase 9 del gateway y de los servicios, poner
+    `IDENTIDAD_EXTERNO: "false"` en el backend, frenar identidad y correr `node scripts/fase9-devolver-identidad.mjs`.
+    `node scripts/fase9-conciliar-identidad.mjs` compara las cuatro tablas.
+- **Suscripciones, planes y facturación en el servicio de pagos (`pagos`, Fase 8):** suscripciones, planes,
+  features, pagos de suscripción, historial de eventos y facturas con ARCA (deshabilitada/simulada). No agrega
+  contenedor nuevo. Su esquema lo crea Flyway en la base `pagos` y copia las ocho tablas iniciales del monolito
+  al arrancar con `PAGOS_SUSCRIPCIONES: "true"`. Para volver al monolito: sacar `TRANQUI_SERVICES_SUSCRIPCIONES_URI`
+  del gateway (o apuntar al monolito), poner `SUSCRIPCIONES_EXTERNO: "false"` en el backend, `PAGOS_SUSCRIPCIONES: "false"`
+  en pagos y correr `node scripts/fase8-devolver-suscripciones.mjs`. `node scripts/fase8-conciliar-suscripciones.mjs`
+  compara las ocho tablas.
+- **Historia clínica y recetas en el servicio de profesionales (`profesionales`, Fase 7):** seguimientos diarios,
+  informes clínicos, recetas electrónicas (QBI2 simulado en local) y solicitudes de conceptos. No agrega contenedor
+  nuevo. Su esquema lo crea Flyway en la base `profesionales` y copia los asientos iniciales del monolito al arrancar con
+  `PROFESIONALES_CLINICA: "true"`. Para volver al monolito: sacar `TRANQUI_SERVICES_CLINICA_URI` del gateway (o apuntar al
+  monolito), poner `CLINICA_EXTERNO: "false"` en el backend, `PROFESIONALES_CLINICA: "false"` en profesionales y correr
+  `node scripts/fase7-devolver-clinica.mjs`. `node scripts/fase7-conciliar-clinica.mjs` compara las cuatro tablas.
+- **Servicio de turnos (`turnos`, Fase 6):** reservas, agenda, cancelación, asistencia y documentos. Su base
+  `turnos` la crea `db-servicios` y en el primer arranque copia del monolito los usuarios, la agenda y los
+  turnos. Para volver al monolito: sacar `TRANQUI_SERVICES_TURNOS_URI` del gateway, poner `TURNOS_EXTERNO: "false"`
+  en el backend, frenar `turnos` y correr `node scripts/fase6-devolver-turnos.mjs`.
+  `node scripts/fase6-conciliar-turnos.mjs` compara las dos bases.
+- **Servicio de profesionales (`profesionales`, Fase 5):** el buscador, "Mi perfil" y la agenda. Su base
+  `profesionales` la crea `db-servicios` y en el primer arranque copia los profesionales del monolito. Para
+  volver al monolito: sacar `TRANQUI_SERVICES_PROFESIONALES_URI` del gateway, poner
+  `PROFESIONALES_EXTERNO: "false"` en el backend, frenar `profesionales` y correr
+  `node scripts/fase5-devolver-profesionales.mjs`. `node scripts/fase5-conciliar-profesionales.mjs` compara
+  las dos bases.
+- **Servicio de pagos (`pagos`, Fase 4):** Mercado Pago simulado como en el monolito: la reserva pide el
+  link aparte y abre el "Simulador de Pago"; "Vincular Mercado Pago" vincula sin Mercado Pago real. Su base
+  `pagos` la crea `db-servicios`. Para volver a los pagos del monolito: sacar
+  `TRANQUI_SERVICES_PAGOS_URI` del gateway, poner `PAGOS_EXTERNO: "false"` en el backend, frenar `pagos`
+  y correr `node scripts/fase4-devolver-pagos.mjs`. `node scripts/fase4-conciliar-pagos.mjs` compara las
+  dos bases.
+- **Servicio de calendario (`calendario`, Fase 3):** Google Calendar y Meet, simulados como en el monolito
+  ("Conectar" vincula sin Google y los turnos online reciben un Meet simulado, que llega en un segundo
+  mail). Su base `calendario` la crea `db-servicios`. Para volver al calendario del monolito: sacar
+  `TRANQUI_SERVICES_CALENDARIO_URI` del gateway, poner `CALENDARIO_EXTERNO: "false"` en el backend,
+  frenar `calendario` y correr `node scripts/fase3-devolver-calendario.mjs`.
+- **Servicio de chat (`chat`, Fase 2):** el chat en vivo (`/ws-tranqui`) y su historial, por el gateway.
+  Su base `chat` la crea `db-servicios`; en el primer arranque copia los mensajes del monolito. Para
+  volver el chat al monolito: sacar `TRANQUI_SERVICES_CHAT_URI` del gateway, frenar `chat` y correr
+  `node scripts/fase2-devolver-mensajes.mjs` (devuelve los mensajes escritos en el servicio).
+- **Servicio de notificaciones (`notificaciones`, Fase 1):** manda los mails (a Mailpit) y crea las
+  notificaciones de la campanita a partir de eventos. Sin puerto publicado: se llega por el gateway
+  (`/api/notificaciones`, `/ws-notificaciones`). Su base `notificaciones` la crea el contenedor
+  `db-servicios` al levantar el entorno. Para comparar con el monolito:
+  `node scripts/fase1-comparar-notificaciones.mjs`. Para volver al envío desde el monolito, poner
+  `NOTIFICACIONES_ENVIO_DIRECTO: "true"` en el backend, sacar `TRANQUI_SERVICES_NOTIFICACIONES_URI` del gateway y
+  frenar `notificaciones` (si sigue prendido, los mails salen dos veces).
+- **RabbitMQ (`rabbitmq:3.13-management-alpine`):** broker de eventos asincrónicos por *push*.
+  Configurado en `infra/rabbitmq/rabbitmq.conf` con `vm_memory_high_watermark.relative = 0.6`
+  (límite de 256 MB de RAM), plugins `rabbitmq_management` y `rabbitmq_prometheus` habilitados,
+  política de colas *lazy* por defecto (`lazy-queues`), y los tres exchanges durables definidos
+  en la topología: `tranqui.eventos` (topic), `tranqui.reintentos` (direct) y `tranqui.dlx` (direct).
+- **Consul (`hashicorp/consul:1.19`):** nodo servidor de desarrollo para registro y descubrimiento
+  de servicios (`infra/consul/consul.json`), con UI habilitada en el puerto 8500 y sin ACLs en local.
+- **Redis (`redis:7-alpine`):** base en memoria sin persistencia en disco (`--save ""` y
+  `--appendonly no`) con tope de memoria chico (`maxmemory 64mb`, política `allkeys-lru`), usada
+  para los contadores de token bucket del rate limiter del gateway.
+- **VictoriaMetrics (`victoriametrics/victoria-metrics:v1.101.0`):** almacenamiento y motor PromQL de
+  métricas locales con retención de 15 días (`-retentionPeriod=15d`) y límite de memoria de 192 MB con `-memory.allowedPercent=30` (con 96 MB lo mataba el OOM).
+  Scrapea cada 15 segundos los endpoints Prometheus de Gateway, Backend, RabbitMQ y exportadores del sistema.
+- **node-exporter y cAdvisor (perfiles `monitoring` / `full`):**
+  Métricas de hardware del host (CPU, memoria, disco) y métricas por contenedor Docker. En entornos locales
+  de desarrollo (particularmente en Windows con Docker Desktop / WSL2), node-exporter y cAdvisor pueden tener
+  limitaciones para montar el sistema de archivos raíz (`/proc`, `/sys`) o el socket de Docker. Por ello,
+  ambos servicios se encuentran agrupados bajo los perfiles `monitoring` y `full` de Docker Compose. Para
+  iniciarlos manualmente se puede usar:
+  ```bash
+  docker compose -f docker-compose.local.yml --profile monitoring up -d
+  ```
+  Si no están activos, el panel de administración en el frontend muestra normalmente el estado de salud,
+  latencia, tráfico, outbox y RabbitMQ, manejando el estado vacío de los gráficos de contenedores sin errores.
 
 El entorno está definido en `docker-compose.local.yml` y **no lee el `.env`**: usa valores
 ficticios propios. La configuración del backend está en

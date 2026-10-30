@@ -1,0 +1,8 @@
+{
+  "solicitudId" : 1,
+  "pacienteId" : 1,
+  "profesionalId" : 1,
+  "tipoConcepto" : "texto",
+  "precio" : 1,
+  "titulo" : "texto"
+}
