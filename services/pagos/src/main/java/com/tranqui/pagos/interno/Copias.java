@@ -1,5 +1,6 @@
 package com.tranqui.pagos.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.pagos.datos.Suscriptores;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,7 +60,7 @@ public class Copias {
                 suscriptores.guardar(s.aSuscriptor());
             }
             total += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 return total;
             }
         }

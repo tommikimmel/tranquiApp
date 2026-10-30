@@ -37,6 +37,10 @@ class CopiasTest {
     private final ObjectProvider<CargaInicial> provider = mock(ObjectProvider.class);
     private final Copias copias = new Copias(interno, personas, turnos, tx, provider);
 
+    private static ClienteInterno.TurnoServicio servicio(Long id, int version) {
+        return new ClienteInterno.TurnoServicio(version, turno(id, version).turno());
+    }
+
     private static ClienteInterno.TurnoMonolito turno(Long id, int version) {
         ClienteInterno.TurnoMonolito m = mock(ClienteInterno.TurnoMonolito.class);
         TurnoActualizadoData d = id == null ? null : mock(TurnoActualizadoData.class);
@@ -84,7 +88,7 @@ class CopiasTest {
     @Test
     void copiarTurnos_delServicio_salteaLasFilasInvalidas() {
         when(interno.fuenteIdentidad()).thenReturn(true);
-        List<ClienteInterno.TurnoMonolito> filas = Arrays.asList(turno(10L, 2), turno(null, 1), turno(-3L, 1), turno(11L, -1), null);
+        List<ClienteInterno.TurnoServicio> filas = Arrays.asList(servicio(10L, 2), servicio(null, 1), servicio(-3L, 1), servicio(11L, -1), null);
         when(interno.turnosDelServicio()).thenReturn(filas);
         assertThat(copias.copiarTurnos()).isEqualTo(1);
         verify(turnos).guardar(10L, 2L, 1L, LocalDate.of(2026, 11, 5), "CONFIRMADO", 2);

@@ -1,0 +1,23 @@
+[
+  {
+    "id" : 1,
+    "version" : 0,
+    "professionalId" : 28,
+    "planId" : 1,
+    "status" : "ACTIVE",
+    "seats" : 1,
+    "billingSource" : "MERCADOPAGO",
+    "mpPreapprovalId" : "texto-mpPreapprovalId",
+    "amountArs" : 12000,
+    "billingCycle" : "MONTHLY",
+    "nextBillingDate" : "2026-11-03T10:30:00",
+    "currentPeriodStart" : "2026-10-01T00:00:00",
+    "currentPeriodEnd" : "2026-10-31T23:59:00",
+    "graceUntil" : "2026-11-03T10:30:00",
+    "cancelAtPeriodEnd" : false,
+    "cancelledAt" : "2026-11-03T10:30:00",
+    "renewalReminderSent" : false,
+    "createdAt" : "2026-10-29T20:32:42.927248",
+    "updatedAt" : "2026-10-29T20:32:42.927248"
+  }
+]

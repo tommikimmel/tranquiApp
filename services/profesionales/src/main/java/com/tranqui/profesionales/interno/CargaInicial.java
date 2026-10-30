@@ -1,5 +1,6 @@
 package com.tranqui.profesionales.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.eventos.consumo.EsperaAntesDeConsumir;
 import com.tranqui.profesionales.datos.Personas;
 import com.tranqui.profesionales.datos.Profesionales;
@@ -130,7 +131,7 @@ public class CargaInicial implements EsperaAntesDeConsumir {
                 tarifas += p.tarifas() != null ? p.tarifas().size() : 0;
             }
             total += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }

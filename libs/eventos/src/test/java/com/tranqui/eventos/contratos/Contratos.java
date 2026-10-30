@@ -2,12 +2,16 @@ package com.tranqui.eventos.contratos;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.tranqui.eventos.EventObjectMapperFactory;
 import com.tranqui.eventos.ValidadorEventos;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.RecordComponent;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -38,11 +42,73 @@ public final class Contratos {
 
     /** Lado productor: lo que devuelve tiene los mismos campos con los mismos tipos de JSON que el contrato. */
     public static void mismaForma(String ruta, JsonNode real) {
+        if (Boolean.getBoolean("contratos.generar") && Contratos.class.getResource("/contratos/" + ruta) == null) {
+            generar(ruta, real);
+            return;
+        }
         List<String> diferencias = new ArrayList<>();
         comparar(fixture(ruta), real, "$", diferencias);
         if (!diferencias.isEmpty()) {
             throw new AssertionError("La salida no cumple el contrato " + ruta + ":\n  " + String.join("\n  ", diferencias));
         }
+    }
+
+    /** Con {@code -Dcontratos.generar=true}: escribe el contrato que falta en libs/eventos a partir de la salida real. */
+    private static void generar(String ruta, JsonNode real) {
+        Path dir = Path.of("").toAbsolutePath();
+        while (dir != null && !Files.isDirectory(dir.resolve("libs/eventos/src/test/resources"))) {
+            dir = dir.getParent();
+        }
+        if (dir == null) {
+            throw new AssertionError("No encuentro libs/eventos para generar " + ruta);
+        }
+        Path archivo = dir.resolve("libs/eventos/src/test/resources/contratos").resolve(ruta);
+        try {
+            Files.createDirectories(archivo.getParent());
+            Files.writeString(archivo, MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(recortar(real)) + "\n");
+        } catch (IOException e) {
+            throw new AssertionError("No pude escribir " + archivo, e);
+        }
+    }
+
+    /** Una lista queda con un solo elemento, el que trae más campos con valor. */
+    private static JsonNode recortar(JsonNode n) {
+        if (n.isArray()) {
+            ArrayNode uno = MAPPER.createArrayNode();
+            JsonNode mejor = null;
+            for (JsonNode e : n) {
+                if (mejor == null || conValor(e) > conValor(mejor)) {
+                    mejor = e;
+                }
+            }
+            return mejor == null ? uno : uno.add(recortar(mejor));
+        }
+        if (n.isObject()) {
+            ObjectNode copia = MAPPER.createObjectNode();
+            n.fields().forEachRemaining(c -> copia.set(c.getKey(), recortar(c.getValue())));
+            return copia;
+        }
+        return n;
+    }
+
+    private static boolean esMapaPorId(JsonNode n) {
+        if (!n.isObject() || n.isEmpty()) {
+            return false;
+        }
+        for (Iterator<String> it = n.fieldNames(); it.hasNext(); ) {
+            if (!it.next().matches("-?\\d+")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static long conValor(JsonNode n) {
+        long total = 0;
+        for (JsonNode v : n) {
+            total += v.isNull() ? 0 : 1;
+        }
+        return total;
     }
 
     public static void mismaForma(String ruta, String json) {
@@ -108,7 +174,18 @@ public final class Contratos {
             diferencias.add(camino + ": se esperaba " + esperado.getNodeType() + " y vino " + real.getNodeType());
             return;
         }
-        if (esperado.isObject()) {
+        if (esMapaPorId(esperado)) {
+            // Un mapa por id (por ejemplo, no leídos por paciente): las claves dependen de los datos, se comparan los valores.
+            JsonNode muestra = esperado.elements().next();
+            for (Iterator<String> it = real.fieldNames(); it.hasNext(); ) {
+                String clave = it.next();
+                if (!clave.matches("-?\\d+")) {
+                    diferencias.add(camino + "." + clave + ": se esperaba un id como clave");
+                } else {
+                    comparar(muestra, real.get(clave), camino + "{}", diferencias);
+                }
+            }
+        } else if (esperado.isObject()) {
             for (Iterator<String> it = esperado.fieldNames(); it.hasNext(); ) {
                 String campo = it.next();
                 comparar(esperado.get(campo), real.get(campo), camino + "." + campo, diferencias);

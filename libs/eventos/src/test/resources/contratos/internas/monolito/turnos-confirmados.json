@@ -1,0 +1,14 @@
+[
+  {
+    "turnoId" : 1,
+    "pacienteId" : 18,
+    "profesionalId" : 19,
+    "fecha" : "2026-10-30",
+    "horaInicio" : "10:00",
+    "horaFin" : "10:45",
+    "modalidad" : "texto-modalidad",
+    "ocupaAgenda" : true,
+    "googleEventId" : "texto-googleEventId",
+    "meetUrl" : "texto-meetUrl"
+  }
+]

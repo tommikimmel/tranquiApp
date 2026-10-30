@@ -1,5 +1,6 @@
 package com.tranqui.profesionales.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.eventos.data.TurnoActualizadoData;
 import com.tranqui.profesionales.datos.Personas;
 import com.tranqui.profesionales.datos.TurnosAtendidos;
@@ -62,7 +63,7 @@ public class Copias {
                 personas.guardar(p.persona());
             }
             total += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 return total;
             }
         }
@@ -75,7 +76,7 @@ public class Copias {
     public int copiarTurnos() {
         if (interno.fuenteIdentidad()) {
             int total = 0;
-            for (ClienteInterno.TurnoMonolito m : interno.turnosDelServicio()) {
+            for (ClienteInterno.TurnoServicio m : interno.turnosDelServicio()) {
                 TurnoActualizadoData d = m != null ? m.turno() : null;
                 // Nunca se confía en lo que manda otro servicio: un turno sin ids válidos se saltea.
                 if (d == null || d.turnoId() == null || d.turnoId() <= 0 || m.version() < 0) {
@@ -95,7 +96,7 @@ public class Copias {
                 turnosAtendidos.guardar(d.turnoId(), d.profesionalId(), d.pacienteId(), d.fecha(), d.estado(), m.version());
             }
             total += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 return total;
             }
         }

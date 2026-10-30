@@ -1,5 +1,6 @@
 package com.tranqui.identidad;
 
+import com.tranqui.eventos.contratos.Contratos;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tranqui.eventos.EventObjectMapperFactory;
@@ -373,6 +374,7 @@ class IdentidadI2cIntegracionTest {
                 .build())).orElseThrow();
 
         JsonNode p = interna(HttpMethod.GET, "/internal/identidad/pacientes/" + u.id(), null, HttpStatus.OK);
+        Contratos.mismaForma("internas/fuente-identidad/paciente.json", p);
         assertThat(claves(p)).isEqualTo(new TreeSet<>(Set.of("id", "version", "rol", "email", "nombre", "apellido",
                 "telefono", "dni", "direccion", "obraSocial", "numAfiliado", "sexo", "fechaNacimiento", "cuil",
                 "tipoDocumento", "numeroDocumento", "datosOfuscado", "credencialCodEntidad", "credencialPan",
@@ -395,6 +397,7 @@ class IdentidadI2cIntegracionTest {
     void internas_buscarOCrearPaciente_creaPisaYValida() throws Exception {
         JsonNode nuevo = interna(HttpMethod.POST, "/internal/identidad/pacientes",
                 Map.of("email", " Nuevo@Tranqui.com ", "nombre", "Nuevo", "telefono", "1144445555"), HttpStatus.OK);
+        Contratos.mismaForma("internas/fuente-identidad/paciente.json", nuevo);
         assertThat(nuevo.get("email").asText()).isEqualTo("nuevo@tranqui.com");
         assertThat(nuevo.get("telefono").asText()).isEqualTo("+54 1144445555");
         assertThat(nuevo.get("rol").asText()).isEqualTo("PACIENTE");
@@ -416,6 +419,12 @@ class IdentidadI2cIntegracionTest {
         interna(HttpMethod.POST, "/internal/identidad/pacientes", Map.of("nombre", "Sin mail"), HttpStatus.BAD_REQUEST);
         interna(HttpMethod.POST, "/internal/identidad/pacientes",
                 Map.of("email", "tel@tranqui.com", "telefono", "12"), HttpStatus.BAD_REQUEST);
+
+        // El pedido del contrato, tal cual lo manda turnos.
+        JsonNode delContrato = interna(HttpMethod.POST, "/internal/identidad/pacientes",
+                Contratos.fixture("internas/fuente-identidad/pacientes-buscar-o-crear.request.json"), HttpStatus.OK);
+        interna(HttpMethod.PUT, "/internal/identidad/pacientes/" + delContrato.get("id").asLong(),
+                Contratos.fixture("internas/fuente-identidad/paciente-actualizar.request.json"), HttpStatus.OK);
     }
 
     @Test
@@ -439,6 +448,7 @@ class IdentidadI2cIntegracionTest {
         borrar.put("fechaNacimiento", "1985-02-03");
         borrar.put("telefono", "1133334444");
         JsonNode p = interna(HttpMethod.PUT, "/internal/identidad/pacientes/" + u.id(), borrar, HttpStatus.OK);
+        Contratos.mismaForma("internas/fuente-identidad/paciente.json", p);
         assertThat(p.get("obraSocial").isNull()).isTrue();
         assertThat(p.get("credencialPan").isNull()).isTrue();
         assertThat(p.get("telefono").asText()).isEqualTo("+54 1133334444");
@@ -456,6 +466,7 @@ class IdentidadI2cIntegracionTest {
         Usuario paciente = crear("no.prof@tranqui.com", "PACIENTE");
 
         JsonNode p = interna(HttpMethod.GET, "/internal/identidad/profesionales/" + psi.id(), null, HttpStatus.OK);
+        Contratos.mismaForma("internas/fuente-identidad/profesional.json", p);
         assertThat(claves(p)).isEqualTo(new TreeSet<>(Set.of("id", "version", "email", "rol", "profession", "nombre",
                 "apellido", "telefono", "sexo", "fechaNacimiento", "cuil", "tipoDocumento", "numeroDocumento", "fotoUrl",
                 "fotoHash", "verificadoAdmin", "mpVinculada", "suscripcionEstado", "suscripcionPeriodoHasta",
@@ -471,6 +482,7 @@ class IdentidadI2cIntegracionTest {
         assertThat(p.get("fotoHash").asText()).isEqualTo(hash);
 
         JsonNode estado = interna(HttpMethod.GET, "/internal/identidad/profesionales/estado", null, HttpStatus.OK);
+        Contratos.mismaForma("internas/fuente-identidad/profesionales-estado.json", estado);
         assertThat(estado).hasSize(1);
         assertThat(estado.get(0).get("fotoUrl").isNull()).isTrue();
         assertThat(estado.get(0).get("perfil").isNull()).isTrue();
@@ -479,10 +491,13 @@ class IdentidadI2cIntegracionTest {
 
         // Suscriptores: rol PSIQUIATRA o con profesión; el cuit sale del perfil del registro.
         JsonNode s = interna(HttpMethod.GET, "/internal/identidad/suscriptores/" + psi.id(), null, HttpStatus.OK);
+        Contratos.mismaForma("internas/fuente-identidad/suscriptor.json", s);
         assertThat(s.get("cuit").asText()).isEqualTo("20999999993");
         assertThat(s.get("taxId").asText()).isEqualTo("20123456789");
         interna(HttpMethod.GET, "/internal/identidad/suscriptores/" + paciente.id(), null, HttpStatus.NOT_FOUND);
-        assertThat(interna(HttpMethod.GET, "/internal/identidad/suscriptores", null, HttpStatus.OK)).hasSize(1);
+        JsonNode suscriptores = interna(HttpMethod.GET, "/internal/identidad/suscriptores", null, HttpStatus.OK);
+        assertThat(suscriptores).hasSize(1);
+        Contratos.mismaForma("internas/fuente-identidad/suscriptores.json", suscriptores);
     }
 
     @Test
@@ -498,6 +513,7 @@ class IdentidadI2cIntegracionTest {
         body.put("numeroDocumento", 12345678);
         body.put("fotoUrl", "https://foto");
         JsonNode r = interna(HttpMethod.PUT, "/internal/identidad/profesionales/" + psi.id() + "/identidad", body, HttpStatus.OK);
+        Contratos.mismaForma("internas/fuente-identidad/profesional.json", r);
         assertThat(r.get("nombre").asText()).isEqualTo("Jorge");
         // Devuelve sin la foto, como el monolito.
         assertThat(r.get("fotoUrl").isNull()).isTrue();
@@ -510,6 +526,9 @@ class IdentidadI2cIntegracionTest {
         body.put("cuil", 123L);
         interna(HttpMethod.PUT, "/internal/identidad/profesionales/" + psi.id() + "/identidad", body, HttpStatus.BAD_REQUEST);
         interna(HttpMethod.PUT, "/internal/identidad/profesionales/999999/identidad", Map.of("nombre", "X"), HttpStatus.NOT_FOUND);
+        // El pedido del contrato, tal cual lo manda profesionales.
+        interna(HttpMethod.PUT, "/internal/identidad/profesionales/" + psi.id() + "/identidad",
+                Contratos.fixture("internas/fuente-identidad/profesional-identidad.request.json"), HttpStatus.OK);
     }
 
     // ================================================================================

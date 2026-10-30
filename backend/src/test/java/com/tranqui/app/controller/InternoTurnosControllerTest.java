@@ -1,5 +1,6 @@
 package com.tranqui.app.controller;
 
+import com.tranqui.eventos.contratos.Contratos;
 import com.tranqui.app.eventos.OutboxRepository;
 import com.tranqui.app.model.EstadoTurno;
 import com.tranqui.app.model.Modalidad;
@@ -77,15 +78,21 @@ class InternoTurnosControllerTest {
         Turno t = turno();
 
         ResponseEntity<String> turnos = llamar(HttpMethod.GET, "/internal/monolito/turnos?pagina=0&tamanio=1000", null, true);
+        Contratos.mismaForma("internas/monolito/turnos.json", turnos.getBody());
         assertThat(turnos.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(turnos.getBody()).contains("\"turnoId\":" + t.getId()).contains("\"tokenReserva\":\"reserva-123\"")
                 .contains("\"tokenConfirmacionAsistencia\":\"asistencia-456\"").contains("\"estado\":\"CONFIRMADO\"")
                 .contains("\"fecha\":\"" + t.getFecha() + "\"");
 
         ResponseEntity<String> paciente = llamar(HttpMethod.GET, "/internal/monolito/pacientes/" + t.getPaciente().getId(), null, true);
+        Contratos.mismaForma("internas/fuente-identidad/paciente.json", paciente.getBody());
         assertThat(paciente.getBody()).contains("\"dni\":\"30111222\"").contains("\"obraSocial\":\"OSDE\"")
                 .contains("\"rol\":\"PACIENTE\"").contains("\"fechaNacimiento\":\"1990-03-07\"")
                 .doesNotContain("password");
+
+        ResponseEntity<String> pacientes = llamar(HttpMethod.GET, "/internal/monolito/pacientes?pagina=0&tamanio=1000", null, true);
+        assertThat(pacientes.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Contratos.mismaForma("internas/monolito/pacientes.json", pacientes.getBody());
     }
 
     @Test
@@ -95,6 +102,7 @@ class InternoTurnosControllerTest {
 
         ResponseEntity<String> creado = llamar(HttpMethod.POST, "/internal/monolito/pacientes",
                 "{\"email\":\"" + email + "\",\"nombre\":\"Juana\",\"telefono\":\"11 5555 1234\"}", true);
+        Contratos.mismaForma("internas/fuente-identidad/paciente.json", creado.getBody());
 
         assertThat(creado.getStatusCode()).isEqualTo(HttpStatus.OK);
         Usuario u = usuarioRepository.findByEmail(email.trim().toLowerCase()).orElseThrow();
@@ -106,6 +114,7 @@ class InternoTurnosControllerTest {
 
         ResponseEntity<String> existente = llamar(HttpMethod.POST, "/internal/monolito/pacientes",
                 "{\"email\":\"" + email.trim() + "\",\"nombre\":\"Otra\",\"obraSocial\":\"Swiss\",\"numAfiliado\":\"123\"}", true);
+        Contratos.mismaForma("internas/fuente-identidad/paciente.json", existente.getBody());
         assertThat(existente.getBody()).contains("\"id\":" + u.getId()).contains("\"obraSocial\":\"Swiss\"")
                 .contains("\"nombre\":\"Juana\"");
     }
@@ -115,6 +124,7 @@ class InternoTurnosControllerTest {
         Turno t = turno();
 
         ResponseEntity<String> r = llamar(HttpMethod.GET, "/internal/turnos/turnos/" + t.getId() + "/enlaces-asistencia", null, true);
+        Contratos.mismaForma("internas/turnos/enlaces-asistencia.json", r.getBody());
 
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody()).contains("https://tranqui.test/api/turnos/" + t.getId() + "/confirmar-asistencia?token=asistencia-456");
@@ -123,8 +133,7 @@ class InternoTurnosControllerTest {
     @Test
     void documentoAdjunto_conLaUrlDelServicioDeNotificaciones() {
         ResponseEntity<String> r = llamar(HttpMethod.POST, "/internal/notificaciones/documentos",
-                "{\"email\":\"pac@mail.com\",\"pacienteNombre\":\"Ana\",\"medicoNombre\":\"Dra. Paz\",\"tipoDocumento\":\"Certificado\","
-                        + "\"archivoDataUri\":\"data:application/pdf;base64,JVBERi0=\",\"archivoNombre\":\"certificado.pdf\"}", true);
+                Contratos.fixture("internas/notificaciones/documentos.request.json").toString(), true);
 
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody()).contains("\"enviado\":true");
@@ -133,8 +142,8 @@ class InternoTurnosControllerTest {
     @Test
     void recetaEmitida_conLaUrlDelServicioDeNotificaciones() {
         ResponseEntity<String> r = llamar(HttpMethod.POST, "/internal/notificaciones/recetas",
-                "{\"email\":\"pac@mail.com\",\"pacienteNombre\":\"Ana\",\"medicoNombre\":\"Dra. Paz\",\"matricula\":\"MN 12345\","
-                        + "\"pdfUrl\":\"https://s3.tranqui/r.pdf\",\"nroRecetario\":\"REC-1\"}", true);
+                Contratos.fixture("internas/notificaciones/recetas.request.json").toString(), true);
+        Contratos.mismaForma("internas/notificaciones/resultado.json", r.getBody());
 
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody()).contains("\"enviado\":true");
@@ -156,6 +165,7 @@ class InternoTurnosControllerTest {
                 + "\"domicilio\":{\"calle\":\"Corrientes\",\"numero\":\"500\",\"localidad\":\"CABA\",\"provincia\":\"Buenos Aires\"}}";
 
         ResponseEntity<String> r = llamar(HttpMethod.PUT, "/internal/monolito/pacientes/" + p.getId(), body, true);
+        Contratos.mismaForma("internas/fuente-identidad/paciente.json", r.getBody());
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody()).contains("\"nombre\":\"Carlos Modificado\"")
                 .contains("\"apellido\":\"Perez\"")
@@ -181,5 +191,18 @@ class InternoTurnosControllerTest {
         String body = "{\"nombre\":\"   \"}";
         ResponseEntity<String> r = llamar(HttpMethod.PUT, "/internal/monolito/pacientes/" + p.getId(), body, true);
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void pedidosDelContrato_seAceptanTalCualLosMandanTurnosYProfesionales() throws Exception {
+        ResponseEntity<String> creado = llamar(HttpMethod.POST, "/internal/monolito/pacientes",
+                Contratos.fixture("internas/fuente-identidad/pacientes-buscar-o-crear.request.json").toString(), true);
+        assertThat(creado.getStatusCode()).isEqualTo(HttpStatus.OK);
+        long id = Contratos.MAPPER.readTree(creado.getBody()).get("id").asLong();
+
+        ResponseEntity<String> actualizado = llamar(HttpMethod.PUT, "/internal/monolito/pacientes/" + id,
+                Contratos.fixture("internas/fuente-identidad/paciente-actualizar.request.json").toString(), true);
+        assertThat(actualizado.getStatusCode()).as(actualizado.getBody()).isEqualTo(HttpStatus.OK);
+        Contratos.mismaForma("internas/fuente-identidad/paciente.json", actualizado.getBody());
     }
 }

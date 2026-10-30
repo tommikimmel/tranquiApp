@@ -184,6 +184,13 @@
 			<artifactId>eventos</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
+		<dependency>
+			<groupId>com.tranqui</groupId>
+			<artifactId>eventos</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
 
 		<!-- Mensajería RabbitMQ con Spring AMQP -->
 		<dependency>

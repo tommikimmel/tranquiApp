@@ -1,5 +1,6 @@
 package com.tranqui.turnos;
 
+import com.tranqui.eventos.contratos.Contratos;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tranqui.eventos.EventEnvelope;
@@ -451,6 +452,7 @@ class TurnosIntegracionTest {
         headers.setBearerAuth(new ServiceJwt(CLAVE_SERVICIO).emitirToken("notificaciones"));
         ResponseEntity<String> enlaces = http.exchange("/internal/turnos/turnos/101/enlaces-asistencia", HttpMethod.GET,
                 new HttpEntity<>(headers), String.class);
+        Contratos.mismaForma("internas/turnos/enlaces-asistencia.json", enlaces.getBody());
         assertThat(enlaces.getBody()).contains("https://tranqui.test/api/turnos/101/confirmar-asistencia?token="
                 + recordado.tokenConfirmacionAsistencia);
 
@@ -497,6 +499,7 @@ class TurnosIntegracionTest {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(new ServiceJwt(CLAVE_SERVICIO).emitirToken("monolito"));
         ResponseEntity<String> r = http.exchange("/internal/turnos/turnos", HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        Contratos.mismaForma("internas/turnos/turnos.json", r.getBody());
 
         JsonNode uno = mapper.readTree(r.getBody()).get(0);
         assertThat(uno.get("version").asInt()).isEqualTo(5);

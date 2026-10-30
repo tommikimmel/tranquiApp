@@ -1,5 +1,6 @@
 package com.tranqui.calendario;
 
+import com.tranqui.eventos.contratos.Contratos;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tranqui.calendario.datos.CuentasGoogle;
@@ -258,6 +259,7 @@ class CalendarioIntegracionTest {
 
         ResponseEntity<String> r = http.exchange("/internal/calendario/profesionales/2/ocupado?fecha=" + dia, HttpMethod.GET,
                 new HttpEntity<>(headers), String.class);
+        Contratos.mismaForma("internas/calendario/ocupado.json", r.getBody());
 
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody()).isEqualTo("[{\"inicio\":\"00:00:00\",\"fin\":\"02:00:00\",\"todoElDia\":false},"

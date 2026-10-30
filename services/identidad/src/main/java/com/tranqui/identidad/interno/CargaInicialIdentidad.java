@@ -1,5 +1,6 @@
 package com.tranqui.identidad.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.eventos.consumo.EsperaAntesDeConsumir;
 import com.tranqui.identidad.datos.*;
 import org.slf4j.Logger;
@@ -142,7 +143,7 @@ public class CargaInicialIdentidad implements EsperaAntesDeConsumir {
                 break;
             }
             rawUsuarios.addAll(lote);
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }
@@ -154,7 +155,7 @@ public class CargaInicialIdentidad implements EsperaAntesDeConsumir {
                 break;
             }
             rawTickets.addAll(lote);
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }
@@ -166,7 +167,7 @@ public class CargaInicialIdentidad implements EsperaAntesDeConsumir {
                 break;
             }
             rawMensajes.addAll(lote);
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }
@@ -178,7 +179,7 @@ public class CargaInicialIdentidad implements EsperaAntesDeConsumir {
                 break;
             }
             rawNovedades.addAll(lote);
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }

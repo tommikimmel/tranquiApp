@@ -1,0 +1,18 @@
+[
+  {
+    "id" : 1,
+    "code" : "consultorio",
+    "name" : "Tranqui Consultorio",
+    "description" : "Ideal para psicólogos y profesionales que buscan adquisición de pacientes por zona y software de gestión integral.",
+    "priceArs" : 149500,
+    "priceUsdRef" : 99,
+    "priceArsAnual" : 1495000,
+    "billingPeriod" : "monthly",
+    "minSeats" : 1,
+    "mpPreapprovalPlanId" : "texto-mpPreapprovalPlanId",
+    "requiresPrescriber" : false,
+    "isActive" : true,
+    "effectiveFrom" : "2026-10-29T20:32:37.626995",
+    "effectiveTo" : "2026-11-03T10:30:00"
+  }
+]

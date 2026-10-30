@@ -19,6 +19,15 @@ class ContratosTest {
     }
 
     @Test
+    void mismaForma_unMapaPorIdComparaLosValores() {
+        Contratos.mismaForma("internas/chat/resumen.json", "{\"pacientesConChat\": [3], \"noLeidosPorPaciente\": {\"3\": 2, \"9\": 0}}");
+        assertThatThrownBy(() -> Contratos.mismaForma("internas/chat/resumen.json",
+                "{\"pacientesConChat\": [3], \"noLeidosPorPaciente\": {\"3\": \"dos\", \"x\": 1}}"))
+                .hasMessageContaining("noLeidosPorPaciente{}: se esperaba NUMBER y vino STRING")
+                .hasMessageContaining("noLeidosPorPaciente.x: se esperaba un id como clave");
+    }
+
+    @Test
     void mismaForma_detectaCampoFaltanteSobranteYTipoDistinto() {
         assertThatThrownBy(() -> Contratos.mismaForma(RUTA, "{\"id\": \"7\", \"fin\": null, \"franjas\": [{\"day\": \"LUNES\"}], \"extra\": 1}"))
                 .isInstanceOf(AssertionError.class)

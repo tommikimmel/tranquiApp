@@ -1,5 +1,6 @@
 package com.tranqui.profesionales;
 
+import com.tranqui.eventos.contratos.Contratos;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tranqui.eventos.EventEnvelope;
@@ -437,6 +438,7 @@ class ProfesionalesIntegracionTest {
         headers.setBearerAuth(new ServiceJwt(CLAVE_SERVICIO).emitirToken("monolito"));
         ResponseEntity<String> r = http.exchange("/internal/profesionales/profesionales", HttpMethod.GET,
                 new HttpEntity<>(headers), String.class);
+        Contratos.mismaForma("internas/profesionales/profesionales.json", r.getBody());
 
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         JsonNode lista = mapper.readTree(r.getBody());

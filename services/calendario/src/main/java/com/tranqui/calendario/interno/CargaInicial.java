@@ -1,5 +1,6 @@
 package com.tranqui.calendario.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.calendario.datos.CuentasGoogle;
 import com.tranqui.calendario.datos.EventosExternos;
 import com.tranqui.calendario.datos.Participantes;
@@ -113,7 +114,7 @@ public class CargaInicial implements EsperaAntesDeConsumir {
                 participantes.guardar(c.id(), c.email(), c.nombre(), c.apellido(), c.rol());
             }
             total += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 return total;
             }
         }
@@ -141,7 +142,8 @@ public class CargaInicial implements EsperaAntesDeConsumir {
                         e.todoElDia(), e.estado());
             }
             total += lote.size();
-            if (lote.size() < PAGINA) {
+            // Una página llena pero toda inválida no deja de dónde seguir: se corta acá (con el aviso de cada fila).
+            if (ValidadorEventos.recibidas(lote) < PAGINA || lote.isEmpty()) {
                 break;
             }
             desde = lote.get(lote.size() - 1).id();

@@ -1,5 +1,6 @@
 package com.tranqui.chat.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.chat.copias.Copias;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,7 +89,7 @@ public class CargaInicial {
                 copias.guardarParticipante(c.id(), c.email(), c.nombre(), c.apellido(), c.rol());
             }
             total += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 return total;
             }
         }
@@ -122,7 +123,7 @@ public class CargaInicial {
             });
             total += lote.size();
             desde = lote.get(lote.size() - 1).id();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }

@@ -1,5 +1,6 @@
 package com.tranqui.notificaciones;
 
+import com.tranqui.eventos.contratos.Contratos;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tranqui.eventos.EventEnvelope;
 import com.tranqui.eventos.EventObjectMapperFactory;
@@ -368,15 +369,15 @@ class NotificacionesIntegracionTest {
         return http.exchange("/internal/notificaciones/documentos", HttpMethod.POST, new HttpEntity<>(cuerpo, headers), String.class);
     }
 
-    private static final String DOCUMENTO = "{\"email\":\"pac@mail.com\",\"pacienteNombre\":\"Ana\",\"medicoNombre\":\"Dra. Paz\","
-            + "\"tipoDocumento\":\"Certificado\",\"archivoDataUri\":\"data:application/pdf;base64,JVBERi0=\","
-            + "\"archivoNombre\":\"certificado.pdf\"}";
+    // El cuerpo es el contrato: lo mismo que mandan turnos y el monolito.
+    private static final String DOCUMENTO = Contratos.fixture("internas/notificaciones/documentos.request.json").toString();
 
     @Test
     void documentoAdjunto_soloConTokenDeServicio_yLoMandaConElArchivo() {
         assertThat(documento(DOCUMENTO, false).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 
         ResponseEntity<String> r = documento(DOCUMENTO, true);
+        Contratos.mismaForma("internas/notificaciones/resultado.json", r.getBody());
 
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody()).contains("\"enviado\":true");
@@ -406,8 +407,7 @@ class NotificacionesIntegracionTest {
         return http.exchange("/internal/notificaciones/recetas", HttpMethod.POST, new HttpEntity<>(cuerpo, headers), String.class);
     }
 
-    private static final String RECETA = "{\"email\":\"pac@mail.com\",\"pacienteNombre\":\"Ana\",\"medicoNombre\":\"Dra. Paz\","
-            + "\"matricula\":\"MN 12345\",\"pdfUrl\":\"https://s3.tranqui/r.pdf\",\"nroRecetario\":\"REC-1\"}";
+    private static final String RECETA = Contratos.fixture("internas/notificaciones/recetas.request.json").toString();
 
     @Test
     void recetaEmitida_soloConTokenDeServicio_yLaManda() {

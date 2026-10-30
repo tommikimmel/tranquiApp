@@ -1,0 +1,16 @@
+[ {
+  "id" : 1,
+  "medicoId" : 3,
+  "pacienteId" : 4,
+  "medicamentos" : "[{\"nombre\":\"Clonazepam\"}]",
+  "laboratorios" : "[\"Bago\"]",
+  "diagnostico" : "F41.1",
+  "indicaciones" : "1 por noche",
+  "pdfUrl" : "https://s3.tranqui/receta-1.pdf",
+  "qbi2IdReceta" : "REC-987",
+  "qbi2Verificador" : "https://verum.ar/abc",
+  "qbi2NroCuir" : "CUIR-111",
+  "qbi2FechaVencimiento" : "2026-11-25",
+  "qbi2IdTransaccion" : "TX-555",
+  "fechaEmision" : "2026-10-29T20:32:41.228157"
+} ]

@@ -1,0 +1,38 @@
+{
+  "id" : 1,
+  "nombre" : "Carlos Modificado",
+  "email" : "carlos@mail.com",
+  "telefono" : "11 4444 5555",
+  "dni" : "28111222",
+  "direccion" : "Corrientes 500",
+  "obraSocial" : "OSDE",
+  "numAfiliado" : "AF-123456",
+  "ultimaVisita" : "2026-10-20",
+  "prioridadClinica" : "NORMAL",
+  "sinTurno" : false,
+  "unreadMessagesCount" : 0,
+  "apellido" : "Perez",
+  "sexo" : "M",
+  "fechaNacimiento" : "1985-04-12",
+  "cuil" : 20281112229,
+  "mail" : "carlos@mail.com",
+  "tipoDocumento" : "DNI",
+  "numeroDocumento" : 28111222,
+  "datosOfuscado" : "C*** P***",
+  "credencial" : {
+    "codEntidad" : 7,
+    "pan" : "PAN-123456",
+    "plan" : "210",
+    "token" : "tok-credencial"
+  },
+  "domicilio" : {
+    "calle" : "Corrientes",
+    "numero" : "500",
+    "piso" : "3",
+    "dpto" : "B",
+    "codigoPostal" : "C1043",
+    "localidad" : "CABA",
+    "provincia" : "Buenos Aires",
+    "pais" : "Argentina"
+  }
+}

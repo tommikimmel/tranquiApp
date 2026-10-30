@@ -1,6 +1,7 @@
 package com.tranqui.chat.interno;
 
 import com.tranqui.chat.copias.Copias;
+import com.tranqui.eventos.ValidadorEventos;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -64,6 +65,23 @@ class CargaInicialTest {
         verify(copias).guardarTurnoConfirmado(eq(9L), eq(1L), eq(2L), any(), eq("10:00"));
         verify(jdbc, times(500)).update(anyString(), any(Object[].class));
         verify(interno).mensajes(500L, 500);
+    }
+
+    @Test
+    void unaFilaInvalidaEnUnaPaginaLlena_noCortaLaCarga() {
+        // Lo que devuelve el cliente real: la página validada, con una fila salteada (Fase 10, T2).
+        List<ClienteInterno.Contacto> llena = new ArrayList<>();
+        for (long i = 1; i <= 500; i++) {
+            llena.add(new ClienteInterno.Contacto(i == 7 ? -7L : i, "a" + i + "@t.com", "Ana", "Paz", "PACIENTE", true));
+        }
+        when(interno.contactos(0, 500)).thenReturn(ValidadorEventos.respuesta(llena, "prueba"));
+        when(interno.contactos(1, 500)).thenReturn(List.of(new ClienteInterno.Contacto(501L, "b@t.com", "Bea", "Ruiz", "PACIENTE", true)));
+        when(interno.mensajes(0L, 500)).thenReturn(List.of());
+
+        carga(true).cargarConReintentos();
+
+        verify(copias, times(500)).guardarParticipante(anyLong(), anyString(), anyString(), anyString(), anyString());
+        verify(copias).guardarParticipante(501L, "b@t.com", "Bea", "Ruiz", "PACIENTE");
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.tranqui.pagos.suscripciones;
 
+import com.tranqui.eventos.contratos.Contratos;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tranqui.eventos.EventEnvelope;
@@ -488,6 +489,7 @@ class SuscripcionesS2bIntegracionTest {
                 false, null, false, ahora, ahora));
 
         ResponseEntity<String> res = pedirInterno(HttpMethod.GET, "/internal/suscripciones/estado?professionalId=10", null);
+        Contratos.mismaForma("internas/suscripciones/estado.json", res.getBody());
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         JsonNode json = mapper.readTree(res.getBody());
@@ -530,6 +532,7 @@ class SuscripcionesS2bIntegracionTest {
 
         // Consultamos la ruta interna para ese profesional
         ResponseEntity<String> resInterno = pedirInterno(HttpMethod.GET, "/internal/suscripciones/estado", null);
+        Contratos.mismaForma("internas/suscripciones/estado.json", resInterno.getBody());
         assertThat(resInterno.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         JsonNode items = mapper.readTree(resInterno.getBody());
@@ -582,6 +585,7 @@ class SuscripcionesS2bIntegracionTest {
                 false, null, false, ahora, ahora));
 
         ResponseEntity<String> resActive = pedirInterno(HttpMethod.GET, "/internal/suscripciones/acceso?email=psiquiatra@mail.com", null);
+        Contratos.mismaForma("internas/suscripciones/acceso.json", resActive.getBody());
         assertThat(resActive.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(mapper.readTree(resActive.getBody()).get("permitido").asBoolean()).isTrue();
 
@@ -654,6 +658,7 @@ class SuscripcionesS2bIntegracionTest {
 
         // 5. Consultar ruta interna: lista plana ordenada por profesionalId, con vinculada y version
         ResponseEntity<String> res = pedirInterno(HttpMethod.GET, "/internal/pagos/cuentas-mp?pagina=0&tamanio=10", null);
+        Contratos.mismaForma("internas/pagos/cuentas-mp.json", res.getBody());
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         JsonNode items = mapper.readTree(res.getBody());

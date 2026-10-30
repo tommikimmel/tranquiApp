@@ -68,6 +68,9 @@ class ValidacionDatosTest {
         List<Fila> filas = ValidadorEventos.respuesta(List.of(new Fila(1L, "a@b.com"), new Fila(-2L, "a@b.com"),
                 new Fila(3L, "no-es-mail"), new Fila(4L, null)), "prueba");
         assertThat(filas).extracting(Fila::id).containsExactly(1L, 4L);
+        // Para paginar cuenta lo que llegó: una página llena con filas salteadas no es la última.
+        assertThat(ValidadorEventos.recibidas(filas)).isEqualTo(4);
+        assertThat(ValidadorEventos.recibidas(List.of(1, 2))).isEqualTo(2);
     }
 
     @Test

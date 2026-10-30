@@ -6,6 +6,7 @@ import com.tranqui.app.model.Turno;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.repository.TurnoRepository;
 import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.eventos.contratos.Contratos;
 import com.tranqui.eventos.jwt.ServiceJwt;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,6 +67,7 @@ class InternoMonolitoControllerTest {
         ResponseEntity<String> respuesta = get("/internal/monolito/contactos?pagina=0&tamanio=1000", tokenServicio());
 
         assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Contratos.mismaForma("internas/monolito/contactos.json", respuesta.getBody());
         assertThat(respuesta.getBody()).contains("\"id\":" + u.getId()).contains(u.getEmail())
                 .contains("\"rol\":\"PACIENTE\"").contains("\"emailHabilitado\":true")
                 .doesNotContain("password");
@@ -86,6 +88,7 @@ class InternoMonolitoControllerTest {
         ResponseEntity<String> respuesta = get("/internal/monolito/notificaciones-vigentes", tokenServicio());
 
         assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Contratos.mismaForma("internas/monolito/notificaciones-vigentes.json", respuesta.getBody());
         assertThat(respuesta.getBody()).contains("\"titulo\":\"" + marca + "\"").contains("\"usuarioId\":" + u.getId())
                 .contains("\"leido\":true").doesNotContain("vieja-" + marca);
     }
@@ -104,11 +107,13 @@ class InternoMonolitoControllerTest {
         ResponseEntity<String> mensajes = get("/internal/monolito/mensajes?desdeId=" + (m.getId() - 1) + "&tamanio=5",
                 tokenServicio());
         assertThat(mensajes.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Contratos.mismaForma("internas/monolito/mensajes.json", mensajes.getBody());
         assertThat(mensajes.getBody()).contains("\"id\":" + m.getId()).contains("\"remitenteId\":" + paciente.getId())
                 .contains("\"contenido\":\"hola doc\"").contains("\"leido\":false");
 
         ResponseEntity<String> resumen = get("/internal/chat/profesionales/" + medico.getId() + "/resumen", tokenServicio());
         assertThat(resumen.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Contratos.mismaForma("internas/chat/resumen.json", resumen.getBody());
         assertThat(resumen.getBody()).contains("\"pacientesConChat\":[" + paciente.getId() + "]")
                 .contains("\"" + paciente.getId() + "\":1");
         assertThat(get("/internal/chat/profesionales/" + medico.getId() + "/resumen", null).getStatusCode())
@@ -131,6 +136,7 @@ class InternoMonolitoControllerTest {
         ResponseEntity<String> respuesta = get("/internal/monolito/turnos-confirmados", tokenServicio());
 
         assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Contratos.mismaForma("internas/monolito/turnos-confirmados.json", respuesta.getBody());
         assertThat(respuesta.getBody()).contains("\"turnoId\":" + futuro.getId()).contains("\"horaInicio\":\"11:00\"")
                 .contains("\"fecha\":\"" + futuro.getFecha() + "\"")
                 .contains("\"horaFin\":\"11:45\"").contains("\"ocupaAgenda\":true")
@@ -156,6 +162,7 @@ class InternoMonolitoControllerTest {
 
         ResponseEntity<String> cuentas = get("/internal/monolito/calendario/cuentas", tokenServicio());
         assertThat(cuentas.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Contratos.mismaForma("internas/monolito/calendario-cuentas.json", cuentas.getBody());
         // Los tokens viajan tal cual están guardados (cifrados), sin descifrar.
         assertThat(cuentas.getBody()).contains("\"profesionalId\":" + medico.getId())
                 .contains("\"refreshTokenCifrado\":\"refresh-cifrado-" + medico.getId() + "\"")
@@ -163,6 +170,7 @@ class InternoMonolitoControllerTest {
 
         ResponseEntity<String> eventos = get("/internal/monolito/calendario/eventos-externos?desdeId="
                 + (evento.getId() - 1) + "&tamanio=5", tokenServicio());
+        Contratos.mismaForma("internas/monolito/calendario-eventos-externos.json", eventos.getBody());
         assertThat(eventos.getBody()).contains("\"googleEventId\":\"" + evento.getGoogleEventId() + "\"")
                 .contains("\"profesionalId\":" + medico.getId()).contains("\"titulo\":\"Dentista\"");
 
@@ -177,6 +185,7 @@ class InternoMonolitoControllerTest {
                 .email("pw.pac." + System.nanoTime() + "@mail.com").rol(Rol.PACIENTE).build());
         String ruta = "/internal/monolito/suscripciones/acceso?email=";
 
+        Contratos.mismaForma("internas/suscripciones/acceso.json", get(ruta + medico.getEmail(), tokenServicio()).getBody());
         assertThat(get(ruta + medico.getEmail(), tokenServicio()).getBody()).isEqualTo("{\"permitido\":false}");
         assertThat(get(ruta + paciente.getEmail(), tokenServicio()).getBody()).isEqualTo("{\"permitido\":true}");
         assertThat(get(ruta + "nadie@mail.com", tokenServicio()).getBody()).isEqualTo("{\"permitido\":true}");

@@ -67,6 +67,14 @@
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
+				<!-- Fase 10, T2: contratos entre servicios (JSON canónicos y su helper) -->
+				<groupId>com.tranqui</groupId>
+				<artifactId>eventos</artifactId>
+				<version>${project.version}</version>
+				<type>test-jar</type>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
 				<groupId>com.tranqui</groupId>
 				<artifactId>notificaciones</artifactId>
 				<version>${project.version}</version>

@@ -71,12 +71,13 @@ public final class ValidadorEventos {
     /**
      * Valida la respuesta de una ruta interna de otro servicio (Fase 10, V2): nunca se confía en lo que manda. En una
      * lista, las filas que no cumplen se saltean con un aviso (la resincronización sigue con las demás); una respuesta
-     * suelta que no cumple es una falla, igual que si el otro servicio no hubiera respondido.
+     * suelta que no cumple es una falla, igual que si el otro servicio no hubiera respondido. La lista recuerda cuántas
+     * filas llegaron: para paginar se usa {@link #recibidas}, no {@code size()}.
      */
     @SuppressWarnings("unchecked")
     public static <T> T respuesta(T respuesta, String origen) {
         if (respuesta instanceof List<?> lista) {
-            List<Object> validas = new ArrayList<>(lista.size());
+            FilasValidas<Object> validas = new FilasValidas<>(lista.size());
             for (int i = 0; i < lista.size(); i++) {
                 Object fila = lista.get(i);
                 Optional<String> problemas = problemas(fila);
@@ -94,6 +95,24 @@ public final class ValidadorEventos {
             });
         }
         return respuesta;
+    }
+
+    /**
+     * Las filas válidas de una página, con cuántas llegaron. Una fila inválida no puede cortar la paginación: si se
+     * decidiera con las que quedaron, una página llena con una fila salteada parecería la última.
+     */
+    public static final class FilasValidas<T> extends ArrayList<T> {
+        private final int recibidas;
+
+        FilasValidas(int recibidas) {
+            super(recibidas);
+            this.recibidas = recibidas;
+        }
+    }
+
+    /** Cuántas filas mandó el otro servicio en esta página (las válidas y las salteadas). */
+    public static int recibidas(List<?> lote) {
+        return lote instanceof FilasValidas<?> f ? f.recibidas : lote.size();
     }
 
     private static String describir(ConstraintViolation<?> v) {

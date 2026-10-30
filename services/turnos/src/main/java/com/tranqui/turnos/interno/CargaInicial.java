@@ -1,5 +1,6 @@
 package com.tranqui.turnos.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.eventos.consumo.EsperaAntesDeConsumir;
 import com.tranqui.eventos.data.TurnoActualizadoData;
 import com.tranqui.turnos.datos.Personas;
@@ -101,7 +102,7 @@ public class CargaInicial implements EsperaAntesDeConsumir {
                 turnos.copiar(turno(m));
             }
             total += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }
