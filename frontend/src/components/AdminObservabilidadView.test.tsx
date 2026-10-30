@@ -255,4 +255,46 @@ describe('AdminObservabilidadView', () => {
     expect(screen.getByText(/Latencia de Peticiones y Rutas Más Lentas/i)).toBeInTheDocument()
     expect(screen.getByText(/Percentiles de Latencia/i)).toBeInTheDocument()
   })
+  it('muestra las series por contenedor y por servicio, el valor al pasar el mouse y actualiza a pedido', async () => {
+    const serie = [{ nombre: 'tranqui-gateway', puntos: [{ timestamp: 1774380000, valor: 12 }, { timestamp: 1774383600, valor: 20 }] }]
+    vi.mocked(api.getAdminSalud).mockResolvedValue(mockSalud)
+    vi.mocked(api.getAdminObservabilidad).mockImplementation((cat) => {
+      if (cat === 'recursos') return Promise.resolve({ ...mockRecursos, metricas: { ...mockRecursos.metricas, contenedoresCpu: serie, contenedoresRam: serie } } as unknown as AdminObservabilidadResponse<MetricasRecursos>)
+      if (cat === 'trafico') return Promise.resolve({ ...mockTrafico, metricas: { ...mockTrafico.metricas, porServicio: serie } } as unknown as AdminObservabilidadResponse<MetricasTrafico>)
+      if (cat === 'latencia') return Promise.resolve(mockLatencia as unknown as AdminObservabilidadResponse<MetricasLatencia>)
+      return Promise.resolve(mockEventos as unknown as AdminObservabilidadResponse<MetricasEventos>)
+    })
+
+    const { container } = render(<AdminObservabilidadView />)
+    await waitFor(() => {
+      expect(screen.queryByText(/Cargando métricas de observabilidad/i)).not.toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Tráfico Desglosado por Servicio / Ruta')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Recursos VPS / Docker' }))
+    expect(screen.getByText('CPU por Contenedor (cAdvisor)')).toBeInTheDocument()
+    expect(screen.getByText('RAM por Contenedor (MB)')).toBeInTheDocument()
+
+    const punto = container.querySelector('circle')!
+    await userEvent.hover(punto)
+    await userEvent.unhover(punto)
+
+    const llamadas = vi.mocked(api.getAdminSalud).mock.calls.length
+    await userEvent.click(screen.getByRole('button', { name: /Actualizar/ }))
+    await waitFor(() => expect(vi.mocked(api.getAdminSalud).mock.calls.length).toBe(llamadas + 1))
+  })
+  it('se actualiza sola cada 30 segundos', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      vi.mocked(api.getAdminSalud).mockResolvedValue(mockSalud)
+      vi.mocked(api.getAdminObservabilidad).mockResolvedValue(mockRecursos as unknown as AdminObservabilidadResponse<MetricasRecursos>)
+      render(<AdminObservabilidadView />)
+      await waitFor(() => expect(api.getAdminSalud).toHaveBeenCalledTimes(1))
+
+      await vi.advanceTimersByTimeAsync(30000)
+      await waitFor(() => expect(api.getAdminSalud).toHaveBeenCalledTimes(2))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

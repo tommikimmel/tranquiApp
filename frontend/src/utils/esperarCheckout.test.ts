@@ -22,6 +22,13 @@ describe('esperarCheckout', () => {
     await expect(esperarCheckout(obtener, rapido)).rejects.toThrow('no vinculó su cuenta')
   })
 
+  it('si la reserva venció, pide elegir el horario de nuevo sin seguir esperando', async () => {
+    const obtener = vi.fn<() => Promise<EstadoCheckout>>().mockResolvedValue({ estado: 'VENCIDO' })
+
+    await expect(esperarCheckout(obtener, rapido)).rejects.toThrow('Elegí el horario de nuevo')
+    expect(obtener).toHaveBeenCalledTimes(1)
+  })
+
   it('si no llega a tiempo, corta con un mensaje para reintentar', async () => {
     const obtener = vi.fn<() => Promise<EstadoCheckout>>().mockResolvedValue({ estado: 'PENDIENTE' })
 

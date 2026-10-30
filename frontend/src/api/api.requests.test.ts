@@ -263,6 +263,9 @@ describe('apiFetch (via api.* methods)', () => {
       ['getSubscriptionEvents', () => api.getSubscriptionEvents()],
       ['getSubscriptionEvents (con subId)', () => api.getSubscriptionEvents(5)],
       ['updateSubscriptionStatus', () => api.updateSubscriptionStatus(1, 'ACTIVE')],
+      ['obtenerCheckout', () => api.obtenerCheckout(63)],
+      ['getAdminSalud', () => api.getAdminSalud()],
+      ['getAdminObservabilidad', () => api.getAdminObservabilidad('eventos', '1h')],
     ]
 
     it.each(invocations)('%s', async (_name, invoke) => {
