@@ -425,6 +425,16 @@ class NotificacionesIntegracionTest {
     }
 
     @Test
+    void recetaEmitida_sinLinkDelPdf_igualSeManda() {
+        ResponseEntity<String> r = receta(RECETA.replace("\"https://s3.tranqui/r.pdf\"", "null"), true);
+
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(mails).enviarRecetaEmitidaPaciente("pac@mail.com", "Ana", "Dra. Paz", "MN 12345", null, "REC-1");
+        assertThat(receta(RECETA.replace("https://s3.tranqui/r.pdf", "http://s3/r.pdf"), true).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void recetaEmitida_siElMailNoSale_502() {
         doThrow(new EnvioMailException("Resend caído")).when(mails).enviarRecetaEmitidaPaciente(anyString(), anyString(), anyString(),
                 anyString(), anyString(), anyString());

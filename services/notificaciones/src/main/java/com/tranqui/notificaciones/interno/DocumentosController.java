@@ -33,7 +33,8 @@ public class DocumentosController {
                                    String archivoNombre) {}
 
     public record RecetaEmitida(@NotBlank @Email String email, String pacienteNombre, String medicoNombre,
-                                String matricula, @NotBlank @Pattern(regexp = "https://\\S+") String pdfUrl,
+                                // Sin link del PDF (QBI2 no lo devolvió) el mail sale igual, como en main; si viene, https.
+                                String matricula, @Pattern(regexp = "https://\\S+") String pdfUrl,
                                 String nroRecetario) {}
 
     public record Resultado(boolean enviado) {}

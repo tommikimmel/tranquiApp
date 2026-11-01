@@ -559,6 +559,7 @@ class IdentidadIntegracionTest {
         dto.setTitulo("Médica Psiquiatra");
         dto.setSpecialty("Psiquiatría Infanto-Juvenil");
         dto.setCuit("27281234564");
+        dto.setCuil(27281234564L);
         dto.setDomicilioAtencion("Av. Corrientes 2500, CABA");
         dto.setDomicilioLat(-34.6037);
         dto.setDomicilioLng(-58.3816);
@@ -573,6 +574,7 @@ class IdentidadIntegracionTest {
         assertThat(u.profession()).isEqualTo("psiquiatra");
         assertThat(u.licenseType()).isEqualTo("MN");
         assertThat(u.licenseNumber()).isEqualTo("MN 54321");
+        assertThat(u.cuil()).isEqualTo(27281234564L);
         assertThat(u.licenseJurisdiction()).isEqualTo("CABA");
         assertThat(u.taxId()).isEqualTo("27281234564");
         assertThat(u.fiscalAddress()).isEqualTo("Av. Corrientes 2500, CABA");

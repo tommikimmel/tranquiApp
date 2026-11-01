@@ -209,6 +209,7 @@ public class AuthController {
                 .fechaNacimiento(dto.getFechaNacimiento())
                 .tipoDocumento(dto.getTipoDocumento())
                 .numeroDocumento(dto.getNumeroDocumento())
+                .cuil(dto.getCuil())
                 .telefono(tel)
                 .obraSocial(dto.getObraSocial())
                 .numAfiliado(dto.getNumAfiliado())

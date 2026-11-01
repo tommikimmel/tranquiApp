@@ -293,8 +293,9 @@ public class InternoIdentidadController {
         if (dto.nombre() == null || dto.nombre().trim().isEmpty()) {
             errores.add("el nombre es obligatorio");
         }
+        // Sin distinguir mayúsculas: el registro y Mi Cuenta del frontend guardan "PASAPORTE".
         if (dto.tipoDocumento() != null && !dto.tipoDocumento().trim().isEmpty()
-                && !TIPOS_DOCUMENTO_VALIDOS.contains(dto.tipoDocumento().trim())) {
+                && TIPOS_DOCUMENTO_VALIDOS.stream().noneMatch(t -> t.equalsIgnoreCase(dto.tipoDocumento().trim()))) {
             errores.add("el tipo de documento debe ser DNI, LC, LE o Pasaporte");
         }
         if (dto.numeroDocumento() != null) {
