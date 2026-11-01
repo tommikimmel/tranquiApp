@@ -179,11 +179,7 @@ public class SincronizacionMonolito {
 
     /** Con la fuente de identidad, solo lo de identidad: Mercado Pago y la suscripción son de pagos. */
     private void guardar(ClienteInterno.ProfesionalMonolito p) {
-        if (interno.fuenteIdentidad()) {
-            profesionales.guardarDatosIdentidad(p.datos());
-        } else {
-            profesionales.guardarDatosMonolito(p.datos());
-        }
+        profesionales.guardarDatos(p.datos(), interno.fuenteIdentidad());
     }
 
     /**
