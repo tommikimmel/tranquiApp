@@ -41,7 +41,7 @@ compara código HTTP y forma del JSON (campos y tipos, no valores). **44 iguales
 | paciente `GET /api/medicos/perfil`, `GET /api/admin/users`; admin `GET /api/medicos/perfil` | el 403 viene sin cuerpo (en `main`, el JSON de error de Spring) | **igual** para el frontend: `sanitizeErrorMessage` muestra el mismo mensaje genérico en los dos casos |
 | profesional `GET /api/chat/historial/{id}` | `remitente` y `destinatario` solo con `id` (en `main`, el `Usuario` entero con el hash de la contraseña y los tokens) | **cambia a propósito**: [Fase 2, C3](../specs/2026-10-20-fase-2-chat.md); el frontend lee solo `remitente.id` y `destinatario.id` |
 | admin `GET /api/admin/users` | sin el hash, los códigos, los tokens cifrados ni los campos que el panel no usa | **cambia a propósito**: [Fase 9, decisión 3](../specs/2026-10-28-fase-9-identidad.md); `AdminDashboard` no lee ninguno de los campos que ya no vienen |
-| paciente y profesional `GET /api/notificaciones` | sin el campo `usuario` (en `main`, el `Usuario` entero) | **igual** para el frontend: no lo lee ningún componente. Falta registrarlo como decisión |
+| paciente y profesional `GET /api/notificaciones` | sin el campo `usuario` (en `main`, el `Usuario` entero) | **cambia a propósito**: [decisión 1 de esta comparación](#decisiones-de-la-comparación); el frontend no lo lee |
 
 Ninguna fila queda en **distinto** o **falta**.
 
@@ -69,3 +69,12 @@ node scripts/comparacion/inventario.mjs mapa main.json migracion.json . docs/mig
 
 El inventario es por expresiones regulares: no ve la lógica dentro de los métodos. Lo que falta revisar es C3: por
 dominio, la lógica de cada endpoint (validaciones, mensajes de error, efectos), con la tabla de arriba como índice.
+
+## Decisiones de la comparación
+
+1. **`GET /api/notificaciones` sin el campo `usuario` (2026-11-01).** En `main`, cada notificación de la campanita
+   traía en `usuario` la cuenta dueña completa: email, DNI, teléfono, dirección, el hash de la contraseña, los códigos
+   de verificación y los tokens cifrados de Google y Mercado Pago. En la migración (`services/notificaciones`,
+   `NotificacionController.NotificacionDto`) cada notificación trae solo sus datos: id, título, mensaje, si está leída,
+   tipo y fecha. Ningún componente del frontend lee `usuario`, así que en pantalla no cambia nada; se deja así porque
+   deja de mandar al navegador datos sensibles que no hacían falta.
