@@ -390,11 +390,19 @@ class SuscripcionServiceTest {
     }
 
     @Test
-    void logEvent_sinCambioDeEstado_soloAudita() {
+    void logEvent_sinEstados_soloAudita() {
         service.logEvent(100L, "X", "ADMIN", "1", "{}");
-        service.logEvent(100L, "X", "ACTIVE", "ACTIVE", "ADMIN", "1", "{}");
-        verify(eventos, org.mockito.Mockito.times(2)).insertarNuevo(any());
+        verify(eventos).insertarNuevo(any());
         verify(outbox, never()).publicar(anyString(), anyString(), anyInt(), any());
+    }
+
+    @Test
+    void logEvent_renovacionSinCambioDeEstado_publicaV2ConElPeriodoNuevo() {
+        existe(sub("ACTIVE", null, "MERCADOPAGO", AHORA.plusDays(30), false, "monthly"));
+        service.logEvent(100L, "MP_SUBSCRIPTION_PAYMENT", "ACTIVE", "ACTIVE", "MP_WEBHOOK", "pay-1", "{}");
+        ArgumentCaptor<SuscripcionCambioEstadoV2Data> captor = ArgumentCaptor.forClass(SuscripcionCambioEstadoV2Data.class);
+        verify(outbox).publicar(eq(Topicos.SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V2), eq("100"), eq(4), captor.capture());
+        assertThat(captor.getValue().periodoHasta()).isEqualTo(AHORA.plusDays(30));
     }
 
     @Test
