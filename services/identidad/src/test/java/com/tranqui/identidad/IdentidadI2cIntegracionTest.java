@@ -113,6 +113,8 @@ class IdentidadI2cIntegracionTest {
 
     @Autowired Usuarios usuarios;
     @Autowired PerfilesRegistro perfilesRegistro;
+    @Autowired @org.springframework.beans.factory.annotation.Qualifier("perfilActualDelProfesional")
+    com.tranqui.eventos.consumo.ManejadorEvento<com.tranqui.eventos.data.ProfesionalActualizadoData> perfilActual;
     @Autowired JdbcTemplate jdbc;
     @Autowired TestRestTemplate rest;
     @Autowired PasswordEncoder passwordEncoder;
@@ -532,6 +534,18 @@ class IdentidadI2cIntegracionTest {
         // El pedido del contrato, tal cual lo manda profesionales.
         interna(HttpMethod.PUT, "/internal/identidad/profesionales/" + psi.id() + "/identidad",
                 Contratos.fixture("internas/fuente-identidad/profesional-identidad.request.json"), HttpStatus.OK);
+    }
+
+
+    @Test
+    void elPerfilQueGuardaProfesionales_eselQueVeElAdmin() {
+        Usuario psi = crear("perfil.actual@mail.com", "PSIQUIATRA");
+        perfilActual.manejar(com.tranqui.eventos.EventEnvelope.<com.tranqui.eventos.data.ProfesionalActualizadoData>builder()
+                .eventId(java.util.UUID.randomUUID()).eventType("profesionales.profesional.actualizado")
+                .data(new com.tranqui.eventos.data.ProfesionalActualizadoData(psi.id(), "Ana", "Paz", "Psiquiatría", null,
+                        List.of("ONLINE"), 50, null, perfil("MN-9999"))).build());
+
+        assertThat(perfilesRegistro.buscarPorUsuarioId(psi.id()).orElseThrow().matricula()).isEqualTo("MN-9999");
     }
 
     // ================================================================================
