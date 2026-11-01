@@ -152,9 +152,19 @@ public class Personas {
                 p.domicilioPais());
     }
 
+    /**
+     * Cuenta eliminada: se anonimiza como main (AccountService#eliminarCuenta) en vez de borrar la fila, porque la
+     * historia clínica la sigue referenciando y tiene guarda legal (Ley 26.529).
+     */
     @Transactional
-    public void eliminar(Long id) {
-        jdbc.update("DELETE FROM persona WHERE id = ?", id);
+    public void anonimizar(Long id) {
+        jdbc.update("UPDATE persona SET nombre = 'Usuario eliminado', email = ?, apellido = NULL, telefono = NULL, dni = NULL, "
+                + "direccion = NULL, obra_social = NULL, num_afiliado = NULL, sexo = NULL, fecha_nacimiento = NULL, cuil = NULL, "
+                + "tipo_documento = NULL, numero_documento = NULL, credencial_cod_entidad = NULL, credencial_pan = NULL, "
+                + "credencial_plan = NULL, credencial_token = NULL, email_habilitado = false, domicilio_calle = NULL, "
+                + "domicilio_numero = NULL, domicilio_piso = NULL, domicilio_dpto = NULL, domicilio_codigo_postal = NULL, "
+                + "domicilio_localidad = NULL, domicilio_provincia = NULL, domicilio_pais = NULL WHERE id = ?",
+                "deleted-" + id + "@tranquiapp.local", id);
     }
 
     public long cantidad() {

@@ -159,7 +159,7 @@ public class Manejadores {
     @Bean
     ManejadorEvento<UsuarioEliminadoData> personaEliminada(Personas personas) {
         return ManejadorEvento.de("persona-eliminada", Topicos.IDENTIDAD_USUARIO_ELIMINADO_V1, UsuarioEliminadoData.class,
-                e -> personas.eliminar(e.data().usuarioId()));
+                e -> personas.anonimizar(e.data().usuarioId()));
     }
 
     private static void refrescarPersona(Copias copias, Long id) {

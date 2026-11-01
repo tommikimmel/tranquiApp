@@ -228,7 +228,7 @@ class HistoriaClinicaIntegracionTest {
         assertThat(actualizada.domicilioCalle()).isEqualTo("Av. Corrientes");
         assertThat(actualizada.version()).isEqualTo(2);
 
-        // Evento identidad.usuario.eliminado borra a la persona
+        // Evento identidad.usuario.eliminado anonimiza a la persona (como main): la fila queda por la historia clínica
         rabbit.send(RabbitMQConstantes.EXCHANGE_EVENTOS, Topicos.IDENTIDAD_USUARIO_ELIMINADO_V1,
                 MessageBuilder.withBody(mapper.writeValueAsBytes(EventEnvelope.<UsuarioEliminadoData>builder()
                                 .eventId(UUID.randomUUID()).eventType("identidad.usuario.eliminado")
@@ -236,7 +236,11 @@ class HistoriaClinicaIntegracionTest {
                                 .data(new UsuarioEliminadoData(55L, "Baja solicitada")).build()))
                         .setContentType("application/json").build());
 
-        esperar(() -> personas.porId(55L).isEmpty());
+        esperar(() -> "Usuario eliminado".equals(personas.porId(55L).map(Personas.Persona::nombre).orElse(null)));
+        Personas.Persona anonimizada = personas.porId(55L).orElseThrow();
+        assertThat(anonimizada.email()).isEqualTo("deleted-55@tranquiapp.local");
+        assertThat(anonimizada.apellido()).isNull();
+        assertThat(anonimizada.dni()).isNull();
     }
 
     @Test
