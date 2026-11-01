@@ -2,6 +2,7 @@ package com.tranqui.pagos.facturacion;
 
 import com.tranqui.pagos.datos.Facturas;
 import com.tranqui.pagos.datos.PagosSuscripcion;
+import com.tranqui.pagos.suscripciones.AvisoSuscripcionPublisher;
 import com.tranqui.pagos.suscripciones.FacturacionSuscripciones;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,15 +25,18 @@ public class FacturacionSuscripcionesArca implements FacturacionSuscripciones {
     private final InvoiceService invoiceService;
     private final PagosSuscripcion pagosSuscripcion;
     private final Facturas facturas;
+    private final AvisoSuscripcionPublisher avisos;
 
     public FacturacionSuscripcionesArca(
             InvoiceService invoiceService,
             PagosSuscripcion pagosSuscripcion,
-            Facturas facturas
+            Facturas facturas,
+            AvisoSuscripcionPublisher avisos
     ) {
         this.invoiceService = invoiceService;
         this.pagosSuscripcion = pagosSuscripcion;
         this.facturas = facturas;
+        this.avisos = avisos;
     }
 
     @Override
@@ -67,6 +71,8 @@ public class FacturacionSuscripcionesArca implements FacturacionSuscripciones {
         List<Facturas.Factura> failed = facturas.fallidas();
         if (!failed.isEmpty()) {
             log.warn("ALERTA: Existen {} facturas en estado FAILED que requieren atención administrativa.", failed.size());
+            avisos.alertarAdministradores("facturas-fallidas", "Hay " + failed.size() + " facturas con error",
+                    "Existen " + failed.size() + " facturas en estado FAILED que requieren atención administrativa.");
         }
     }
 }

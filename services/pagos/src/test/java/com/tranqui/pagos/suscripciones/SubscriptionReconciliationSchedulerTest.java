@@ -18,6 +18,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
@@ -87,6 +88,21 @@ class SubscriptionReconciliationSchedulerTest {
         verify(facturacion).verificarFacturasFallidas();
         verify(suscripciones).activasVencidasConGracia(any());
         verify(suscripciones).manualesPorVencer(any(), any());
+    }
+
+    @Test
+    void monotributo_porEncimaDel80PorCiento_alertaALosAdministradores() {
+        when(pagos.sumaAprobadosDesde(any())).thenReturn(new BigDecimal("11000000"));
+        scheduler.checkMonotributoThreshold();
+        verify(avisos).alertarAdministradores(eq("monotributo"), eq("Facturación cerca del tope de monotributo"),
+                contains("11000000"));
+    }
+
+    @Test
+    void monotributo_porDebajoDel80PorCiento_noAlerta() {
+        when(pagos.sumaAprobadosDesde(any())).thenReturn(new BigDecimal("9000000"));
+        scheduler.checkMonotributoThreshold();
+        verify(avisos, never()).alertarAdministradores(any(), any(), any());
     }
 
     @Test

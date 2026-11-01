@@ -1,6 +1,7 @@
 package com.tranqui.notificaciones.avisos;
 
 import com.tranqui.eventos.EventEnvelope;
+import com.tranqui.eventos.data.AlertaAdminData;
 import com.tranqui.eventos.data.ConceptoAprobadoData;
 import com.tranqui.eventos.data.ReembolsoFallidoData;
 import com.tranqui.eventos.data.ReembolsoRealizadoData;
@@ -101,5 +102,26 @@ class ManejadoresPagosTest {
                 new ReembolsoFallidoData(30L, 1L, 2L, fecha, "10:00", "rechazado por Mercado Pago")));
 
         verify(mails).enviarReembolsoPendientePaciente("ana@mail.com", "Ana", "Lucía", fecha, java.time.LocalTime.of(10, 0));
+    }
+
+    // ---------------------------------------------------------------- Fase 11: alertas para los administradores
+
+    @Test
+    void alertaAdmin_unMailACadaAdministradorConSuClave() {
+        Avisos avisos = avisosConContactos();
+        Contacto admin1 = new Contacto(7L, "admin@tranqui.com");
+        Contacto admin2 = new Contacto(8L, "admin2@tranqui.com");
+        Contacto sinMail = new Contacto(9L, null);
+        when(avisos.administradores()).thenReturn(java.util.List.of(admin1, admin2, sinMail));
+        ResendEmailService mails = mock(ResendEmailService.class);
+
+        new ManejadoresPagos().mailAlertaAdmin(avisos, mails).manejar(evento(
+                new AlertaAdminData("Hay 2 facturas con error", "Existen 2 facturas en estado FAILED.")));
+
+        verify(mails).enviarAlertaAdmin("admin@tranqui.com", "Hay 2 facturas con error", "Existen 2 facturas en estado FAILED.");
+        verify(mails).enviarAlertaAdmin("admin2@tranqui.com", "Hay 2 facturas con error", "Existen 2 facturas en estado FAILED.");
+        verify(avisos).mail(any(), eq("mail-alerta-admin:7"), any());
+        verify(avisos).mail(any(), eq("mail-alerta-admin:8"), any());
+        verify(avisos, never()).mail(any(), eq("mail-alerta-admin:9"), any());
     }
 }

@@ -1,6 +1,7 @@
 package com.tranqui.pagos.suscripciones;
 
 import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.AlertaAdminData;
 import com.tranqui.eventos.data.SuscripcionAvisoData;
 import com.tranqui.eventos.outbox.OutboxPublisher;
 import com.tranqui.pagos.datos.Suscripciones;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -44,5 +46,15 @@ public class AvisoSuscripcionPublisher {
                         diasRestantes
                 )
         );
+    }
+
+    /**
+     * Fase 11: una alerta para los administradores (en el monolito, mail directo a cada admin). Una por motivo y día,
+     * que es lo que corre la reconciliación diaria.
+     */
+    @Transactional
+    public void alertarAdministradores(String motivo, String titulo, String mensaje) {
+        outboxPublisher.publicar(Topicos.PAGOS_ALERTA_ADMIN_V1, "alerta", motivo + ":" + LocalDate.now(), 1,
+                new AlertaAdminData(titulo, mensaje));
     }
 }

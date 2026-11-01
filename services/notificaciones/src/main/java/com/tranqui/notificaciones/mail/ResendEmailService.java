@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -201,6 +202,14 @@ public class ResendEmailService {
         String html = plantilla("Nueva contraseña temporal", TONO_ALERTA,
                 "¡Hola, " + nombreOUsuario(nombreUsuario) + "!", cuerpo);
         enviarCorreo(toEmail, asunto, html);
+    }
+
+    /** Fase 11: la alerta interna que el monolito mandaba a cada admin desde la reconciliación de suscripciones. */
+    public void enviarAlertaAdmin(String toEmail, String titulo, String mensaje) {
+        // El texto llega en un evento de otro servicio: se escapa antes de meterlo en el HTML.
+        String html = plantilla("Alerta interna", TONO_ALERTA, HtmlUtils.htmlEscape(titulo),
+                "<p>" + HtmlUtils.htmlEscape(mensaje) + "</p>", "Ir al panel de admin", frontendUrl);
+        enviarCorreo(toEmail, "[Tranqui App · Alerta] " + titulo, html);
     }
 
     public void enviarSolicitudCopiaDatos(String nombreUsuario, String emailUsuario, String rolUsuario) {

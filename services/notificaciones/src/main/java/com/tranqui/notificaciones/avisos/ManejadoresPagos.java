@@ -2,6 +2,7 @@ package com.tranqui.notificaciones.avisos;
 
 import com.tranqui.eventos.Topicos;
 import com.tranqui.eventos.consumo.ManejadorEvento;
+import com.tranqui.eventos.data.AlertaAdminData;
 import com.tranqui.eventos.data.ConceptoAprobadoData;
 import com.tranqui.eventos.data.ReembolsoFallidoData;
 import com.tranqui.eventos.data.ReembolsoRealizadoData;
@@ -72,6 +73,21 @@ public class ManejadoresPagos {
             Contacto medico = avisos.contacto(d.profesionalId());
             avisos.mail(e, consumidor, () -> mails.enviarReembolsoPendientePaciente(paciente.getEmail(),
                     paciente.getNombre(), medico.getNombre(), d.fecha(), Avisos.hora(d.horaInicio())));
+        });
+    }
+
+    /** Fase 11: la alerta de la reconciliación de suscripciones, un mail a cada administrador (como el monolito). */
+    @Bean
+    ManejadorEvento<AlertaAdminData> mailAlertaAdmin(Avisos avisos, ResendEmailService mails) {
+        String consumidor = "mail-alerta-admin";
+        return ManejadorEvento.de(consumidor, Topicos.PAGOS_ALERTA_ADMIN_V1, AlertaAdminData.class, e -> {
+            for (Contacto admin : avisos.administradores()) {
+                if (admin.getEmail() != null) {
+                    // Una clave por admin: si el evento se reintenta, no se repite el mail a los que ya lo recibieron.
+                    avisos.mail(e, consumidor + ":" + admin.getId(),
+                            () -> mails.enviarAlertaAdmin(admin.getEmail(), e.data().titulo(), e.data().mensaje()));
+                }
+            }
         });
     }
 }
