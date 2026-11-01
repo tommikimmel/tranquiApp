@@ -45,8 +45,27 @@ compara código HTTP y forma del JSON (campos y tipos, no valores). **44 iguales
 
 Ninguna fila queda en **distinto** o **falta**.
 
-## C1 a C3 — Inventario y revisión por dominio
+## C1 y C2 — Inventario de `main` y mapa a la migración (2026-11-01)
 
-Pendiente: el inventario de `main` (endpoints, tareas programadas, webhooks, mails, integraciones), el mapa de la
-migración y la revisión de código por dominio. La comparación ejecutando cubre lo que el frontend usa; lo que no pasa
-por una ruta (crons, webhooks, mails, integraciones) necesita la revisión de código.
+`scripts/comparacion/inventario.mjs` saca de cada revisión los endpoints, las tareas programadas y de arranque, los
+mails, las integraciones externas y las llamadas de `api.ts`. Para cada endpoint de `main` resuelve la regla del
+gateway (la primera que coincide, en orden) y el módulo destino según las `TRANQUI_SERVICES_*_URI` del compose local.
+El detalle generado está en [inventario.md](inventario.md).
+
+```bash
+node scripts/comparacion/inventario.mjs inventario <repo-main> main.json
+node scripts/comparacion/inventario.mjs inventario . migracion.json
+node scripts/comparacion/inventario.mjs mapa main.json migracion.json . docs/migracion/inventario.md
+```
+
+| Qué | `main` | Resultado | Estado |
+|---|---|---|---|
+| Endpoints | 112 | Los 112 tienen regla del gateway y un endpoint con el mismo método y ruta en el módulo destino | **igual** (la forma de las respuestas, en C4) |
+| Llamadas de `api.ts` | 95 leídas (más `getSubscriptionEvents`, que arma la ruta con un ternario) | Las 95 siguen iguales en el frontend migrado | **igual** |
+| Tareas programadas y de arranque | 12 | Cada una sigue en el monolito (con su interruptor de la fase) o tiene su par en un servicio: vencimiento de reservas y recordatorios en turnos, Google Calendar en calendario, limpieza de notificaciones en notificaciones, reconciliación de suscripciones en pagos | **igual**, salvo la fila siguiente |
+| Mails | 23 tipos | 22 salen de notificaciones por evento o por ruta interna | **igual** |
+| Mail de alerta a los administradores (`enviarAlertaAdmin`) | Facturas con error y facturación cerca del tope del monotributo, en la reconciliación diaria | Con `SUSCRIPCIONES_EXTERNO` la reconciliación la hace pagos, que **solo lo escribe en el log**; la del monolito no corre | **falta**: se arregla en su PR (C5, suscripciones) |
+| Integraciones externas | 14 hosts | Cada host de `main` sigue usado en la migración (Mercado Pago en pagos, Google en calendario, Resend en notificaciones e identidad, ARCA en pagos) | **igual** |
+
+El inventario es por expresiones regulares: no ve la lógica dentro de los métodos. Lo que falta revisar es C3: por
+dominio, la lógica de cada endpoint (validaciones, mensajes de error, efectos), con la tabla de arriba como índice.
