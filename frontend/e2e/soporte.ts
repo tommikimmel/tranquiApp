@@ -66,8 +66,24 @@ export async function pasarPortonSiHace(page: Page) {
   }
 }
 
+/**
+ * Fase 11: el frontend de main tiene el backend fijo en :8081, que puede estar ocupado por otro stack. Con
+ * E2E_REDIRIGIR_API="http://localhost:8081=http://localhost:18081" sus pedidos van al stack que se compara.
+ */
+async function redirigirApi(page: Page) {
+  const [desde, hacia] = (process.env.E2E_REDIRIGIR_API ?? '').split('=')
+  if (!desde || !hacia) return
+  await page.route(`${desde}/**`, async (route) => {
+    // El streaming de SockJS no termina nunca y colgaría el route.fetch: sin avisos en vivo, que esta suite no prueba.
+    if (route.request().url().includes('/ws-')) return route.abort()
+    const r = await route.fetch({ url: hacia + route.request().url().slice(desde.length) })
+    await route.fulfill({ response: r })
+  })
+}
+
 /** Entra a la interfaz con la cookie de la sesión de la API (las cookies de localhost no dependen del puerto). */
 export async function entrar(page: Page, email: string) {
+  await redirigirApi(page)
   const { cookies } = await (await sesion(email)).storageState()
   await page.context().addCookies(cookies)
   await page.goto('/')
@@ -77,6 +93,7 @@ export async function entrar(page: Page, email: string) {
 
 /** Entra por el formulario de login, para probar el formulario mismo. */
 export async function entrarConFormulario(page: Page, email: string, password = CLAVE) {
+  await redirigirApi(page)
   await page.goto('/login')
   await pasarPortonSiHace(page)
   await page.locator('#login-email').fill(email)
