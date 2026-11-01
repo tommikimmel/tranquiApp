@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -74,7 +73,7 @@ public class SuscripcionesInternoController {
 
     /**
      * Consulta de acceso de suscripción por email (Fase 9, I3c), portado de AccesoSuscripciones e
-     * InternoMonolitoController del monolito. Email desconocido o sin suscripción: permitido=true.
+     * InternoMonolitoController del monolito. Profesional sin suscripción: permitido=false, como main.
      * Email inválido o vacío: 400.
      */
     @GetMapping("/acceso")
@@ -85,6 +84,7 @@ public class SuscripcionesInternoController {
 
         String emailNormalizado = email.trim();
         Optional<Suscriptores.Suscriptor> suscriptorOpt = suscriptores.porEmail(emailNormalizado);
+        // shortcut: un mail que la copia todavía no tiene pasa (el gateway solo pregunta por un PSIQUIATRA con sesión válida); si la copia se atrasa seguido, consultar a identidad.
         if (suscriptorOpt.isEmpty()) {
             return ResponseEntity.ok(new Dtos.AccesoDto(true));
         }
@@ -94,15 +94,7 @@ public class SuscripcionesInternoController {
             return ResponseEntity.ok(new Dtos.AccesoDto(true));
         }
 
-        Optional<Suscripciones.Suscripcion> subOpt = suscripciones.porProfesionalId(suscriptor.id());
-        if (subOpt.isEmpty()) {
-            return ResponseEntity.ok(new Dtos.AccesoDto(true));
-        }
-
-        Suscripciones.Suscripcion sub = subOpt.get();
-        boolean permitido = suscripcionService.isAccessAllowed(suscriptor.id())
-                || ("ACTIVE".equals(sub.status()) && sub.graceUntil() != null && sub.graceUntil().isAfter(LocalDateTime.now()));
-
-        return ResponseEntity.ok(new Dtos.AccesoDto(permitido));
+        // La regla de main (SubscriptionAccessFilter): sin suscripción o con el período vencido, sin acceso (Fase 11).
+        return ResponseEntity.ok(new Dtos.AccesoDto(suscripcionService.isAccessAllowed(suscriptor.id())));
     }
 }

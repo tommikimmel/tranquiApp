@@ -572,10 +572,10 @@ class SuscripcionesS2bIntegracionTest {
         JsonNode jsonDesconocido = mapper.readTree(resDesconocido.getBody());
         assertThat(jsonDesconocido.get("permitido").asBoolean()).isTrue();
 
-        // 4. Profesional sin suscripción -> permitido = true
+        // 4. Profesional sin suscripción -> permitido = false (como SubscriptionAccessFilter de main)
         ResponseEntity<String> resSinSub = pedirInterno(HttpMethod.GET, "/internal/suscripciones/acceso?email=psiquiatra@mail.com", null);
         assertThat(resSinSub.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(mapper.readTree(resSinSub.getBody()).get("permitido").asBoolean()).isTrue();
+        assertThat(mapper.readTree(resSinSub.getBody()).get("permitido").asBoolean()).isFalse();
 
         // 5. Suscripción ACTIVE vigente -> permitido = true
         LocalDateTime ahora = LocalDateTime.now();
@@ -611,7 +611,7 @@ class SuscripcionesS2bIntegracionTest {
         assertThat(resCancelledVencida.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(mapper.readTree(resCancelledVencida.getBody()).get("permitido").asBoolean()).isFalse();
 
-        // 8. ACTIVE vencida pero dentro de gracia -> permitido = true
+        // 8. ACTIVE vencida, aunque esté dentro de la gracia -> permitido = false (como main)
         subActual = suscripciones.porId(subId).orElseThrow();
         suscripciones.actualizar(new Suscripciones.Suscripcion(subId, subActual.version(), 11L, 2L, "ACTIVE", 1,
                 "MERCADOPAGO", "PRE-11", new BigDecimal("25000.00"), "monthly",
@@ -620,7 +620,7 @@ class SuscripcionesS2bIntegracionTest {
 
         ResponseEntity<String> resActiveGracia = pedirInterno(HttpMethod.GET, "/internal/suscripciones/acceso?email=psiquiatra@mail.com", null);
         assertThat(resActiveGracia.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(mapper.readTree(resActiveGracia.getBody()).get("permitido").asBoolean()).isTrue();
+        assertThat(mapper.readTree(resActiveGracia.getBody()).get("permitido").asBoolean()).isFalse();
     }
 
     @Test
