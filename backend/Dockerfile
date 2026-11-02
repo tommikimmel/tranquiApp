@@ -8,6 +8,7 @@ COPY libs/comun/pom.xml libs/comun/
 COPY libs/eventos/pom.xml libs/eventos/
 COPY backend/pom.xml backend/
 COPY gateway/pom.xml gateway/
+COPY services/notificaciones/pom.xml services/notificaciones/
 
 # Copiar código fuente de las librerías y del backend
 COPY libs/comun/src libs/comun/src
