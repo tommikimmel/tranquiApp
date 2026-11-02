@@ -48,4 +48,20 @@ class TopicosTest {
         assertThat(Topicos.esValido("Turnos.Turno.Confirmado.v1")).isFalse(); // mayúsculas
         assertThat(Topicos.esValido("turnos.v1")).isFalse(); // partes incompletas
     }
+
+    @Test
+    void extraerDominioTipoEventoYVersion() {
+        String topico = "turnos.turno.confirmado.v1";
+        assertThat(Topicos.extraerDominio(topico)).isEqualTo("turnos");
+        assertThat(Topicos.extraerTipoEvento(topico)).isEqualTo("turnos.turno.confirmado");
+        assertThat(Topicos.extraerVersion(topico)).isEqualTo(1);
+
+        assertThat(Topicos.extraerDominio("pagos.pago.aprobado.v2")).isEqualTo("pagos");
+        assertThat(Topicos.extraerTipoEvento("pagos.pago.aprobado.v2")).isEqualTo("pagos.pago.aprobado");
+        assertThat(Topicos.extraerVersion("pagos.pago.aprobado.v2")).isEqualTo(2);
+
+        assertThat(Topicos.extraerDominio(null)).isEqualTo("monolito");
+        assertThat(Topicos.extraerTipoEvento(null)).isEmpty();
+        assertThat(Topicos.extraerVersion(null)).isEqualTo(1);
+    }
 }

@@ -28,6 +28,46 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:tranqui}
+    password: ${SPRING_RABBITMQ_PASSWORD:tranqui-local}
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+
+management:
+  # Actuator en un puerto propio que no se publica fuera de la red de Docker: lo usa
+  # VictoriaMetrics para leer /actuator/prometheus (igual que el gateway).
+  server:
+    port: 8082
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+eventos:
+  relay:
+    enabled: ${EVENTOS_RELAY_ENABLED:false}
+    backup-poll-ms: ${EVENTOS_RELAY_BACKUP_POLL_MS:30000}
+  cleaner:
+    enabled: ${EVENTOS_CLEANER_ENABLED:true}
+    cron: ${EVENTOS_CLEANER_CRON:0 0 3 * * ?}
 
 google:
   client-id: ${GOOGLE_CLIENT_ID:dummy-client-id}
@@ -92,3 +132,6 @@ novedades:
 resend:
   api-key: ${RESEND_API_KEY:}
   from-email: ${RESEND_FROM_EMAIL:onboarding@resend.dev}
+
+jwt:
+  secret: ${JWT_SECRET:}

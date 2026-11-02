@@ -225,6 +225,15 @@ public class WebhookController {
                         log.error("Referencia externa de webhook no válida: {}", externalReference);
                     }
                 }
+            } else if (externalReference != null && ("rejected".equals(status) || "cancelled".equals(status))) {
+                if (!externalReference.startsWith("doc-")) {
+                    try {
+                        Long turnoId = Long.parseLong(externalReference);
+                        pagoWebhookHandler.procesarRechazoTurno(turnoId, transactionId, status);
+                    } catch (NumberFormatException e) {
+                        log.error("Referencia externa de webhook no válida: {}", externalReference);
+                    }
+                }
             }
         } catch (Exception e) {
             log.error("Error al procesar el webhook de pago", e);

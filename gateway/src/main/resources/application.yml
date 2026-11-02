@@ -1,0 +1,589 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gateway
+  main:
+    web-application-type: reactive
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      discovery:
+        enabled: ${CONSUL_DISCOVERY_ENABLED:true}
+        service-name: gateway
+        instance-id: ${spring.application.name}:${random.value}
+        # Con management en otro puerto (8082), Consul chequea ese puerto: ahi la salud esta en
+        # /actuator/health (el /health publico vive en el puerto 8080).
+        health-check-path: /actuator/health
+        health-check-interval: 10s
+        register-health-check: true
+    gateway:
+      metrics:
+        enabled: true
+      httpclient:
+        connect-timeout: 2000
+        response-timeout: 10s
+      # El gateway no deriva los preflight OPTIONS: los responde el mismo con esta politica, que
+      # replica la del monolito (SecurityConfig.corsConfigurationSource). DedupeResponseHeader
+      # saca los encabezados CORS que vuelven duplicados del monolito en las demas respuestas.
+      # Desde Spring Cloud Gateway 4.3 la clave va bajo server.webflux (la vieja se ignora).
+      server:
+        webflux:
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowed-origin-patterns: "*"
+                allowed-methods: GET,POST,PUT,DELETE,OPTIONS,PATCH
+                allowed-headers: "*"
+                allow-credentials: true
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Access-Control-Allow-Headers Access-Control-Allow-Methods, RETAIN_FIRST
+      routes:
+        # --- TURNOS ---
+        - id: turnos-conteo
+          uri: ${tranqui.services.turnos.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/api/medicos/turnos-disponibles-conteo
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: turnos
+                fallbackUri: forward:/fallback/turnos
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        - id: turnos-disponibles
+          uri: ${tranqui.services.turnos.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/api/medicos/*/turnos-disponibles
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: turnos
+                fallbackUri: forward:/fallback/turnos
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        - id: medicos-turnos
+          uri: ${tranqui.services.turnos.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/api/medicos/turnos/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: turnos
+                fallbackUri: forward:/fallback/turnos
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        - id: turnos-reservar
+          uri: ${tranqui.services.turnos.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/api/turnos/reservar
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: turnos
+                fallbackUri: forward:/fallback/turnos
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        - id: turnos
+          uri: ${tranqui.services.turnos.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/api/turnos/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: turnos
+                fallbackUri: forward:/fallback/turnos
+                statusCodes:
+                  - 500
+                  - 502
+                  - 503
+                  - 504
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        # --- PAGOS ---
+        - id: medicos-mercadopago
+          uri: ${tranqui.services.pagos.uri:${tranqui.services.monolito.uri}}
+          metadata:
+            response-timeout: 30000
+            connect-timeout: 2000
+          predicates:
+            - Path=/api/medicos/mercadopago/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: pagos
+                fallbackUri: forward:/fallback/pagos
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        - id: pagos-webhooks
+          uri: ${tranqui.services.pagos.uri:${tranqui.services.monolito.uri}}
+          metadata:
+            response-timeout: 30000
+            connect-timeout: 2000
+          predicates:
+            - Path=/api/payments/webhook,/api/webhooks/mercadopago
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: pagos
+                fallbackUri: forward:/fallback/pagos
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@ipKeyResolver}"
+
+        - id: pagos
+          uri: ${tranqui.services.pagos.uri:${tranqui.services.monolito.uri}}
+          metadata:
+            response-timeout: 30000
+            connect-timeout: 2000
+          predicates:
+            - Path=/api/payments/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: pagos
+                fallbackUri: forward:/fallback/pagos
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        # --- CALENDARIO ---
+        - id: medicos-google-calendar
+          uri: ${tranqui.services.calendario.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/api/medicos/google-calendar/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: calendario
+                fallbackUri: forward:/fallback/calendario
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        # --- IDENTIDAD ---
+        - id: auth-ratelimited
+          uri: ${tranqui.services.identidad.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/api/auth/login,/api/auth/register,/api/auth/verify-email,/api/auth/resend-code,/api/auth/forgot-password,/api/auth/reset-password
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: identidad
+                fallbackUri: forward:/fallback/identidad
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@ipKeyResolver}"
+
+        - id: identidad
+          uri: ${tranqui.services.identidad.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/api/auth/**,/api/tickets/**,/api/soporte/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: identidad
+                fallbackUri: forward:/fallback/identidad
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        # --- SUSCRIPCIONES ---
+        - id: subscriptions-checkout
+          uri: ${tranqui.services.suscripciones.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/api/subscriptions/checkout
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: suscripciones
+                fallbackUri: forward:/fallback/suscripciones
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        - id: suscripciones
+          uri: ${tranqui.services.suscripciones.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/api/subscriptions/**,/api/admin/subscriptions/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: suscripciones
+                fallbackUri: forward:/fallback/suscripciones
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        # --- NOTIFICACIONES ---
+        - id: notificaciones
+          uri: ${tranqui.services.notificaciones.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/api/notificaciones/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: notificaciones
+                fallbackUri: forward:/fallback/notificaciones
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        # --- CHAT ---
+        - id: chat
+          uri: ${tranqui.services.chat.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/api/chat/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: chat
+                fallbackUri: forward:/fallback/chat
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        # --- PROFESIONALES ---
+        - id: profesionales
+          uri: ${tranqui.services.profesionales.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/api/medicos/**,/api/conceptos/**,/api/recetas/**,/api/clinical/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: profesionales
+                fallbackUri: forward:/fallback/profesionales
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+        # --- CHAT WEBSOCKET ---
+        - id: chat-ws
+          uri: ${tranqui.services.chat-ws.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/ws-tranqui/**
+
+        # --- RUTA INTERNA ENTRE SERVICIOS ---
+        - id: internal
+          uri: ${tranqui.services.internal.uri:${tranqui.services.monolito.uri}}
+          predicates:
+            - Path=/internal/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: internal
+                fallbackUri: forward:/fallback/internal
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@serviceKeyResolver}"
+
+        # --- MONOLITO FALLBACK (resto de /api/**) ---
+        - id: monolito-fallback
+          uri: ${tranqui.services.monolito.uri}
+          predicates:
+            - Path=/api/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: monolito
+                fallbackUri: forward:/fallback/monolito
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
+tranqui:
+  gateway:
+    trusted-proxies:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+      - 127.0.0.1/32
+  services:
+    monolito:
+      uri: ${TRANQUI_SERVICES_MONOLITO_URI:http://localhost:8081}
+    identidad:
+      uri: ${tranqui.services.monolito.uri}
+    profesionales:
+      uri: ${tranqui.services.monolito.uri}
+    turnos:
+      uri: ${tranqui.services.monolito.uri}
+    pagos:
+      uri: ${tranqui.services.monolito.uri}
+    suscripciones:
+      uri: ${tranqui.services.monolito.uri}
+    notificaciones:
+      uri: ${tranqui.services.monolito.uri}
+    chat:
+      uri: ${tranqui.services.monolito.uri}
+    chat-ws:
+      uri: ${tranqui.services.monolito.uri}
+    calendario:
+      uri: ${tranqui.services.monolito.uri}
+    internal:
+      uri: ${tranqui.services.monolito.uri}
+  jwt:
+    service-secret: ${SERVICE_JWT_KEY:}
+  victoriametrics:
+    url: ${VICTORIAMETRICS_URL:http://localhost:8428}
+
+jwt:
+  secret: ${JWT_SECRET:}
+
+management:
+  server:
+    port: 8082
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info,metrics
+  endpoint:
+    health:
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        spring.cloud.gateway.requests: true
+        http.server.requests: true
+      percentiles:
+        spring.cloud.gateway.requests: 0.5, 0.95, 0.99
+        http.server.requests: 0.5, 0.95, 0.99
+
+resilience4j.circuitbreaker:
+  configs:
+    default:
+      slidingWindowSize: 20
+      failureRateThreshold: 50
+      waitDurationInOpenState: 30s
+      permittedNumberOfCallsInHalfOpenState: 5
+      automaticTransitionFromOpenToHalfOpenEnabled: true

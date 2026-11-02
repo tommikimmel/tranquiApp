@@ -27,8 +27,9 @@ new release", tag nuevo `vX.Y.Z` con target `main`), GitHub Actions (`.github/wo
 
 1. Verifica que el tag esté en `main`.
 2. Corre los tests (backend y frontend).
-3. Construye las imágenes y las publica en GHCR (`ghcr.io/tommikimmel/tranqui-backend:vX.Y.Z` y
-   `tranqui-frontend:vX.Y.Z`).
+3. Construye las imágenes y las publica en GHCR (`ghcr.io/tommikimmel/tranqui-backend:vX.Y.Z`,
+   `tranqui-gateway:vX.Y.Z` y `tranqui-frontend:vX.Y.Z`).
+
 4. Por SSH, el VPS baja las imágenes y recrea los contenedores (`scripts/vps/deploy-remoto.sh`), sin
    compilar nada.
 5. Verifica que respondan `https://tranquisalud.com` y `/api/health`. Si no, **vuelve sola a la

@@ -21,6 +21,23 @@ public class Subscription {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Builder.Default
+    @Column(name = "version")
+    private Integer version = 0;
+
+    /**
+     * Versión del agregado para publicación de eventos de dominio (sección 5.3 y 6.4 del plan).
+     * En la creación (version == 0), retorna 1.
+     * Tras cada actualización persistida (donde @PreUpdate incrementa el campo version),
+     * retorna version + 1, garantizando que el aggregateVersion publicado sea estrictamente creciente
+     * (1 en creación, 2 en primera actualización, 3 en segunda, etc.).
+     * Para que el evento lleve la versión actualizada, el guardado de la entidad debe realizarse
+     * mediante saveAndFlush(...) antes de publicar el evento, asegurando la ejecución de @PreUpdate.
+     */
+    public int getAggregateVersion() {
+        return (version != null ? version : 0) + 1;
+    }
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "professional_id", nullable = false)
     private Usuario professional;
@@ -88,12 +105,17 @@ public class Subscription {
 
     @PrePersist
     protected void onCreate() {
+        if (version == null) version = 0;
         if (createdAt == null) createdAt = LocalDateTime.now();
         if (updatedAt == null) updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate
     protected void onUpdate() {
+        if (version == null) {
+            version = 0;
+        }
+        version++;
         updatedAt = LocalDateTime.now();
     }
 }

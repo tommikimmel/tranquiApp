@@ -11,6 +11,10 @@ import com.tranqui.app.model.dto.EventoExternoDto;
 import com.tranqui.app.repository.GoogleCalendarEventoExternoRepository;
 import com.tranqui.app.repository.TurnoRepository;
 import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.HorarioBloqueadoData;
+import com.tranqui.eventos.data.MeetCreadoData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -37,6 +42,9 @@ public class GoogleCalendarSyncService {
 
     @Value("${google.calendar.enabled:false}")
     private boolean isEnabled;
+
+    @Autowired
+    private OutboxPublisher outboxPublisher;
 
     @Autowired
     private GoogleCalendarOAuthService googleCalendarOAuthService;
@@ -106,7 +114,7 @@ public class GoogleCalendarSyncService {
             exportarTurnosPendientesAGoogleCalendar(medico);
         } catch (GoogleJsonResponseException e) {
             if (e.getStatusCode() == 410) {
-                // Sync token expired/invalidated by Google — the only recovery is a full resync.
+                // Sync token expired/invalidated by Google � the only recovery is a full resync.
                 log.info("Sync token inválido (410) para médico ID {}. Reiniciando con sincronización completa.", medico.getId());
                 medico.setGoogleSyncToken(null);
                 sincronizacionCompleta(medico, accessToken);
@@ -136,7 +144,7 @@ public class GoogleCalendarSyncService {
         String calendarId = calendarId(medico);
 
         // Bounded window so a médico with years of calendar history doesn't get fully re-read
-        // every time the token is invalidated — matches what the UI actually needs to show.
+        // every time the token is invalidated � matches what the UI actually needs to show.
         ZonedDateTime timeMin = ZonedDateTime.now(ZONA).minusDays(7);
         ZonedDateTime timeMax = ZonedDateTime.now(ZONA).plusDays(90);
 
@@ -190,7 +198,7 @@ public class GoogleCalendarSyncService {
                     String meetUrl = googleCalendarService.crearEventoReunion(turno);
                     // crearEventoReunion no tira excepción si Google falla: devuelve un Meet simulado
                     // sin setear googleEventId. Solo pisamos el link del paciente cuando el evento
-                    // real se creó — si no, cada pasada (cada 5 min) le cambiaría el link por otro
+                    // real se creó � si no, cada pasada (cada 5 min) le cambiaría el link por otro
                     // falso hasta que Google responda.
                     if (turno.getGoogleEventId() == null || turno.getGoogleEventId().isBlank()) {
                         log.warn("Turno ID {} todavía no se pudo exportar a Google Calendar; se reintenta en la próxima sincronización.", turno.getId());
@@ -201,8 +209,21 @@ public class GoogleCalendarSyncService {
                     if (linkNuevo) {
                         turno.setTelemedicinaUrl(meetUrl);
                     }
-                    turnoRepository.save(turno);
+                    turno = turnoRepository.saveAndFlush(turno);
                     log.info("Turno ID {} exportado con éxito a Google Calendar (Event ID: {})", turno.getId(), turno.getGoogleEventId());
+
+                    if (meetUrl != null && !meetUrl.isBlank()) {
+                        outboxPublisher.publicar(
+                                Topicos.CALENDARIO_MEET_CREADO_V1,
+                                String.valueOf(turno.getId()),
+                                turno.getAggregateVersion(),
+                                new MeetCreadoData(
+                                        turno.getId(),
+                                        meetUrl,
+                                        turno.getGoogleEventId()
+                                )
+                        );
+                    }
                     // El paciente recibió la confirmación sin link (o con uno que ya no sirve):
                     // le avisamos que el link real está listo.
                     if (linkNuevo && turno.getPaciente() != null && turno.getPaciente().getEmail() != null
@@ -255,7 +276,22 @@ public class GoogleCalendarSyncService {
         evento.setEstado(googleEvent.getStatus());
         evento.setUltimaActualizacion(LocalDateTime.now());
 
-        eventoExternoRepository.save(evento);
+        evento = eventoExternoRepository.saveAndFlush(evento);
+
+        OffsetDateTime offsetInicio = inicio.atZone(ZONA).toOffsetDateTime();
+        OffsetDateTime offsetFin = fin.atZone(ZONA).toOffsetDateTime();
+        outboxPublisher.publicar(
+                Topicos.CALENDARIO_HORARIO_BLOQUEADO_V1,
+                String.valueOf(evento.getId()),
+                evento.getAggregateVersion(),
+                new HorarioBloqueadoData(
+                        medico.getId(),
+                        googleEvent.getId(),
+                        offsetInicio,
+                        offsetFin,
+                        evento.getTitulo()
+                )
+        );
     }
 
     private LocalDateTime aLocalDateTime(EventDateTime eventDateTime) {
@@ -278,11 +314,11 @@ public class GoogleCalendarSyncService {
     }
 
     // Deletes every Google Calendar event TranquiApp created for this médico's turnos (the
-    // Meet events tracked via Turno.googleEventId — distinct from GoogleCalendarEventoExterno,
+    // Meet events tracked via Turno.googleEventId � distinct from GoogleCalendarEventoExterno,
     // which caches the médico's own personal events and is never something we'd delete from
     // their real calendar). Must run BEFORE GoogleCalendarOAuthService.desvincular() clears the
     // OAuth tokens, since eliminarEventoReunion needs a still-valid access token to call the
-    // Calendar API. A failure deleting one event never blocks the rest — same best-effort
+    // Calendar API. A failure deleting one event never blocks the rest � same best-effort
     // pattern eliminarEventoReunion already uses when a turno is cancelled individually.
     @Transactional
     public void eliminarEventosCreadosPorLaApp(Usuario medico) {

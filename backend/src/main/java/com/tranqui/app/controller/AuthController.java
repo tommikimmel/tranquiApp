@@ -21,12 +21,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.transaction.annotation.Transactional;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.CodigoVerificacionGeneradoData;
+import com.tranqui.eventos.data.UsuarioRegistradoData;
 import com.tranqui.app.repository.UsuarioRepository;
 import jakarta.persistence.EntityNotFoundException;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+
+    @Autowired
+    private OutboxPublisher outboxPublisher;
 
     @Autowired
     private GoogleAuthService googleAuthService;
@@ -72,6 +80,7 @@ public class AuthController {
         return trimmed;
     }
 
+    @Transactional
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody com.tranqui.app.model.dto.RegisterRequestDto registerRequestDto) {
         String emailClean = registerRequestDto.getEmail() != null ? registerRequestDto.getEmail().trim().toLowerCase() : "";
@@ -209,6 +218,31 @@ public class AuthController {
             // same "already registered" message instead of letting it bubble up as a 500.
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El email ya está registrado");
         }
+
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new UsuarioRegistradoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        usuario.getNombre(),
+                        usuario.getApellido(),
+                        usuario.getRol() != null ? usuario.getRol().name() : null
+                )
+        );
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new CodigoVerificacionGeneradoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        codigoVerificacion,
+                        "REGISTRO"
+                )
+        );
+
         resendEmailService.enviarCodigoVerificacion(usuario.getEmail(), usuario.getNombre(), codigoVerificacion);
 
         java.util.Map<String, Object> response = new java.util.HashMap<>();
@@ -248,6 +282,7 @@ public class AuthController {
         return ResponseEntity.ok("Email verificado correctamente. Ya podés iniciar sesión.");
     }
 
+    @Transactional
     @PostMapping("/resend-code")
     public ResponseEntity<?> resendCode(@RequestBody com.tranqui.app.model.dto.VerifyEmailDto dto) {
         String cleanEmail = dto.getEmail() != null ? dto.getEmail().trim().toLowerCase() : "";
@@ -265,12 +300,25 @@ public class AuthController {
         String nuevoCodigo = String.format("%06d", new java.util.Random().nextInt(1000000));
         usuario.setCodigoVerificacion(nuevoCodigo);
         usuario.setCodigoVerificacionExpiresAt(java.time.LocalDateTime.now().plusMinutes(15));
-        usuarioRepository.save(usuario);
+        usuarioRepository.saveAndFlush(usuario);
+
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new CodigoVerificacionGeneradoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        nuevoCodigo,
+                        "EMAIL_VERIFICATION"
+                )
+        );
 
         resendEmailService.enviarCodigoVerificacion(usuario.getEmail(), usuario.getNombre(), nuevoCodigo);
         return ResponseEntity.ok("Código reenviado a tu correo.");
     }
 
+    @Transactional
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody com.tranqui.app.model.dto.ForgotPasswordDto dto) {
         String cleanEmail = dto.getEmail() != null ? dto.getEmail().trim().toLowerCase() : "";
@@ -284,7 +332,19 @@ public class AuthController {
         String resetCode = String.format("%06d", new java.util.Random().nextInt(1000000));
         usuario.setResetPasswordCode(resetCode);
         usuario.setResetPasswordExpiresAt(java.time.LocalDateTime.now().plusMinutes(15));
-        usuarioRepository.save(usuario);
+        usuarioRepository.saveAndFlush(usuario);
+
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new CodigoVerificacionGeneradoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        resetCode,
+                        "PASSWORD_RESET"
+                )
+        );
 
         resendEmailService.enviarCodigoRecuperacion(usuario.getEmail(), usuario.getNombre(), resetCode);
         return ResponseEntity.ok("Si el correo está registrado, recibirás las instrucciones en tu bandeja de entrada.");

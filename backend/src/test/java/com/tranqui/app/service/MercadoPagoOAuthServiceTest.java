@@ -27,6 +27,7 @@ import javax.net.ssl.SSLParameters;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import com.tranqui.app.eventos.OutboxPublisher;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +35,7 @@ class MercadoPagoOAuthServiceTest {
 
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private EncryptionUtil encryptionUtil;
+    @Mock private OutboxPublisher outboxPublisher;
 
     private MercadoPagoOAuthService buildService() {
         MercadoPagoOAuthService service = new MercadoPagoOAuthService();
@@ -43,6 +45,7 @@ class MercadoPagoOAuthServiceTest {
         ReflectionTestUtils.setField(service, "stateSigningKey", "masterdecryptionkey32charspart12");
         ReflectionTestUtils.setField(service, "usuarioRepository", usuarioRepository);
         ReflectionTestUtils.setField(service, "encryptionUtil", encryptionUtil);
+        ReflectionTestUtils.setField(service, "outboxPublisher", outboxPublisher);
         return service;
     }
 
@@ -258,7 +261,7 @@ class MercadoPagoOAuthServiceTest {
         when(usuarioRepository.findById(1L)).thenReturn(Optional.of(medico));
         when(encryptionUtil.encrypt("tok-abc")).thenReturn("enc-tok-abc");
         when(encryptionUtil.encrypt("ref-abc")).thenReturn("enc-ref-abc");
-        when(usuarioRepository.save(medico)).thenReturn(medico);
+        when(usuarioRepository.saveAndFlush(medico)).thenReturn(medico);
 
         Usuario result = service.procesarCallback(1L, "auth-code");
 
@@ -300,7 +303,7 @@ class MercadoPagoOAuthServiceTest {
         Usuario medico = Usuario.builder().id(1L).build();
         when(usuarioRepository.findById(1L)).thenReturn(Optional.of(medico));
         when(encryptionUtil.encrypt("tok-only")).thenReturn("enc-tok-only");
-        when(usuarioRepository.save(medico)).thenReturn(medico);
+        when(usuarioRepository.saveAndFlush(medico)).thenReturn(medico);
 
         Usuario result = service.procesarCallback(1L, "code");
 
@@ -319,7 +322,7 @@ class MercadoPagoOAuthServiceTest {
                 .mpAccessTokenEncrypted("a").mpRefreshTokenEncrypted("r")
                 .mpTokenExpiresAt(LocalDateTime.now()).mpUserId("123")
                 .build();
-        when(usuarioRepository.save(medico)).thenReturn(medico);
+        when(usuarioRepository.saveAndFlush(medico)).thenReturn(medico);
 
         service.desvincular(medico);
 
@@ -327,6 +330,6 @@ class MercadoPagoOAuthServiceTest {
         assertNull(medico.getMpRefreshTokenEncrypted());
         assertNull(medico.getMpTokenExpiresAt());
         assertNull(medico.getMpUserId());
-        verify(usuarioRepository).save(medico);
+        verify(usuarioRepository).saveAndFlush(medico);
     }
 }

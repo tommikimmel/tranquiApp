@@ -107,4 +107,50 @@ public final class Topicos {
     public static boolean esValido(String topico) {
         return topico != null && PATRON_TOPICO.matcher(topico.trim()).matches();
     }
+
+    /**
+     * Extrae el dominio (primer segmento) de un nombre de tópico.
+     * Ejemplo: "turnos.turno.confirmado.v1" -> "turnos"
+     */
+    public static String extraerDominio(String topico) {
+        if (topico == null || topico.trim().isEmpty()) {
+            return "monolito";
+        }
+        int primerPunto = topico.indexOf('.');
+        return primerPunto > 0 ? topico.substring(0, primerPunto) : topico;
+    }
+
+    /**
+     * Extrae el eventType (sin sufijo de versión) de un tópico.
+     * Ejemplo: "turnos.turno.confirmado.v1" -> "turnos.turno.confirmado"
+     */
+    public static String extraerTipoEvento(String topico) {
+        if (topico == null || topico.trim().isEmpty()) {
+            return "";
+        }
+        int ultimoPunto = topico.lastIndexOf('.');
+        if (ultimoPunto > 0 && topico.substring(ultimoPunto + 1).matches("v\\d+")) {
+            return topico.substring(0, ultimoPunto);
+        }
+        return topico;
+    }
+
+    /**
+     * Extrae la versión numérica del sufijo de versión de un tópico.
+     * Ejemplo: "turnos.turno.confirmado.v1" -> 1
+     */
+    public static int extraerVersion(String topico) {
+        if (topico == null) {
+            return 1;
+        }
+        int ultimoPunto = topico.lastIndexOf('.');
+        if (ultimoPunto > 0 && topico.substring(ultimoPunto + 1).matches("v\\d+")) {
+            try {
+                return Integer.parseInt(topico.substring(ultimoPunto + 2));
+            } catch (NumberFormatException e) {
+                return 1;
+            }
+        }
+        return 1;
+    }
 }
