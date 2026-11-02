@@ -12,6 +12,8 @@ import com.tranqui.app.repository.TurnoRepository;
 import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.eventos.OutboxPublisher;
 import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.AsistenciaConfirmadaData;
+import com.tranqui.eventos.data.DocumentoEnviadoData;
 import com.tranqui.eventos.data.DocumentoSolicitadoData;
 import com.tranqui.eventos.data.MeetCreadoData;
 import com.tranqui.eventos.data.TurnoCanceladoData;
@@ -208,6 +210,23 @@ public class TurnoService {
     @Transactional(readOnly = true)
     public boolean esPrimeraConsulta(String email) {
         return !turnoRepository.existsByPacienteEmailAndEstadoNot(email, EstadoTurno.CANCELADO);
+    }
+
+    // Aviso en la app de notificaciones; el documento en sí no viaja en el evento (sección 5.3).
+    private void publicarDocumentoEnviado(Turno turno, String origen) {
+        outboxPublisher.publicar(
+                Topicos.TURNOS_DOCUMENTO_ENVIADO_V1,
+                "turno",
+                String.valueOf(turno.getId()),
+                turno.getAggregateVersion(),
+                new DocumentoEnviadoData(
+                        turno.getId(),
+                        turno.getPaciente().getId(),
+                        turno.getMedico().getId(),
+                        resolverTypeLabel(turno),
+                        origen
+                )
+        );
     }
 
     private String resolverTypeLabel(Turno t) {
@@ -542,7 +561,13 @@ public class TurnoService {
                         turno.getFecha(),
                         turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00",
                         turno.getModalidad() != null ? turno.getModalidad().name() : "ONLINE",
-                        turno.getPrecio()
+                        turno.getPrecio(),
+                        turno.isOcupaAgenda(),
+                        resolverTypeLabel(turno),
+                        null,
+                        turno.getModalidad() == Modalidad.ONLINE ? null : turno.getMedico().getDomicilioAtencion(),
+                        turno.getTelemedicinaUrl(),
+                        TurnoConfirmadoData.ORIGEN_OSDE
                 )
         );
 
@@ -838,7 +863,11 @@ public class TurnoService {
                         turno.getMedico().getId(),
                         profesionalCancela ? "PROFESIONAL" : "PACIENTE",
                         "Cancelado por usuario",
-                        resultadoReembolso == ResendEmailService.ResultadoReembolso.REEMBOLSADO
+                        resultadoReembolso == ResendEmailService.ResultadoReembolso.REEMBOLSADO,
+                        turno.getFecha(),
+                        turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : null,
+                        turno.isOcupaAgenda(),
+                        resultadoReembolso.name()
                 )
         );
 
@@ -954,7 +983,11 @@ public class TurnoService {
         }
 
         turno.setDocumentoEnviado(true);
-        turnoRepository.save(turno);
+        Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+        if (turnoGuardado != null) {
+            turno = turnoGuardado;
+        }
+        publicarDocumentoEnviado(turno, "ADJUNTO");
 
         String titulo = "Documento enviado";
         String mensaje = "Tu " + resolverTypeLabel(turno).toLowerCase() + " te llegó por mail.";
@@ -975,7 +1008,11 @@ public class TurnoService {
                 medicoId, pacienteId, "receta-fuera", EstadoTurno.CONFIRMADO, false);
         for (Turno turno : pendientes) {
             turno.setDocumentoEnviado(true);
-            turnoRepository.save(turno);
+            Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+            if (turnoGuardado != null) {
+                turno = turnoGuardado;
+            }
+            publicarDocumentoEnviado(turno, "RECETA");
             notificacionService.crearNotificacion(turno.getPaciente(), "Documento enviado",
                     "Tu receta fuera de turno ya fue generada.", "DOCUMENTO_ENVIADO");
         }
@@ -1036,7 +1073,10 @@ public class TurnoService {
                         fechaAnterior,
                         horaInicioAnterior != null ? horaInicioAnterior.toString() : "",
                         nuevaFecha,
-                        nuevaHoraInicio.toString()
+                        nuevaHoraInicio.toString(),
+                        turno.getModalidad() != null ? turno.getModalidad().name() : null,
+                        turno.getModalidad() == Modalidad.ONLINE ? null : turno.getMedico().getDomicilioAtencion(),
+                        turno.getTelemedicinaUrl()
                 )
         );
 
@@ -1107,6 +1147,12 @@ public class TurnoService {
                     turno = turnoGuardado;
                 }
 
+                String modalidadLabel = turno.getModalidad() == Modalidad.ONLINE ? "Online (videollamada)"
+                        : turno.getModalidad() == Modalidad.PRESENCIAL ? "Presencial" : null;
+                String direccion = turno.getModalidad() == Modalidad.PRESENCIAL ? turno.getMedico().getDomicilioAtencion() : null;
+
+                // El token no viaja en el evento (sección 5.3): notificaciones arma los enlaces con
+                // la ruta interna /internal/monolito/turnos/{id}/enlaces-asistencia.
                 outboxPublisher.publicar(
                         Topicos.TURNOS_RECORDATORIO_PROGRAMADO_V1,
                         String.valueOf(turno.getId()),
@@ -1116,15 +1162,15 @@ public class TurnoService {
                                 turno.getPaciente().getId(),
                                 turno.getMedico().getId(),
                                 turno.getFecha(),
-                                turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00"
+                                turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : "00:00",
+                                modalidadLabel,
+                                resolverTypeLabel(turno),
+                                direccion
                         )
                 );
 
                 String confirmarUrl = publicUrl + "/api/turnos/" + turno.getId() + "/confirmar-asistencia?token=" + token;
                 String noAsistiraUrl = publicUrl + "/api/turnos/" + turno.getId() + "/no-asistira?token=" + token;
-                String modalidadLabel = turno.getModalidad() == Modalidad.ONLINE ? "Online (videollamada)"
-                        : turno.getModalidad() == Modalidad.PRESENCIAL ? "Presencial" : null;
-                String direccion = turno.getModalidad() == Modalidad.PRESENCIAL ? turno.getMedico().getDomicilioAtencion() : null;
 
                 resendEmailService.enviarConfirmacionAsistencia(
                         turno.getPaciente().getEmail(),
@@ -1163,7 +1209,24 @@ public class TurnoService {
         }
 
         turno.setAsistenciaConfirmadaPaciente(true);
-        turnoRepository.save(turno);
+        Turno turnoGuardado = turnoRepository.saveAndFlush(turno);
+        if (turnoGuardado != null) {
+            turno = turnoGuardado;
+        }
+
+        outboxPublisher.publicar(
+                Topicos.TURNOS_ASISTENCIA_CONFIRMADA_V1,
+                "turno",
+                String.valueOf(turno.getId()),
+                turno.getAggregateVersion(),
+                new AsistenciaConfirmadaData(
+                        turno.getId(),
+                        turno.getPaciente().getId(),
+                        turno.getMedico().getId(),
+                        turno.getFecha(),
+                        turno.getHoraInicio() != null ? turno.getHoraInicio().toString() : null
+                )
+        );
 
         String titulo = "Paciente confirmó su asistencia";
         String mensaje = turno.getPaciente().getNombre() + " confirmó que va a asistir al turno del " +

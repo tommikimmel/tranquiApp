@@ -70,7 +70,7 @@ class AdminControllerUnitTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(Rol.PSIQUIATRA, usuario.getRol());
         assertEquals(Boolean.TRUE, usuario.getVerificadoAdmin());
-        verify(usuarioRepository).save(usuario);
+        verify(usuarioRepository).saveAndFlush(usuario);
     }
 
     @Test

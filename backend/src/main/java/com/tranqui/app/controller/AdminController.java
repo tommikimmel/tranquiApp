@@ -9,6 +9,7 @@ import com.tranqui.app.service.TicketService;
 import com.tranqui.app.eventos.OutboxPublisher;
 import com.tranqui.eventos.Topicos;
 import com.tranqui.eventos.data.ProfesionalVisibilidadCambiadaData;
+import com.tranqui.eventos.data.UsuarioActualizadoData;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,6 +49,7 @@ public class AdminController {
     }
 
     @PutMapping("/users/{id}/rol")
+    @Transactional
     public ResponseEntity<?> updateRol(@PathVariable Long id, @RequestBody Map<String, String> body) {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Usuario no encontrado"));
@@ -59,11 +61,30 @@ public class AdminController {
             if (rol == Rol.PSIQUIATRA) {
                 usuario.setVerificadoAdmin(true);
             }
-            usuarioRepository.save(usuario);
+            usuarioRepository.saveAndFlush(usuario);
+            publicarContactoActualizado(usuario);
             return ResponseEntity.ok(usuario);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body("Rol inválido");
         }
+    }
+
+    // El rol decide quién recibe los avisos de administrador en notificaciones (copia de contactos).
+    private void publicarContactoActualizado(Usuario usuario) {
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new UsuarioActualizadoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        usuario.getNombre(),
+                        usuario.getApellido(),
+                        usuario.getTelefono(),
+                        usuario.getRol() != null ? usuario.getRol().name() : null,
+                        usuario.isNotificacionesEmailHabilitadas()
+                )
+        );
     }
 
     @Autowired
@@ -87,6 +108,7 @@ public class AdminController {
         usuario.setLicenseVerifiedAt(java.time.LocalDateTime.now());
         usuario.setLicenseVerifiedBy(auth != null ? auth.getName() : "admin");
         usuarioRepository.saveAndFlush(usuario);
+        publicarContactoActualizado(usuario);
 
         outboxPublisher.publicar(
                 Topicos.PROFESIONALES_PROFESIONAL_VISIBILIDAD_CAMBIADA_V1,

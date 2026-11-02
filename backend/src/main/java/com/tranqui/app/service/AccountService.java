@@ -79,6 +79,23 @@ public class AccountService {
         u.setFotoUrl(dto.getFotoUrl());
 
         usuarioRepository.saveAndFlush(u);
+        publicarUsuarioActualizado(u);
+        return construirDto(u);
+    }
+
+    @Transactional
+    public MiCuentaDto actualizarPreferenciasNotificacion(String email, boolean emailHabilitado) {
+        Usuario u = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+        u.setNotificacionesEmailHabilitadas(emailHabilitado);
+        usuarioRepository.saveAndFlush(u);
+        publicarUsuarioActualizado(u);
+        return construirDto(u);
+    }
+
+    // Notificaciones guarda una copia de contacto (mail, nombre, rol y si acepta mails); cualquier
+    // cambio de esos datos tiene que salir en este evento.
+    private void publicarUsuarioActualizado(Usuario u) {
         outboxPublisher.publicar(
                 Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1,
                 String.valueOf(u.getId()),
@@ -88,19 +105,11 @@ public class AccountService {
                         u.getEmail(),
                         u.getNombre(),
                         u.getApellido(),
-                        u.getTelefono()
+                        u.getTelefono(),
+                        u.getRol() != null ? u.getRol().name() : null,
+                        u.isNotificacionesEmailHabilitadas()
                 )
         );
-        return construirDto(u);
-    }
-
-    @Transactional
-    public MiCuentaDto actualizarPreferenciasNotificacion(String email, boolean emailHabilitado) {
-        Usuario u = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
-        u.setNotificacionesEmailHabilitadas(emailHabilitado);
-        usuarioRepository.save(u);
-        return construirDto(u);
     }
 
     @Transactional

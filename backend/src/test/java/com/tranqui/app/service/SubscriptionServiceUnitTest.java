@@ -1,5 +1,6 @@
 package com.tranqui.app.service;
 
+import com.tranqui.app.service.AvisoSuscripcionPublisher;
 import com.tranqui.app.model.*;
 import com.tranqui.app.repository.*;
 import jakarta.persistence.EntityNotFoundException;
@@ -55,6 +56,9 @@ class SubscriptionServiceUnitTest {
 
     @Mock
     private com.tranqui.app.service.arca.ArcaConfig arcaConfig;
+
+    @Mock
+    private AvisoSuscripcionPublisher avisoSuscripcionPublisher;
 
     @InjectMocks
     private SubscriptionService subscriptionService;

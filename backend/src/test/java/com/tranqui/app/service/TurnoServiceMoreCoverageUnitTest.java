@@ -256,7 +256,7 @@ class TurnoServiceMoreCoverageUnitTest {
 
         turnoService.marcarRecetasEnviadasParaPaciente(1L, 2L);
         assertTrue(turno.isDocumentoEnviado());
-        verify(turnoRepository).save(turno);
+        verify(turnoRepository).saveAndFlush(turno);
     }
 
     @Test

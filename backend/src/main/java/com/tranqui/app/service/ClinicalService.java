@@ -3,6 +3,9 @@ package com.tranqui.app.service;
 import com.tranqui.app.model.*;
 import com.tranqui.app.model.dto.PacienteDto;
 import com.tranqui.app.repository.*;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.HistoriaClinicaActualizadaData;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -41,7 +44,23 @@ public class ClinicalService {
     private NotificacionService notificacionService;
 
     @Autowired
+    private OutboxPublisher outboxPublisher;
+
+    @Autowired
     private MensajeRepository mensajeRepository;
+
+    // Aviso para notificaciones de que se cargó algo en la historia clínica. Sección 5.3: el evento
+    // dice qué se cargó y quién, nunca el contenido. Cada asiento es su propio agregado (versión 1).
+    private void publicarHistoriaClinica(String tipoAgregado, Long asientoId, Long profesionalId, Long pacienteId,
+                                         String tipo, String cargadoPor, String tipoInforme) {
+        outboxPublisher.publicar(
+                Topicos.PROFESIONALES_HISTORIA_CLINICA_ACTUALIZADA_V1,
+                tipoAgregado,
+                String.valueOf(asientoId),
+                1,
+                new HistoriaClinicaActualizadaData(profesionalId, pacienteId, tipo, cargadoPor, tipoInforme)
+        );
+    }
 
     // Sella la integridad de un asiento clínico en el momento de su creación (o de su anexo de
     // corrección) — no es una firma digital en el sentido de la Ley 25.506 (eso requeriría un
@@ -193,6 +212,7 @@ public class ClinicalService {
                 entry.getEstadoAnimo(), entry.getSintomas(), entry.getNotas(), ahora.toString()));
 
         SeguimientoDiario saved = seguimientoDiarioRepository.save(entry);
+        publicarHistoriaClinica("seguimiento", saved != null ? saved.getId() : null, medico.getId(), paciente.getId(), "SEGUIMIENTO", "PROFESIONAL", null);
 
         // Notify professional/patient (in this case, since the professional logged it or the patient logged it, we can notify the user)
         notificacionService.crearNotificacion(
@@ -235,6 +255,7 @@ public class ClinicalService {
                 .build();
 
         InformeClinico saved = informeClinicoRepository.save(informe);
+        publicarHistoriaClinica("informe", saved != null ? saved.getId() : null, medico.getId(), paciente.getId(), "INFORME", "PROFESIONAL", tipoInforme);
 
         notificacionService.crearNotificacion(
                 medico,
@@ -282,6 +303,7 @@ public class ClinicalService {
                 entry.getEstadoAnimo(), entry.getSintomas(), entry.getNotas(), ahora.toString()));
 
         SeguimientoDiario saved = seguimientoDiarioRepository.save(entry);
+        publicarHistoriaClinica("seguimiento", saved != null ? saved.getId() : null, entry.getMedico().getId(), paciente.getId(), "SEGUIMIENTO", "PACIENTE", null);
 
         notificacionService.crearNotificacion(
                 entry.getMedico(),
