@@ -47,6 +47,12 @@ terminal interactiva, aborta y lista los puertos ocupados.
 A partir de la Fase 0 ([Plan de migración a microservicios](../arquitectura/microservicios.md)), el
 entorno local incluye la infraestructura de soporte para la arquitectura distribuida:
 
+- **Servicio de pagos (`pagos`, Fase 4):** Mercado Pago simulado como en el monolito: la reserva pide el
+  link aparte y abre el "Simulador de Pago"; "Vincular Mercado Pago" vincula sin Mercado Pago real. Su base
+  `pagos` la crea `db-servicios`. Para volver a los pagos del monolito: sacar
+  `TRANQUI_SERVICES_PAGOS_URI` del gateway, poner `PAGOS_EXTERNO: "false"` en el backend, frenar `pagos`
+  y correr `node scripts/fase4-devolver-pagos.mjs`. `node scripts/fase4-conciliar-pagos.mjs` compara las
+  dos bases.
 - **Servicio de calendario (`calendario`, Fase 3):** Google Calendar y Meet, simulados como en el monolito
   ("Conectar" vincula sin Google y los turnos online reciben un Meet simulado, que llega en un segundo
   mail). Su base `calendario` la crea `db-servicios`. Para volver al calendario del monolito: sacar
