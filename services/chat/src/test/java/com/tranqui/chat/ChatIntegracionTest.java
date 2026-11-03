@@ -1,5 +1,6 @@
 package com.tranqui.chat;
 
+import com.tranqui.eventos.contratos.Contratos;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tranqui.chat.copias.Copias;
@@ -285,6 +286,7 @@ class ChatIntegracionTest {
 
         ResponseEntity<String> respuesta = http.exchange("/internal/chat/profesionales/2/resumen", HttpMethod.GET,
                 new HttpEntity<>(headers), String.class);
+        Contratos.mismaForma("internas/chat/resumen.json", respuesta.getBody());
 
         assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.OK);
         JsonNode resumen = mapper.readTree(respuesta.getBody());

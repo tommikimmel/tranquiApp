@@ -1,5 +1,6 @@
 package com.tranqui.turnos.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.turnos.datos.Personas;
 import com.tranqui.turnos.datos.Profesionales;
 import org.slf4j.Logger;
@@ -62,7 +63,7 @@ public class Copias {
                 personas.guardar(p.persona(false));
             }
             total += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 return total;
             }
         }
@@ -88,7 +89,7 @@ public class Copias {
                 personas.mercadoPago(p.id(), p.mpVinculada());
             }
             total += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 return total;
             }
         }
@@ -118,7 +119,7 @@ public class Copias {
                 }
                 personas.mercadoPago(c.profesionalId(), c.vinculada());
             }
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 return total;
             }
         }

@@ -1,0 +1,21 @@
+[
+  {
+    "id" : 28,
+    "email" : "docsub.42430883964600@mail.com",
+    "nombre" : "DocSub",
+    "apellido" : "Test",
+    "rol" : "PSIQUIATRA",
+    "profession" : "Psiquiatría",
+    "verificadoAdmin" : true,
+    "version" : 1,
+    "taxIdType" : "CUIT",
+    "taxId" : "20123456789",
+    "legalName" : "DocSub Test",
+    "ivaConditionId" : 1,
+    "fiscalAddress" : "Av Corrientes 1234",
+    "cuit" : "20123456789",
+    "cuil" : 27123456780,
+    "dni" : "12345678",
+    "numeroDocumento" : 12345678
+  }
+]

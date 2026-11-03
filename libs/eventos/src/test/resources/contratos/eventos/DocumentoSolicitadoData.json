@@ -1,0 +1,7 @@
+{
+  "turnoId" : 1,
+  "pacienteId" : 1,
+  "profesionalId" : 1,
+  "tipoDocumento" : "texto",
+  "descripcion" : "texto"
+}

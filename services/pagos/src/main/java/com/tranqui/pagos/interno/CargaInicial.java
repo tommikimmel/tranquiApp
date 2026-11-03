@@ -1,5 +1,6 @@
 package com.tranqui.pagos.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.eventos.consumo.EsperaAntesDeConsumir;
 import com.tranqui.pagos.datos.Cobros;
 import com.tranqui.pagos.datos.CuentasMp;
@@ -137,7 +138,7 @@ public class CargaInicial implements EsperaAntesDeConsumir {
                 participantes.guardar(c.id(), c.email(), c.nombre(), c.apellido(), c.rol());
             }
             total += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 return total;
             }
         }
@@ -163,7 +164,7 @@ public class CargaInicial implements EsperaAntesDeConsumir {
                         p.transactionId(), p.estado(), p.monto(), p.fechaPago()), p.id());
             }
             total += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 return total;
             }
         }

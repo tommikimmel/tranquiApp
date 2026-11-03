@@ -124,10 +124,11 @@ class ResincronizacionSuscripcionesTest {
             rutasLlamadas.add(uri);
 
             StringBuilder sb = new StringBuilder("[");
+            // Una fila inválida en la página llena: se saltea, pero la página sigue contando como llena.
             if (uri.contains("pagina=0")) {
                 for (int i = 0; i < 200; i++) {
                     if (i > 0) sb.append(",");
-                    sb.append(String.format("{\"professionalId\":%d,\"estado\":\"ACTIVE\",\"planCode\":\"BASIC\",\"acceso\":true,\"puedeRecetar\":false,\"version\":1}", i + 1));
+                    sb.append(String.format("{\"professionalId\":%d,\"estado\":\"ACTIVE\",\"planCode\":\"BASIC\",\"acceso\":true,\"puedeRecetar\":false,\"version\":1}", i == 7 ? -8 : i + 1));
                 }
             } else if (uri.contains("pagina=1")) {
                 for (int i = 200; i < 205; i++) {
@@ -155,7 +156,7 @@ class ResincronizacionSuscripcionesTest {
                 "/internal/suscripciones/estado?pagina=0&tamanio=200",
                 "/internal/suscripciones/estado?pagina=1&tamanio=200"
         );
-        verify(copia, times(205)).upsert(anyLong(), anyString(), anyString(), anyBoolean(), anyBoolean(), any(), any(), anyLong());
+        verify(copia, times(204)).upsert(anyLong(), anyString(), anyString(), anyBoolean(), anyBoolean(), any(), any(), anyLong());
     }
 
     @Test

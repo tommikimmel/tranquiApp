@@ -1,0 +1,12 @@
+[
+  {
+    "professionalId" : 10,
+    "estado" : "ACTIVE",
+    "planCode" : "consultorio",
+    "acceso" : true,
+    "puedeRecetar" : false,
+    "periodoHasta" : "2026-11-23T20:44:21.763571",
+    "graciaHasta" : "2026-11-03T10:30:00",
+    "version" : 2
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "turnoId" : 1,
+  "pacienteId" : 1,
+  "profesionalId" : 1,
+  "canceladoPor" : "texto",
+  "motivo" : "texto",
+  "correspondeReembolso" : false,
+  "fecha" : "2026-11-03",
+  "horaInicio" : "texto",
+  "ocupaAgenda" : false,
+  "resultadoReembolso" : "texto"
+}

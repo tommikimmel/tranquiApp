@@ -1,5 +1,6 @@
 package com.tranqui.app.controller;
 
+import com.tranqui.eventos.contratos.Contratos;
 import com.tranqui.app.model.EstadoPago;
 import com.tranqui.app.model.InformeClinico;
 import com.tranqui.app.model.Receta;
@@ -90,6 +91,7 @@ class InternoClinicaControllerTest {
                 .build());
 
         ResponseEntity<String> r = get("/internal/monolito/clinica/seguimientos?pagina=0&tamanio=1000", true);
+        Contratos.mismaForma("internas/monolito/clinica-seguimientos.json", r.getBody());
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody())
                 .contains("\"id\":" + s.getId())
@@ -127,6 +129,7 @@ class InternoClinicaControllerTest {
                 .build());
 
         ResponseEntity<String> r = get("/internal/monolito/clinica/informes?pagina=0&tamanio=1000", true);
+        Contratos.mismaForma("internas/monolito/clinica-informes.json", r.getBody());
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody())
                 .contains("\"id\":" + i.getId())
@@ -163,6 +166,7 @@ class InternoClinicaControllerTest {
                 .build());
 
         ResponseEntity<String> r = get("/internal/monolito/clinica/recetas?pagina=0&tamanio=1000", true);
+        Contratos.mismaForma("internas/monolito/clinica-recetas.json", r.getBody());
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody())
                 .contains("\"id\":" + rec.getId())
@@ -191,6 +195,7 @@ class InternoClinicaControllerTest {
                 .build());
 
         ResponseEntity<String> r = get("/internal/monolito/clinica/solicitudes?pagina=0&tamanio=1000", true);
+        Contratos.mismaForma("internas/monolito/clinica-solicitudes.json", r.getBody());
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody())
                 .contains("\"id\":" + sol.getId())

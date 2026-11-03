@@ -80,6 +80,12 @@
 			<artifactId>eventos</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>com.tranqui</groupId>
+			<artifactId>eventos</artifactId>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-api</artifactId>
 		</dependency>

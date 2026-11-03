@@ -1,5 +1,6 @@
 package com.tranqui.profesionales.interno;
 
+import com.tranqui.eventos.EventObjectMapperFactory;
 import com.tranqui.eventos.ValidadorEventos;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
@@ -21,6 +22,8 @@ import com.tranqui.profesionales.datos.Solicitudes;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -29,6 +32,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * Llamadas de profesionales al monolito, siempre por el gateway con un JWT de servicio (sección 4.2):
@@ -108,6 +112,9 @@ public class ClienteInterno {
 
     /** {@code InternoTurnosController.TurnoDto} del monolito (carga inicial y resincronización). */
     public record TurnoMonolito(int version, @NotNull @Valid TurnoActualizadoData turno, String tokenReserva, String tokenConfirmacionAsistencia) {}
+
+    /** Lo que manda el servicio de turnos ({@code /internal/turnos/turnos}): sin los tokens, que quedan en turnos. */
+    public record TurnoServicio(int version, @NotNull @Valid TurnoActualizadoData turno) {}
 
     /** {@code InternoClinicaController.SeguimientoDiarioDto} del monolito. */
     public record SeguimientoMonolito(
@@ -207,6 +214,9 @@ public class ClienteInterno {
     private final RestClient httpRapido;
     private final ServiceJwt serviceJwt;
 
+    private static final Consumer<List<HttpMessageConverter<?>>> ISO =
+            c -> c.add(0, new MappingJackson2HttpMessageConverter(EventObjectMapperFactory.create()));
+
     // /internal/monolito o /internal/identidad (ver rutaIdentidad).
     private final String baseIdentidad;
 
@@ -220,12 +230,13 @@ public class ClienteInterno {
         SimpleClientHttpRequestFactory fabrica = new SimpleClientHttpRequestFactory();
         fabrica.setConnectTimeout(2_000);
         fabrica.setReadTimeout(30_000);
-        this.http = RestClient.builder().baseUrl(gatewayUrl).requestFactory(fabrica).build();
+        // Fechas en ISO como texto: sin esto un LocalDate del cuerpo sale como [1990,5,1] y el monolito lo rechaza.
+        this.http = RestClient.builder().baseUrl(gatewayUrl).requestFactory(fabrica).messageConverters(ISO).build();
 
         SimpleClientHttpRequestFactory fabricaRapida = new SimpleClientHttpRequestFactory();
         fabricaRapida.setConnectTimeout(2_000);
         fabricaRapida.setReadTimeout(5_000);
-        this.httpRapido = RestClient.builder().baseUrl(gatewayUrl).requestFactory(fabricaRapida).build();
+        this.httpRapido = RestClient.builder().baseUrl(gatewayUrl).requestFactory(fabricaRapida).messageConverters(ISO).build();
         this.serviceJwt = new ServiceJwt(claveServicio);
     }
 
@@ -322,8 +333,8 @@ public class ClienteInterno {
      * Fase 9, con la fuente de identidad: los turnos salen de su dueño ({@code /internal/turnos/turnos}, la misma ruta
      * que usaba el monolito para su copia), sin paginar.
      */
-    public List<TurnoMonolito> turnosDelServicio() {
-        List<TurnoMonolito> r = get("/internal/turnos/turnos", new ParameterizedTypeReference<>() {});
+    public List<TurnoServicio> turnosDelServicio() {
+        List<TurnoServicio> r = get("/internal/turnos/turnos", new ParameterizedTypeReference<>() {});
         return r != null ? r : List.of();
     }
 

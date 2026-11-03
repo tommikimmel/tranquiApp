@@ -55,6 +55,13 @@
 			<groupId>com.tranqui</groupId>
 			<artifactId>eventos</artifactId>
 		</dependency>
+		<dependency>
+			<!-- Fase 10, T2: contratos entre servicios -->
+			<groupId>com.tranqui</groupId>
+			<artifactId>eventos</artifactId>
+			<type>test-jar</type>
+			<scope>test</scope>
+		</dependency>
 
 		<!-- JJWT para validación reactiva de tokens -->
 		<dependency>

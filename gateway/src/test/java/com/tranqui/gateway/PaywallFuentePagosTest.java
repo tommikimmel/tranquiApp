@@ -1,5 +1,6 @@
 package com.tranqui.gateway;
 
+import com.tranqui.eventos.contratos.Contratos;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import com.tranqui.eventos.jwt.EmisorJwtUsuario;
@@ -86,7 +87,7 @@ public class PaywallFuentePagosTest {
         monolito.stubFor(any(urlPathMatching("/.*")).willReturn(json("{\"desde\":\"monolito\"}")));
 
         pagos.stubFor(get(urlPathEqualTo(ACCESO_PAGOS)).withQueryParam("email", equalTo("sin@mail.com"))
-                .willReturn(json("{\"permitido\":false}")));
+                .willReturn(json(Contratos.fixture("internas/suscripciones/acceso.json").toString())));
         pagos.stubFor(get(urlPathEqualTo(ACCESO_PAGOS)).withQueryParam("email", equalTo("con@mail.com"))
                 .willReturn(json("{\"permitido\":true}")));
         pagos.stubFor(get(urlPathEqualTo(ACCESO_PAGOS)).withQueryParam("email", equalTo("caido@mail.com"))

@@ -1,0 +1,8 @@
+[ {
+  "id" : 11,
+  "email" : "u1.42429523508900@mail.com",
+  "nombre" : "Usuario Uno",
+  "apellido" : "Test",
+  "rol" : "PACIENTE",
+  "emailHabilitado" : true
+} ]

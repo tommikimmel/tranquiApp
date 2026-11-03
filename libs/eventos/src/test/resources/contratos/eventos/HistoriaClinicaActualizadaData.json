@@ -1,0 +1,7 @@
+{
+  "profesionalId" : 1,
+  "pacienteId" : 1,
+  "tipo" : "texto",
+  "cargadoPor" : "texto",
+  "tipoInforme" : "texto"
+}

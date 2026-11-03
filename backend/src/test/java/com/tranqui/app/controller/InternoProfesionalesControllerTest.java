@@ -1,5 +1,6 @@
 package com.tranqui.app.controller;
 
+import com.tranqui.eventos.contratos.Contratos;
 import com.tranqui.app.eventos.OutboxRepository;
 import com.tranqui.app.model.Disponibilidad;
 import com.tranqui.app.model.Modalidad;
@@ -84,6 +85,7 @@ class InternoProfesionalesControllerTest {
         Usuario u = profesional();
 
         ResponseEntity<String> r = llamar(HttpMethod.GET, "/internal/monolito/profesionales/" + u.getId(), tokenServicio(), null);
+        Contratos.mismaForma("internas/fuente-identidad/profesional.json", r.getBody());
 
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody()).contains("\"rol\":\"PSIQUIATRA\"").contains("\"fotoUrl\":\"data:image/png;base64,AAAA\"")
@@ -101,6 +103,7 @@ class InternoProfesionalesControllerTest {
 
         ResponseEntity<String> r = llamar(HttpMethod.GET, "/internal/monolito/profesionales?pagina=0&tamanio=200&foto=false",
                 tokenServicio(), null);
+        Contratos.mismaForma("internas/monolito/profesionales.json", r.getBody());
 
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody()).contains("\"id\":" + u.getId()).contains("\"servicioId\":\"particular\"")
@@ -112,6 +115,7 @@ class InternoProfesionalesControllerTest {
         Usuario u = profesional();
 
         ResponseEntity<String> r = llamar(HttpMethod.GET, "/internal/monolito/profesionales/estado", tokenServicio(), null);
+        Contratos.mismaForma("internas/fuente-identidad/profesionales-estado.json", r.getBody());
 
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody()).contains("\"id\":" + u.getId())
@@ -124,11 +128,11 @@ class InternoProfesionalesControllerTest {
         Usuario u = profesional();
         long antes = outboxRepository.count();
 
-        String cuerpo = "{\"nombre\":\"Ana María\",\"apellido\":\"Paz\",\"telefono\":\"+54 11 5555\",\"sexo\":\"F\","
-                + "\"fechaNacimiento\":\"1980-05-04\",\"cuil\":27123456780,\"tipoDocumento\":\"DNI\","
-                + "\"numeroDocumento\":12345678,\"fotoUrl\":\"data:image/png;base64,BBBB\"}";
+        // El cuerpo es el contrato: lo mismo que manda profesionales.
+        String cuerpo = Contratos.fixture("internas/fuente-identidad/profesional-identidad.request.json").toString();
         ResponseEntity<String> r = llamar(HttpMethod.PUT, "/internal/monolito/profesionales/" + u.getId() + "/identidad",
                 tokenServicio(), cuerpo);
+        Contratos.mismaForma("internas/fuente-identidad/profesional.json", r.getBody());
 
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         Usuario guardado = usuarioRepository.findById(u.getId()).orElseThrow();

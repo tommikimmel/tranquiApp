@@ -2,6 +2,7 @@ package com.tranqui.app.controller;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tranqui.eventos.contratos.Contratos;
 import com.tranqui.app.model.NovedadesEnvio;
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.Ticket;
@@ -90,6 +91,7 @@ class InternoIdentidadControllerTest {
                 .build());
 
         ResponseEntity<String> res = get("/internal/monolito/identidad/usuarios?pagina=0&tamanio=1000", true);
+        Contratos.mismaForma("internas/monolito/identidad-usuarios.json", res.getBody());
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         List<Map<String, Object>> filas = mapper.readValue(res.getBody(), new TypeReference<>() {});
@@ -162,6 +164,7 @@ class InternoIdentidadControllerTest {
                 .build());
 
         ResponseEntity<String> res = get("/internal/monolito/identidad/tickets?pagina=0&tamanio=1000", true);
+        Contratos.mismaForma("internas/monolito/identidad-tickets.json", res.getBody());
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         List<Map<String, Object>> filas = mapper.readValue(res.getBody(), new TypeReference<>() {});
@@ -203,6 +206,7 @@ class InternoIdentidadControllerTest {
                 .build());
 
         ResponseEntity<String> res = get("/internal/monolito/identidad/ticket-mensajes?pagina=0&tamanio=1000", true);
+        Contratos.mismaForma("internas/monolito/identidad-ticket-mensajes.json", res.getBody());
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         List<Map<String, Object>> filas = mapper.readValue(res.getBody(), new TypeReference<>() {});
@@ -235,6 +239,7 @@ class InternoIdentidadControllerTest {
                 .build());
 
         ResponseEntity<String> res = get("/internal/monolito/identidad/novedades-envios?pagina=0&tamanio=1000", true);
+        Contratos.mismaForma("internas/monolito/identidad-novedades-envios.json", res.getBody());
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         List<Map<String, Object>> filas = mapper.readValue(res.getBody(), new TypeReference<>() {});

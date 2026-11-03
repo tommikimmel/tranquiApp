@@ -1,5 +1,6 @@
 package com.tranqui.profesionales.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.eventos.consumo.EsperaAntesDeConsumir;
 import com.tranqui.profesionales.datos.Informes;
 import com.tranqui.profesionales.datos.Recetas;
@@ -107,7 +108,7 @@ public class CargaInicialClinica implements EsperaAntesDeConsumir {
                 seguimientos.insertar(s.seguimiento());
             }
             totalSeguimientos += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }
@@ -120,7 +121,7 @@ public class CargaInicialClinica implements EsperaAntesDeConsumir {
                 informes.insertar(inf.informe());
             }
             totalInformes += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }
@@ -133,7 +134,7 @@ public class CargaInicialClinica implements EsperaAntesDeConsumir {
                 recetas.insertar(r.receta());
             }
             totalRecetas += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }
@@ -146,7 +147,7 @@ public class CargaInicialClinica implements EsperaAntesDeConsumir {
                 solicitudes.insertar(s.solicitud());
             }
             totalSolicitudes += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }

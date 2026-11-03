@@ -1,5 +1,6 @@
 package com.tranqui.app.controller;
 
+import com.tranqui.eventos.contratos.Contratos;
 import com.tranqui.app.model.*;
 import com.tranqui.app.repository.*;
 import com.tranqui.eventos.jwt.ServiceJwt;
@@ -96,6 +97,7 @@ class InternoSuscripcionesControllerTest {
                 .build());
 
         ResponseEntity<String> rPlanes = get("/internal/monolito/suscripciones/planes?pagina=0&tamanio=1000", true);
+        Contratos.mismaForma("internas/monolito/suscripciones-planes.json", rPlanes.getBody());
         assertThat(rPlanes.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(rPlanes.getBody())
                 .contains("\"id\":" + plan.getId())
@@ -109,6 +111,7 @@ class InternoSuscripcionesControllerTest {
                 .build());
 
         ResponseEntity<String> rFeat = get("/internal/monolito/suscripciones/features?pagina=0&tamanio=1000", true);
+        Contratos.mismaForma("internas/monolito/suscripciones-features.json", rFeat.getBody());
         assertThat(rFeat.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(rFeat.getBody())
                 .contains("\"key\":\"" + feature.getKey() + "\"")
@@ -121,6 +124,7 @@ class InternoSuscripcionesControllerTest {
                 .build());
 
         ResponseEntity<String> rPf = get("/internal/monolito/suscripciones/plan-features?pagina=0&tamanio=1000", true);
+        Contratos.mismaForma("internas/monolito/suscripciones-plan-features.json", rPf.getBody());
         assertThat(rPf.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(rPf.getBody())
                 .contains("\"id\":" + pf.getId())
@@ -153,6 +157,7 @@ class InternoSuscripcionesControllerTest {
                 .build());
 
         ResponseEntity<String> rSub = get("/internal/monolito/suscripciones/suscripciones?pagina=0&tamanio=1000", true);
+        Contratos.mismaForma("internas/monolito/suscripciones-suscripciones.json", rSub.getBody());
         assertThat(rSub.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(rSub.getBody())
                 .contains("\"id\":" + sub.getId())
@@ -171,11 +176,22 @@ class InternoSuscripcionesControllerTest {
                 .build());
 
         ResponseEntity<String> rEvt = get("/internal/monolito/suscripciones/eventos?pagina=0&tamanio=1000", true);
+        Contratos.mismaForma("internas/monolito/suscripciones-eventos.json", rEvt.getBody());
         assertThat(rEvt.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(rEvt.getBody())
                 .contains("\"id\":" + event.getId())
                 .contains("\"subscriptionId\":" + sub.getId())
                 .contains("\"newStatus\":\"ACTIVE\"");
+
+        subscriptionPaymentRepository.save(SubscriptionPayment.builder()
+                .subscriptionId(sub.getId()).professionalId(prof.getId()).mpPaymentId("MP-PAGO-1")
+                .idempotencyKey("idem-" + System.nanoTime()).method("MERCADO_PAGO").status("APPROVED")
+                .amountArs(new BigDecimal("25000.00")).paidAt(LocalDateTime.now())
+                .periodStart(LocalDateTime.now()).periodEnd(LocalDateTime.now().plusMonths(1))
+                .invoiceId(1L).registeredByAdminId(1L).receiptReference("REC-1").notes("pago de prueba").build());
+        ResponseEntity<String> rPagos = get("/internal/monolito/suscripciones/pagos?pagina=0&tamanio=1000", true);
+        assertThat(rPagos.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Contratos.mismaForma("internas/monolito/suscripciones-pagos.json", rPagos.getBody());
     }
 
     @Test
@@ -199,6 +215,7 @@ class InternoSuscripcionesControllerTest {
                 .build());
 
         ResponseEntity<String> r = get("/internal/monolito/suscripciones/facturas?pagina=0&tamanio=20", true);
+        Contratos.mismaForma("internas/monolito/suscripciones-facturas.json", r.getBody());
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody())
                 .contains("\"id\":" + invoice.getId())
@@ -220,6 +237,7 @@ class InternoSuscripcionesControllerTest {
                 .build());
 
         ResponseEntity<String> r = get("/internal/monolito/suscripciones/secuencias?pagina=0&tamanio=500", true);
+        Contratos.mismaForma("internas/monolito/suscripciones-secuencias.json", r.getBody());
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody())
                 .contains("\"puntoVenta\":1")
@@ -232,6 +250,7 @@ class InternoSuscripcionesControllerTest {
         Usuario prof = crearUsuario("SuscriptorTest", Rol.PSIQUIATRA);
 
         ResponseEntity<String> rId = get("/internal/monolito/suscriptores/" + prof.getId(), true);
+        Contratos.mismaForma("internas/fuente-identidad/suscriptor.json", rId.getBody());
         assertThat(rId.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(rId.getBody())
                 .contains("\"id\":" + prof.getId())
@@ -241,6 +260,7 @@ class InternoSuscripcionesControllerTest {
                 .contains("\"taxId\":\"20123456789\"");
 
         ResponseEntity<String> rLista = get("/internal/monolito/suscriptores?pagina=0&tamanio=500", true);
+        Contratos.mismaForma("internas/fuente-identidad/suscriptores.json", rLista.getBody());
         assertThat(rLista.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(rLista.getBody())
                 .contains("\"id\":" + prof.getId())

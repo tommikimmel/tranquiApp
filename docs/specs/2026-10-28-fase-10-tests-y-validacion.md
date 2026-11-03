@@ -81,6 +81,27 @@ confíe en lo que le manda otro**. Lo que hay hoy:
   ejemplo; el consumidor, uno que lo deserializa y lo valida. Si alguien cambia un campo, se rompe el test del lado
   que no se actualizó.
 
+- **Hecho en T2:**
+  - **Contratos:** `libs/eventos` publica un test-jar con `contratos/eventos` (los 44 records de `data`) y
+    `contratos/internas` (cada ruta interna y los cuerpos de los pedidos), más el helper `Contratos`:
+    - `mismaForma` compara campos y tipos de JSON del lado que produce; un mapa por id compara solo los valores.
+    - `leer` exige del lado que consume que todo componente del record llegue con valor y pase sus validaciones.
+    - `ServidorCaptura` toma el cuerpo que manda el cliente real.
+    - Con `-Dcontratos.generar=true` los productores escriben los contratos que faltan.
+  - **Lados:** el monolito y los siete servicios verifican lo que producen en sus tests de integración. Donde dos
+    dueños sirven la misma ruta (monolito e identidad, o la vuelta atrás de notificaciones), los dos contra el mismo
+    contrato. Cada consumidor tiene su `ContratosConsumidorTest`; el gateway sirve el contrato de acceso en su test del
+    paywall.
+  - **Lo que encontraron los contratos (arreglado):**
+    - Profesionales mandaba la fecha de nacimiento del `PUT .../identidad` como `[1990,5,1]` (su `RestClient` no usaba
+      la configuración de fechas) y el monolito la rechazaba. Ahora usa el mapper ISO de la librería.
+    - Profesionales leía los turnos del servicio de turnos con un record con dos tokens que turnos nunca manda.
+    - **Paginación cortada por una fila inválida:** las cargas iniciales cortaban cuando una página traía menos filas
+      que las pedidas, contando las que quedaban después de saltear las inválidas (V2). Una sola fila inválida en una
+      página llena dejaba sin copiar todo lo que seguía. `ValidadorEventos.recibidas` da las que llegaron y las 33
+      cargas paginan con eso.
+    - La resincronización de suscripciones del monolito no validaba la respuesta de pagos.
+
 ### T3 — Tests de punta a punta
 - Playwright sobre el stack local completo (`docker-compose.local.yml`, proyecto `tranqui-local`, sin tocar tu stack
   `tranquiapp`), con datos semilla.

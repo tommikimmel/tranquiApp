@@ -68,6 +68,9 @@ class ValidacionDatosTest {
         List<Fila> filas = ValidadorEventos.respuesta(List.of(new Fila(1L, "a@b.com"), new Fila(-2L, "a@b.com"),
                 new Fila(3L, "no-es-mail"), new Fila(4L, null)), "prueba");
         assertThat(filas).extracting(Fila::id).containsExactly(1L, 4L);
+        // Para paginar cuenta lo que llegó: una página llena con filas salteadas no es la última.
+        assertThat(ValidadorEventos.recibidas(filas)).isEqualTo(4);
+        assertThat(ValidadorEventos.recibidas(List.of(1, 2))).isEqualTo(2);
     }
 
     @Test
@@ -95,7 +98,7 @@ class ValidacionDatosTest {
 
     private static final Object SIN_REGLA = new Object();
 
-    private static List<Class<?>> records() throws IOException, ClassNotFoundException {
+    static List<Class<?>> records() throws IOException, ClassNotFoundException {
         Path dir = Path.of("src/main/java", PAQUETE.replace('.', '/'));
         List<Class<?>> lista = new ArrayList<>();
         try (Stream<Path> archivos = Files.list(dir)) {
@@ -109,7 +112,7 @@ class ValidacionDatosTest {
     }
 
     /** Una instancia válida del record, con el componente {@code indice} reemplazado por {@code valor}. */
-    private static Object instancia(Class<?> tipo, int indice, Object valor) throws Exception {
+    static Object instancia(Class<?> tipo, int indice, Object valor) throws Exception {
         RecordComponent[] componentes = tipo.getRecordComponents();
         Class<?>[] tipos = Arrays.stream(componentes).map(RecordComponent::getType).toArray(Class<?>[]::new);
         Object[] args = new Object[componentes.length];

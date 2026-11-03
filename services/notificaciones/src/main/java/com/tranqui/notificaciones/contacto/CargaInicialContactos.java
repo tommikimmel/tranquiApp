@@ -1,5 +1,6 @@
 package com.tranqui.notificaciones.contacto;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.notificaciones.interno.ClienteInterno;
 import com.tranqui.notificaciones.notificacion.Notificacion;
 import com.tranqui.notificaciones.notificacion.NotificacionRepository;
@@ -99,7 +100,7 @@ public class CargaInicialContactos {
                 contactos.guardar(c.id(), c.email(), c.nombre(), c.apellido(), c.rol(), c.emailHabilitado());
             }
             total += lote.size();
-            if (lote.size() < TAMANIO_PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < TAMANIO_PAGINA) {
                 return total;
             }
         }

@@ -1,0 +1,14 @@
+[
+  {
+    "profesionalId" : 17,
+    "accessTokenCifrado" : "texto-accessTokenCifrado",
+    "refreshTokenCifrado" : "refresh-cifrado-17",
+    "tokenVenceEn" : "2026-11-03T10:30:00",
+    "calendarId" : "texto-calendarId",
+    "syncToken" : "sync-17",
+    "watchChannelId" : "texto-watchChannelId",
+    "watchResourceId" : "texto-watchResourceId",
+    "watchVenceEn" : "2026-11-03T10:30:00",
+    "watchActivo" : false
+  }
+]

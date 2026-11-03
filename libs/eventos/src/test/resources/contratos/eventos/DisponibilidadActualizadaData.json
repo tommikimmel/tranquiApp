@@ -1,0 +1,7 @@
+{
+  "profesionalId" : 1,
+  "diaSemana" : 1,
+  "horaInicio" : "texto",
+  "horaFin" : "texto",
+  "activo" : false
+}

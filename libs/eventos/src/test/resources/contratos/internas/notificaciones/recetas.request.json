@@ -1,0 +1,8 @@
+{
+  "email" : "pac@mail.com",
+  "pacienteNombre" : "Ana",
+  "medicoNombre" : "Dra. Paz",
+  "matricula" : "MN 12345",
+  "pdfUrl" : "https://s3.tranqui/r.pdf",
+  "nroRecetario" : "REC-1"
+}

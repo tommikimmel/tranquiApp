@@ -2,7 +2,11 @@ package com.tranqui.app.service;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.eventos.jwt.ServiceJwt;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -34,14 +38,14 @@ public class ResincronizacionSuscripciones {
      * que implementa S2b en el servicio de pagos.
      */
     public record EstadoSuscripcionDto(
-            Long professionalId,
+            @NotNull @Positive Long professionalId,
             String estado,
             String planCode,
             boolean acceso,
             boolean puedeRecetar,
             @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDateTime periodoHasta,
             @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDateTime graciaHasta,
-            Long version
+            @PositiveOrZero Long version
     ) {}
 
     private final CopiaSuscripciones copia;
@@ -91,7 +95,7 @@ public class ResincronizacionSuscripciones {
             final int p = pagina;
             List<EstadoSuscripcionDto> elementos;
             try {
-                elementos = http.get()
+                elementos = ValidadorEventos.respuesta(http.get()
                         .uri(uriBuilder -> uriBuilder
                                 .path("/internal/suscripciones/estado")
                                 .queryParam("pagina", p)
@@ -105,13 +109,13 @@ public class ResincronizacionSuscripciones {
                             h.set("X-Correlation-Id", correlacion != null ? correlacion : UUID.randomUUID().toString());
                         })
                         .retrieve()
-                        .body(new ParameterizedTypeReference<List<EstadoSuscripcionDto>>() {});
+                        .body(new ParameterizedTypeReference<List<EstadoSuscripcionDto>>() {}), "/internal/suscripciones/estado");
             } catch (Exception e) {
                 log.warn("El servicio de pagos no respondió la resincronización de suscripciones; la copia sigue como está: {}", e.getMessage());
                 return;
             }
 
-            if (elementos == null || elementos.isEmpty()) {
+            if (elementos == null || ValidadorEventos.recibidas(elementos) == 0) {
                 break;
             }
 
@@ -125,7 +129,7 @@ public class ResincronizacionSuscripciones {
                 }
             }
 
-            if (elementos.size() < tamanio) {
+            if (ValidadorEventos.recibidas(elementos) < tamanio) {
                 break;
             }
             pagina++;

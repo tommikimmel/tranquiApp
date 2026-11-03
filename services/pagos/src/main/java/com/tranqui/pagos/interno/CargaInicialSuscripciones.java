@@ -1,5 +1,6 @@
 package com.tranqui.pagos.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.eventos.consumo.EsperaAntesDeConsumir;
 import com.tranqui.pagos.datos.EventosSuscripcion;
 import com.tranqui.pagos.datos.Facturas;
@@ -133,7 +134,7 @@ public class CargaInicialSuscripciones implements EsperaAntesDeConsumir {
                 listaSuscripciones.add(s);
                 subsPorProfesional.computeIfAbsent(s.professionalId(), k -> new ArrayList<>()).add(s.id());
             }
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }
@@ -160,7 +161,7 @@ public class CargaInicialSuscripciones implements EsperaAntesDeConsumir {
                 planes.insertar(p.aPlan());
             }
             totalPlanes += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }
@@ -173,7 +174,7 @@ public class CargaInicialSuscripciones implements EsperaAntesDeConsumir {
                 planes.insertarFeature(f.aFeature());
             }
             totalFeatures += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }
@@ -186,7 +187,7 @@ public class CargaInicialSuscripciones implements EsperaAntesDeConsumir {
                 planes.insertarPlanFeature(pf.aPlanFeature());
             }
             totalPlanFeatures += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }
@@ -207,7 +208,7 @@ public class CargaInicialSuscripciones implements EsperaAntesDeConsumir {
                 eventosSuscripcion.insertar(e.aEvento());
             }
             totalEventos += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }
@@ -221,7 +222,7 @@ public class CargaInicialSuscripciones implements EsperaAntesDeConsumir {
                 pagosSuscripcion.insertar(p.aPago());
             }
             totalPagos += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }
@@ -235,7 +236,7 @@ public class CargaInicialSuscripciones implements EsperaAntesDeConsumir {
                 facturas.insertar(f.aFactura());
             }
             totalFacturas += lote.size();
-            if (lote.size() < PAGINA_FACTURAS) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA_FACTURAS) {
                 break;
             }
         }
@@ -249,7 +250,7 @@ public class CargaInicialSuscripciones implements EsperaAntesDeConsumir {
                 secuenciasFactura.insertar(s.aSecuencia());
             }
             totalSecuencias += lote.size();
-            if (lote.size() < PAGINA) {
+            if (ValidadorEventos.recibidas(lote) < PAGINA) {
                 break;
             }
         }

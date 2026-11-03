@@ -198,8 +198,8 @@ class FuenteIdentidadIntegracionTest {
     @Test
     void turnos_seResincronizanDesdeElServicioDeTurnos() {
         when(interno.turnosDelServicio()).thenReturn(List.of(
-                new ClienteInterno.TurnoMonolito(3, turno(40L), null, null),
-                new ClienteInterno.TurnoMonolito(1, null, null, null)));
+                new ClienteInterno.TurnoServicio(3, turno(40L)),
+                new ClienteInterno.TurnoServicio(1, null)));
 
         assertThat(copias.copiarTurnos()).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM turno_atendido", Integer.class)).isEqualTo(1);

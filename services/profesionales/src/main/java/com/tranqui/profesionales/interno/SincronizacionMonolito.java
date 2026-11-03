@@ -1,5 +1,6 @@
 package com.tranqui.profesionales.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.eventos.data.TarifasProfesionalData;
 import com.tranqui.profesionales.datos.Agendas;
 import com.tranqui.profesionales.datos.Profesionales;
@@ -89,7 +90,7 @@ public class SincronizacionMonolito {
                     }
                     if (profesionales.guardarMercadoPago(c.profesionalId(), c.vinculada(), c.version())) cambios++;
                 }
-                if (lote.size() < PAGINA_PAGOS) break;
+                if (ValidadorEventos.recibidas(lote) < PAGINA_PAGOS) break;
             }
             for (int pagina = 0; ; pagina++) {
                 List<ClienteInterno.EstadoSuscripcion> lote = interno.estadoSuscripciones(pagina, PAGINA_PAGOS);
@@ -102,7 +103,7 @@ public class SincronizacionMonolito {
                     if (profesionales.guardarSuscripcion(e.professionalId(), e.estado(), e.periodoHasta(), e.puedeRecetar(),
                             e.version())) cambios++;
                 }
-                if (lote.size() < PAGINA_PAGOS) break;
+                if (ValidadorEventos.recibidas(lote) < PAGINA_PAGOS) break;
             }
             if (cambios > 0) {
                 log.info("Sincronización con pagos: {} datos de Mercado Pago o suscripción actualizados", cambios);

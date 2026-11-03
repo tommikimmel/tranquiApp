@@ -1,0 +1,12 @@
+{
+  "suscripcionId" : 1,
+  "profesionalId" : 1,
+  "tipo" : "texto",
+  "nombrePlan" : "texto",
+  "monto" : 1,
+  "fecha" : "2026-11-03T10:00:00",
+  "fechaHasta" : "2026-11-03T10:00:00",
+  "ciclo" : "texto",
+  "comprobante" : "texto",
+  "diasRestantes" : 1
+}
