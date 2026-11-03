@@ -10,6 +10,8 @@ import com.tranqui.eventos.data.SuscripcionCambioEstadoV2Data;
 import com.tranqui.eventos.data.TurnoActualizadoData;
 import com.tranqui.profesionales.seguridad.JwtTestHelper;
 import com.tranqui.profesionales.datos.Profesionales;
+import com.tranqui.profesionales.perfil.MedicoDto;
+import com.tranqui.profesionales.perfil.Perfiles;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,8 +35,10 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
@@ -75,6 +79,7 @@ class FuenteIdentidadIntegracionTest {
     @Autowired Profesionales profesionales;
     @Autowired SincronizacionMonolito sincronizacion;
     @Autowired Copias copias;
+    @Autowired Perfiles perfiles;
     @Autowired JdbcTemplate jdbc;
     @Autowired @Qualifier("profesionalMpVinculada") ManejadorEvento<CuentaMpVinculadaData> mpVinculada;
     @Autowired @Qualifier("profesionalMpDesvinculada") ManejadorEvento<CuentaMpDesvinculadaData> mpDesvinculada;
@@ -100,6 +105,20 @@ class FuenteIdentidadIntegracionTest {
         Profesionales.Profesional p = profesionales.porId(7L).orElseThrow();
         assertThat(p.nombre()).isEqualTo("Nueva");
         assertThat(p.version()).isEqualTo(12);
+        assertThat(p.mpVinculada()).isTrue();
+        assertThat(p.suscripcionEstado()).isEqualTo("ACTIVE");
+        assertThat(p.puedeRecetar()).isTrue();
+    }
+
+    @Test
+    void guardarElPerfil_conIdentidad_noPisaMercadoPagoNiLaSuscripcion() {
+        altaConPagos(7L);
+        when(interno.guardarIdentidad(eq(7L), any())).thenReturn(deIdentidad(7L, "Nueva", 12));
+
+        perfiles.actualizarPerfil("ana@mail.com", mock(MedicoDto.class));
+
+        Profesionales.Profesional p = profesionales.porId(7L).orElseThrow();
+        assertThat(p.nombre()).isEqualTo("Nueva");
         assertThat(p.mpVinculada()).isTrue();
         assertThat(p.suscripcionEstado()).isEqualTo("ACTIVE");
         assertThat(p.puedeRecetar()).isTrue();

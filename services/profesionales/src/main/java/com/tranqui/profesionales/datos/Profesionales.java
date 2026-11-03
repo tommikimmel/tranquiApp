@@ -139,6 +139,11 @@ public class Profesionales {
         return n > 0;
     }
 
+    /** Lo que mandó la fuente de identidad: con identidad, solo lo suyo; con el monolito, todo. */
+    public boolean guardarDatos(DatosMonolito d, boolean deIdentidad) {
+        return deIdentidad ? guardarDatosIdentidad(d) : guardarDatosMonolito(d);
+    }
+
     /**
      * Fase 9, con la fuente de identidad: pisa solo lo que es de identidad (y la verificación del administrador). Mercado
      * Pago y la suscripción no se tocan: identidad los manda en null y llegan de pagos ({@link #guardarMercadoPago},

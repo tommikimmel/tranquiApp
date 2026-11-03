@@ -180,7 +180,8 @@ public class Perfiles {
 
         tx.executeWithoutResult(estado -> {
             if (monolito != null) {
-                profesionales.guardarDatosMonolito(monolito.datos().conFoto(dto.fotoUrl()));
+                // Con identidad, su respuesta trae Mercado Pago y la suscripción en null: no se pisan (son de pagos).
+                profesionales.guardarDatos(monolito.datos().conFoto(dto.fotoUrl()), interno.fuenteIdentidad());
             }
             int version = profesionales.guardarPerfil(p.id(), nuevo);
             publicador.perfil(buscar(email), version);
