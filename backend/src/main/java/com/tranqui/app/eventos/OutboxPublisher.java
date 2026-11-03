@@ -6,6 +6,11 @@ import com.tranqui.comun.correlation.CorrelationIdHolder;
 import com.tranqui.eventos.EventEnvelope;
 import com.tranqui.eventos.EventObjectMapperFactory;
 import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.ValidadorEventos;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,12 +25,22 @@ import java.util.UUID;
 @Service
 public class OutboxPublisher {
 
+    private static final Logger log = LoggerFactory.getLogger(OutboxPublisher.class);
+
     private final OutboxRepository outboxRepository;
     private final ObjectMapper objectMapper;
+    private final ValidadorEventos.Modo validacion;
 
-    public OutboxPublisher(OutboxRepository outboxRepository) {
+    @Autowired
+    public OutboxPublisher(OutboxRepository outboxRepository,
+                           @Value("${eventos.validacion.modo:rechazar}") String validacion) {
         this.outboxRepository = outboxRepository;
         this.objectMapper = EventObjectMapperFactory.create();
+        this.validacion = ValidadorEventos.Modo.de(validacion);
+    }
+
+    public OutboxPublisher(OutboxRepository outboxRepository) {
+        this(outboxRepository, "rechazar");
     }
 
     /**
@@ -75,6 +90,13 @@ public class OutboxPublisher {
         if (aggregateId == null || aggregateId.isBlank()) {
             throw new IllegalArgumentException("aggregateId no puede ser nulo ni vacío");
         }
+        // Fase 10: un data que no cumple las reglas de su record no se publica (o se avisa, en modo loguear).
+        ValidadorEventos.problemas(data).ifPresent(problemas -> {
+            if (validacion == ValidadorEventos.Modo.RECHAZAR) {
+                throw new IllegalArgumentException("El data de " + topico + " no cumple sus reglas: " + problemas);
+            }
+            log.warn("Se publica {} con data inválido (modo loguear): {}", topico, problemas);
+        });
 
         UUID eventId = UUID.randomUUID();
         OffsetDateTime occurredAt = OffsetDateTime.now();

@@ -1,5 +1,8 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.PositiveOrZero;
+
 import java.math.BigDecimal;
 
 /**
@@ -9,7 +12,7 @@ import java.math.BigDecimal;
  * salud ni la foto.
  */
 public record PerfilProfesionalData(
-    String emailContacto,
+    @Email String emailContacto,
     String domicilioAtencion,
     Double domicilioLat,
     Double domicilioLng,
@@ -28,7 +31,7 @@ public record PerfilProfesionalData(
     String titulo,
     String especialidad,
     String cuit,
-    BigDecimal precio,
+    @PositiveOrZero BigDecimal precio,
     String color,
     boolean ofreceOnline,
     boolean ofrecePresencial,

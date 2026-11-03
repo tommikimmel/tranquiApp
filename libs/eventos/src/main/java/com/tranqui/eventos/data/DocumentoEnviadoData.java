@@ -1,5 +1,8 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 /**
  * Datos del evento turnos.documento.enviado.v1 (agregado en la Fase 1).
  * Un documento pedido (certificado, informe o receta fuera de turno) ya le llegó al paciente.
@@ -9,9 +12,9 @@ package com.tranqui.eventos.data;
  * desde Recetas Electrónicas).
  */
 public record DocumentoEnviadoData(
-    Long turnoId,
-    Long pacienteId,
-    Long profesionalId,
+    @NotNull @Positive Long turnoId,
+    @Positive Long pacienteId,
+    @Positive Long profesionalId,
     String tipoLabel,
     String origen
 ) {}

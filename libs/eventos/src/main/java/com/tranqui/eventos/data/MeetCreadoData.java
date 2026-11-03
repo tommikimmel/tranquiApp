@@ -1,5 +1,8 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.LocalDate;
@@ -13,11 +16,11 @@ import java.time.LocalDate;
  * este link y hay que mandárselo (si no, el link ya iba en el mail de confirmación).
  */
 public record MeetCreadoData(
-    Long turnoId,
+    @NotNull @Positive Long turnoId,
     String meetUrl,
     String googleEventId,
-    Long pacienteId,
-    Long profesionalId,
+    @Positive Long pacienteId,
+    @Positive Long profesionalId,
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     LocalDate fecha,
     String horaInicio,

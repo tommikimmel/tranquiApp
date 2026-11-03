@@ -2,6 +2,7 @@ package com.tranqui.eventos.consumo;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tranqui.eventos.EventObjectMapperFactory;
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.eventos.RabbitMQConstantes;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.LoggerFactory;
@@ -67,11 +68,12 @@ public class EventosConsumoAutoConfiguration {
         ConsumidorEventos consumidorEventos(@Value("${eventos.consumo.servicio}") String servicio,
                                             ObjectProvider<ManejadorEvento<?>> manejadores, InboxHelper inbox,
                                             PlatformTransactionManager transactionManager,
-                                            ObjectProvider<MeterRegistry> metricas) {
+                                            ObjectProvider<MeterRegistry> metricas,
+                                            @Value("${eventos.validacion.modo:rechazar}") String validacion) {
             ObjectMapper mapper = EventObjectMapperFactory.create();
             List<ManejadorEvento<?>> lista = manejadores.orderedStream().toList();
             return new ConsumidorEventos(servicio, lista, inbox, new TransactionTemplate(transactionManager),
-                    mapper, metricas.getIfAvailable());
+                    mapper, metricas.getIfAvailable(), ValidadorEventos.Modo.de(validacion));
         }
 
         @Bean

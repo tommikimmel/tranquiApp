@@ -1,5 +1,8 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.OffsetDateTime;
@@ -10,10 +13,10 @@ import java.time.OffsetDateTime;
  * Nota: Nunca incluye contenido clínico ni texto privado del mensaje.
  */
 public record MensajeEnviadoData(
-    Long mensajeId,
-    Long conversacionId,
-    Long remitenteId,
-    Long destinatarioId,
+    @NotNull @Positive Long mensajeId,
+    @Positive Long conversacionId,
+    @Positive Long remitenteId,
+    @Positive Long destinatarioId,
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     OffsetDateTime enviadoEn
 ) {}

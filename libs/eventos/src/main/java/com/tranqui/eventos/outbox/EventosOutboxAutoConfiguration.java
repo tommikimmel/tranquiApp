@@ -1,6 +1,8 @@
 package com.tranqui.eventos.outbox;
 
+import com.tranqui.eventos.ValidadorEventos;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.ObjectProvider;
@@ -33,8 +35,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 public class EventosOutboxAutoConfiguration {
 
     @Bean
-    OutboxPublisher outboxPublisher(JdbcTemplate jdbc) {
-        return new OutboxPublisher(jdbc);
+    OutboxPublisher outboxPublisher(JdbcTemplate jdbc, @Value("${eventos.validacion.modo:rechazar}") String validacion) {
+        return new OutboxPublisher(jdbc, ValidadorEventos.Modo.de(validacion));
     }
 
     @Bean

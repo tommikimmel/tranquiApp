@@ -1,5 +1,8 @@
 package com.tranqui.eventos.data;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.LocalDate;
@@ -13,9 +16,9 @@ import java.time.LocalDate;
  * {@code SIN_PAGO} o {@code PENDIENTE}).
  */
 public record TurnoCanceladoData(
-    Long turnoId,
-    Long pacienteId,
-    Long profesionalId,
+    @NotNull @Positive Long turnoId,
+    @Positive Long pacienteId,
+    @Positive Long profesionalId,
     String canceladoPor,
     String motivo,
     boolean correspondeReembolso,
