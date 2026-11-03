@@ -65,7 +65,11 @@ public class ReembolsoService {
         return saltarPolitica48h || !LocalDateTime.now().plusHours(48).isAfter(fechaTurno);
     }
 
-    @Transactional
+    // Corre dentro de la transacción de la cancelación (es transaccional desde la outbox de la Fase 0). Sin noRollbackFor, una excepción de acá (token
+    // ilegible, Mercado Pago rechaza el reembolso) dejaba la transacción marcada para deshacerse aunque
+    // TurnoService la atrapara: la cancelación entera fallaba con 500 en vez de seguir con el reembolso
+    // PENDIENTE. Las excepciones salen antes de cambiar el pago o el turno, así que no queda nada a medias.
+    @Transactional(noRollbackFor = Exception.class)
     public boolean procesarReembolso(Turno turno, Usuario medico, boolean saltarPolitica48h) throws Exception {
         // Validate 48 hours cancellation policy
         if (!correspondeReembolso(turno, saltarPolitica48h)) {
