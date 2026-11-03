@@ -446,10 +446,12 @@ spring:
                 key-resolver: "#{@userOrIpKeyResolver}"
 
         # --- PROFESIONALES ---
+        # Fase 5: el buscador, "Mi perfil" y la agenda van al servicio de profesionales (o al monolito en la
+        # vuelta atrás, que responde las mismas rutas). Antes de la regla general de /api/medicos/**.
         - id: profesionales
           uri: ${tranqui.services.profesionales.uri:${tranqui.services.monolito.uri}}
           predicates:
-            - Path=/api/medicos/**,/api/conceptos/**,/api/recetas/**,/api/clinical/**
+            - Path=/api/medicos,/api/medicos/perfil,/api/medicos/disponibilidad,/api/medicos/disponibilidad-config
           filters:
             - name: CircuitBreaker
               args:
@@ -474,6 +476,38 @@ spring:
               args:
                 rate-limiter: "#{@tranquiRateLimiter}"
                 key-resolver: "#{@userOrIpKeyResolver}"
+
+        # Lo demás de /api/medicos (las estadísticas del panel), los documentos de la API de conceptos, las
+        # recetas y la historia clínica siguen en el monolito (decisiones 1 y 3 de la Fase 5).
+        - id: profesionales-monolito
+          uri: ${tranqui.services.monolito.uri}
+          predicates:
+            - Path=/api/medicos/**,/api/conceptos/**,/api/recetas/**,/api/clinical/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: monolito-profesionales
+                fallbackUri: forward:/fallback/profesionales
+            - name: Retry
+              args:
+                retries: 2
+                methods: GET
+                series: SERVER_ERROR
+                exceptions:
+                  - java.io.IOException
+                  - java.net.ConnectException
+                  - io.netty.channel.ConnectTimeoutException
+                  - io.netty.handler.timeout.ReadTimeoutException
+                backoff:
+                  firstBackoff: 50ms
+                  maxBackoff: 500ms
+                  factor: 2
+                  basedOnPreviousValue: false
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@userOrIpKeyResolver}"
+
 
         # --- CHAT WEBSOCKET ---
         - id: chat-ws
@@ -507,6 +541,21 @@ spring:
             - name: CircuitBreaker
               args:
                 name: calendario
+                fallbackUri: forward:/fallback/internal
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@serviceKeyResolver}"
+
+        # Fase 5: la resincronización del monolito con el servicio de profesionales.
+        - id: internal-profesionales
+          uri: ${tranqui.services.profesionales.uri}
+          predicates:
+            - Path=/internal/profesionales/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: profesionales
                 fallbackUri: forward:/fallback/internal
             - name: RequestRateLimiter
               args:
@@ -570,8 +619,11 @@ tranqui:
       uri: ${TRANQUI_SERVICES_MONOLITO_URI:http://localhost:8081}
     identidad:
       uri: ${tranqui.services.monolito.uri}
+    # Fase 5: lb://profesionales cuando el servicio está desplegado (docker-compose). Lleva el buscador,
+    # /api/medicos/perfil, la disponibilidad y /internal/profesionales. Vuelta atrás: sacar la variable y
+    # PROFESIONALES_EXTERNO=false en el monolito.
     profesionales:
-      uri: ${tranqui.services.monolito.uri}
+      uri: ${TRANQUI_SERVICES_PROFESIONALES_URI:${tranqui.services.monolito.uri}}
     turnos:
       uri: ${tranqui.services.monolito.uri}
     # Fase 4: lb://pagos cuando el servicio está desplegado (docker-compose). Lleva /api/payments (webhook,

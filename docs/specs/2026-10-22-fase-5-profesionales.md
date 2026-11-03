@@ -122,6 +122,11 @@ perfil de cada profesional sale del buscador (`GET /api/medicos`).
 ### R3 — Gateway
 - Las rutas del perfil, la disponibilidad y el buscador van a `TRANQUI_SERVICES_PROFESIONALES_URI`; las de
   turnos, pagos y calendario siguen con sus reglas, y `/api/medicos/stats` sigue en el monolito.
+- Hecho en R3: la regla vieja `profesionales` (`/api/medicos/**`, conceptos, recetas y `/api/clinical/**`)
+  tomaba todo con el mismo destino. Ahora hay dos: `profesionales` (solo el buscador, el perfil y la agenda,
+  con `TRANQUI_SERVICES_PROFESIONALES_URI`) y `profesionales-monolito` (lo demás, fijo en el monolito), más
+  `internal-profesionales` para la resincronización. Las rutas de turnos, Mercado Pago y Google Calendar
+  van antes y no cambian.
 
 ### R4 — Infraestructura, vuelta atrás y conciliación
 - Compose, CI, deploy, métricas y presupuesto (3.264 + 288 = 3.552 MB). Script de vuelta atrás (perfil,
