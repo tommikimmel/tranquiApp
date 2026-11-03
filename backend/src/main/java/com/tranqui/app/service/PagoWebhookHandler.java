@@ -171,14 +171,15 @@ public class PagoWebhookHandler {
             turno = turnoGuardado;
         }
 
-        // Registrar el Pago (con el servicio de pagos, una copia del que registró el servicio)
-        Pago pago = Pago.builder()
-                .turno(turno)
-                .transactionId(transactionId)
-                .estado(EstadoPago.APROBADO)
-                .monto(turno.getPrecio())
-                .fechaPago(LocalDateTime.now())
-                .build();
+        // Registrar el Pago (con el servicio de pagos, una copia del que registró el servicio). La tabla
+        // tiene un pago por turno (turno_id único): si el paciente ya tuvo un intento rechazado, ese mismo
+        // registro pasa a aprobado. Antes se insertaba otro, chocaba con la restricción y el turno quedaba
+        // pendiente aunque el paciente hubiera pagado.
+        Pago pago = turno.getPago() != null ? turno.getPago() : Pago.builder().turno(turno).build();
+        pago.setTransactionId(transactionId);
+        pago.setEstado(EstadoPago.APROBADO);
+        pago.setMonto(turno.getPrecio());
+        pago.setFechaPago(LocalDateTime.now());
         Pago pagoGuardado = pagoRepository.save(pago);
         Long pagoId = (pagoGuardado != null && pagoGuardado.getId() != null) ? pagoGuardado.getId() : (pago.getId() != null ? pago.getId() : turno.getId());
         int pagoVersion = pagoGuardado != null ? pagoGuardado.getAggregateVersion() : pago.getAggregateVersion();
@@ -356,6 +357,10 @@ public class PagoWebhookHandler {
         Turno turno = turnoRepository.findById(d.turnoId()).orElse(null);
         if (turno == null) {
             log.warn("pagos.pago.rechazado de un turno que no existe en el monolito: {}", d.turnoId());
+            return;
+        }
+        // Un pago por turno: si ya tiene uno (otro intento rechazado, o el aprobado), no se pisa.
+        if (turno.getPago() != null) {
             return;
         }
         pagoRepository.save(Pago.builder()

@@ -18,6 +18,8 @@ public class TurnoResponseDto {
     private LocalTime horaInicio;
     private BigDecimal precio;
     private String checkoutUrl; // URL para pagar con Mercado Pago
+    // Fase 4: true cuando el link lo crea el servicio de pagos y se pide aparte (GET /api/payments/checkout/{id}).
+    private Boolean checkoutPendiente;
     private String tokenReserva; // solo en la respuesta de la reserva: habilita abandonar-pago
     private String meetLink; // Google Meet URL si ya está confirmado
 }

@@ -519,6 +519,7 @@ public class TurnoService {
                 .horaInicio(turno.getHoraInicio())
                 .precio(turno.getPrecio())
                 .checkoutUrl(checkoutUrl)
+                .checkoutPendiente(pagosExterno ? Boolean.TRUE : null)
                 .tokenReserva(turno.getTokenReserva())
                 .build();
     }
