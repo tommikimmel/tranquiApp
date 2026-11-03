@@ -1,12 +1,17 @@
 package com.tranqui.app.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.sql.Date;
 import java.sql.ResultSet;
@@ -30,6 +35,23 @@ public class InternoIdentidadController {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    // El servidor web atiende antes de que terminen los CommandLineRunner (LocalDemoSeeder, DataInitializer): sin esto,
+    // identidad copiaba los usuarios a medio sembrar y, como copia una sola vez, quedaba sin las cuentas.
+    private volatile boolean listo;
+
+    @EventListener(ApplicationReadyEvent.class)
+    void alArrancar() {
+        listo = true;
+    }
+
+    /** Antes de cada ruta: hasta que el monolito terminó de arrancar, 503 (identidad reintenta la carga). */
+    @ModelAttribute
+    void exigirArranqueCompleto() {
+        if (!listo) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "El monolito todavía está arrancando");
+        }
+    }
 
     @GetMapping("/usuarios")
     public ResponseEntity<List<Map<String, Object>>> usuarios(
