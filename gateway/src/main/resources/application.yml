@@ -577,6 +577,10 @@ tranqui:
       uri: ${tranqui.services.monolito.uri}
     internal:
       uri: ${tranqui.services.monolito.uri}
+  # Fase 3 (G1): portón del sitio para las rutas que van a servicios (vacío = apagado, como en el
+  # monolito). El paywall no lleva configuración: consulta al monolito.
+  portones:
+    sitio-password: ${SITE_ACCESS_PASSWORD:}
   jwt:
     service-secret: ${SERVICE_JWT_KEY:}
   victoriametrics:

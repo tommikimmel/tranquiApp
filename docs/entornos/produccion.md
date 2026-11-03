@@ -4,7 +4,7 @@
 - **Servidor:** un VPS con Docker (8 GB de RAM, 2 núcleos). Los datos de acceso no se documentan acá (ver
   [secretos.md](secretos.md)).
 - **Proxy y TLS:** Traefik, compartido con otros servicios del VPS. A partir de la Fase 0 de microservicios,
-  enruta `/api` y `/ws-tranqui` hacia el **API Gateway** (`gateway:8080`) y el resto al frontend (`tranqui-frontend:80`).
+  enruta `/api`, `/ws-tranqui` y `/ws-notificaciones` hacia el **API Gateway** (`gateway:8080`) y el resto al frontend (`tranqui-frontend:80`).
 - **Aislamiento interno:** el monolito (`tranqui-backend`) y los servicios de soporte no publican puertos en el
   host ni tienen labels de Traefik; viven exclusivamente en la red interna de Docker (`tranqui-network`).
 
@@ -212,7 +212,7 @@ permite **volver atrás al monolito directo de forma inmediata** sin apagar la b
    # labels:
    #   - "traefik.enable=true"
    #   - "traefik.http.routers.tranqui-gateway.entrypoints=websecure"
-   #   - "traefik.http.routers.tranqui-gateway.rule=Host(`tranquisalud.com`) && (PathPrefix(`/api`) || PathPrefix(`/ws-tranqui`))"
+   #   - "traefik.http.routers.tranqui-gateway.rule=Host(`tranquisalud.com`) && (PathPrefix(`/api`) || PathPrefix(`/ws-tranqui`) || PathPrefix(`/ws-notificaciones`))"
    #   - "traefik.http.routers.tranqui-gateway.tls.certresolver=letsencrypt"
    #   - "traefik.http.services.tranqui-gateway.loadbalancer.server.port=8080"
    ```

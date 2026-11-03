@@ -137,6 +137,20 @@ class InternoMonolitoControllerTest {
     }
 
     @Test
+    void accesoSuscripcion_paraElPaywallDelGateway() {
+        Usuario medico = usuarioRepository.save(Usuario.builder().nombre("Dra")
+                .email("pw.med." + System.nanoTime() + "@mail.com").rol(Rol.PSIQUIATRA).build());
+        Usuario paciente = usuarioRepository.save(Usuario.builder().nombre("Pía")
+                .email("pw.pac." + System.nanoTime() + "@mail.com").rol(Rol.PACIENTE).build());
+        String ruta = "/internal/monolito/suscripciones/acceso?email=";
+
+        assertThat(get(ruta + medico.getEmail(), tokenServicio()).getBody()).isEqualTo("{\"permitido\":false}");
+        assertThat(get(ruta + paciente.getEmail(), tokenServicio()).getBody()).isEqualTo("{\"permitido\":true}");
+        assertThat(get(ruta + "nadie@mail.com", tokenServicio()).getBody()).isEqualTo("{\"permitido\":true}");
+        assertThat(get(ruta + medico.getEmail(), null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
     void enlacesDeAsistencia_soloSiElTurnoTieneToken() {
         Usuario paciente = usuarioRepository.save(Usuario.builder().nombre("Lía")
                 .email("pac." + System.nanoTime() + "@mail.com").rol(Rol.PACIENTE).build());

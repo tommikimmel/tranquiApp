@@ -267,11 +267,13 @@ services:
       TRANQUI_SERVICES_CHAT_URI: ${TRANQUI_SERVICES_CHAT_URI:-lb://chat}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      # Fase 3 (G1): el gateway aplica el portón del sitio y el paywall a las rutas de los servicios.
+      SITE_ACCESS_PASSWORD: ${SITE_ACCESS_PASSWORD:-}
       VICTORIAMETRICS_URL: http://victoriametrics:8428
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tranqui-gateway.entrypoints=websecure"
-      - "traefik.http.routers.tranqui-gateway.rule=Host(`tranquisalud.com`) && (PathPrefix(`/api`) || PathPrefix(`/ws-tranqui`))"
+      - "traefik.http.routers.tranqui-gateway.rule=Host(`tranquisalud.com`) && (PathPrefix(`/api`) || PathPrefix(`/ws-tranqui`) || PathPrefix(`/ws-notificaciones`))"
       - "traefik.http.routers.tranqui-gateway.tls.certresolver=letsencrypt"
       - "traefik.http.services.tranqui-gateway.loadbalancer.server.port=8080"
     healthcheck:
