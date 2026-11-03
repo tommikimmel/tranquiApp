@@ -546,7 +546,8 @@ public class SuscripcionService {
         );
         eventosSuscripcion.insertarNuevo(evento);
 
-        if (previousStatus != null && newStatus != null && !previousStatus.equals(newStatus)) {
+        // También sin cambio de estado (una renovación ACTIVE -> ACTIVE): cambia el período y las copias tienen que saberlo.
+        if (previousStatus != null && newStatus != null) {
             suscripciones.porId(subscriptionId).ifPresent(sub -> {
                 LocalDate vencimiento = sub.currentPeriodEnd() != null ? sub.currentPeriodEnd().toLocalDate() : null;
                 boolean acceso = isAccessAllowed(sub.professionalId());

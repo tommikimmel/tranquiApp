@@ -361,7 +361,8 @@ class SuscripcionesS2bIntegracionTest {
 
     @Test
     void manualPayment_esIdempotentePorClave() throws Exception {
-        String tokenAdmin = token("admin@mail.com", "ADMIN");
+        // Un admin con su id en el token (no está en la copia de suscriptores): la auditoría queda a su nombre.
+        String tokenAdmin = JwtTestHelper.tokenRs256("admin@mail.com", "ADMIN", 77L);
 
         LocalDateTime ahora = LocalDateTime.now();
         Dtos.ManualPaymentRequestDto dto = new Dtos.ManualPaymentRequestDto(
@@ -374,6 +375,8 @@ class SuscripcionesS2bIntegracionTest {
         ResponseEntity<String> res1 = pedir(HttpMethod.POST, "/api/admin/subscriptions/manual-payment", tokenAdmin, dto);
         assertThat(res1.getStatusCode()).isEqualTo(HttpStatus.OK);
         JsonNode p1 = mapper.readTree(res1.getBody());
+        assertThat(jdbc.queryForObject("SELECT actor_id FROM subscription_events WHERE event_type = 'MANUAL_PAYMENT_ACTIVATED'",
+                String.class)).isEqualTo("77");
         assertThat(p1.get("idempotencyKey").asText()).isEqualTo("IDEMP-KEY-TEST-1");
         assertThat(p1.get("status").asText()).isEqualTo("APPROVED");
 
@@ -447,6 +450,8 @@ class SuscripcionesS2bIntegracionTest {
         assertThat(fila.get("plan").get("id").asLong()).isEqualTo(1L);
 
         assertThat(pedir(HttpMethod.PATCH, "/api/admin/subscriptions/" + subId + "/status", tokenAdmin, Map.of("reason", "x"))
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(pedir(HttpMethod.PATCH, "/api/admin/subscriptions/" + subId + "/status", tokenAdmin, Map.of("status", "INVENTADO"))
                 .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(pedir(HttpMethod.PATCH, "/api/admin/subscriptions/999999/status", tokenAdmin, Map.of("status", "ACTIVE"))
                 .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);

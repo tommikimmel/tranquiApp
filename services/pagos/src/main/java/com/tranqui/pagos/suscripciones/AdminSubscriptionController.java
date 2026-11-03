@@ -40,6 +40,9 @@ import java.util.Map;
 @RequestMapping("/api/admin/subscriptions")
 public class AdminSubscriptionController {
 
+    private static final java.util.Set<String> ESTADOS = java.util.Set.of("REGISTERED", "PENDING_VERIFICATION", "VERIFIED",
+            "SUBSCRIPTION_PENDING", "ACTIVE", "PAST_DUE", "SUSPENDED", "CANCELLED", "REJECTED");
+
     private static final Logger log = LoggerFactory.getLogger(AdminSubscriptionController.class);
 
     private final Suscripciones suscripciones;
@@ -155,7 +158,7 @@ public class AdminSubscriptionController {
     @PostMapping("/manual-payment")
     public ResponseEntity<?> registerManualPayment(HttpServletRequest request, @RequestBody Dtos.ManualPaymentRequestDto req) {
         UsuarioJwt.Usuario u = validarAdmin(request);
-        Long adminId = suscriptores.porEmail(u.email()).map(Suscriptores.Suscriptor::id).orElse(1L);
+        Long adminId = adminId(u);
 
         try {
             boolean emitFactura = req.emitInvoice() != null ? req.emitInvoice() : true;
@@ -312,6 +315,10 @@ public class AdminSubscriptionController {
 
         String oldStatus = sub.status();
         String newStatus = newStatusStr.toUpperCase();
+        // Como SubscriptionStatus.valueOf de main: un estado que no existe es un 400.
+        if (!ESTADOS.contains(newStatus)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Estado de suscripción inválido: " + newStatusStr));
+        }
         LocalDateTime now = LocalDateTime.now();
 
         boolean cancelAtPeriodEnd = sub.cancelAtPeriodEnd();
@@ -410,7 +417,7 @@ public class AdminSubscriptionController {
             @RequestBody(required = false) Dtos.CreditNoteRequestDto req
     ) {
         UsuarioJwt.Usuario admin = validarAdmin(request);
-        Long adminId = suscriptores.porEmail(admin.email()).map(Suscriptores.Suscriptor::id).orElse(1L);
+        Long adminId = adminId(admin);
         try {
             String reason = (req != null && req.reason() != null && !req.reason().isBlank())
                     ? req.reason() : "Anulación administrativa";
@@ -419,5 +426,10 @@ public class AdminSubscriptionController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    /** El admin del token (los admins no están en la copia de suscriptores; antes caía en el usuario 1). */
+    private Long adminId(UsuarioJwt.Usuario u) {
+        return u.uid() != null ? u.uid() : suscriptores.porEmail(u.email()).map(Suscriptores.Suscriptor::id).orElse(1L);
     }
 }
