@@ -1,7 +1,12 @@
 package com.tranqui.identidad.interno;
 
 import com.tranqui.comun.correlation.CorrelationIdHolder;
+import com.tranqui.eventos.ValidadorEventos;
+import com.tranqui.eventos.data.PerfilProfesionalData;
 import com.tranqui.eventos.jwt.ServiceJwt;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -45,6 +50,9 @@ public class ClienteInterno {
             valores = valores != null ? Collections.unmodifiableMap(new HashMap<>(valores)) : Map.of();
         }
     }
+
+    /** El perfil actual de un profesional, de {@code GET /internal/profesionales/profesionales} (Fase 11). */
+    public record PerfilProfesional(@NotNull @Positive Long profesionalId, @NotNull @Valid PerfilProfesionalData perfil) {}
 
     private final RestClient http;
     private final ServiceJwt serviceJwt;
@@ -96,5 +104,11 @@ public class ClienteInterno {
                 "/internal/monolito/identidad/novedades-envios?pagina={p}&tamanio={t}",
                 new ParameterizedTypeReference<>() {}, pagina, tamanio);
         return r.stream().map(NovedadesEnvioMonolito::new).toList();
+    }
+
+    /** Los perfiles de todos los profesionales; las filas inválidas se saltean (no se confía en otro servicio). */
+    public List<PerfilProfesional> perfilesProfesionales() {
+        return ValidadorEventos.respuesta(lista("/internal/profesionales/profesionales",
+                new ParameterizedTypeReference<List<PerfilProfesional>>() {}), "/internal/profesionales/profesionales");
     }
 }

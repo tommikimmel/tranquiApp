@@ -245,14 +245,17 @@ jobs:
           echo "JWT_PRIVATE_KEY=$(openssl pkcs8 -topk8 -nocrypt -in /tmp/jwt.pem -outform DER | base64 -w0)" > /tmp/claves.env
           echo "JWT_PUBLIC_KEY=$(openssl rsa -in /tmp/jwt.pem -pubout -outform DER | base64 -w0)" >> /tmp/claves.env
           rm /tmp/jwt.pem
-      - name: Levantar el stack
-        run: $COMPOSE up -d --build
-      - name: Playwright
+      # Antes del stack: el contenedor del frontend monta frontend/ y crea node_modules como root.
+      - name: Dependencias de Playwright
         working-directory: frontend
         run: |
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
-          E2E_RESILIENCIA=1 E2E_COMPOSE="$COMPOSE" npx playwright test
+      - name: Levantar el stack
+        run: $COMPOSE up -d --build
+      - name: Playwright
+        working-directory: frontend
+        run: E2E_RESILIENCIA=1 E2E_COMPOSE="$COMPOSE" npx playwright test
       - name: Logs del stack
         if: failure()
         run: $COMPOSE logs --no-color --tail=300 > stack.log
