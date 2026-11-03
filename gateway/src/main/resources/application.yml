@@ -481,6 +481,23 @@ spring:
           predicates:
             - Path=/ws-tranqui/**
 
+        # --- RUTA INTERNA AL CHAT (Fase 2) ---
+        # Antes de la interna general: /internal/chat/** va al servicio de chat (o al monolito en la
+        # vuelta atrás, que responde la misma ruta). La protege InternalSecurityFilter como al resto.
+        - id: internal-chat
+          uri: ${tranqui.services.chat.uri}
+          predicates:
+            - Path=/internal/chat/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: chat
+                fallbackUri: forward:/fallback/internal
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@tranquiRateLimiter}"
+                key-resolver: "#{@serviceKeyResolver}"
+
         # --- RUTA INTERNA ENTRE SERVICIOS ---
         - id: internal
           uri: ${tranqui.services.internal.uri:${tranqui.services.monolito.uri}}
@@ -550,10 +567,12 @@ tranqui:
     # Vuelta atrás: sacar la variable y la ruta vuelve al monolito.
     notificaciones:
       uri: ${TRANQUI_SERVICES_NOTIFICACIONES_URI:${tranqui.services.monolito.uri}}
+    # Fase 2: lb://chat cuando el servicio está desplegado (docker-compose). Lleva /api/chat, el
+    # WebSocket /ws-tranqui y /internal/chat. Vuelta atrás: sacar la variable y vuelve al monolito.
     chat:
-      uri: ${tranqui.services.monolito.uri}
+      uri: ${TRANQUI_SERVICES_CHAT_URI:${tranqui.services.monolito.uri}}
     chat-ws:
-      uri: ${tranqui.services.monolito.uri}
+      uri: ${tranqui.services.chat.uri}
     calendario:
       uri: ${tranqui.services.monolito.uri}
     internal:
