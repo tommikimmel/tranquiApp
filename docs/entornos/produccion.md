@@ -29,16 +29,20 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 | `tranqui-chat` | `chat` | Servicio de chat (Fase 2): mensajería en vivo por `/ws-tranqui` e historial, base propia `chat` | 288 MB | 0.5 |
 | `tranqui-calendario` | `calendario` | Servicio de calendario (Fase 3): Google Calendar y Meet, eventos de los turnos y horarios ocupados, base propia `calendario` | 288 MB | 0.5 |
 | `tranqui-pagos` | `pagos` | Servicio de pagos (Fase 4): Mercado Pago de turnos y documentos (checkout, webhooks, reembolsos y cuentas de los profesionales), base propia `pagos` | 288 MB | 0.5 |
+| `tranqui-profesionales` | `profesionales` | Servicio de profesionales (Fase 5): perfil, buscador, tarifas y disponibilidad, base propia `profesionales` | 288 MB | 0.5 |
 | `tranqui-db-servicios` | `db-servicios` | Contenedor de una sola ejecución: crea la base y el usuario de cada servicio (`infra/postgres/crear-bases-servicios.sh`) y termina | 32 MB | 0.2 |
 | `tranqui-bot`, `tranqui-bot-worker`, `wsp-db`, `wsp-redis` | — | Bot de WhatsApp (proyecto aparte, fuera de este repositorio) | ~70 MB | — |
 
 ### Presupuesto de memoria (RAM)
 
-- **Total suma `mem_limit` Docker Compose (Fase 4):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 288 + 288 + 288 + 288 = 3.264 MB` (~3,26 GB; `db-servicios` corre unos segundos al arrancar y no suma).
+- **Total suma `mem_limit` Docker Compose (Fase 5):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 288 + 288 + 288 + 288 + 288 = 3.552 MB` (~3,55 GB; `db-servicios` corre unos segundos al arrancar y no suma).
 - **Traefik y bot de WhatsApp:** ~112 MB.
 - **Sistema operativo y buffers mínimos:** ~1 GB.
-- **Consumo proyectado total en VPS:** **~4,4 GB**, dentro del techo presupuestado de **~4,8 GB**
-  de la sección 9.1 para la Fase 0, reservando ~3,5 GB de margen libre para picos y caché de disco de PostgreSQL.
+- **Consumo proyectado total en VPS:** **~4,7 GB**, todavía dentro del techo presupuestado de **~4,8 GB**
+  de la sección 9.1 para la Fase 0, reservando ~3,2 GB de margen libre para picos y caché de disco de PostgreSQL.
+  Con la Fase 5 el margen contra el techo queda en ~0,1 GB: antes de sumar otro servicio hay que medir el
+  consumo real en el VPS (los servicios usan bastante menos que su límite: pagos ~175 MB de 288) o revisar
+  el techo.
 
 ### Afinación de JVM (backend y gateway)
 
@@ -142,6 +146,54 @@ define dependencias escalonadas con `condition: service_healthy`:
    docker compose -p app ps
    curl -fsS https://tranquisalud.com/api/health
    ```
+
+## Fase 5: servicio de profesionales
+
+El buscador (`GET /api/medicos`), "Mi perfil" (`/api/medicos/perfil`) y la agenda (`/api/medicos/disponibilidad`
+y `/api/medicos/disponibilidad-config`) viven en el contenedor `profesionales`, en las mismas URLs. Las
+estadísticas del panel, la historia clínica, las recetas y los documentos de la API de conceptos **siguen en
+el monolito**, igual que la verificación del administrador.
+
+- **Identidad:** nombre, apellido, teléfono, sexo, fecha de nacimiento, CUIL, documento y foto siguen siendo
+  del monolito. Al guardar el perfil, el servicio manda esa parte al monolito antes que el resto; si el
+  monolito no responde, el profesional ve un error y no se guarda nada.
+- **Suscripción, verificación y Mercado Pago:** el servicio los copia del monolito cada minuto
+  (`PROFESIONALES_SINCRONIZACION_SEGUNDOS`) y enseguida con los eventos de identidad y de verificación. Un
+  cambio de suscripción tarda hasta un minuto en reflejarse en el buscador.
+- **Copia del monolito:** turnos, recetas, facturación y los mails siguen leyendo el perfil, la
+  disponibilidad y las tarifas de sus tablas. Se actualizan con los eventos del servicio y con una
+  resincronización cada 15 minutos (`PROFESIONALES_RESINCRONIZACION_MINUTOS`). Con el servicio caído, la
+  agenda y la reserva siguen andando; lo que no se puede es editar el perfil ni ver el buscador.
+
+**Variables en `/srv/tranqui/.env`:** `PROFESIONALES_DB_PASSWORD` (`openssl rand -hex 24`). `MERCADOPAGO_ENABLED`
+es la misma que ya usa el monolito.
+
+**Primer arranque:** copia del monolito los profesionales con su perfil, foto, disponibilidad y tarifas, y lo
+que es del monolito (identidad, verificación, suscripción, Mercado Pago). La versión de cada profesional
+arranca en la de su usuario. Recién después empieza a consumir eventos.
+
+**El corte va en un solo paso:** `PROFESIONALES_EXTERNO=true` en el monolito y la ruta del gateway al servicio.
+Con el flag, el monolito responde 409 si alguna de esas rutas le llega igual. Después, la conciliación todos
+los días durante dos semanas (una diferencia de menos de 15 minutos puede ser la resincronización que no
+pasó todavía):
+```bash
+node scripts/fase5-conciliar-profesionales.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+```
+
+**Vuelta atrás de la Fase 5:**
+
+1. En `/srv/tranqui/.env`: `PROFESIONALES_EXTERNO=false` y
+   `TRANQUI_SERVICES_PROFESIONALES_URI=http://tranqui-backend:8080`.
+2. `docker compose -p app stop profesionales` y `docker compose -p app up -d tranqui-backend gateway`.
+3. Devolver al monolito el perfil, la disponibilidad y las tarifas, y dejar la versión de cada usuario por
+   encima de la del servicio (idempotente; `--prueba` solo cuenta):
+   ```bash
+   node scripts/fase5-devolver-profesionales.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+   ```
+
+**Volver al servicio después:** borrar la base de profesionales para que el primer arranque vuelva a copiar
+todo: `docker compose -p app exec tranqui-db psql -U <DB_USER> -d tranqui_app -c "DROP DATABASE profesionales"`,
+volver las dos variables a su valor y `docker compose -p app up -d`.
 
 ## Fase 4: servicio de pagos
 

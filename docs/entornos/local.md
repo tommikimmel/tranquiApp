@@ -47,6 +47,12 @@ terminal interactiva, aborta y lista los puertos ocupados.
 A partir de la Fase 0 ([Plan de migración a microservicios](../arquitectura/microservicios.md)), el
 entorno local incluye la infraestructura de soporte para la arquitectura distribuida:
 
+- **Servicio de profesionales (`profesionales`, Fase 5):** el buscador, "Mi perfil" y la agenda. Su base
+  `profesionales` la crea `db-servicios` y en el primer arranque copia los profesionales del monolito. Para
+  volver al monolito: sacar `TRANQUI_SERVICES_PROFESIONALES_URI` del gateway, poner
+  `PROFESIONALES_EXTERNO: "false"` en el backend, frenar `profesionales` y correr
+  `node scripts/fase5-devolver-profesionales.mjs`. `node scripts/fase5-conciliar-profesionales.mjs` compara
+  las dos bases.
 - **Servicio de pagos (`pagos`, Fase 4):** Mercado Pago simulado como en el monolito: la reserva pide el
   link aparte y abre el "Simulador de Pago"; "Vincular Mercado Pago" vincula sin Mercado Pago real. Su base
   `pagos` la crea `db-servicios`. Para volver a los pagos del monolito: sacar

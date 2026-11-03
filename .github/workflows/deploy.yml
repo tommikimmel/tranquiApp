@@ -60,6 +60,9 @@ jobs:
           - servicio: pagos
             context: .
             file: ./services/pagos/Dockerfile
+          - servicio: profesionales
+            context: .
+            file: ./services/profesionales/Dockerfile
           - servicio: backend
             context: .
             file: ./backend/Dockerfile
