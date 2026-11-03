@@ -28,7 +28,7 @@ class ClienteInternoFuenteTest {
         servidor.createContext("/", intercambio -> {
             String ruta = intercambio.getRequestURI().getPath();
             pedidos.add(intercambio.getRequestMethod() + " " + ruta);
-            byte[] cuerpo = (unObjeto(intercambio.getRequestMethod(), ruta) ? "{}" : "[]").getBytes(StandardCharsets.UTF_8);
+            byte[] cuerpo = (unObjeto(intercambio.getRequestMethod(), ruta) ? "{\"id\":1}" : "[]").getBytes(StandardCharsets.UTF_8);
             intercambio.getResponseHeaders().add("Content-Type", "application/json");
             intercambio.sendResponseHeaders(200, cuerpo.length);
             intercambio.getResponseBody().write(cuerpo);

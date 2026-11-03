@@ -54,6 +54,8 @@ confíe en lo que le manda otro**. Lo que hay hoy:
 - **Identidad del pedido:** cada servicio cruza el `uid` del token con el id que encuentra por mail en su copia; si
   no coinciden, 401 y log. El gateway borra cualquier `X-User-Id` o `X-Service-Name` que venga de afuera.
 
+- **Hecho en V2:** el gateway borra `X-User-Id` y `X-Service-Name` que vengan de afuera; las rutas internas de notificaciones validan el cuerpo; cada `ClienteInterno` valida lo que le responden con `ValidadorEventos.respuesta` (en una lista se saltea la fila inválida con un aviso, una respuesta suelta inválida es una falla), con reglas en los records de respuesta; y el `uid` del token se cruza con el id de la copia en los seis servicios (401 si no coincide, `tranqui.seguridad.cruzar-uid`) y con la cuenta en identidad y el monolito.
+
 ### T1 — Cobertura
 - JaCoCo en todos los módulos, con el reporte en el CI y un umbral mínimo (pregunta 3) que el CI exige solo sobre el
   código nuevo o tocado (para no frenar por el monolito viejo).

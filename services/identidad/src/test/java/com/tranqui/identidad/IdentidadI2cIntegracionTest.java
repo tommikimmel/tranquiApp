@@ -333,6 +333,16 @@ class IdentidadI2cIntegracionTest {
     }
 
     @Test
+    void tokenConElUidDeOtraCuenta_401() {
+        Usuario ana = crear("ana.uid@tranqui.com", "PACIENTE");
+        Usuario otra = crear("otra.uid@tranqui.com", "PACIENTE");
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(emisor.emitir(ana.email(), "PACIENTE", ana.nombre(), otra.id()));
+        assertThat(rest.exchange("/api/auth/me", HttpMethod.GET, new HttpEntity<>(headers), String.class).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
     void miCuenta_novedades_leeYCambiaLaPreferencia() throws Exception {
         Usuario paciente = crear("preferencia@tranqui.com", "PACIENTE");
         JsonNode antes = mapper.readTree(pedir(HttpMethod.GET, "/api/auth/mi-cuenta/novedades", paciente, null).getBody());

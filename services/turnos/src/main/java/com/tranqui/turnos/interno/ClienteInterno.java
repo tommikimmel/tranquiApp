@@ -1,5 +1,11 @@
 package com.tranqui.turnos.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.Valid;
+
 import com.tranqui.comun.correlation.CorrelationIdHolder;
 import com.tranqui.eventos.data.DisponibilidadProfesionalData;
 import com.tranqui.eventos.data.PerfilProfesionalData;
@@ -29,7 +35,7 @@ public class ClienteInterno {
     static final String SERVICIO = "turnos";
 
     /** {@code InternoTurnosController.PacienteDto} del monolito. */
-    public record PacienteMonolito(Long id, int version, String rol, String email, String nombre, String apellido,
+    public record PacienteMonolito(@NotNull @Positive Long id, int version, String rol, @Email String email, String nombre, String apellido,
                                    String telefono, String dni, String direccion, String obraSocial, String numAfiliado,
                                    String sexo, LocalDate fechaNacimiento, Long cuil, String tipoDocumento,
                                    Integer numeroDocumento, String datosOfuscado, Integer credencialCodEntidad,
@@ -42,28 +48,28 @@ public class ClienteInterno {
         }
     }
 
-    public record BuscarOCrearPaciente(String email, String nombre, String telefono, String obraSocial, String numAfiliado) {}
+    public record BuscarOCrearPaciente(@Email String email, String nombre, String telefono, String obraSocial, String numAfiliado) {}
 
     /** {@code InternoTurnosController.TurnoDto} del monolito (carga inicial). */
-    public record TurnoMonolito(int version, TurnoActualizadoData turno, String tokenReserva, String tokenConfirmacionAsistencia) {}
+    public record TurnoMonolito(int version, @NotNull @Valid TurnoActualizadoData turno, String tokenReserva, String tokenConfirmacionAsistencia) {}
 
     /** Lo que turnos usa de {@code InternoProfesionalesController.ProfesionalDto} del monolito. */
-    public record ProfesionalMonolito(Long id, String rol, boolean mpVinculada, PerfilProfesionalData perfil,
+    public record ProfesionalMonolito(@NotNull @Positive Long id, String rol, boolean mpVinculada, @Valid PerfilProfesionalData perfil,
                                       List<DisponibilidadProfesionalData.Franja> disponibilidad,
                                       List<TarifasProfesionalData.Tarifa> tarifas) {}
 
     /** {@code InternoController.ProfesionalServicio} del servicio de profesionales. */
-    public record ProfesionalServicio(Long profesionalId, int version, PerfilProfesionalData perfil,
+    public record ProfesionalServicio(@NotNull @Positive Long profesionalId, int version, @Valid PerfilProfesionalData perfil,
                                       List<DisponibilidadProfesionalData.Franja> disponibilidad,
                                       List<TarifasProfesionalData.Tarifa> tarifas) {}
 
     /** {@code CuentasMp.CuentaMpResumenDto} del servicio de pagos. */
-    public record CuentaMp(Long profesionalId, boolean vinculada, long version) {}
+    public record CuentaMp(@NotNull @Positive Long profesionalId, boolean vinculada, long version) {}
 
     /** Un intervalo ocupado en el Google Calendar del profesional; {@code todoElDia} bloquea el día. */
     public record Intervalo(LocalTime inicio, LocalTime fin, boolean todoElDia) {}
 
-    public record DocumentoAdjunto(String email, String pacienteNombre, String medicoNombre, String tipoDocumento,
+    public record DocumentoAdjunto(@Email String email, String pacienteNombre, String medicoNombre, String tipoDocumento,
                                    String archivoDataUri, String archivoNombre) {}
 
     private final RestClient http;
@@ -112,23 +118,23 @@ public class ClienteInterno {
     }
 
     private <T> T get(RestClient cliente, String uri, ParameterizedTypeReference<T> tipo, Object... variables) {
-        return cliente.get().uri(uri, variables)
+        return ValidadorEventos.respuesta(cliente.get().uri(uri, variables)
                 .headers(h -> {
                     h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
                     h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
                 })
-                .retrieve().body(tipo);
+                .retrieve().body(tipo), uri);
     }
 
     private <T> T post(String uri, Object cuerpo, Class<T> tipo) {
-        return http.post().uri(uri)
+        return ValidadorEventos.respuesta(http.post().uri(uri)
                 .contentType(MediaType.APPLICATION_JSON)
                 .headers(h -> {
                     h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
                     h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
                 })
                 .body(cuerpo)
-                .retrieve().body(tipo);
+                .retrieve().body(tipo), uri);
     }
 
     public List<PacienteMonolito> pacientes(int pagina, int tamanio) {

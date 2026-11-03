@@ -107,4 +107,17 @@ public class RoutingAndCorrelationIdTest {
                     assertThat(corrId).matches("^[0-9a-fA-F\\-]{36}$");
                 });
     }
+
+    @Test
+    void encabezadosDeIdentidadQueVienenDeAfuera_noLleganAlDestino() {
+        wireMockServer.stubFor(get(urlEqualTo("/api/medicos/2")).willReturn(aResponse().withStatus(200)));
+
+        webTestClient.get().uri("/api/medicos/2")
+                .header("X-User-Id", "1")
+                .header("X-Service-Name", "identidad")
+                .exchange().expectStatus().isOk();
+
+        wireMockServer.verify(getRequestedFor(urlEqualTo("/api/medicos/2"))
+                .withoutHeader("X-User-Id").withoutHeader("X-Service-Name"));
+    }
 }

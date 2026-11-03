@@ -1,5 +1,7 @@
 package com.tranqui.profesionales.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
+
 import com.tranqui.comun.correlation.CorrelationIdHolder;
 import com.tranqui.eventos.jwt.ServiceJwt;
 import org.slf4j.Logger;
@@ -45,14 +47,14 @@ public class ClienteChat {
 
     public Resumen resumen(Long profesionalId) {
         try {
-            Resumen r = http.get()
+            Resumen r = ValidadorEventos.respuesta(http.get()
                     .uri("/internal/chat/profesionales/{id}/resumen", profesionalId)
                     .headers(h -> {
                         h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
                         h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
                     })
                     .retrieve()
-                    .body(Resumen.class);
+                    .body(Resumen.class), "/internal/chat/profesionales/{id}/resumen");
             return r != null ? r : Resumen.vacio();
         } catch (RuntimeException e) {
             log.warn("El chat no respondió el resumen del profesional {}; la lista sale sin no leídos: {}",

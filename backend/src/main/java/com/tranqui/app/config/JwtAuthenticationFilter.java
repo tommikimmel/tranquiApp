@@ -1,5 +1,6 @@
 package com.tranqui.app.config;
 
+import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.service.CustomUserDetailsService;
 import com.tranqui.app.service.JwtService;
 import jakarta.servlet.FilterChain;
@@ -23,6 +24,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private CustomUserDetailsService userDetailsService;
 
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -35,6 +39,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 String email = jwtService.extractEmail(token);
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                // Fase 10: el uid del token tiene que ser el de la cuenta; si no, el pedido queda sin autenticar.
+                Long uid = jwtService.extractUid(token);
+                if (uid != null && usuarioRepository.findByEmail(email).map(u -> !uid.equals(u.getId())).orElse(false)) {
+                    SecurityContextHolder.clearContext();
+                    filterChain.doFilter(request, response);
+                    return;
+                }
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities()
                 );

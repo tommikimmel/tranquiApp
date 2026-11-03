@@ -434,4 +434,15 @@ class NotificacionesIntegracionTest {
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
         assertThat(r.getBody()).contains("\"enviado\":false");
     }
+
+    @Test
+    void rutasInternas_validanElCuerpoAunqueVengaConTokenDeServicio() {
+        assertThat(documento(DOCUMENTO.replace("pac@mail.com", "no-es-un-mail"), true).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(documento(DOCUMENTO.replace("data:application/pdf;base64,JVBERi0=", "https://otro.sitio/x.pdf"), true)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(receta(RECETA.replace("https://s3.tranqui/r.pdf", "http://s3.tranqui/r.pdf"), true).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        org.mockito.Mockito.verifyNoInteractions(mails);
+    }
 }

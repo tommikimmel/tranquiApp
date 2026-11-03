@@ -1,5 +1,11 @@
 package com.tranqui.profesionales.interno;
 
+import com.tranqui.eventos.ValidadorEventos;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.Valid;
+
 import com.tranqui.comun.correlation.CorrelationIdHolder;
 import com.tranqui.eventos.data.DisponibilidadProfesionalData;
 import com.tranqui.eventos.data.PerfilProfesionalData;
@@ -35,13 +41,13 @@ public class ClienteInterno {
     static final String SERVICIO = "profesionales";
 
     /** {@code InternoProfesionalesController.ProfesionalDto} del monolito. */
-    public record ProfesionalMonolito(Long id, int version, String email, String rol, String profession,
+    public record ProfesionalMonolito(@NotNull @Positive Long id, int version, @Email String email, String rol, String profession,
                                       String nombre, String apellido, String telefono, String sexo,
                                       LocalDate fechaNacimiento, Long cuil, String tipoDocumento, Integer numeroDocumento,
                                       String fotoUrl, String fotoHash,
                                       Boolean verificadoAdmin, boolean mpVinculada,
                                       String suscripcionEstado, LocalDateTime suscripcionPeriodoHasta, boolean puedeRecetar,
-                                      PerfilProfesionalData perfil,
+                                      @Valid PerfilProfesionalData perfil,
                                       List<DisponibilidadProfesionalData.Franja> disponibilidad,
                                       List<TarifasProfesionalData.Tarifa> tarifas) {
 
@@ -65,10 +71,10 @@ public class ClienteInterno {
     }
 
     /** {@code CuentasMp.CuentaMpResumenDto} del servicio de pagos. */
-    public record CuentaMp(Long profesionalId, boolean vinculada, long version) {}
+    public record CuentaMp(@NotNull @Positive Long profesionalId, boolean vinculada, long version) {}
 
     /** {@code Dtos.EstadoSuscripcionDto} del servicio de pagos (el mismo dato que suscripciones.suscripcion.cambio-estado.v2). */
-    public record EstadoSuscripcion(Long professionalId, String estado, String planCode, boolean acceso,
+    public record EstadoSuscripcion(@NotNull @Positive Long professionalId, String estado, String planCode, boolean acceso,
                                     boolean puedeRecetar, LocalDateTime periodoHasta, LocalDateTime graciaHasta,
                                     Long version) {}
 
@@ -78,7 +84,7 @@ public class ClienteInterno {
 
     /** {@code InternoTurnosController.PacienteDto} del monolito. */
     public record PacienteMonolito(
-            Long id, int version, String rol, String email, String nombre, String apellido,
+            @NotNull @Positive Long id, int version, String rol, @Email String email, String nombre, String apellido,
             String telefono, String dni, String direccion, String obraSocial, String numAfiliado,
             String sexo, LocalDate fechaNacimiento, Long cuil, String tipoDocumento,
             Integer numeroDocumento, String datosOfuscado, Integer credencialCodEntidad,
@@ -101,13 +107,13 @@ public class ClienteInterno {
     }
 
     /** {@code InternoTurnosController.TurnoDto} del monolito (carga inicial y resincronización). */
-    public record TurnoMonolito(int version, TurnoActualizadoData turno, String tokenReserva, String tokenConfirmacionAsistencia) {}
+    public record TurnoMonolito(int version, @NotNull @Valid TurnoActualizadoData turno, String tokenReserva, String tokenConfirmacionAsistencia) {}
 
     /** {@code InternoClinicaController.SeguimientoDiarioDto} del monolito. */
     public record SeguimientoMonolito(
-            Long id,
-            Long pacienteId,
-            Long medicoId,
+            @NotNull @Positive Long id,
+            @Positive Long pacienteId,
+            @Positive Long medicoId,
             LocalDate fecha,
             String estadoAnimo,
             String sintomas,
@@ -127,9 +133,9 @@ public class ClienteInterno {
 
     /** {@code InternoClinicaController.InformeClinicoDto} del monolito. */
     public record InformeMonolito(
-            Long id,
-            Long pacienteId,
-            Long medicoId,
+            @NotNull @Positive Long id,
+            @Positive Long pacienteId,
+            @Positive Long medicoId,
             LocalDate fecha,
             String tipoInforme,
             String planTrabajo,
@@ -137,7 +143,7 @@ public class ClienteInterno {
             String nombreArchivo,
             LocalDateTime fechaCreacion,
             String estado,
-            Long informeOriginalId,
+            @Positive Long informeOriginalId,
             String motivo,
             String hashIntegridad
     ) {
@@ -151,9 +157,9 @@ public class ClienteInterno {
 
     /** {@code InternoClinicaController.RecetaDto} del monolito. */
     public record RecetaMonolito(
-            Long id,
-            Long medicoId,
-            Long pacienteId,
+            @NotNull @Positive Long id,
+            @Positive Long medicoId,
+            @Positive Long pacienteId,
             String medicamentos,
             String laboratorios,
             String diagnostico,
@@ -177,9 +183,9 @@ public class ClienteInterno {
 
     /** {@code InternoClinicaController.SolicitudDocumentoDto} del monolito. */
     public record SolicitudMonolito(
-            Long id,
-            Long pacienteId,
-            Long medicoId,
+            @NotNull @Positive Long id,
+            @Positive Long pacienteId,
+            @Positive Long medicoId,
             String tipoConcepto,
             BigDecimal precio,
             String estado,
@@ -243,12 +249,12 @@ public class ClienteInterno {
     }
 
     private <T> T get(String uri, ParameterizedTypeReference<T> tipo, Object... variables) {
-        return http.get().uri(uri, variables)
+        return ValidadorEventos.respuesta(http.get().uri(uri, variables)
                 .headers(h -> {
                     h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
                     h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
                 })
-                .retrieve().body(tipo);
+                .retrieve().body(tipo), uri);
     }
 
     /** Carga inicial: los profesionales completos (con foto, perfil, disponibilidad y tarifas), paginados. */
@@ -271,14 +277,14 @@ public class ClienteInterno {
 
     /** La parte de identidad del perfil. Si el monolito no responde, tira la excepción: no se guarda nada. */
     public ProfesionalMonolito guardarIdentidad(Long id, Identidad identidad) {
-        return http.put().uri(baseIdentidad + "/profesionales/{id}/identidad", id)
+        return ValidadorEventos.respuesta(http.put().uri(baseIdentidad + "/profesionales/{id}/identidad", id)
                 .contentType(MediaType.APPLICATION_JSON)
                 .headers(h -> {
                     h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
                     h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
                 })
                 .body(identidad)
-                .retrieve().body(ProfesionalMonolito.class);
+                .retrieve().body(ProfesionalMonolito.class), baseIdentidad + "/profesionales/{id}/identidad");
     }
 
     /** Todos los usuarios (pacientes y profesionales), paginados por id. */
@@ -291,14 +297,14 @@ public class ClienteInterno {
     /** Un usuario por id (para refrescar la copia tras eventos de identidad). */
     /** Actualiza la ficha de un paciente en el monolito (dueño de identidad). */
     public PacienteMonolito actualizarPaciente(Long id, Object body) {
-        return http.put().uri(baseIdentidad + "/pacientes/{id}", id)
+        return ValidadorEventos.respuesta(http.put().uri(baseIdentidad + "/pacientes/{id}", id)
                 .contentType(MediaType.APPLICATION_JSON)
                 .headers(h -> {
                     h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
                     h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
                 })
                 .body(body)
-                .retrieve().body(PacienteMonolito.class);
+                .retrieve().body(PacienteMonolito.class), baseIdentidad + "/pacientes/{id}");
     }
 
     public PacienteMonolito paciente(Long id) {
@@ -364,7 +370,7 @@ public class ClienteInterno {
     }
 
     /** Payload para POST /internal/notificaciones/recetas (decisión 4). */
-    public record NotificacionReceta(String email, String pacienteNombre, String medicoNombre,
+    public record NotificacionReceta(@Email String email, String pacienteNombre, String medicoNombre,
                                      String matricula, String pdfUrl, String nroRecetario) {}
 
     /**
