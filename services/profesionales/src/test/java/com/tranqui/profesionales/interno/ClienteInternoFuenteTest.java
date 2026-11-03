@@ -80,6 +80,23 @@ class ClienteInternoFuenteTest {
     }
 
     @Test
+    void lasConsultasDeCargaInicialYElMailDeReceta() {
+        ClienteInterno interno = cliente("monolito");
+        assertThat(interno.profesionales(0, 10)).isEmpty();
+        interno.pacientes(0, 10);
+        interno.turnos(0, 10);
+        interno.seguimientos(0, 10);
+        interno.informes(0, 10);
+        interno.recetas(0, 10);
+        interno.solicitudes(0, 10);
+        interno.enviarMailReceta(new ClienteInterno.NotificacionReceta("p@t.com", "Juan", "Dra. Paz", "MN 1", null, "R-1"));
+        assertThat(pedidos).hasSize(8);
+        assertThat(pedidos.get(7)).isEqualTo("POST /internal/notificaciones/recetas");
+        assertThatThrownBy(() -> new ClienteInterno("http://127.0.0.1:1", " ", "monolito"))
+                .hasMessageContaining("SERVICE_JWT_KEY");
+    }
+
+    @Test
     void conElMonolito_todoComoHoy() {
         ClienteInterno interno = cliente("monolito");
         interno.profesional(5L);

@@ -854,3 +854,10 @@ resilience4j.circuitbreaker:
       waitDurationInOpenState: 30s
       permittedNumberOfCallsInHalfOpenState: 5
       automaticTransitionFromOpenToHalfOpenEnabled: true
+
+# Sin esto el TimeLimiter de Resilience4j corta a 1 s y responde el 503 del fallback aunque el servicio responda bien
+# (emitir una receta, el primer pedido en frío). El límite real es el response-timeout de cada ruta (hasta 30 s).
+resilience4j.timelimiter:
+  configs:
+    default:
+      timeoutDuration: 31s

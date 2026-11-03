@@ -136,4 +136,57 @@ class RealIpResolverTest {
         assertThat(net127.matches("127.0.0.1")).isTrue();
         assertThat(net127.matches("127.0.0.2")).isFalse();
     }
+
+    @Test
+    void configuracion_vaciaUsaLosRangosPorDefectoEIgnoraLosInvalidos() {
+        RealIpResolver porDefecto = new RealIpResolver(List.<String>of());
+        assertThat(porDefecto.isTrusted("10.1.2.3")).isTrue();
+        assertThat(new RealIpResolver((List<String>) null).isTrusted("192.168.1.1")).isTrue();
+
+        RealIpResolver propia = new RealIpResolver(java.util.Arrays.asList("203.0.113.0/24", "no-es-cidr/99x", " ", null, "2001:db8::/32"));
+        assertThat(propia.isTrusted("203.0.113.7")).isTrue();
+        assertThat(propia.isTrusted("10.1.2.3")).isFalse();
+        assertThat(propia.isTrusted("2001:db8::1")).isTrue();
+        assertThat(propia.isTrusted((String) null)).isFalse();
+        assertThat(propia.isTrusted("host-que-no-existe.invalid")).isFalse();
+        assertThat(new RealIpResolver(null, true).isTrusted("127.0.0.1")).isTrue();
+    }
+
+    @Test
+    void sinRequestOSinDireccion_usaLocalhost() {
+        assertThat(realIpResolver.extractClientIp(null)).isEqualTo("127.0.0.1");
+        ServerWebExchange sinRemota = MockServerWebExchange.from(MockServerHttpRequest.get("/").build());
+        assertThat(realIpResolver.extractClientIp(sinRemota)).isEqualTo("127.0.0.1");
+        ServerWebExchange sinResolver = MockServerWebExchange.from(MockServerHttpRequest.get("/")
+                .remoteAddress(InetSocketAddress.createUnresolved("proxy.local", 80)).build());
+        assertThat(realIpResolver.extractClientIp(sinResolver)).isEqualTo("proxy.local");
+    }
+
+    @Test
+    void xffVacio_usaLaIpRemota() {
+        ServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/")
+                .remoteAddress(new InetSocketAddress("10.0.0.2", 1)).header("X-Forwarded-For", " , ").build());
+        assertThat(realIpResolver.extractClientIp(exchange)).isEqualTo("10.0.0.2");
+    }
+
+    @Test
+    void sanitizeIp_ipv6ConPuertoYNull() {
+        assertThat(RealIpResolver.sanitizeIp("[2001:db8::1]:8080")).isEqualTo("2001:db8::1");
+        assertThat(RealIpResolver.sanitizeIp("2001:db8::1")).isEqualTo("2001:db8::1");
+        assertThat(RealIpResolver.sanitizeIp(null)).isEqualTo("127.0.0.1");
+    }
+
+    @Test
+    void cidrMatcher_bordes() {
+        RealIpResolver.CidrMatcher host = new RealIpResolver.CidrMatcher("10.0.0.1");
+        assertThat(host.matches("10.0.0.1")).isTrue();
+        assertThat(host.matches("10.0.0.2")).isFalse();
+        assertThat(host.matches("2001:db8::1")).isFalse();
+        assertThat(host.matches((java.net.InetAddress) null)).isFalse();
+        assertThat(host.matches(" ")).isFalse();
+        assertThat(host.matches("no.existe.invalid")).isFalse();
+        assertThat(new RealIpResolver.CidrMatcher("172.16.0.0/12").matches("172.31.255.255")).isTrue();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new RealIpResolver.CidrMatcher("10.0.0.0/abc"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }

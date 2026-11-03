@@ -439,6 +439,24 @@ class SuscripcionesS2bIntegracionTest {
         assertThat(resPatch.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(suscripciones.porId(subId).orElseThrow().status()).isEqualTo("PAST_DUE");
 
+        JsonNode listaConDatos = mapper.readTree(pedir(HttpMethod.GET, "/api/admin/subscriptions/list", tokenAdmin, null).getBody());
+        JsonNode fila = null;
+        for (JsonNode n : listaConDatos) if (n.get("id").asLong() == subId) fila = n;
+        assertThat(fila).isNotNull();
+        assertThat(fila.get("plan").get("id").asLong()).isEqualTo(1L);
+
+        assertThat(pedir(HttpMethod.PATCH, "/api/admin/subscriptions/" + subId + "/status", tokenAdmin, Map.of("reason", "x"))
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(pedir(HttpMethod.PATCH, "/api/admin/subscriptions/999999/status", tokenAdmin, Map.of("status", "ACTIVE"))
+                .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(pedir(HttpMethod.PATCH, "/api/admin/subscriptions/" + subId + "/status", tokenAdmin, Map.of("status", "suspended"))
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(pedir(HttpMethod.PATCH, "/api/admin/subscriptions/" + subId + "/status", tokenAdmin, Map.of("status", "CANCELLED"))
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+        Suscripciones.Suscripcion cancelada = suscripciones.porId(subId).orElseThrow();
+        assertThat(cancelada.status()).isEqualTo("CANCELLED");
+        assertThat(cancelada.cancelAtPeriodEnd()).isTrue();
+
         ResponseEntity<String> resEvents = pedir(HttpMethod.GET, "/api/admin/subscriptions/" + subId + "/events", tokenAdmin, null);
         assertThat(resEvents.getStatusCode()).isEqualTo(HttpStatus.OK);
         JsonNode eventsJson = mapper.readTree(resEvents.getBody());

@@ -67,6 +67,35 @@ class ClienteInternoFuenteTest {
     }
 
     @Test
+    void lasConsultasDeCargaInicialYElReenvio_vanAlMonolito() {
+        ClienteInterno interno = cliente("monolito");
+        assertThat(interno.contactos(0, 10)).isEmpty();
+        interno.cuentas();
+        interno.pagos(0, 10);
+        interno.solicitudes();
+        interno.cobrosPendientes();
+        interno.planes(0, 10);
+        interno.features(0, 10);
+        interno.planFeatures(0, 10);
+        interno.suscripciones(0, 10);
+        interno.eventosSuscripcion(0, 10);
+        interno.pagosSuscripcion(0, 10);
+        interno.facturas(0, 10);
+        interno.secuenciasFactura(0, 10);
+        interno.reenviarSuscripcion("{}", "7");
+        interno.reenviarSuscripcion("{}", null);
+        assertThat(pedidos).containsExactly(
+                "GET /internal/monolito/contactos", "GET /internal/monolito/pagos/cuentas", "GET /internal/monolito/pagos/pagos",
+                "GET /internal/monolito/pagos/solicitudes", "GET /internal/monolito/pagos/cobros-pendientes",
+                "GET /internal/monolito/suscripciones/planes", "GET /internal/monolito/suscripciones/features",
+                "GET /internal/monolito/suscripciones/plan-features", "GET /internal/monolito/suscripciones/suscripciones",
+                "GET /internal/monolito/suscripciones/eventos", "GET /internal/monolito/suscripciones/pagos",
+                "GET /internal/monolito/suscripciones/facturas", "GET /internal/monolito/suscripciones/secuencias",
+                "POST /internal/monolito/pagos/notificacion-suscripcion",
+                "POST /internal/monolito/pagos/notificacion-suscripcion");
+    }
+
+    @Test
     void conElMonolito_todoComoHoy() {
         ClienteInterno interno = cliente("monolito");
         assertThat(interno.fuenteIdentidad()).isFalse();

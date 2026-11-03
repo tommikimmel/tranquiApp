@@ -1,6 +1,7 @@
 package com.tranqui.app.service;
 
 import com.tranqui.app.repository.MensajeRepository;
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.eventos.jwt.ServiceJwt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,7 +60,8 @@ public class ResumenChatCliente {
             return calcularLocal(profesionalId);
         }
         try {
-            ResumenChat resumen = http.get()
+            // Fase 10: un resumen inválido se trata como si el chat no hubiera respondido.
+            ResumenChat resumen = ValidadorEventos.respuesta(http.get()
                     .uri("/internal/chat/profesionales/{id}/resumen", profesionalId)
                     .headers(h -> {
                         h.setBearerAuth(serviceJwt.emitirToken("monolito"));
@@ -67,7 +69,7 @@ public class ResumenChatCliente {
                         h.set("X-Correlation-Id", correlacion != null ? correlacion : UUID.randomUUID().toString());
                     })
                     .retrieve()
-                    .body(ResumenChat.class);
+                    .body(ResumenChat.class), "/internal/chat/profesionales/{id}/resumen");
             return resumen != null ? resumen : ResumenChat.vacio();
         } catch (RuntimeException e) {
             log.warn("El chat no respondió el resumen del profesional {}; la lista sale sin no leídos: {}",

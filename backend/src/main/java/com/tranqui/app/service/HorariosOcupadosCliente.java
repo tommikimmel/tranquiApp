@@ -1,7 +1,9 @@
 package com.tranqui.app.service;
 
 import com.tranqui.app.model.Usuario;
+import com.tranqui.eventos.ValidadorEventos;
 import com.tranqui.eventos.jwt.ServiceJwt;
+import jakarta.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -41,7 +43,7 @@ public class HorariosOcupadosCliente {
     private static final ZoneId ZONA = ZoneId.of("America/Argentina/Buenos_Aires");
 
     /** Un intervalo ocupado del día; {@code todoElDia} bloquea el día entero. */
-    public record Intervalo(LocalTime inicio, LocalTime fin, boolean todoElDia) {}
+    public record Intervalo(@NotNull LocalTime inicio, @NotNull LocalTime fin, boolean todoElDia) {}
 
     private final GoogleCalendarService googleCalendarService;
     private final RestClient http;
@@ -74,7 +76,8 @@ public class HorariosOcupadosCliente {
             return desdeGoogle(medico, fecha);
         }
         try {
-            List<Intervalo> intervalos = http.get()
+            // Fase 10: los intervalos inválidos se saltean.
+            List<Intervalo> intervalos = ValidadorEventos.respuesta(http.get()
                     .uri("/internal/calendario/profesionales/{id}/ocupado?fecha={fecha}", medico.getId(), fecha.toString())
                     .headers(h -> {
                         h.setBearerAuth(serviceJwt.emitirToken("monolito"));
@@ -82,7 +85,7 @@ public class HorariosOcupadosCliente {
                         h.set("X-Correlation-Id", correlacion != null ? correlacion : UUID.randomUUID().toString());
                     })
                     .retrieve()
-                    .body(new ParameterizedTypeReference<List<Intervalo>>() {});
+                    .body(new ParameterizedTypeReference<List<Intervalo>>() {}), "/internal/calendario/profesionales/{id}/ocupado");
             return intervalos != null ? intervalos : Collections.emptyList();
         } catch (RuntimeException e) {
             log.warn("El calendario no respondió los horarios ocupados del profesional {} el {}; se ofrece la agenda sin ese filtro: {}",

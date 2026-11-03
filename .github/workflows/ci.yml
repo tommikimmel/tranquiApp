@@ -21,6 +21,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -28,6 +30,12 @@ jobs:
           cache: maven
       - name: Tests
         run: ./mvnw -B -q test
+      # Fase 10: 90 % de las líneas de Java nuevas o tocadas por el PR (reportes de JaCoCo de cada módulo).
+      - name: Cobertura de los cambios
+        if: github.event_name == 'pull_request'
+        run: |
+          node --test scripts/ci/cobertura-cambios.test.mjs
+          node scripts/ci/cobertura-cambios.mjs "origin/${{ github.base_ref }}" 90
 
   frontend:
     name: Frontend (typecheck, tests y build)

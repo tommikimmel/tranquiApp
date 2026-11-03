@@ -90,4 +90,40 @@ class CargaInicialTest {
         assertThat(carga.listo()).isTrue();
         verify(interno, never()).cuentas();
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void suscriptores_seCopianAparteYUnFalloSeReintentaSinRepetirLoHecho() {
+        when(participantes.cantidad()).thenReturn(1L);
+        com.tranqui.pagos.datos.Suscriptores suscriptores = mock(com.tranqui.pagos.datos.Suscriptores.class);
+        Copias copias = mock(Copias.class);
+        when(copias.copiarSuscriptores()).thenThrow(new IllegalStateException("identidad caída")).thenReturn(3);
+        org.springframework.beans.factory.ObjectProvider<com.tranqui.pagos.datos.Suscriptores> ps = mock(org.springframework.beans.factory.ObjectProvider.class);
+        org.springframework.beans.factory.ObjectProvider<Copias> pc = mock(org.springframework.beans.factory.ObjectProvider.class);
+        when(ps.getIfAvailable()).thenReturn(suscriptores);
+        when(pc.getIfAvailable()).thenReturn(copias);
+        carga(true);
+        CargaInicial carga = new CargaInicial(participantes, cuentas, pagos, cobros, ps, pc, interno, tx, true);
+
+        carga.cargarConReintentos();
+
+        assertThat(carga.listo()).isTrue();
+        verify(copias, times(2)).copiarSuscriptores();
+        verify(interno, never()).cuentas();
+    }
+
+    @Test
+    void interrumpidaODeshabilitada() {
+        when(interno.contactos(anyInt(), anyInt())).thenThrow(new IllegalStateException("caído"));
+        Thread.currentThread().interrupt();
+        try {
+            CargaInicial carga = carga(true);
+            carga.cargarConReintentos();
+            assertThat(carga.listo()).isFalse();
+        } finally {
+            Thread.interrupted();
+        }
+        carga(false).alArrancar();
+        new CargaInicial(participantes, cuentas, pagos, cobros, null, null, interno, tx, false).alArrancar();
+    }
 }

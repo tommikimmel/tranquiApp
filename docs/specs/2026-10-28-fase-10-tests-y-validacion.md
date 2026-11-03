@@ -63,6 +63,18 @@ confíe en lo que le manda otro**. Lo que hay hoy:
 - Completar los unitarios donde la cobertura quede por debajo: reglas de negocio puras (cálculo de estadísticas,
   reglas de acceso de suscripción, liberación de turnos, honorarios, conciliación).
 
+- **Hecho en T1:**
+  - **Medición:** JaCoCo en todos los módulos. `scripts/ci/cobertura-cambios.mjs` mide las líneas de Java nuevas o tocadas del PR contra la rama base y el CI exige 90 %. Como los PR encadenados apuntan a `develop`, eso equivale a toda la migración: pasó de 75,8 % a 90,2 % (15696/17407).
+  - **Tests nuevos:**
+    - plantillas y transporte de mails;
+    - clientes de QBI2, Resend, Google y Consul (contra servidores o clientes HTTP falsos);
+    - suscripciones, webhooks y reconciliación de pagos;
+    - reservas, cobros, gestión y horarios de turnos;
+    - cargas iniciales con sus reintentos y su rechazo de datos inválidos;
+    - inbox, outbox y tokens.
+  - **Tests intermitentes del gateway:** la causa era el TimeLimiter de Resilience4j. Sin configurar, corta a 1 s y responde 503 aunque el servicio conteste. Ahora es 31 s, por encima del response-timeout más largo de las rutas, con un test de una respuesta de 1,5 s.
+  - **Validación que faltaba (Fase 10, V2):** el monolito ahora valida lo que le devuelven turnos, profesionales, chat y calendario en las resincronizaciones, el resumen del chat y los horarios ocupados. Los intervalos ocupados exigen inicio y fin, también en turnos.
+
 ### T2 — Tests de contrato entre servicios
 - Para cada ruta interna y cada evento: un **JSON de ejemplo canónico** en `libs/eventos` (test-jar), generado por el
   que produce y leído por el que consume. El productor tiene un test que verifica que su salida coincide con el
