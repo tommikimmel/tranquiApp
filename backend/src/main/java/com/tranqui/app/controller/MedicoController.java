@@ -129,7 +129,7 @@ public class MedicoController {
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<Map<String, Object>> obtenerEstadoMercadoPago(@AuthenticationPrincipal UserDetails userDetails) {
         Usuario medico = obtenerMedicoAutenticado(userDetails);
-        boolean connected = medico.getMpAccessTokenEncrypted() != null;
+        boolean connected = medico.tieneMercadoPagoVinculado();
         return ResponseEntity.ok(Map.of(
                 "connected", connected,
                 "mpUserId", medico.getMpUserId() != null ? medico.getMpUserId() : "",

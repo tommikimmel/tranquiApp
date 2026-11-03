@@ -392,7 +392,8 @@ public class ResendEmailService {
             "hasta 48 horas antes del turno y se te reembolsa el total. Con menos de 48 horas de anticipación, el " +
             "turno se cancela pero no corresponde reembolso.</p>";
 
-    public enum ResultadoReembolso { REEMBOLSADO, SIN_REEMBOLSO, SIN_PAGO, PENDIENTE }
+    // EN_PROCESO (Fase 4): lo pide el servicio de pagos después de la cancelación y avisa con otro mail.
+    public enum ResultadoReembolso { REEMBOLSADO, SIN_REEMBOLSO, SIN_PAGO, PENDIENTE, EN_PROCESO }
 
     // meetUrl puede venir vacío para un turno online si Google Calendar todavía no generó el link
     // real (ver GoogleCalendarSyncService#exportarTurnosPendientesAGoogleCalendar): en ese caso
@@ -458,6 +459,7 @@ public class ResendEmailService {
             case REEMBOLSADO -> "Se reembolsa el total abonado al mismo medio de pago. La acreditación depende de los plazos de Mercado Pago.";
             case SIN_REEMBOLSO -> "La cancelación se hizo con menos de 48 horas de anticipación, así que según la política de cancelación no corresponde reembolso.";
             case PENDIENTE -> "Te corresponde el reembolso del total abonado, pero no pudimos procesarlo automáticamente. Ya estamos revisándolo: si en 5 días hábiles no lo ves acreditado, escribinos desde Soporte.";
+            case EN_PROCESO -> "Te corresponde el reembolso del total abonado. Ya lo pedimos a Mercado Pago y te avisamos por mail cuando se acredite.";
             case SIN_PAGO -> null;
         };
         String cuerpo = motivo +

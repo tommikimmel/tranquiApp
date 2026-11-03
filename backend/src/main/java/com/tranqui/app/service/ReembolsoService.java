@@ -55,13 +55,20 @@ public class ReembolsoService {
     // from a patient bailing last-minute, not to penalize the patient's refund when it's the
     // médico who decided not to hold the appointment. A patient-initiated cancellation still
     // goes through the false path below and keeps the existing policy.
+    /**
+     * La política de cancelación: corresponde reembolso si cancela el profesional o si faltan más de
+     * 48 horas. Fase 4: con el servicio de pagos el monolito solo decide esto (va en
+     * turnos.turno.cancelado) y pagos ejecuta el reembolso.
+     */
+    public static boolean correspondeReembolso(Turno turno, boolean saltarPolitica48h) {
+        LocalDateTime fechaTurno = LocalDateTime.of(turno.getFecha(), turno.getHoraInicio());
+        return saltarPolitica48h || !LocalDateTime.now().plusHours(48).isAfter(fechaTurno);
+    }
+
     @Transactional
     public boolean procesarReembolso(Turno turno, Usuario medico, boolean saltarPolitica48h) throws Exception {
-        LocalDateTime ahora = LocalDateTime.now();
-        LocalDateTime fechaTurno = LocalDateTime.of(turno.getFecha(), turno.getHoraInicio());
-
         // Validate 48 hours cancellation policy
-        if (!saltarPolitica48h && ahora.plusHours(48).isAfter(fechaTurno)) {
+        if (!correspondeReembolso(turno, saltarPolitica48h)) {
             log.warn("Intento de cancelación tardía para turno ID: {}. Menos de 48 horas.", turno.getId());
             return false; // Block automatic refund
         }

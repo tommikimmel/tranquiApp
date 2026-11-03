@@ -295,7 +295,8 @@ public class ResendEmailService {
             "hasta 48 horas antes del turno y se te reembolsa el total. Con menos de 48 horas de anticipación, el " +
             "turno se cancela pero no corresponde reembolso.</p>";
 
-    public enum ResultadoReembolso { REEMBOLSADO, SIN_REEMBOLSO, SIN_PAGO, PENDIENTE }
+    // EN_PROCESO (Fase 4): lo pide el servicio de pagos después de la cancelación y avisa con otro mail.
+    public enum ResultadoReembolso { REEMBOLSADO, SIN_REEMBOLSO, SIN_PAGO, PENDIENTE, EN_PROCESO }
 
     // meetUrl puede venir vacío para un turno online si Google Calendar todavía no generó el link
     // real (ver GoogleCalendarSyncService#exportarTurnosPendientesAGoogleCalendar): en ese caso
@@ -346,6 +347,44 @@ public class ResendEmailService {
         enviarCorreo(toEmail, asunto, html);
     }
 
+    /**
+     * Fase 4: el segundo mail de una cancelación con reembolso. Con el servicio de pagos la cancelación
+     * sale enseguida ("te avisamos cuando se acredite") y este confirma que Mercado Pago lo hizo.
+     */
+    public void enviarReembolsoRealizadoPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
+                                                 LocalDate fecha, LocalTime hora, BigDecimal monto) {
+        String asunto = "Reembolso realizado" + (fecha != null ? " — turno del " + fecha.format(FECHA_FMT) : "");
+        String cuerpo = "<p>Mercado Pago ya procesó el reembolso de tu turno cancelado. Se devuelve al mismo medio "
+                + "de pago y la acreditación depende de los plazos de Mercado Pago.</p>" +
+                panelInfo(
+                        "Profesional", nombreProfesional,
+                        "Fecha del turno", fecha != null ? fecha.format(FECHA_FMT) : null,
+                        "Hora", hora != null ? hora.format(HORA_FMT) + " hs" : null,
+                        "Monto reembolsado", monto != null ? "$ " + String.format(Locale.GERMANY, "%,.0f", monto) : null
+                );
+        String html = plantilla("Reembolso realizado", TONO_EXITO,
+                "Te devolvimos el pago, " + nombreOUsuario(nombrePaciente), cuerpo,
+                "Ir a Tranqui App", frontendUrl);
+        enviarCorreo(toEmail, asunto, html);
+    }
+
+    /** Fase 4: el reembolso que correspondía no se pudo hacer automáticamente (mismo texto que PENDIENTE). */
+    public void enviarReembolsoPendientePaciente(String toEmail, String nombrePaciente, String nombreProfesional,
+                                                 LocalDate fecha, LocalTime hora) {
+        String asunto = "Tu reembolso está en revisión" + (fecha != null ? " — turno del " + fecha.format(FECHA_FMT) : "");
+        String cuerpo = "<p>Te corresponde el reembolso del total abonado, pero no pudimos procesarlo automáticamente. "
+                + "Ya estamos revisándolo: si en 5 días hábiles no lo ves acreditado, escribinos desde Soporte.</p>" +
+                panelInfo(
+                        "Profesional", nombreProfesional,
+                        "Fecha del turno", fecha != null ? fecha.format(FECHA_FMT) : null,
+                        "Hora", hora != null ? hora.format(HORA_FMT) + " hs" : null
+                );
+        String html = plantilla("Reembolso en revisión", TONO_ALERTA,
+                "Estamos revisando tu reembolso, " + nombreOUsuario(nombrePaciente), cuerpo,
+                "Ir a Tranqui App", frontendUrl);
+        enviarCorreo(toEmail, asunto, html);
+    }
+
     // fecha/hora en null para documentos (no ocupan agenda).
     public void enviarTurnoCanceladoPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
                                               LocalDate fecha, LocalTime hora, boolean canceladoPorProfesional,
@@ -358,6 +397,7 @@ public class ResendEmailService {
             case REEMBOLSADO -> "Se reembolsa el total abonado al mismo medio de pago. La acreditación depende de los plazos de Mercado Pago.";
             case SIN_REEMBOLSO -> "La cancelación se hizo con menos de 48 horas de anticipación, así que según la política de cancelación no corresponde reembolso.";
             case PENDIENTE -> "Te corresponde el reembolso del total abonado, pero no pudimos procesarlo automáticamente. Ya estamos revisándolo: si en 5 días hábiles no lo ves acreditado, escribinos desde Soporte.";
+            case EN_PROCESO -> "Te corresponde el reembolso del total abonado. Ya lo pedimos a Mercado Pago y te avisamos por mail cuando se acredite.";
             case SIN_PAGO -> null;
         };
         String cuerpo = motivo +

@@ -12,6 +12,7 @@ import com.tranqui.eventos.data.ConceptoAprobadoData;
 import com.tranqui.eventos.data.MeetCreadoData;
 import com.tranqui.eventos.data.PagoAprobadoData;
 import com.tranqui.eventos.data.PagoRechazadoData;
+import com.tranqui.eventos.data.ReembolsoRealizadoData;
 import com.tranqui.eventos.data.TurnoConfirmadoData;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
@@ -53,6 +54,23 @@ public class PagoWebhookHandler {
 
     @Transactional
     public void procesarAprobacionConcepto(Long solicitudId, String transactionId) {
+        aprobarConcepto(solicitudId, transactionId, true);
+    }
+
+    /**
+     * Fase 4: pagos.concepto.aprobado que publicó el servicio de pagos. Se marca la solicitud sin volver
+     * a publicar el evento; el aviso en vivo al profesional lo manda notificaciones con ese mismo evento.
+     */
+    @Transactional
+    public void aplicarConceptoAprobado(ConceptoAprobadoData d) {
+        if (!solicitudRepository.existsById(d.solicitudId())) {
+            log.warn("pagos.concepto.aprobado de una solicitud que no existe en el monolito: {}", d.solicitudId());
+            return;
+        }
+        aprobarConcepto(d.solicitudId(), d.mpPaymentId(), false);
+    }
+
+    private void aprobarConcepto(Long solicitudId, String transactionId, boolean publicar) {
         SolicitudDocumento solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
 
@@ -68,6 +86,9 @@ public class PagoWebhookHandler {
         solicitud.setEstado(EstadoPago.APROBADO);
         solicitud.setTransactionId(transactionId);
         solicitudRepository.save(solicitud);
+        if (!publicar) {
+            return;
+        }
 
         // Fase 2: /ws-tranqui pasa al servicio de chat; el aviso en vivo al profesional lo manda el
         // servicio de notificaciones a partir de este evento. El push de abajo queda para la vuelta atrás.
@@ -103,6 +124,27 @@ public class PagoWebhookHandler {
     public void procesarAprobacionTurno(Long turnoId, String transactionId) {
         Turno turno = turnoRepository.findById(turnoId)
                 .orElseThrow(() -> new EntityNotFoundException("Turno no encontrado con ID: " + turnoId));
+        confirmarTurnoPagado(turno, transactionId, true);
+    }
+
+    /**
+     * Fase 4: pagos.pago.aprobado que publicó el servicio de pagos. Confirma el turno igual que el webhook
+     * (mismos eventos, avisos y mails) y guarda una copia del pago, que todavía leen los ingresos del
+     * profesional y la cancelación; no vuelve a publicar pagos.pago.aprobado. Idempotente: el monolito en
+     * la vuelta atrás también publica este evento y lo recibe.
+     */
+    @Transactional
+    public void aplicarPagoAprobado(PagoAprobadoData d) {
+        Turno turno = turnoRepository.findById(d.turnoId()).orElse(null);
+        if (turno == null) {
+            log.warn("pagos.pago.aprobado de un turno que no existe en el monolito: {}", d.turnoId());
+            return;
+        }
+        confirmarTurnoPagado(turno, d.mpPaymentId(), false);
+    }
+
+    private void confirmarTurnoPagado(Turno turno, String transactionId, boolean publicarPagoAprobado) {
+        Long turnoId = turno.getId();
 
         // Idempotent for the same reason as procesarAprobacionConcepto above � this now has two
         // callers (the async webhook and the synchronous fallback WebhookController#verificarPago
@@ -129,7 +171,7 @@ public class PagoWebhookHandler {
             turno = turnoGuardado;
         }
 
-        // Registrar el Pago
+        // Registrar el Pago (con el servicio de pagos, una copia del que registró el servicio)
         Pago pago = Pago.builder()
                 .turno(turno)
                 .transactionId(transactionId)
@@ -141,18 +183,20 @@ public class PagoWebhookHandler {
         Long pagoId = (pagoGuardado != null && pagoGuardado.getId() != null) ? pagoGuardado.getId() : (pago.getId() != null ? pago.getId() : turno.getId());
         int pagoVersion = pagoGuardado != null ? pagoGuardado.getAggregateVersion() : pago.getAggregateVersion();
 
-        outboxPublisher.publicar(
-                Topicos.PAGOS_PAGO_APROBADO_V1,
-                String.valueOf(pagoId),
-                pagoVersion,
-                new PagoAprobadoData(
-                        pagoId,
-                        turno.getId(),
-                        transactionId,
-                        pago.getMonto(),
-                        "mercadopago"
-                )
-        );
+        if (publicarPagoAprobado) {
+            outboxPublisher.publicar(
+                    Topicos.PAGOS_PAGO_APROBADO_V1,
+                    String.valueOf(pagoId),
+                    pagoVersion,
+                    new PagoAprobadoData(
+                            pagoId,
+                            turno.getId(),
+                            transactionId,
+                            pago.getMonto(),
+                            "mercadopago"
+                    )
+            );
+        }
 
         outboxPublisher.publicar(
                 Topicos.TURNOS_TURNO_CONFIRMADO_V1,
@@ -298,6 +342,40 @@ public class PagoWebhookHandler {
         if (turno.getTipo() == com.tranqui.app.model.TipoTurno.RECETA) return "una receta";
         if (turno.getTipo() == com.tranqui.app.model.TipoTurno.CERTIFICADO) return "un certificado";
         return "un documento";
+    }
+
+    /**
+     * Fase 4: pagos.pago.rechazado que publicó el servicio de pagos: se guarda la copia del pago rechazado,
+     * como hacía el webhook, sin volver a publicar. El horario lo libera el vencimiento del bloqueo.
+     */
+    @Transactional
+    public void aplicarPagoRechazado(PagoRechazadoData d) {
+        if (d.mpPaymentId() != null && pagoRepository.findByTransactionId(d.mpPaymentId()).isPresent()) {
+            return;
+        }
+        Turno turno = turnoRepository.findById(d.turnoId()).orElse(null);
+        if (turno == null) {
+            log.warn("pagos.pago.rechazado de un turno que no existe en el monolito: {}", d.turnoId());
+            return;
+        }
+        pagoRepository.save(Pago.builder()
+                .turno(turno)
+                .transactionId(d.mpPaymentId())
+                .estado(EstadoPago.RECHAZADO)
+                .monto(turno.getPrecio())
+                .fechaPago(LocalDateTime.now())
+                .build());
+    }
+
+    /** Fase 4: pagos.reembolso.realizado que publicó el servicio de pagos: la copia del pago queda reembolsada. */
+    @Transactional
+    public void aplicarReembolsoRealizado(ReembolsoRealizadoData d) {
+        turnoRepository.findById(d.turnoId()).map(Turno::getPago).ifPresent(pago -> {
+            if (pago.getEstado() != EstadoPago.REEMBOLSADO) {
+                pago.setEstado(EstadoPago.REEMBOLSADO);
+                pagoRepository.save(pago);
+            }
+        });
     }
 
     @Transactional

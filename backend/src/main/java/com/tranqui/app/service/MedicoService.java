@@ -765,7 +765,7 @@ public class MedicoService {
                 // Without Mercado Pago conectado, the médico can't actually get paid for a
                 // particular consultation � only enforced once the integration is really live
                 // (mercadopago.enabled=true), so local/dev/test environments aren't blocked.
-                && (!mercadoPagoEnabled || u.getMpAccessTokenEncrypted() != null)
+                && (!mercadoPagoEnabled || u.tieneMercadoPagoVinculado())
                 && Boolean.TRUE.equals(u.getVerificadoAdmin());
     }
 }
