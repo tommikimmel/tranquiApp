@@ -22,6 +22,9 @@ import com.tranqui.profesionales.recetas.RecetaResponseDto;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import com.tranqui.profesionales.seguridad.JwtTestHelper;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -82,8 +85,13 @@ import static org.mockito.Mockito.when;
 })
 class RecetasIntegracionTest {
 
-    static final String CLAVE_JWT = "clave-de-test-de-al-menos-32-bytes-ok";
+    static final String CLAVE_JWT = JwtTestHelper.CLAVE_JWT;
     static final String CLAVE_SERVICIO = "clave-servicio-test-de-32-bytes-ok";
+
+    @DynamicPropertySource
+    static void registrarJwt(DynamicPropertyRegistry registry) {
+        JwtTestHelper.registrarPropiedades(registry);
+    }
 
     @Container
     @ServiceConnection
@@ -126,13 +134,7 @@ class RecetasIntegracionTest {
     }
 
     private static String token(String email, String rol) {
-        return Jwts.builder()
-                .setClaims(Map.of("rol", rol))
-                .setSubject(email)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 3600_000))
-                .signWith(Keys.hmacShaKeyFor(CLAVE_JWT.getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256)
-                .compact();
+        return JwtTestHelper.tokenRs256(email, rol);
     }
 
     private ResponseEntity<String> pedir(HttpMethod metodo, String ruta, String token, String cuerpo) {

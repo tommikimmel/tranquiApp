@@ -16,6 +16,9 @@ import com.tranqui.pagos.mp.MercadoPagoApi;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import com.tranqui.pagos.seguridad.JwtTestHelper;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.MessageBuilder;
@@ -90,8 +93,13 @@ import static org.mockito.Mockito.when;
 })
 class PagosIntegracionTest {
 
-    static final String CLAVE_JWT = "clave-de-test-de-al-menos-32-bytes-ok";
+    static final String CLAVE_JWT = JwtTestHelper.CLAVE_JWT;
     static final String SECRETO_WEBHOOK = "secreto-del-webhook";
+
+    @DynamicPropertySource
+    static void registrarJwt(DynamicPropertyRegistry registry) {
+        JwtTestHelper.registrarPropiedades(registry);
+    }
 
     @Container
     @ServiceConnection
@@ -176,10 +184,7 @@ class PagosIntegracionTest {
     }
 
     private static String token(String email, String rol) {
-        return Jwts.builder().setClaims(Map.of("rol", rol)).setSubject(email).setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 60_000))
-                .signWith(Keys.hmacShaKeyFor(CLAVE_JWT.getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256)
-                .compact();
+        return JwtTestHelper.tokenRs256(email, rol);
     }
 
     private ResponseEntity<String> pedir(HttpMethod metodo, String ruta, String token) {
@@ -357,5 +362,17 @@ class PagosIntegracionTest {
 
         assertThat(redireccion("/api/medicos/mercadopago/callback?code=abc&state=2.falso"))
                 .isEqualTo("https://front.test/?mp=error&reason=invalid_state");
+    }
+
+    @Test
+    void transicion_tokenHs256_esAceptado() {
+        String draHs = JwtTestHelper.tokenHs256("dra@mail.com", "PSIQUIATRA");
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/mercadopago/status", draHs).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void rutasDePagos_conTokenRs256FirmadoConOtraClave_devuelve401() {
+        String tokenOtra = JwtTestHelper.tokenRs256OtraClave("dra@mail.com", "PSIQUIATRA");
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/mercadopago/status", tokenOtra).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 }

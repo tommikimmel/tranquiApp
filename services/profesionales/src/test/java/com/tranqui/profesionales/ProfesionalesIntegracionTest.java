@@ -20,6 +20,9 @@ import com.tranqui.profesionales.interno.SincronizacionMonolito;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import com.tranqui.profesionales.seguridad.JwtTestHelper;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.MessageBuilder;
@@ -81,8 +84,13 @@ import static org.mockito.Mockito.when;
 })
 class ProfesionalesIntegracionTest {
 
-    static final String CLAVE_JWT = "clave-de-test-de-al-menos-32-bytes-ok";
+    static final String CLAVE_JWT = JwtTestHelper.CLAVE_JWT;
     static final String CLAVE_SERVICIO = "clave-servicio-test-de-32-bytes-ok";
+
+    @DynamicPropertySource
+    static void registrarJwt(DynamicPropertyRegistry registry) {
+        JwtTestHelper.registrarPropiedades(registry);
+    }
 
     @Container
     @ServiceConnection
@@ -155,10 +163,7 @@ class ProfesionalesIntegracionTest {
     }
 
     private static String token(String email, String rol) {
-        return Jwts.builder().setClaims(Map.of("rol", rol)).setSubject(email).setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 60_000))
-                .signWith(Keys.hmacShaKeyFor(CLAVE_JWT.getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256)
-                .compact();
+        return JwtTestHelper.tokenRs256(email, rol);
     }
 
     private ResponseEntity<String> pedir(HttpMethod metodo, String ruta, String token, String cuerpo) {
@@ -224,6 +229,19 @@ class ProfesionalesIntegracionTest {
                 .contains("\"fechaNacimiento\":\"1980-05-04\"");
         assertThat(pedir(HttpMethod.GET, "/api/medicos/perfil", token("otra@mail.com", "PSIQUIATRA"), null).getStatusCode())
                 .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void transicion_tokenHs256_esAceptado() {
+        alta(1L, "ana@mail.com", "ACTIVE", LocalDateTime.now().plusDays(1), true);
+        String tokenHs = JwtTestHelper.tokenHs256("ana@mail.com", "PSIQUIATRA");
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/perfil", tokenHs, null).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void rutasDeProfesionales_conTokenRs256FirmadoConOtraClave_devuelve401() {
+        String tokenOtra = JwtTestHelper.tokenRs256OtraClave("ana@mail.com", "PSIQUIATRA");
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/perfil", tokenOtra, null).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     private static final String CUERPO_PERFIL = "{\"nombre\":\"Ana María\",\"apellido\":\"Paz\",\"telefono\":\" +54 11 6666 \","

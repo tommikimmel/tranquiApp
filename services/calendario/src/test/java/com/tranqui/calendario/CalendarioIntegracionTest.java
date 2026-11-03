@@ -19,6 +19,9 @@ import com.tranqui.eventos.jwt.ServiceJwt;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import com.tranqui.calendario.seguridad.JwtTestHelper;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.MessageBuilder;
@@ -76,8 +79,13 @@ import static org.mockito.Mockito.when;
 })
 class CalendarioIntegracionTest {
 
-    static final String CLAVE_JWT = "clave-de-test-de-al-menos-32-bytes-ok";
+    static final String CLAVE_JWT = JwtTestHelper.CLAVE_JWT;
     static final String CLAVE_SERVICIO = "clave-servicio-test-de-32-bytes-ok";
+
+    @DynamicPropertySource
+    static void registrarJwt(DynamicPropertyRegistry registry) {
+        JwtTestHelper.registrarPropiedades(registry);
+    }
 
     @Container
     @ServiceConnection
@@ -125,10 +133,7 @@ class CalendarioIntegracionTest {
     }
 
     private static String token(String email, String rol) {
-        return Jwts.builder().setClaims(Map.of("rol", rol)).setSubject(email).setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 60_000))
-                .signWith(Keys.hmacShaKeyFor(CLAVE_JWT.getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256)
-                .compact();
+        return JwtTestHelper.tokenRs256(email, rol);
     }
 
     private ResponseEntity<String> pedir(HttpMethod metodo, String ruta, String token) {
@@ -207,6 +212,20 @@ class CalendarioIntegracionTest {
         assertThat(pedir(HttpMethod.GET, "/api/medicos/google-calendar/status", token("pac@mail.com", "PACIENTE"))
                 .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(pedir(HttpMethod.GET, "/api/medicos/google-calendar/status", null).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void rutasDelPanel_conTokenHs256DuranteTransicion_esAceptado() {
+        String draHs = JwtTestHelper.tokenHs256("dra@mail.com", "PSIQUIATRA");
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/google-calendar/status", draHs).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void rutasDelPanel_conTokenRs256FirmadoConOtraClave_devuelve401() {
+        String tokenOtra = JwtTestHelper.tokenRs256OtraClave("dra@mail.com", "PSIQUIATRA");
+        assertThat(pedir(HttpMethod.GET, "/api/medicos/google-calendar/status", tokenOtra).getStatusCode())
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 

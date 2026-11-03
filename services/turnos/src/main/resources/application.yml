@@ -104,7 +104,12 @@ turnos:
   resincronizacion-profesionales-minutos: ${TURNOS_RESINCRONIZACION_PROFESIONALES_MINUTOS:15}
 
 jwt:
-  # Misma clave que identidad (hoy el monolito) usa para firmar los JWT de usuario. Sin default.
+  # Clave pública de identidad para validar JWT de usuario en formato RS256 (vacía por defecto).
+  public-key: ${JWT_PUBLIC_KEY:}
+  # Durante la transición valen los dos: tokens HS256 del monolito y RS256 de identidad. Siete días
+  # después del corte se desactiva con JWT_HS256_ACEPTADO=false.
+  hs256-aceptado: ${JWT_HS256_ACEPTADO:true}
+  # Secreto HS256 histórico del monolito. Ya no es obligatorio si hs256-aceptado=false.
   secret: ${JWT_SECRET:}
 
 tranqui:

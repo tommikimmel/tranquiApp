@@ -14,6 +14,9 @@ import com.tranqui.eventos.jwt.ServiceJwt;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import com.tranqui.chat.seguridad.JwtTestHelper;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.MessageBuilder;
@@ -76,8 +79,13 @@ import static org.mockito.Mockito.when;
 })
 class ChatIntegracionTest {
 
-    static final String CLAVE_JWT = "clave-de-test-de-al-menos-32-bytes-ok";
+    static final String CLAVE_JWT = JwtTestHelper.CLAVE_JWT;
     static final String CLAVE_SERVICIO = "clave-servicio-test-de-32-bytes-ok";
+
+    @DynamicPropertySource
+    static void registrarJwt(DynamicPropertyRegistry registry) {
+        JwtTestHelper.registrarPropiedades(registry);
+    }
 
     @Container
     @ServiceConnection
@@ -128,10 +136,7 @@ class ChatIntegracionTest {
     }
 
     private static String token(String email, String rol) {
-        return Jwts.builder().setClaims(Map.of("rol", rol)).setSubject(email).setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 60_000))
-                .signWith(Keys.hmacShaKeyFor(CLAVE_JWT.getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256)
-                .compact();
+        return JwtTestHelper.tokenRs256(email, rol);
     }
 
     private ResponseEntity<String> get(String ruta, String token) {
@@ -314,5 +319,17 @@ class ChatIntegracionTest {
         paciente.send("/app/chat.enviar", Map.of("destinatarioId", 2, "contenido", "nuevo"));
         assertThat(((Number) confirmacion.get(10, TimeUnit.SECONDS).get("id")).longValue()).isGreaterThan(101L);
         paciente.disconnect();
+    }
+
+    @Test
+    void transicion_tokenHs256_esAceptado() {
+        String tokenHs = JwtTestHelper.tokenHs256("dra@mail.com", "PSIQUIATRA");
+        assertThat(get("/api/chat/tiene-no-leidos", tokenHs).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void rutasDelChat_conTokenRs256FirmadoConOtraClave_devuelve401() {
+        String tokenOtra = JwtTestHelper.tokenRs256OtraClave("dra@mail.com", "PSIQUIATRA");
+        assertThat(get("/api/chat/tiene-no-leidos", tokenOtra).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 }
