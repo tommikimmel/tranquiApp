@@ -10,6 +10,7 @@ COPY backend/pom.xml backend/
 COPY gateway/pom.xml gateway/
 COPY services/notificaciones/pom.xml services/notificaciones/
 COPY services/chat/pom.xml services/chat/
+COPY services/calendario/pom.xml services/calendario/
 
 # Copiar código fuente de las librerías y del servicio
 COPY libs/comun/src libs/comun/src

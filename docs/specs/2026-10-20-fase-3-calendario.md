@@ -186,3 +186,19 @@ de prueba (decisión 4).
   una decisión del usuario, junto con el hotfix del `JWT_SECRET`. Mientras tanto, el servicio de calendario
   resuelve la clave exactamente igual que el monolito (decisión 3), así lee los tokens existentes y el día
   que se corrija cambia en los dos a la vez.
+
+### G3 — servicio de calendario
+- **JDBC en vez de JPA:** las tablas son simples y la librería de eventos ya trabaja con `JdbcTemplate`;
+  sin Hibernate el servicio carga muchas menos clases, y el metaspace era lo que más pesaba en la
+  medición de la Fase 2.
+- **`evento_externo.transparente`:** el monolito no guardaba si un evento de Google estaba marcado como
+  "disponible" (lo miraba en vivo); ahora la caché lo guarda para que la ruta de horarios ocupados lo
+  ignore igual que antes. Por eso la carga inicial no copia el syncToken: la primera pasada (a los 30 s
+  del arranque, con Google habilitado) hace una sincronización completa y reconstruye la caché con ese
+  dato; hasta entonces vale la caché copiada del monolito.
+- **Eventos de varios días:** la ruta de horarios ocupados recorta al día pedido los eventos que
+  empiezan antes o terminan después (el monolito tomaba solo la hora y podía equivocarse).
+- **Google detrás de una interfaz** (`GoogleCalendarApi`): la lógica se prueba sin Google; la
+  implementación real hace las mismas llamadas que el monolito.
+- **`calendario.meet.creado` también para presenciales**, sin link y con `linkNuevo=false`: el monolito
+  guarda el id del evento (para la vuelta atrás) y notificaciones no manda nada.
