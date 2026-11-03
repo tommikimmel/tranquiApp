@@ -29,6 +29,7 @@
 		<module>services/notificaciones</module>
 		<module>services/chat</module>
 		<module>services/calendario</module>
+		<module>services/pagos</module>
 	</modules>
 
 	<dependencyManagement>

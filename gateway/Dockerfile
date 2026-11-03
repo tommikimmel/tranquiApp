@@ -11,6 +11,7 @@ COPY gateway/pom.xml gateway/
 COPY services/notificaciones/pom.xml services/notificaciones/
 COPY services/chat/pom.xml services/chat/
 COPY services/calendario/pom.xml services/calendario/
+COPY services/pagos/pom.xml services/pagos/
 
 
 # Copiar código fuente de librerías y del gateway
