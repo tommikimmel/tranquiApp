@@ -47,6 +47,13 @@ terminal interactiva, aborta y lista los puertos ocupados.
 A partir de la Fase 0 ([Plan de migración a microservicios](../arquitectura/microservicios.md)), el
 entorno local incluye la infraestructura de soporte para la arquitectura distribuida:
 
+- **Suscripciones, planes y facturación en el servicio de pagos (`pagos`, Fase 8):** suscripciones, planes,
+  features, pagos de suscripción, historial de eventos y facturas con ARCA (deshabilitada/simulada). No agrega
+  contenedor nuevo. Su esquema lo crea Flyway en la base `pagos` y copia las ocho tablas iniciales del monolito
+  al arrancar con `PAGOS_SUSCRIPCIONES: "true"`. Para volver al monolito: sacar `TRANQUI_SERVICES_SUSCRIPCIONES_URI`
+  del gateway (o apuntar al monolito), poner `SUSCRIPCIONES_EXTERNO: "false"` en el backend, `PAGOS_SUSCRIPCIONES: "false"`
+  en pagos y correr `node scripts/fase8-devolver-suscripciones.mjs`. `node scripts/fase8-conciliar-suscripciones.mjs`
+  compara las ocho tablas.
 - **Historia clínica y recetas en el servicio de profesionales (`profesionales`, Fase 7):** seguimientos diarios,
   informes clínicos, recetas electrónicas (QBI2 simulado en local) y solicitudes de conceptos. No agrega contenedor
   nuevo. Su esquema lo crea Flyway en la base `profesionales` y copia los asientos iniciales del monolito al arrancar con
