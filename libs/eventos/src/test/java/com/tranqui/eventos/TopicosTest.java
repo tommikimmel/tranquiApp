@@ -10,7 +10,7 @@ class TopicosTest {
     @Test
     void todosLosTopicos_cumplenConLaExpresionRegular() {
         assertThat(Topicos.TODOS_LOS_TOPICOS).isNotEmpty();
-        assertThat(Topicos.TODOS_LOS_TOPICOS).hasSize(43);
+        assertThat(Topicos.TODOS_LOS_TOPICOS).hasSize(44);
 
         for (String topico : Topicos.TODOS_LOS_TOPICOS) {
             assertThat(Topicos.esValido(topico))

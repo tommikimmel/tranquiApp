@@ -252,6 +252,8 @@ public class SubscriptionReconciliationScheduler {
         if (sum12m.compareTo(umbral80) >= 0) {
             log.warn("ALERTA MONOTRIBUTO: La facturación rodante de los últimos 12 meses ($ {}) superó el 80% del tope de Categoría A ($ {})",
                     sum12m, topeCatA);
+            avisoSuscripcionPublisher.alertarAdministradores("monotributo", "Facturación cerca del tope de monotributo",
+                    "La facturación de los últimos 12 meses ($ " + sum12m + ") superó el 80% del tope de la Categoría A ($ " + topeCatA + ").");
         }
     }
 }

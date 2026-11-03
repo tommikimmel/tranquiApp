@@ -99,6 +99,13 @@ class PlantillasYTransporteTest {
     }
 
     @Test
+    void alertaAdmin_escapaElTextoQueLlegaDeOtroServicio() throws Exception {
+        verificar(() -> service.enviarAlertaAdmin("admin@test.com", "Hay 2 facturas con error", "Revisar <b>ya</b>"),
+                "[Tranqui App · Alerta] Hay 2 facturas con error", "Hay 2 facturas con error", "Revisar &lt;b&gt;ya&lt;/b&gt;");
+        assertThat(html(enviado())).doesNotContain("<b>ya</b>");
+    }
+
+    @Test
     void turnosAlProfesional() throws Exception {
         verificar(() -> service.enviarNuevoTurnoProfesional("m@test.com", "Dra. Paz", "Juan", FECHA, HORA, "Online", "Primera consulta"),
                 "Nuevo turno reservado — Juan", "05/11/2026", "10:30 hs", "Primera consulta", "Dra. Paz");

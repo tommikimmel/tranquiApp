@@ -70,6 +70,8 @@ public final class Topicos {
     public static final String PAGOS_CHECKOUT_CREADO_V1 = "pagos.checkout.creado.v1";
     /** Fase 4: Mercado Pago no aceptó un reembolso que correspondía; queda para revisar a mano. */
     public static final String PAGOS_REEMBOLSO_FALLIDO_V1 = "pagos.reembolso.fallido.v1";
+    /** Fase 11: una alerta de la reconciliación de suscripciones para los administradores (antes, mail del monolito). */
+    public static final String PAGOS_ALERTA_ADMIN_V1 = "pagos.alerta.admin.v1";
 
     // ==================== Suscripciones ====================
     /**
@@ -129,6 +131,7 @@ public final class Topicos {
         PAGOS_CONCEPTO_APROBADO_V1,
         PAGOS_CHECKOUT_CREADO_V1,
         PAGOS_REEMBOLSO_FALLIDO_V1,
+        PAGOS_ALERTA_ADMIN_V1,
         SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1,
         SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V2,
         SUSCRIPCIONES_AVISO_PROGRAMADO_V1,

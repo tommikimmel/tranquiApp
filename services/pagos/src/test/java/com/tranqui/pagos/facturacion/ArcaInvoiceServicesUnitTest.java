@@ -557,7 +557,8 @@ class ArcaInvoiceServicesUnitTest {
     @Test
     void testFacturacionSuscripcionesArca_reconciliacion() {
         InvoiceService mockInvoiceService = mock(InvoiceService.class);
-        FacturacionSuscripcionesArca f = new FacturacionSuscripcionesArca(mockInvoiceService, pagosSuscripcion, facturas);
+        com.tranqui.pagos.suscripciones.AvisoSuscripcionPublisher avisos = mock(com.tranqui.pagos.suscripciones.AvisoSuscripcionPublisher.class);
+        FacturacionSuscripcionesArca f = new FacturacionSuscripcionesArca(mockInvoiceService, pagosSuscripcion, facturas, avisos);
 
         // 1. emitirFactura
         f.emitirFactura(50L, "test");
@@ -571,5 +572,7 @@ class ArcaInvoiceServicesUnitTest {
         // 3. verificarFacturasFallidas
         when(facturas.fallidas()).thenReturn(List.of(invoice));
         assertDoesNotThrow(f::verificarFacturasFallidas);
+        verify(avisos).alertarAdministradores("facturas-fallidas", "Hay 1 facturas con error",
+                "Existen 1 facturas en estado FAILED que requieren atención administrativa.");
     }
 }
