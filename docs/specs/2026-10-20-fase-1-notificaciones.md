@@ -174,3 +174,9 @@ Desvíos respecto de la spec, encontrados al cablear cada punto del monolito:
   del gateway) y fuera del gate de contraseña del sitio.
 - **Vuelta atrás:** `NOTIFICACIONES_ENVIO_DIRECTO=true` en el monolito y la ruta del gateway de
   vuelta al monolito (N5).
+
+### N5 — gateway y frontend
+- La URI del servicio sale de `TRANQUI_SERVICES_NOTIFICACIONES_URI`; por defecto el gateway sigue
+  derivando al monolito y el compose la pone en `lb://notificaciones`. Vuelta atrás: sacar la variable.
+- El frontend se conecta a los dos endpoints con el mismo canal, porque los avisos de chat y de
+  pagos de concepto siguen saliendo del monolito por `/ws-tranqui` (ver N3).

@@ -407,6 +407,14 @@ spring:
                 rate-limiter: "#{@tranquiRateLimiter}"
                 key-resolver: "#{@userOrIpKeyResolver}"
 
+        # --- NOTIFICACIONES EN VIVO (STOMP + SockJS) ---
+        # Fase 1: las notificaciones guardadas se empujan desde el servicio de notificaciones.
+        # El chat (y sus avisos de "nuevo mensaje") sigue en /ws-tranqui.
+        - id: notificaciones-ws
+          uri: ${tranqui.services.notificaciones-ws.uri:${tranqui.services.notificaciones.uri}}
+          predicates:
+            - Path=/ws-notificaciones/**
+
         # --- CHAT ---
         - id: chat
           uri: ${tranqui.services.chat.uri:${tranqui.services.monolito.uri}}
@@ -538,8 +546,10 @@ tranqui:
       uri: ${tranqui.services.monolito.uri}
     suscripciones:
       uri: ${tranqui.services.monolito.uri}
+    # Fase 1: lb://notificaciones cuando el servicio está desplegado (docker-compose).
+    # Vuelta atrás: sacar la variable y la ruta vuelve al monolito.
     notificaciones:
-      uri: ${tranqui.services.monolito.uri}
+      uri: ${TRANQUI_SERVICES_NOTIFICACIONES_URI:${tranqui.services.monolito.uri}}
     chat:
       uri: ${tranqui.services.monolito.uri}
     chat-ws:

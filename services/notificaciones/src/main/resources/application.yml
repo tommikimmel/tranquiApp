@@ -35,6 +35,8 @@ spring:
         health-check-path: /actuator/health
         health-check-interval: 10s
         health-check-critical-timeout: 1m
+        # Registro por IP: el gateway lo alcanza en la red de Docker sin resolver el hostname del contenedor.
+        prefer-ip-address: true
         tags: version=${TRANQUI_VERSION:dev}
 
 server:
