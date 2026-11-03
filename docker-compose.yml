@@ -469,8 +469,8 @@ services:
       GOOGLE_CALENDAR_WATCH_ENABLED: ${GOOGLE_CALENDAR_WATCH_ENABLED:-false}
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-http://localhost:8081}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
-      # Sin clave de cifrado a propósito: el servicio resuelve security.encryption.key igual que el
-      # monolito, que hoy usa el valor de respaldo (ver docs/specs/2026-10-20-fase-3-calendario.md).
+      # La misma clave que el monolito: los tokens de Google se leen en los dos.
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Falta ENCRYPTION_KEY en .env}
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
       interval: 10s

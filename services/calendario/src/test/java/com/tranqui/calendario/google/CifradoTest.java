@@ -4,39 +4,63 @@ import org.junit.jupiter.api.Test;
 
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Base64;
 import java.util.HexFormat;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Compatibilidad con el monolito: un token cifrado por EncryptionUtil y un state o token de canal
- * firmado por GoogleCalendarOAuthService/WatchService se leen igual en el servicio.
+ * firmado por GoogleCalendarOAuthService/WatchService se leen igual en el servicio, en el formato
+ * actual y en el de antes del hotfix de la clave.
  */
 class CifradoTest {
 
     private static final String CLAVE = "clave-de-prueba-de-32-caracteres";
+    private static final String CLAVE_LEGADA = "masterdecryptionkey32charspart12";
+
+    private static String hmac(String clave, String payload) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(clave.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        return HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
+    }
 
     @Test
     void leeLoQueCifraElMonolito() throws Exception {
-        // Mismo algoritmo que EncryptionUtil del monolito.
+        // Mismo formato que EncryptionUtil del monolito: v2: + base64(IV de 12 bytes + AES-256-GCM).
+        byte[] iv = new byte[12];
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(MessageDigest.getInstance("SHA-256")
+                .digest(CLAVE.getBytes(StandardCharsets.UTF_8)), "AES"), new GCMParameterSpec(128, iv));
+        byte[] cifrado = cipher.doFinal("ya29.token".getBytes(StandardCharsets.UTF_8));
+        String delMonolito = "v2:" + Base64.getEncoder().encodeToString(
+                ByteBuffer.allocate(12 + cifrado.length).put(iv).put(cifrado).array());
+
+        Cifrado servicio = new Cifrado(CLAVE);
+
+        assertThat(servicio.descifrar(delMonolito)).isEqualTo("ya29.token");
+        assertThat(servicio.cifrar("ya29.token")).startsWith("v2:");
+        assertThat(servicio.descifrar(servicio.cifrar("ya29.token"))).isEqualTo("ya29.token");
+    }
+
+    @Test
+    void leeLoCifradoAntesDelHotfix() throws Exception {
         Cipher cipher = Cipher.getInstance("AES");
-        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(CLAVE.getBytes(StandardCharsets.UTF_8), "AES"));
-        String delMonolito = Base64.getEncoder().encodeToString(cipher.doFinal("ya29.token".getBytes(StandardCharsets.UTF_8)));
+        cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(CLAVE_LEGADA.getBytes(StandardCharsets.UTF_8), "AES"));
+        String viejo = Base64.getEncoder().encodeToString(cipher.doFinal("ya29.viejo".getBytes(StandardCharsets.UTF_8)));
 
-        Cifrado cifrado = new Cifrado(CLAVE);
-
-        assertThat(cifrado.descifrar(delMonolito)).isEqualTo("ya29.token");
-        assertThat(cifrado.cifrar("ya29.token")).isEqualTo(delMonolito);
+        assertThat(new Cifrado(CLAVE).descifrar(viejo)).isEqualTo("ya29.viejo");
     }
 
     @Test
     void verificaLaFirmaDelMonolitoYRechazaLaAdulterada() throws Exception {
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(CLAVE.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-        String delMonolito = "16." + HexFormat.of().formatHex(mac.doFinal("16".getBytes(StandardCharsets.UTF_8)));
+        String delMonolito = "16." + hmac(CLAVE, "16");
 
         Cifrado cifrado = new Cifrado(CLAVE);
 
@@ -45,5 +69,17 @@ class CifradoTest {
         assertThat(cifrado.verificar("17" + delMonolito.substring(2))).isNull();
         assertThat(cifrado.verificar(null)).isNull();
         assertThat(cifrado.verificar("sin-punto")).isNull();
+    }
+
+    @Test
+    void aceptaLosCanalesFirmadosConLaClaveAnterior() throws Exception {
+        assertThat(new Cifrado(CLAVE).verificar("16." + hmac(CLAVE_LEGADA, "16"))).isEqualTo(16L);
+    }
+
+    @Test
+    void noArrancaSinClaveNiConUnaPublicada() {
+        assertThatThrownBy(() -> new Cifrado("")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> new Cifrado(CLAVE_LEGADA)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> new Cifrado("corta")).isInstanceOf(IllegalStateException.class);
     }
 }

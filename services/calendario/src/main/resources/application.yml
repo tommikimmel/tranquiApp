@@ -109,6 +109,12 @@ jwt:
   # Misma clave que identidad (hoy el monolito) usa para firmar los JWT de usuario. Sin default.
   secret: ${JWT_SECRET:}
 
+security:
+  encryption:
+    # La misma ENCRYPTION_KEY que el monolito: cifra los tokens de Google y firma el state y los
+    # canales (Cifrado). Obligatoria, sin default.
+    key: ${ENCRYPTION_KEY:}
+
 tranqui:
   gateway:
     # Las consultas internas (carga inicial) pasan por el gateway (sección 4.2).

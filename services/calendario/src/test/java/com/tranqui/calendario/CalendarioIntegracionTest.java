@@ -71,6 +71,7 @@ import static org.mockito.Mockito.when;
         "app.frontend-url=https://front.test",
         "jwt.secret=" + CalendarioIntegracionTest.CLAVE_JWT,
         "tranqui.jwt.service-secret=" + CalendarioIntegracionTest.CLAVE_SERVICIO,
+        "security.encryption.key=clave-de-cifrado-de-test-de-32-bytes",
         "tranqui.gateway.url=http://localhost:1"
 })
 class CalendarioIntegracionTest {
