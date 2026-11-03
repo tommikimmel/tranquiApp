@@ -66,6 +66,9 @@ jobs:
           - servicio: turnos
             context: .
             file: ./services/turnos/Dockerfile
+          - servicio: identidad
+            context: .
+            file: ./services/identidad/Dockerfile
           - servicio: backend
             context: .
             file: ./backend/Dockerfile

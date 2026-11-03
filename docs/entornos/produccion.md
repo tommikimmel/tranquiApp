@@ -31,12 +31,16 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 | `tranqui-pagos` | `pagos` | Servicio de pagos (Fase 4 y Fase 8): Mercado Pago de turnos y documentos (Fase 4), suscripciones, planes y facturación ARCA (Fase 8), base propia `pagos` | 288 MB | 0.5 |
 | `tranqui-profesionales` | `profesionales` | Servicio de profesionales (Fase 5 y Fase 7): perfil, buscador, tarifas, disponibilidad, historia clínica y recetas (Fase 7), base propia `profesionales` | 288 MB | 0.5 |
 | `tranqui-turnos` | `turnos` | Servicio de turnos (Fase 6): reservas, agenda, cancelación, reprogramación, asistencia y documentos, base propia `turnos` | 288 MB | 0.5 |
+| `tranqui-identidad` | `identidad` | Servicio de identidad (Fase 9): registro, login y JWT RS256, Mi Cuenta, soporte, administración de usuarios, portón del sitio y novedades, base propia `identidad`. Publica `127.0.0.1:8084` en el VPS solo para el script de novedades | 288 MB | 0.5 |
 | `tranqui-db-servicios` | `db-servicios` | Contenedor de una sola ejecución: crea la base y el usuario de cada servicio (`infra/postgres/crear-bases-servicios.sh`) y termina | 32 MB | 0.2 |
 | `tranqui-bot`, `tranqui-bot-worker`, `wsp-db`, `wsp-redis` | — | Bot de WhatsApp (proyecto aparte, fuera de este repositorio) | ~70 MB | — |
 
 ### Presupuesto de memoria (RAM)
 
 - **Total suma `mem_limit` Docker Compose (Fase 6, Fase 7 y Fase 8):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 288 + 288 + 288 + 288 + 288 + 288 = 3.840 MB` (~3,84 GB; `db-servicios` corre unos segundos al arrancar y no suma). Las Fases 7 y 8 no agregan ningún contenedor (historia clínica en `profesionales`, suscripciones en `pagos`, decisión 1), por lo que la suma de límites se mantiene idéntica en 3.840 MB y ~5,0 GB proyectados. El consumo y trabajo de facturación (SOAP de ARCA y PDF) se mide en la verificación de punta a punta.
+- **Fase 9:** el contenedor `identidad` suma 288 MB mientras el monolito siga prendido (no se apaga en esta fase):
+  **4.128 MB** de límites y **~5,3 GB** proyectados. Se mide en la verificación de punta a punta; el apagado del
+  monolito (una fase posterior) libera sus 512 MB.
 - **Traefik y bot de WhatsApp:** ~112 MB.
 - **Sistema operativo y buffers mínimos:** ~1 GB.
 - **Consumo proyectado total en VPS:** **~5,0 GB**, por encima del techo de **~4,8 GB** de la sección 9.1, con
@@ -146,6 +150,109 @@ define dependencias escalonadas con `condition: service_healthy`:
    docker compose -p app ps
    curl -fsS https://tranquisalud.com/api/health
    ```
+
+## Fase 9: identidad en su propio servicio
+
+La cuenta y la sesión (`/api/auth/**`, incluida Mi Cuenta), los tickets (`/api/tickets/**`, `/api/admin/tickets/**`),
+soporte (`/api/soporte/**`), la administración de usuarios (`/api/admin/users/**`), el portón del sitio
+(`/api/site-access/**`) y las novedades viven en el contenedor `identidad`, sobre su base propia `identidad`. El monolito
+**no se apaga** en esta fase: queda como vuelta atrás.
+
+- **Requisito:** la Fase 8 tiene que estar cortada antes (el paywall del gateway pasa a preguntarle a pagos).
+- **JWT RS256:** solo identidad firma los tokens de usuario (`JWT_PRIVATE_KEY`); el gateway, los servicios y el
+  monolito los validan con la clave pública (`JWT_PUBLIC_KEY`). Durante siete días después del corte se aceptan también
+  los tokens HS256 que emitía el monolito (`JWT_HS256_ACEPTADO=true`), así nadie pierde la sesión.
+- **Fuentes de datos:** con `TRANQUI_FUENTE_IDENTIDAD=identidad`, pagos, profesionales y turnos leen los datos de usuario de
+  `/internal/identidad/...` y lo que no es de identidad de su dueño (Mercado Pago y la suscripción de pagos, los turnos de
+  turnos, la agenda de profesionales).
+- **Novedades:** `scripts/mantenimiento.mjs` las manda a `127.0.0.1:8084/internal/identidad/novedades` cuando el `.env`
+  tiene `IDENTIDAD_EXTERNO=true`; si no, al monolito, que en el compose de microservicios no publica puerto: **antes del
+  corte de la Fase 9 las novedades no salen** (como hoy desde la Fase 0).
+
+**Claves RSA** (una vez, en el VPS; nunca se versionan ni salen del servidor):
+```bash
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/jwt-privada.pem
+echo "JWT_PRIVATE_KEY=$(openssl pkcs8 -topk8 -nocrypt -in /tmp/jwt-privada.pem -outform DER | base64 -w0)"
+echo "JWT_PUBLIC_KEY=$(openssl rsa -in /tmp/jwt-privada.pem -pubout -outform DER | base64 -w0)"
+shred -u /tmp/jwt-privada.pem
+```
+Las dos líneas van al `/srv/tranqui/.env` (base64 de una línea: PKCS#8 la privada, X.509 la pública). También hace
+falta `IDENTIDAD_DB_PASSWORD` (`openssl rand -hex 24`) antes del primer `up`, para que `db-servicios` cree la base.
+
+**Primer arranque / carga inicial:** con `IDENTIDAD_CARGA=true`, el servicio copia del monolito `usuario` (solo las 57
+columnas de identidad), `ticket`, `ticket_mensaje` y `novedades_envio`, con los mismos ids, hashes y versiones,
+únicamente si las cuatro tablas están vacías. Antes de insertar valida cada fila (ids y mails sin repetir, roles, fechas,
+claves del contrato): si algo no cumple, aborta sin insertar nada y lo dice en el log con los ids.
+
+**El corte va con la app en mantenimiento** (hay contraseñas y sesiones):
+
+1. `npm run mantenimiento -- on "Volvemos en unos minutos"`.
+2. Cargar `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY` y `IDENTIDAD_DB_PASSWORD` en `/srv/tranqui/.env` (con `JWT_HS256_ACEPTADO=true`,
+   que es el valor por defecto) y reiniciar gateway, servicios y monolito para que acepten los dos formatos de token:
+   ```bash
+   docker compose -p app up -d gateway notificaciones chat calendario pagos profesionales turnos tranqui-backend
+   ```
+3. En `/srv/tranqui/.env`: `IDENTIDAD_EXTERNO=true` y reiniciar el monolito:
+   ```bash
+   docker compose -p app up -d tranqui-backend
+   ```
+   Desde acá el monolito no escribe identidad: sus rutas de cuenta, soporte y administración de usuarios responden 409,
+   igual que sus escrituras internas de pacientes y de la identidad del profesional.
+4. En `/srv/tranqui/.env`: `IDENTIDAD_CARGA=true` y levantar identidad:
+   ```bash
+   docker compose -p app up -d identidad
+   ```
+   Esperar que esté sano y el log "Carga inicial de identidad completada: N usuarios, ...". Si la carga aborta, los logs
+   de `identidad` dicen qué ids no cumplen: corregirlos en el monolito (con aprobación) o volver atrás.
+5. En `/srv/tranqui/.env`: `TRANQUI_FUENTE_IDENTIDAD=identidad` y reiniciar pagos, profesionales y turnos:
+   ```bash
+   docker compose -p app up -d pagos profesionales turnos
+   ```
+6. En `/srv/tranqui/.env`: `TRANQUI_PAYWALL_FUENTE=pagos` y `TRANQUI_SERVICES_IDENTIDAD_URI=lb://identidad`, y reiniciar el
+   gateway:
+   ```bash
+   docker compose -p app up -d gateway
+   ```
+7. Conciliar y, sin diferencias, mantenimiento off:
+   ```bash
+   node scripts/fase9-conciliar-identidad.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+   npm run mantenimiento -- off
+   ```
+
+**Siete días después del corte:** `JWT_HS256_ACEPTADO=false` en `/srv/tranqui/.env` y reiniciar gateway, servicios, identidad y
+monolito. Desde ahí solo valen los tokens RS256 (los HS256 ya vencieron: duran 7 días).
+
+**Vuelta atrás de la Fase 9** (en mantenimiento):
+
+1. `npm run mantenimiento -- on "Mantenimiento por actualización"`.
+2. En `/srv/tranqui/.env`: `IDENTIDAD_CARGA=false` y bajar identidad:
+   ```bash
+   docker compose -p app stop identidad
+   ```
+3. Devolver al monolito lo creado o cambiado en identidad (aborta sin tocar nada si un mail pertenece a otro usuario en el
+   monolito):
+   ```bash
+   node scripts/fase9-devolver-identidad.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+   ```
+4. En `/srv/tranqui/.env`: sacar `TRANQUI_FUENTE_IDENTIDAD`, `TRANQUI_PAYWALL_FUENTE` y `TRANQUI_SERVICES_IDENTIDAD_URI`, poner
+   `IDENTIDAD_EXTERNO=false` y reiniciar monolito, servicios y gateway:
+   ```bash
+   docker compose -p app up -d tranqui-backend pagos profesionales turnos gateway
+   ```
+   Las sesiones RS256 abiertas siguen valiendo: el monolito valida con `JWT_PUBLIC_KEY`. Los tokens nuevos vuelven a ser
+   HS256, así que `JWT_HS256_ACEPTADO` tiene que quedar en `true`.
+5. Conciliar:
+   ```bash
+   node scripts/fase9-conciliar-identidad.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+   ```
+6. `npm run mantenimiento -- off`.
+
+**Volver a cortar después de una vuelta atrás:**
+La carga inicial de identidad solo corre con las cuatro tablas vacías: después de haber devuelto y conciliado sin
+diferencias, y con la app en mantenimiento, vaciarlas en la base `identidad` y repetir el corte:
+```bash
+docker compose -p app exec tranqui-db psql -U <DB_USER> -d identidad -c "TRUNCATE TABLE ticket_mensaje, ticket, perfil_registro, usuario, novedades_envio RESTART IDENTITY CASCADE;"
+```
 
 ## Fase 8: suscripciones, planes y facturación en el servicio de pagos
 

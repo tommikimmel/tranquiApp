@@ -35,8 +35,12 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const SITIO = 'https://tranquisalud.com'
 const DIR = '/srv/tranqui/mantenimiento'
 const CONTENEDOR = 'tranqui-frontend'
-// El backend publica 127.0.0.1:8081 en el VPS; el endpoint de novedades rechaza lo que pasa por Traefik.
-const API_INTERNA = 'http://127.0.0.1:8081/api/internal/novedades'
+// El endpoint de novedades rechaza lo que pasa por Traefik, así que se llama desde el propio VPS a un puerto publicado
+// solo en 127.0.0.1. Desde la Fase 9 lo atiende identidad (127.0.0.1:8084) cuando está cortada
+// (IDENTIDAD_EXTERNO=true en el .env); si no, el monolito, que en el compose de microservicios no publica puerto:
+// antes del corte de la Fase 9 las novedades no salen (ver docs/entornos/produccion.md).
+const API_MONOLITO = 'http://127.0.0.1:8081/api/internal/novedades'
+const API_IDENTIDAD = 'http://127.0.0.1:8084/internal/identidad/novedades'
 const ENV_VPS = '/srv/tranqui/.env'
 const EN_ACTIONS = process.env.GITHUB_ACTIONS === 'true'
 
@@ -155,6 +159,7 @@ const sh = s => `'${String(s).replace(/'/g, `'\\''`)}'`
 
 // curl al endpoint interno desde el propio VPS. El token se lee del .env del servidor y nunca sale de él.
 const curlNovedades = (args) =>
+  `API=${API_MONOLITO}; grep -qE '^IDENTIDAD_EXTERNO="?true"?' ${ENV_VPS} && API=${API_IDENTIDAD}; ` +
   `TOKEN=$(grep -E '^NOVEDADES_TOKEN=' ${ENV_VPS} | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//'); ` +
   `[ -n "$TOKEN" ] || { echo 'Falta NOVEDADES_TOKEN en ${ENV_VPS}' >&2; exit 3; }; ` +
   `curl -sS -w '\\n%{http_code}' -H 'Content-Type: application/json' -H "X-Novedades-Token: $TOKEN" ${args}`
@@ -247,7 +252,7 @@ async function off() {
 }
 
 async function enviarNovedadesGuardadas() {
-  const out = await ssh(curlNovedades(`-X POST --data-binary @${DIR}/novedades.json ${API_INTERNA}`))
+  const out = await ssh(curlNovedades(`-X POST --data-binary @${DIR}/novedades.json "$API"`))
   const { status, cuerpo } = respuesta(out)
   if (status === 202 || status === 200) {
     const id = cuerpo.id
@@ -271,7 +276,7 @@ async function estado() {
 async function novedadesPrueba(archivo) {
   const n = { id: 'prueba', ...leerNovedades(archivo) }
   vistaPrevia(n)
-  const out = await ssh(curlNovedades(`-X POST --data-binary @- '${API_INTERNA}?prueba=true'`), JSON.stringify(n))
+  const out = await ssh(curlNovedades(`-X POST --data-binary @- "$API?prueba=true"`), JSON.stringify(n))
   const { status, cuerpo } = respuesta(out)
   if (status === 200) console.log(`Prueba enviada a los administradores (${cuerpo.mailsEnviados} mails).`)
   else console.log(`No se pudo enviar la prueba (HTTP ${status}): ${JSON.stringify(cuerpo)}`)
@@ -283,7 +288,7 @@ async function novedadesEstado(id) {
     if (!ultimo) return console.log('Todavía no se envió ninguna novedad.')
     id = ultimo.replace(/\.json$/, '')
   }
-  const { status, cuerpo } = respuesta(await ssh(curlNovedades(`${API_INTERNA}/${encodeURIComponent(id)}`)))
+  const { status, cuerpo } = respuesta(await ssh(curlNovedades(`"$API/${encodeURIComponent(id)}"`)))
   if (status === 200) console.log(`Novedades "${id}": ${cuerpo.estado}${cuerpo.detalle ? ` (${cuerpo.detalle})` : ''}`)
   else console.log(`No hay registro de las novedades "${id}".`)
 }

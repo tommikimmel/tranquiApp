@@ -190,3 +190,20 @@ jobs:
           push: false
           cache-from: type=gha,scope=turnos
           cache-to: type=gha,mode=max,scope=turnos
+
+  imagen-identidad:
+    name: Imagen Identidad (build sin push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen del servicio de identidad
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/identidad/Dockerfile
+          push: false
+          cache-from: type=gha,scope=identidad
+          cache-to: type=gha,mode=max,scope=identidad
