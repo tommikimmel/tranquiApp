@@ -36,6 +36,21 @@ public class Suscriptores {
             Integer numeroDocumento,
             LocalDateTime actualizadoEn
     ) {
+
+        public String taxIdEfectivo() {
+            if (taxId != null && !taxId.isBlank()) return taxId;
+            if (cuit != null && !cuit.isBlank()) return cuit;
+            if (cuil != null) return String.valueOf(cuil);
+            if (dni != null && !dni.isBlank()) return dni;
+            if (numeroDocumento != null) return String.valueOf(numeroDocumento);
+            return null;
+        }
+
+        public Integer condicionIvaEfectiva() {
+            if (ivaConditionId != null) return ivaConditionId;
+            return 6; // Default to Monotributo (6) for Argentina health professionals
+        }
+
         public String nombreLegalEfectivo() {
             if (legalName != null && !legalName.isBlank()) return legalName;
             String full = ((nombre != null ? nombre : "") + " " + (apellido != null ? apellido : "")).trim();

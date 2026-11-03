@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -101,5 +102,30 @@ public class Dtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDateTime periodoHasta,
             @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDateTime graciaHasta,
             Long version
+    ) {}
+
+    public record InvoiceResponseDto(
+            Long id,
+            Long paymentId,
+            Integer cbteTipo,
+            String cbteTipoNombre,
+            Integer puntoVenta,
+            Long cbteNumero,
+            String cae,
+            LocalDate caeVencimiento,
+            String receptorNombre,
+            Long receptorDocNro,
+            Integer receptorCondicionIva,
+            BigDecimal importeTotal,
+            LocalDate fechaEmision,
+            String pdfUrl,
+            String status,
+            String lastError,
+            Long comprobanteAsociadoId,
+            LocalDateTime issuedAt
+    ) {}
+
+    public record CreditNoteRequestDto(
+            String reason
     ) {}
 }
