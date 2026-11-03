@@ -251,6 +251,18 @@ public class ClienteInterno {
     }
 
     /** Un usuario por id (para refrescar la copia tras eventos de identidad). */
+    /** Actualiza la ficha de un paciente en el monolito (dueño de identidad). */
+    public PacienteMonolito actualizarPaciente(Long id, Object body) {
+        return http.put().uri("/internal/monolito/pacientes/{id}", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .headers(h -> {
+                    h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
+                    h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());
+                })
+                .body(body)
+                .retrieve().body(PacienteMonolito.class);
+    }
+
     public PacienteMonolito paciente(Long id) {
         return get("/internal/monolito/pacientes/{id}", new ParameterizedTypeReference<>() {}, id);
     }

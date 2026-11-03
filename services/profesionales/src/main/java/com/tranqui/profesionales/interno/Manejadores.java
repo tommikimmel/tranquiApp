@@ -2,6 +2,7 @@ package com.tranqui.profesionales.interno;
 
 import com.tranqui.eventos.Topicos;
 import com.tranqui.eventos.consumo.ManejadorEvento;
+import com.tranqui.eventos.data.ConceptoAprobadoData;
 import com.tranqui.eventos.data.ProfesionalVisibilidadCambiadaData;
 import com.tranqui.eventos.data.TurnoActualizadoData;
 import com.tranqui.eventos.data.UsuarioActualizadoData;
@@ -9,6 +10,7 @@ import com.tranqui.eventos.data.UsuarioEliminadoData;
 import com.tranqui.eventos.data.UsuarioRegistradoData;
 import com.tranqui.profesionales.datos.Personas;
 import com.tranqui.profesionales.datos.Profesionales;
+import com.tranqui.profesionales.datos.Solicitudes;
 import com.tranqui.profesionales.datos.TurnosAtendidos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,6 +109,27 @@ public class Manejadores {
             log.warn("No se pudo refrescar a la persona {} desde el monolito: {}", id, ex.getMessage());
             throw ex;
         }
+    }
+
+    // ------------------------------------------------------------------ conceptos (documentos pagos)
+
+    @Bean
+    ManejadorEvento<ConceptoAprobadoData> conceptoAprobado(Solicitudes solicitudes) {
+        return ManejadorEvento.de("concepto-aprobado", Topicos.PAGOS_CONCEPTO_APROBADO_V1,
+                ConceptoAprobadoData.class, e -> {
+                    ConceptoAprobadoData d = e.data();
+                    var op = solicitudes.porId(d.solicitudId());
+                    if (op.isEmpty()) {
+                        log.warn("pagos.concepto.aprobado de una solicitud que no existe en profesionales: {}", d.solicitudId());
+                        return;
+                    }
+                    var solicitud = op.get();
+                    if ("APROBADO".equals(solicitud.estado())) {
+                        log.info("Aprobación de concepto para solicitud ID {} ya estaba procesada; ignorando.", d.solicitudId());
+                        return;
+                    }
+                    solicitudes.actualizarAprobado(d.solicitudId(), d.mpPaymentId());
+                });
     }
 
     // ------------------------------------------------------------------ turnos (copia)

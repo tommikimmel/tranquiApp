@@ -98,6 +98,14 @@ public class Personas {
         this.jdbc = jdbc;
     }
 
+    public Optional<Persona> porEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return Optional.empty();
+        }
+        return jdbc.query("SELECT " + COLUMNAS + " FROM persona WHERE lower(email) = lower(?)", mapeo, email.trim())
+                .stream().findFirst();
+    }
+
     public Optional<Persona> porId(Long id) {
         return jdbc.query("SELECT " + COLUMNAS + " FROM persona WHERE id = ?", mapeo, id)
                 .stream().findFirst();
