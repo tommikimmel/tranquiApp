@@ -66,6 +66,8 @@ public class AccesoSuscripcionCliente {
             WebClient.Builder lbBuilder = loadBalancedBuilderProvider.getIfAvailable();
             if (lbBuilder != null) {
                 clientBuilder = lbBuilder;
+                // El WebClient balanceado resuelve http://servicio; lb:// es el esquema de las rutas y quedaba sin cambiar.
+                baseUri = "http://" + baseUri.substring("lb://".length());
             }
         }
 
