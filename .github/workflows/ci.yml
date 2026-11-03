@@ -46,6 +46,8 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -55,7 +57,11 @@ jobs:
       - name: Typecheck
         run: npx tsc -b
       - name: Tests
-        run: npm test
+        run: npx vitest run --coverage --coverage.reporter=lcov
+      # Fase 10, T4: 90 % de las líneas del frontend nuevas o tocadas por el PR, como el backend.
+      - name: Cobertura de los cambios
+        if: github.event_name == 'pull_request'
+        run: node ../scripts/ci/cobertura-cambios-frontend.mjs "origin/${{ github.base_ref }}" 90
       - name: Build
         run: npm run build
 

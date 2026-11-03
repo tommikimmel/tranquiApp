@@ -141,6 +141,16 @@ confíe en lo que le manda otro**. Lo que hay hoy:
 
 ### T4 — Frontend
 - Vitest para los componentes y la capa `api.ts` que no tienen tests (hoy 18 archivos de test).
+- **Hecho en T4:** el mismo criterio que en Java (decisión del 2026-10-30): 90 % de las líneas del frontend que cambia cada
+  PR, no del frontend entero (32 % hoy).
+  - `scripts/ci/cobertura-cambios-frontend.mjs` cruza el diff de `frontend/src` (sin los tests) con el `lcov.info` de
+    Vitest. El job del frontend corre los tests con cobertura y, en los PR, el control.
+  - Tests nuevos para lo que cambió la migración y no estaba cubierto: `api.ts` (checkout, salud y observabilidad,
+    `VITE_API_URL`), la reserva vencida de `esperarCheckout`, el menú de Observabilidad de `AdminDashboard`, el panel de
+    observabilidad (series por contenedor y servicio, refresco a pedido y automático) y la fábrica de SockJS de `useChat`.
+  - Con los PR encadenados a develop: 159/176 líneas (90,3 %). Sin cubrir quedan los WebSocket de avisos en vivo de
+    `App.tsx` y `LandingPage.tsx` (los cubre la suite de punta a punta) y el `catch` de observabilidad, al que no se
+    llega porque cada pedido ya tiene el suyo.
 
 ## Criterios de aceptación
 

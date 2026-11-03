@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { sanitizeErrorMessage } from './api'
 
 describe('sanitizeErrorMessage', () => {
@@ -65,5 +65,17 @@ describe('sanitizeErrorMessage', () => {
     expect(sanitizeErrorMessage('{}', 400)).toBe(
       'No se pudo procesar la solicitud. Por favor, verificá la información e intentá nuevamente.'
     )
+  })
+})
+
+describe('getBackendOrigin', () => {
+  it('usa VITE_API_URL cuando está definida', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.tranqui.test')
+    try {
+      const { getBackendOrigin } = await import('./api')
+      expect(getBackendOrigin()).toBe('https://api.tranqui.test')
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 })
