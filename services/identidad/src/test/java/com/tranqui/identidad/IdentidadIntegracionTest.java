@@ -1,21 +1,51 @@
 package com.tranqui.identidad;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.tranqui.eventos.EventObjectMapperFactory;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.PerfilProfesionalData;
+import com.tranqui.eventos.jwt.EmisorJwtUsuario;
+import com.tranqui.eventos.jwt.UsuarioToken;
+import com.tranqui.eventos.jwt.VerificadorJwtUsuario;
+import com.tranqui.eventos.outbox.OutboxPublisher;
+import com.tranqui.identidad.config.DataInitializer;
+import com.tranqui.identidad.cuenta.AccountService;
 import com.tranqui.identidad.datos.*;
 import com.tranqui.identidad.interno.CargaInicialIdentidad;
 import com.tranqui.identidad.interno.ClienteInterno;
+import com.tranqui.identidad.seguridad.GoogleAuthService;
+import com.tranqui.identidad.web.dto.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.http.*;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPublicKey;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -28,8 +58,8 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests de integración de la Fase 9 (I2a): esquema, datos y carga inicial
- * del servicio de identidad sobre PostgreSQL y RabbitMQ reales.
+ * Tests de integración de la Fase 9 (I2a e I2b): esquema, datos, carga inicial,
+ * cuentas, sesiones y JWT RS256 del servicio de identidad sobre PostgreSQL y RabbitMQ reales.
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
@@ -37,11 +67,36 @@ import static org.mockito.Mockito.when;
         "spring.cloud.consul.discovery.enabled=false",
         "management.server.port=0",
         "identidad.carga.habilitada=false",
+        "identidad.google.simulado=true",
+        "app.seed-test-accounts=true",
         "jwt.secret=clave-de-test-de-al-menos-32-bytes-ok",
         "tranqui.jwt.service-secret=clave-servicio-test-de-32-bytes-ok",
         "tranqui.gateway.url=http://localhost:1"
 })
 class IdentidadIntegracionTest {
+
+    private static final KeyPair CLAVES_TEST;
+    static {
+        try {
+            KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+            kpg.initialize(2048);
+            CLAVES_TEST = kpg.generateKeyPair();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @DynamicPropertySource
+    static void registrarPropiedades(DynamicPropertyRegistry registry) {
+        String privPem = "-----BEGIN PRIVATE KEY-----\n" +
+                Base64.getMimeEncoder().encodeToString(CLAVES_TEST.getPrivate().getEncoded()) +
+                "\n-----END PRIVATE KEY-----";
+        String pubPem = "-----BEGIN PUBLIC KEY-----\n" +
+                Base64.getMimeEncoder().encodeToString(CLAVES_TEST.getPublic().getEncoded()) +
+                "\n-----END PUBLIC KEY-----";
+        registry.add("jwt.private-key", () -> privPem);
+        registry.add("jwt.public-key", () -> pubPem);
+    }
 
     @Container
     @ServiceConnection
@@ -54,16 +109,28 @@ class IdentidadIntegracionTest {
     @MockitoBean ClienteInterno interno;
 
     @Autowired Usuarios usuarios;
+    @Autowired PerfilesRegistro perfilesRegistro;
     @Autowired Tickets tickets;
     @Autowired TicketMensajes ticketMensajes;
     @Autowired NovedadesEnvios novedadesEnvios;
     @Autowired CargaInicialIdentidad cargaInicial;
     @Autowired JdbcTemplate jdbc;
+    @Autowired TestRestTemplate restTemplate;
+    @Autowired PasswordEncoder passwordEncoder;
+    @Autowired EmisorJwtUsuario emisorJwtUsuario;
+    @Autowired VerificadorJwtUsuario verificadorJwtUsuario;
+    @Autowired OutboxPublisher outboxPublisher;
+    @Autowired GoogleAuthService googleAuthService;
+    @Autowired AccountService accountService;
+    @Autowired DataInitializer dataInitializer;
+
+    private final ObjectMapper mapper = EventObjectMapperFactory.create();
 
     @BeforeEach
     void limpiar() {
         jdbc.update("DELETE FROM ticket_mensaje");
         jdbc.update("DELETE FROM ticket");
+        jdbc.update("DELETE FROM perfil_registro");
         jdbc.update("DELETE FROM usuario");
         jdbc.update("DELETE FROM novedades_envio");
         jdbc.update("DELETE FROM outbox");
@@ -77,9 +144,9 @@ class IdentidadIntegracionTest {
         Integer tablas = jdbc.queryForObject("""
                 SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'
                 AND table_name IN ('usuario', 'ticket', 'ticket_mensaje', 'novedades_envio',
-                                   'outbox', 'eventos_procesados', 'versiones_aplicadas')
+                                   'outbox', 'eventos_procesados', 'versiones_aplicadas', 'perfil_registro')
                 """, Integer.class);
-        assertThat(tablas).isEqualTo(7);
+        assertThat(tablas).isEqualTo(8);
 
         Integer secuencias = jdbc.queryForObject("""
                 SELECT count(*) FROM information_schema.sequences WHERE sequence_schema = 'public'
@@ -417,5 +484,678 @@ class IdentidadIntegracionTest {
         map.put("enviado_pacientes", true);
         map.put("enviado_profesionales", true);
         return map;
+    }
+
+    private List<JsonNode> buscarEventosOutbox(String topico) {
+        return jdbc.query("SELECT payload FROM outbox WHERE topic = ? ORDER BY id ASC",
+                (rs, rowNum) -> {
+                    try {
+                        return mapper.readTree(rs.getString("payload"));
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                },
+                topico
+        );
+    }
+
+    @Test
+    void registro_paciente_creaUsuarioYPublicaEventosSinPerfilRegistro() {
+        RegisterRequestDto dto = new RegisterRequestDto();
+        dto.setEmail("paciente.nuevo@tranqui.com");
+        dto.setPassword("Tranqui123");
+        dto.setRol("PACIENTE");
+        dto.setNombre("Mariana");
+        dto.setApellido("Lopez");
+        dto.setFechaNacimiento(LocalDate.of(1995, 5, 10));
+        dto.setSexo("F");
+        dto.setTipoDocumento("DNI");
+        dto.setNumeroDocumento(38123456);
+        dto.setTelefono("1165432109");
+        dto.setAceptaTerminos(true);
+
+        ResponseEntity<Map> res = restTemplate.postForEntity("/api/auth/register", dto, Map.class);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(res.getBody().get("requiresVerification")).isEqualTo(true);
+
+        Usuario u = usuarios.buscarPorEmail("paciente.nuevo@tranqui.com").orElseThrow();
+        assertThat(u.rol()).isEqualTo("PACIENTE");
+        assertThat(u.emailVerificado()).isFalse();
+        assertThat(u.telefono()).isEqualTo("+54 1165432109");
+        assertThat(u.codigoVerificacion()).isNotNull();
+
+        assertThat(perfilesRegistro.buscarPorUsuarioId(u.id())).isEmpty();
+
+        List<JsonNode> regEvents = buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1);
+        assertThat(regEvents).hasSize(1);
+        assertThat(regEvents.get(0).get("aggregateVersion").asInt()).isEqualTo(1);
+        assertThat(regEvents.get(0).get("data").get("email").asText()).isEqualTo("paciente.nuevo@tranqui.com");
+
+        List<JsonNode> codEvents = buscarEventosOutbox(Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1);
+        assertThat(codEvents).hasSize(1);
+        assertThat(codEvents.get(0).get("data").get("tipo").asText()).isEqualTo("REGISTRO");
+    }
+
+    @Test
+    void registro_profesional_creaUsuarioYPerfilRegistroYPublicaEventos() {
+        RegisterRequestDto dto = new RegisterRequestDto();
+        dto.setEmail("dra.suarez@tranqui.com");
+        dto.setPassword("Tranqui123");
+        dto.setRol("PSIQUIATRA");
+        dto.setNombre("Laura");
+        dto.setApellido("Suarez");
+        dto.setFechaNacimiento(LocalDate.of(1980, 2, 14));
+        dto.setSexo("F");
+        dto.setTipoDocumento("DNI");
+        dto.setNumeroDocumento(28123456);
+        dto.setTelefono("+54 1198765432");
+        dto.setAceptaTerminos(true);
+        dto.setMatricula("MN 54321");
+        dto.setMatriculaTipo("MN");
+        dto.setMatriculaProvincia("CABA");
+        dto.setMatriculaNumero(54321);
+        dto.setTitulo("Médica Psiquiatra");
+        dto.setSpecialty("Psiquiatría Infanto-Juvenil");
+        dto.setCuit("27281234564");
+        dto.setDomicilioAtencion("Av. Corrientes 2500, CABA");
+        dto.setDomicilioLat(-34.6037);
+        dto.setDomicilioLng(-58.3816);
+        dto.setOfreceOnline(true);
+        dto.setOfrecePresencial(true);
+
+        ResponseEntity<Map> res = restTemplate.postForEntity("/api/auth/register", dto, Map.class);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        Usuario u = usuarios.buscarPorEmail("dra.suarez@tranqui.com").orElseThrow();
+        assertThat(u.rol()).isEqualTo("PSIQUIATRA");
+        assertThat(u.profession()).isEqualTo("psiquiatra");
+        assertThat(u.licenseType()).isEqualTo("MN");
+        assertThat(u.licenseNumber()).isEqualTo("MN 54321");
+        assertThat(u.licenseJurisdiction()).isEqualTo("CABA");
+        assertThat(u.taxId()).isEqualTo("27281234564");
+        assertThat(u.fiscalAddress()).isEqualTo("Av. Corrientes 2500, CABA");
+
+        Optional<PerfilProfesionalData> perfilOpt = perfilesRegistro.buscarPorUsuarioId(u.id());
+        assertThat(perfilOpt).isPresent();
+        PerfilProfesionalData perfil = perfilOpt.get();
+        assertThat(perfil.domicilioAtencion()).isEqualTo("Av. Corrientes 2500, CABA");
+        assertThat(perfil.matricula()).isEqualTo("MN 54321");
+        assertThat(perfil.matriculaNumero()).isEqualTo(54321);
+        assertThat(perfil.especialidad()).isEqualTo("Psiquiatría Infanto-Juvenil");
+        assertThat(perfil.cuit()).isEqualTo("27281234564");
+        assertThat(perfil.ofreceOnline()).isTrue();
+        assertThat(perfil.ofrecePresencial()).isTrue();
+
+        List<JsonNode> regEvents = buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1);
+        assertThat(regEvents).hasSize(1);
+    }
+
+    @Test
+    void registro_rolAdminOInvalido_esRechazadoCon400() {
+        RegisterRequestDto dto = new RegisterRequestDto();
+        dto.setEmail("hacker@tranqui.com");
+        dto.setPassword("Tranqui123");
+        dto.setRol("ADMIN");
+        dto.setNombre("Malicioso");
+        dto.setAceptaTerminos(true);
+
+        ResponseEntity<String> resAdmin = restTemplate.postForEntity("/api/auth/register", dto, String.class);
+        assertThat(resAdmin.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resAdmin.getBody()).contains("El rol debe ser PACIENTE o PSIQUIATRA.");
+
+        dto.setRol("OTRO");
+        ResponseEntity<String> resOtro = restTemplate.postForEntity("/api/auth/register", dto, String.class);
+        assertThat(resOtro.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resOtro.getBody()).contains("El rol debe ser PACIENTE o PSIQUIATRA.");
+    }
+
+    @Test
+    void verificacionMail_codigoInvalidoOExpirado_fallaYVerificadoExitoso() {
+        Usuario u = Usuario.builder()
+                .email("verif@tranqui.com")
+                .password(passwordEncoder.encode("Pass1234"))
+                .rol("PACIENTE")
+                .nombre("Usuario")
+                .emailVerificado(false)
+                .codigoVerificacion("123456")
+                .codigoVerificacionExpiresAt(LocalDateTime.now().plusMinutes(15))
+                .build();
+        usuarios.insertarNuevo(u);
+
+        // Código incorrecto
+        ResponseEntity<String> resBadCode = restTemplate.postForEntity(
+                "/api/auth/verify-email",
+                new VerifyEmailDto("verif@tranqui.com", "999999"),
+                String.class
+        );
+        assertThat(resBadCode.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resBadCode.getBody()).contains("Código de verificación incorrecto.");
+
+        // Código expirado
+        Usuario expirado = usuarios.buscarPorEmail("verif@tranqui.com").orElseThrow().toBuilder()
+                .codigoVerificacionExpiresAt(LocalDateTime.now().minusMinutes(1))
+                .build();
+        usuarios.actualizar(expirado);
+
+        ResponseEntity<String> resExp = restTemplate.postForEntity(
+                "/api/auth/verify-email",
+                new VerifyEmailDto("verif@tranqui.com", "123456"),
+                String.class
+        );
+        assertThat(resExp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resExp.getBody()).contains("El código ha expirado. Solicitá uno nuevo.");
+
+        // Código válido
+        Usuario valido = usuarios.buscarPorEmail("verif@tranqui.com").orElseThrow().toBuilder()
+                .codigoVerificacionExpiresAt(LocalDateTime.now().plusMinutes(15))
+                .build();
+        usuarios.actualizar(valido);
+
+        ResponseEntity<String> resOk = restTemplate.postForEntity(
+                "/api/auth/verify-email",
+                new VerifyEmailDto("verif@tranqui.com", "123456"),
+                String.class
+        );
+        assertThat(resOk.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resOk.getBody()).contains("Email verificado correctamente. Ya podés iniciar sesión.");
+
+        Usuario verificadoDb = usuarios.buscarPorEmail("verif@tranqui.com").orElseThrow();
+        assertThat(verificadoDb.emailVerificado()).isTrue();
+        assertThat(verificadoDb.codigoVerificacion()).isNull();
+
+        // Repetir verificación
+        ResponseEntity<String> resRepetido = restTemplate.postForEntity(
+                "/api/auth/verify-email",
+                new VerifyEmailDto("verif@tranqui.com", "123456"),
+                String.class
+        );
+        assertThat(resRepetido.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resRepetido.getBody()).contains("Tu email ya está verificado.");
+    }
+
+    @Test
+    void reenvioYRecuperacion_emitenEventosConTipoCorrecto() {
+        Usuario u = Usuario.builder()
+                .email("recup@tranqui.com")
+                .password(passwordEncoder.encode("Pass1234"))
+                .rol("PACIENTE")
+                .nombre("Pedro")
+                .emailVerificado(false)
+                .build();
+        usuarios.insertarNuevo(u);
+
+        // Reenvío de código
+        ResponseEntity<String> resReenvio = restTemplate.postForEntity(
+                "/api/auth/resend-code",
+                new VerifyEmailDto("recup@tranqui.com", null),
+                String.class
+        );
+        assertThat(resReenvio.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        List<JsonNode> reenvioEvents = buscarEventosOutbox(Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1);
+        assertThat(reenvioEvents).hasSize(1);
+        assertThat(reenvioEvents.get(0).get("data").get("tipo").asText()).isEqualTo("EMAIL_VERIFICATION");
+
+        // Recuperación de contraseña (forgot-password)
+        ResponseEntity<String> resForgot = restTemplate.postForEntity(
+                "/api/auth/forgot-password",
+                new ForgotPasswordDto("recup@tranqui.com"),
+                String.class
+        );
+        assertThat(resForgot.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        List<JsonNode> todosCodigos = buscarEventosOutbox(Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1);
+        assertThat(todosCodigos).hasSize(2);
+        JsonNode forgotEvent = todosCodigos.get(1);
+        assertThat(forgotEvent.get("data").get("tipo").asText()).isEqualTo("PASSWORD_RESET");
+        String resetCode = forgotEvent.get("data").get("codigo").asText();
+
+        // Reset password
+        ResetPasswordDto resetDto = new ResetPasswordDto("recup@tranqui.com", resetCode, "NuevaPass123");
+        ResponseEntity<String> resReset = restTemplate.postForEntity("/api/auth/reset-password", resetDto, String.class);
+        assertThat(resReset.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        Usuario actualizado = usuarios.buscarPorEmail("recup@tranqui.com").orElseThrow();
+        assertThat(passwordEncoder.matches("NuevaPass123", actualizado.password())).isTrue();
+        assertThat(actualizado.resetPasswordCode()).isNull();
+    }
+
+    @Test
+    void login_credencialesIncorrectas_cuentaEliminada_mailSinVerificar_yAdmin() {
+        Usuario uNormal = Usuario.builder()
+                .email("login.test@tranqui.com")
+                .password(passwordEncoder.encode("Pass1234"))
+                .rol("PACIENTE")
+                .nombre("Lucas")
+                .emailVerificado(false)
+                .build();
+        usuarios.insertarNuevo(uNormal);
+
+        // Mail sin verificar -> 403
+        ResponseEntity<String> res403 = restTemplate.postForEntity(
+                "/api/auth/login",
+                new LoginRequestDto("login.test@tranqui.com", "Pass1234"),
+                String.class
+        );
+        assertThat(res403.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(res403.getBody()).contains("Debés verificar tu correo electrónico antes de ingresar.");
+
+        // Password incorrecto -> 401
+        ResponseEntity<String> res401Pass = restTemplate.postForEntity(
+                "/api/auth/login",
+                new LoginRequestDto("login.test@tranqui.com", "Erronea123"),
+                String.class
+        );
+        assertThat(res401Pass.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        // Usuario inexistente -> 401
+        ResponseEntity<String> res401Inexistente = restTemplate.postForEntity(
+                "/api/auth/login",
+                new LoginRequestDto("noexiste@tranqui.com", "Pass1234"),
+                String.class
+        );
+        assertThat(res401Inexistente.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        // Cuenta eliminada -> 401
+        Usuario uEliminado = Usuario.builder()
+                .email("borrado@tranqui.com")
+                .password(passwordEncoder.encode("Pass1234"))
+                .rol("PACIENTE")
+                .nombre("Borrado")
+                .cuentaEliminada(true)
+                .emailVerificado(true)
+                .build();
+        usuarios.insertarNuevo(uEliminado);
+
+        ResponseEntity<String> res401Borrado = restTemplate.postForEntity(
+                "/api/auth/login",
+                new LoginRequestDto("borrado@tranqui.com", "Pass1234"),
+                String.class
+        );
+        assertThat(res401Borrado.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(res401Borrado.getBody()).contains("Esta cuenta fue eliminada.");
+
+        // Admin sin verificar email -> entra con 200 OK
+        Usuario adminNoVerif = Usuario.builder()
+                .email("admin.nov@tranqui.com")
+                .password(passwordEncoder.encode("Pass1234"))
+                .rol("ADMIN")
+                .nombre("Admin")
+                .emailVerificado(false)
+                .build();
+        usuarios.insertarNuevo(adminNoVerif);
+
+        ResponseEntity<UserResponseDto> resAdmin = restTemplate.postForEntity(
+                "/api/auth/login",
+                new LoginRequestDto("admin.nov@tranqui.com", "Pass1234"),
+                UserResponseDto.class
+        );
+        assertThat(resAdmin.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resAdmin.getBody().getEmail()).isEqualTo("admin.nov@tranqui.com");
+    }
+
+    @Test
+    void cookieSesion_atributosCorrectosYLimpiezaEnLogout() {
+        Usuario u = Usuario.builder()
+                .email("cookie.user@tranqui.com")
+                .password(passwordEncoder.encode("Pass1234"))
+                .rol("PACIENTE")
+                .nombre("Cookie")
+                .emailVerificado(true)
+                .build();
+        usuarios.insertarNuevo(u);
+
+        ResponseEntity<UserResponseDto> resLogin = restTemplate.postForEntity(
+                "/api/auth/login",
+                new LoginRequestDto("cookie.user@tranqui.com", "Pass1234"),
+                UserResponseDto.class
+        );
+        assertThat(resLogin.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        String setCookie = resLogin.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
+        assertThat(setCookie).isNotNull();
+        assertThat(setCookie).contains("SESSION-TOKEN=");
+        assertThat(setCookie).contains("HttpOnly");
+        assertThat(setCookie).contains("Path=/");
+        assertThat(setCookie).contains("Max-Age=604800");
+
+        // Logout
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Cookie", setCookie);
+        HttpEntity<?> logoutReq = new HttpEntity<>(headers);
+
+        ResponseEntity<String> resLogout = restTemplate.postForEntity("/api/auth/logout", logoutReq, String.class);
+        assertThat(resLogout.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        String logoutCookie = resLogout.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
+        assertThat(logoutCookie).isNotNull();
+        assertThat(logoutCookie).contains("Max-Age=0");
+    }
+
+    @Test
+    void jwt_rs256_conUidValidadoConClavePublica() {
+        Usuario u = Usuario.builder()
+                .email("rs256.user@tranqui.com")
+                .password(passwordEncoder.encode("Pass1234"))
+                .rol("PSIQUIATRA")
+                .nombre("Doctor RS256")
+                .emailVerificado(true)
+                .build();
+        Long uid = usuarios.insertarNuevo(u);
+
+        ResponseEntity<UserResponseDto> res = restTemplate.postForEntity(
+                "/api/auth/login",
+                new LoginRequestDto("rs256.user@tranqui.com", "Pass1234"),
+                UserResponseDto.class
+        );
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        String setCookie = res.getHeaders().getFirst(HttpHeaders.SET_COOKIE);
+        String token = setCookie.split(";")[0].substring("SESSION-TOKEN=".length());
+
+        // Validar con VerificadorJwtUsuario
+        Optional<UsuarioToken> tokenValidado = verificadorJwtUsuario.validar(token);
+        assertThat(tokenValidado).isPresent();
+        assertThat(tokenValidado.get().email()).isEqualTo("rs256.user@tranqui.com");
+        assertThat(tokenValidado.get().rol()).isEqualTo("PSIQUIATRA");
+        assertThat(tokenValidado.get().uid()).isEqualTo(uid);
+
+        // Validar claims directamente con la clave pública RSA del test
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(CLAVES_TEST.getPublic())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        assertThat(claims.getIssuer()).isEqualTo("tranqui-identidad");
+        assertThat(claims.getSubject()).isEqualTo("rs256.user@tranqui.com");
+        assertThat(claims.get("uid", Long.class)).isEqualTo(uid);
+    }
+
+    @Test
+    void jwt_hs256_transicionAceptadoYRechazadoConFlag() {
+        Usuario u = Usuario.builder()
+                .email("hs256.transicion@tranqui.com")
+                .password(passwordEncoder.encode("Pass1234"))
+                .rol("PACIENTE")
+                .nombre("Usuario Transición")
+                .emailVerificado(true)
+                .build();
+        usuarios.insertarNuevo(u);
+
+        SecretKey hmacKey = Keys.hmacShaKeyFor("clave-de-test-de-al-menos-32-bytes-ok".getBytes(StandardCharsets.UTF_8));
+        String hs256Token = Jwts.builder()
+                .setSubject("hs256.transicion@tranqui.com")
+                .claim("rol", "PACIENTE")
+                .claim("nombre", "Usuario Transición")
+                .setIssuedAt(new Date())
+                .setExpiration(Date.from(Instant.now().plus(Duration.ofDays(7))))
+                .signWith(hmacKey, SignatureAlgorithm.HS256)
+                .compact();
+
+        // 1. Aceptado por el filtro en la app actual (jwt.hs256-aceptado=true)
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(hs256Token);
+        HttpEntity<?> req = new HttpEntity<>(headers);
+
+        ResponseEntity<UserResponseDto> resMe = restTemplate.exchange("/api/auth/me", HttpMethod.GET, req, UserResponseDto.class);
+        assertThat(resMe.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resMe.getBody().getEmail()).isEqualTo("hs256.transicion@tranqui.com");
+
+        // 2. Rechazado cuando jwt.hs256-aceptado=false
+        VerificadorJwtUsuario verificadorEstricto = new VerificadorJwtUsuario(
+                (RSAPublicKey) CLAVES_TEST.getPublic(),
+                "clave-de-test-de-al-menos-32-bytes-ok",
+                false
+        );
+        assertThat(verificadorEstricto.validar(hs256Token)).isEmpty();
+    }
+
+    @Test
+    void google_simuladoAceptadoConPropiedadYRechazadoSinElla() {
+        // 1. Simulado habilitado -> login con mock-token exitoso
+        GoogleLoginDto dto = new GoogleLoginDto("mock-token");
+        ResponseEntity<UserResponseDto> res = restTemplate.postForEntity("/api/auth/google", dto, UserResponseDto.class);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(res.getBody().getEmail()).isEqualTo("paula@tranqui.com");
+        assertThat(res.getBody().getRol()).isEqualTo("PACIENTE");
+
+        List<JsonNode> regEvents = buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1);
+        assertThat(regEvents).anyMatch(ev -> "paula@tranqui.com".equals(ev.get("data").get("email").asText()));
+
+        // 2. Simulado deshabilitado -> verifyGoogleToken rechaza tokens mock
+        GoogleAuthService googleReal = new GoogleAuthService(usuarios, outboxPublisher, "dummy-client-id", false);
+        GoogleIdToken.Payload payload = googleReal.verifyGoogleToken("mock-token");
+        assertThat(payload).isNull();
+    }
+
+    @Test
+    void me_y_miCuenta_actualizacionesYPreferencias() {
+        Usuario u = Usuario.builder()
+                .email("micuenta.test@tranqui.com")
+                .password(passwordEncoder.encode("Pass1234"))
+                .rol("PACIENTE")
+                .nombre("Natalia")
+                .apellido("Gomez")
+                .telefono("+54 1144332211")
+                .emailVerificado(true)
+                .perfilCompleto(true)
+                .build();
+        Long uid = usuarios.insertarNuevo(u);
+
+        String token = emisorJwtUsuario.emitir("micuenta.test@tranqui.com", "PACIENTE", "Natalia", uid);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+
+        // GET /api/auth/me
+        ResponseEntity<UserResponseDto> resMe = restTemplate.exchange("/api/auth/me", HttpMethod.GET, new HttpEntity<>(headers), UserResponseDto.class);
+        assertThat(resMe.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resMe.getBody().getNombre()).isEqualTo("Natalia");
+
+        // GET /api/auth/mi-cuenta
+        ResponseEntity<MiCuentaDto> resMiCuenta = restTemplate.exchange("/api/auth/mi-cuenta", HttpMethod.GET, new HttpEntity<>(headers), MiCuentaDto.class);
+        assertThat(resMiCuenta.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resMiCuenta.getBody().getEmail()).isEqualTo("micuenta.test@tranqui.com");
+
+        // PUT /api/auth/mi-cuenta
+        MiCuentaDto updateDto = new MiCuentaDto();
+        updateDto.setNombre("Natalia Sofia");
+        updateDto.setApellido("Gomez");
+        updateDto.setDomicilioCalle("Av. Libertador");
+        updateDto.setDomicilioNumero("1000");
+        updateDto.setTelefono("1155667788");
+
+        HttpEntity<MiCuentaDto> updateReq = new HttpEntity<>(updateDto, headers);
+        ResponseEntity<MiCuentaDto> resUpdate = restTemplate.exchange("/api/auth/mi-cuenta", HttpMethod.PUT, updateReq, MiCuentaDto.class);
+        assertThat(resUpdate.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resUpdate.getBody().getNombre()).isEqualTo("Natalia Sofia");
+        assertThat(resUpdate.getBody().getTelefono()).isEqualTo("+54 1155667788");
+
+        // PUT /api/auth/mi-cuenta/notificaciones
+        PreferenciasNotificacionDto prefDto = new PreferenciasNotificacionDto(false);
+        HttpEntity<PreferenciasNotificacionDto> prefReq = new HttpEntity<>(prefDto, headers);
+        ResponseEntity<MiCuentaDto> resPref = restTemplate.exchange("/api/auth/mi-cuenta/notificaciones", HttpMethod.PUT, prefReq, MiCuentaDto.class);
+        assertThat(resPref.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resPref.getBody().isNotificacionesEmailHabilitadas()).isFalse();
+
+        List<JsonNode> actEvents = buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1);
+        assertThat(actEvents.size()).isGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    void cambioPassword_y_setNewPassword() {
+        Usuario u = Usuario.builder()
+                .email("pass.change@tranqui.com")
+                .password(passwordEncoder.encode("OldPass123"))
+                .rol("PACIENTE")
+                .nombre("Martin")
+                .emailVerificado(true)
+                .build();
+        Long uid = usuarios.insertarNuevo(u);
+
+        String token = emisorJwtUsuario.emitir("pass.change@tranqui.com", "PACIENTE", "Martin", uid);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+
+        // Password actual erróneo
+        CambiarPasswordDto badDto = new CambiarPasswordDto("Erroneo123", "NewPass123");
+        ResponseEntity<String> resBad = restTemplate.exchange(
+                "/api/auth/mi-cuenta/password",
+                HttpMethod.POST,
+                new HttpEntity<>(badDto, headers),
+                String.class
+        );
+        assertThat(resBad.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resBad.getBody()).contains("La contraseña actual es incorrecta.");
+
+        // Password actual correcto
+        CambiarPasswordDto goodDto = new CambiarPasswordDto("OldPass123", "NewPass123");
+        ResponseEntity<String> resGood = restTemplate.exchange(
+                "/api/auth/mi-cuenta/password",
+                HttpMethod.POST,
+                new HttpEntity<>(goodDto, headers),
+                String.class
+        );
+        assertThat(resGood.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        Usuario modificado = usuarios.buscarPorEmail("pass.change@tranqui.com").orElseThrow();
+        assertThat(passwordEncoder.matches("NewPass123", modificado.password())).isTrue();
+
+        // Set new password (forzoso, post reseteo admin)
+        modificado = modificado.toBuilder().mustChangePassword(true).build();
+        usuarios.actualizar(modificado);
+
+        SetNewPasswordDto setNewDto = new SetNewPasswordDto("ForzadaPass123");
+        ResponseEntity<UserResponseDto> resForzada = restTemplate.exchange(
+                "/api/auth/set-new-password",
+                HttpMethod.POST,
+                new HttpEntity<>(setNewDto, headers),
+                UserResponseDto.class
+        );
+        assertThat(resForzada.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resForzada.getBody().getMustChangePassword()).isFalse();
+
+        Usuario finalDb = usuarios.buscarPorEmail("pass.change@tranqui.com").orElseThrow();
+        assertThat(passwordEncoder.matches("ForzadaPass123", finalDb.password())).isTrue();
+        assertThat(finalDb.mustChangePassword()).isFalse();
+    }
+
+    @Test
+    void eliminarCuenta_anonimizaYInvalidaSesion() {
+        Usuario u = Usuario.builder()
+                .email("eliminar.test@tranqui.com")
+                .password(passwordEncoder.encode("Pass1234"))
+                .rol("PACIENTE")
+                .nombre("Federico")
+                .apellido("Paz")
+                .emailVerificado(true)
+                .build();
+        Long uid = usuarios.insertarNuevo(u);
+
+        String token = emisorJwtUsuario.emitir("eliminar.test@tranqui.com", "PACIENTE", "Federico", uid);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+
+        // Password erróneo al eliminar
+        ResponseEntity<String> resBadPass = restTemplate.exchange(
+                "/api/auth/mi-cuenta/eliminar",
+                HttpMethod.POST,
+                new HttpEntity<>(new EliminarCuentaDto("Erronea123"), headers),
+                String.class
+        );
+        assertThat(resBadPass.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        // Eliminar correctamente
+        ResponseEntity<String> resOk = restTemplate.exchange(
+                "/api/auth/mi-cuenta/eliminar",
+                HttpMethod.POST,
+                new HttpEntity<>(new EliminarCuentaDto("Pass1234"), headers),
+                String.class
+        );
+        assertThat(resOk.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resOk.getBody()).contains("Cuenta eliminada.");
+
+        Usuario borrado = usuarios.buscarPorId(uid).orElseThrow();
+        assertThat(borrado.email()).isEqualTo("deleted-" + uid + "@tranquiapp.local");
+        assertThat(borrado.nombre()).isEqualTo("Usuario eliminado");
+        assertThat(borrado.apellido()).isNull();
+        assertThat(borrado.password()).isNull();
+        assertThat(borrado.isCuentaEliminada()).isTrue();
+        assertThat(borrado.anonimizadoEn()).isNotNull();
+
+        List<JsonNode> elimEvents = buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_ELIMINADO_V1);
+        assertThat(elimEvents).hasSize(1);
+        assertThat(elimEvents.get(0).get("data").get("motivo").asText()).isEqualTo("solicitud_usuario");
+
+        // Con el mismo token, ahora GET /me responde 401 Unauthorized
+        ResponseEntity<String> resMePostEliminar = restTemplate.exchange(
+                "/api/auth/me",
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                String.class
+        );
+        assertThat(resMePostEliminar.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void semilla_creaCuentasYPublicaEventos() throws Exception {
+        dataInitializer.run();
+
+        assertThat(usuarios.buscarPorEmail("admin@tranqui.com")).isPresent();
+        assertThat(usuarios.buscarPorEmail("medico.verificado@gmail.com")).isPresent();
+        assertThat(usuarios.buscarPorEmail("paciente.completo@gmail.com")).isPresent();
+
+        List<JsonNode> seededEvents = buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1);
+        assertThat(seededEvents.size()).isGreaterThanOrEqualTo(3);
+    }
+
+    @Test
+    void escritura_subeVersionYEventoLLevaVersionMasUno() {
+        Usuario u = Usuario.builder()
+                .email("version.test@tranqui.com")
+                .password(passwordEncoder.encode("Pass1234"))
+                .rol("PACIENTE")
+                .nombre("Clara")
+                .emailVerificado(true)
+                .build();
+        Long uid = usuarios.insertarNuevo(u);
+
+        Usuario inicial = usuarios.buscarPorId(uid).orElseThrow();
+        assertThat(inicial.version()).isEqualTo(0);
+
+        String token = emisorJwtUsuario.emitir("version.test@tranqui.com", "PACIENTE", "Clara", uid);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+
+        // 1ª actualización: /mi-cuenta
+        MiCuentaDto miCuentaDto = new MiCuentaDto();
+        miCuentaDto.setNombre("Clara Elena");
+        restTemplate.exchange("/api/auth/mi-cuenta", HttpMethod.PUT, new HttpEntity<>(miCuentaDto, headers), MiCuentaDto.class);
+
+        Usuario v1 = usuarios.buscarPorId(uid).orElseThrow();
+        assertThat(v1.version()).isEqualTo(1);
+
+        List<JsonNode> actEvents = buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1);
+        assertThat(actEvents).hasSize(1);
+        assertThat(actEvents.get(0).get("aggregateVersion").asInt()).isEqualTo(1);
+
+        // 2ª actualización: /mi-cuenta/notificaciones
+        restTemplate.exchange("/api/auth/mi-cuenta/notificaciones", HttpMethod.PUT, new HttpEntity<>(new PreferenciasNotificacionDto(false), headers), MiCuentaDto.class);
+
+        Usuario v2 = usuarios.buscarPorId(uid).orElseThrow();
+        assertThat(v2.version()).isEqualTo(2);
+
+        List<JsonNode> actEvents2 = buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1);
+        assertThat(actEvents2).hasSize(2);
+        assertThat(actEvents2.get(1).get("aggregateVersion").asInt()).isEqualTo(2);
+
+        // 3ª actualización: /mi-cuenta/eliminar
+        restTemplate.exchange("/api/auth/mi-cuenta/eliminar", HttpMethod.POST, new HttpEntity<>(new EliminarCuentaDto("Pass1234"), headers), String.class);
+
+        Usuario v3 = usuarios.buscarPorId(uid).orElseThrow();
+        assertThat(v3.version()).isEqualTo(3);
+
+        List<JsonNode> elimEvents = buscarEventosOutbox(Topicos.IDENTIDAD_USUARIO_ELIMINADO_V1);
+        assertThat(elimEvents).hasSize(1);
+        assertThat(elimEvents.get(0).get("aggregateVersion").asInt()).isEqualTo(3);
     }
 }
