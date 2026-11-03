@@ -37,6 +37,8 @@ public final class Topicos {
     public static final String PROFESIONALES_DISPONIBILIDAD_ACTUALIZADA_V2 = "profesionales.disponibilidad.actualizada.v2";
     /** Fase 5: todas las tarifas del profesional (el v1 iba tarifa por tarifa y sin los servicios). */
     public static final String PROFESIONALES_TARIFA_ACTUALIZADA_V2 = "profesionales.tarifa.actualizada.v2";
+    /** Fase 6: el profesional emitió recetas a un paciente (turnos marca los turnos de receta como enviados). */
+    public static final String PROFESIONALES_RECETA_EMITIDA_V1 = "profesionales.receta.emitida.v1";
 
     // ==================== Turnos ====================
     public static final String TURNOS_TURNO_RESERVADO_V1 = "turnos.turno.reservado.v1";
@@ -48,6 +50,8 @@ public final class Topicos {
     public static final String TURNOS_DOCUMENTO_SOLICITADO_V1 = "turnos.documento.solicitado.v1";
     public static final String TURNOS_DOCUMENTO_ENVIADO_V1 = "turnos.documento.enviado.v1";
     public static final String TURNOS_ASISTENCIA_CONFIRMADA_V1 = "turnos.asistencia.confirmada.v1";
+    /** Fase 6: el turno completo en cada cambio, para la copia del monolito. */
+    public static final String TURNOS_TURNO_ACTUALIZADO_V1 = "turnos.turno.actualizado.v1";
 
     // ==================== Pagos ====================
     public static final String PAGOS_PAGO_APROBADO_V1 = "pagos.pago.aprobado.v1";
@@ -73,7 +77,7 @@ public final class Topicos {
     public static final String CHAT_MENSAJE_ENVIADO_V1 = "chat.mensaje.enviado.v1";
 
     /**
-     * Lista inmutable de todos los tópicos del catálogo de la sección 5.4, más los agregados en las Fases 1 (notificaciones), 2 (chat), 4 (pagos) y 5 (profesionales).
+     * Lista inmutable de todos los tópicos del catálogo de la sección 5.4, más los agregados en las Fases 1 (notificaciones), 2 (chat), 4 (pagos), 5 (profesionales) y 6 (turnos).
      */
     public static final List<String> TODOS_LOS_TOPICOS = List.of(
         IDENTIDAD_USUARIO_REGISTRADO_V1,
@@ -91,6 +95,7 @@ public final class Topicos {
         PROFESIONALES_CONCEPTO_SOLICITADO_V1,
         PROFESIONALES_DISPONIBILIDAD_ACTUALIZADA_V2,
         PROFESIONALES_TARIFA_ACTUALIZADA_V2,
+        PROFESIONALES_RECETA_EMITIDA_V1,
         TURNOS_TURNO_RESERVADO_V1,
         TURNOS_TURNO_CONFIRMADO_V1,
         TURNOS_TURNO_CANCELADO_V1,
@@ -100,6 +105,7 @@ public final class Topicos {
         TURNOS_DOCUMENTO_SOLICITADO_V1,
         TURNOS_DOCUMENTO_ENVIADO_V1,
         TURNOS_ASISTENCIA_CONFIRMADA_V1,
+        TURNOS_TURNO_ACTUALIZADO_V1,
         PAGOS_PAGO_APROBADO_V1,
         PAGOS_PAGO_RECHAZADO_V1,
         PAGOS_REEMBOLSO_REALIZADO_V1,

@@ -78,6 +78,22 @@ Lo que encontré y el plan no resolvía:
   `marcarRecetasEnviadasParaPaciente` publica un evento (`profesionales.receta.emitida.v1`, sin datos de
   salud: profesional y paciente) y el servicio marca los turnos de receta como enviados.
 
+- **Hecho en T1 (lo que apareció al implementar):**
+  - `turno.actualizado` lleva también el estado del pago del turno (transacción, estado, monto, fecha): la
+    copia del pago en el monolito (la usan las ganancias de las estadísticas) sale del mismo evento y no
+    depende de que `pagos.pago.*` llegue después del turno. Con el flag, los handlers de turnos de
+    `ManejadoresPagos` y el del Meet de `ManejadoresCalendario` no hacen nada.
+  - Los tokens de los links de los mails no viajan en el evento: van en la carga inicial (ruta interna) y en
+    el script de vuelta atrás (base a base).
+  - Notificaciones pedía los enlaces del mail de asistencia a `/internal/monolito/turnos/{id}/enlaces-asistencia`.
+    Ahora pide `/internal/turnos/turnos/{id}/enlaces-asistencia`, que atiende el servicio de turnos y, antes del
+    corte o en la vuelta atrás, el monolito con la misma URL.
+  - El documento adjunto (decisión 3): `POST /internal/notificaciones/documentos` en notificaciones (que suma el
+    filtro de JWT de servicio para `/internal/**` y el envío con adjunto por Resend o SMTP). El monolito atiende la
+    misma URL para la vuelta atrás de la Fase 1.
+  - Con el flag, las rutas de turnos que lleguen igual al monolito responden 409 (`TurnosExternoFilter`) y no
+    corren el vencimiento del bloqueo ni los recordatorios.
+
 ### T2 — Servicio `services/turnos`
 - Base propia `turnos` (JDBC, como los anteriores): `turno` (mismos ids; la secuencia arranca después del
   máximo), copias de profesionales (perfil para la agenda, disponibilidad, tarifas, Mercado Pago vinculado) y

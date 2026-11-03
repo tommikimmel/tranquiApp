@@ -28,8 +28,9 @@ import java.util.Map;
 
 /**
  * Plantillas y envío de los mails, mudados desde el ResendEmailService del monolito con el mismo
- * HTML. Quedan solo los mails que salen por eventos; los de envío directo (contraseña temporal,
- * copia de datos, documento adjunto, receta, alerta al admin y novedades) siguen en el monolito.
+ * HTML. Quedan los mails que salen por eventos y, desde la Fase 6, el documento adjunto (lo pide el
+ * servicio de turnos por una ruta interna: el archivo no viaja en eventos). Los demás de envío directo
+ * (contraseña temporal, copia de datos, receta, alerta al admin y novedades) siguen en el monolito.
  */
 @Service
 public class ResendEmailService {
@@ -645,14 +646,45 @@ public class ResendEmailService {
     // reintento no le manda el mismo mail dos veces al destinatario (Resend la recuerda 24 h).
     // ================================================================================
 
+    // ================================================================================
+    // DOCUMENTO ADJUNTO (Fase 6) — el certificado, informe o documento que el profesional le manda al
+    // paciente. Lo pide turnos en el momento (DocumentosController); el archivo no se guarda.
+    // ================================================================================
+
+    public void enviarDocumentoAdjunto(String toEmail, String pacienteNombre, String medicoNombre, String tipoDocumento,
+                                       String archivoDataUri, String archivoNombre) {
+        String tipoLower = tipoDocumento != null ? tipoDocumento.toLowerCase() : "documento";
+        String asunto = "Tu " + tipoLower + " de " + medicoNombre;
+        String cuerpo = "<p><strong>" + medicoNombre + "</strong> te envió tu " + tipoLower + " adjunto en este correo.</p>" +
+                "<p style=\"font-size:13px;color:" + COLOR_MUTED + ";\">Enviado a través de Tranqui App.</p>";
+        String html = plantilla("Documento adjunto", TONO_EXITO,
+                "¡Hola, " + nombreOUsuario(pacienteNombre) + "!", cuerpo);
+        String base64 = extraerBase64(archivoDataUri);
+        if (base64 == null || base64.isBlank()) {
+            throw new IllegalArgumentException("El documento no tiene contenido.");
+        }
+        String nombre = archivoNombre != null && !archivoNombre.isBlank() ? archivoNombre : "documento";
+        enviarCorreo(toEmail, asunto, html, nombre, base64);
+    }
+
+    private static String extraerBase64(String dataUri) {
+        if (dataUri == null) return null;
+        int coma = dataUri.indexOf(',');
+        return coma >= 0 ? dataUri.substring(coma + 1) : dataUri;
+    }
+
     private void enviarCorreo(String toEmail, String asunto, String htmlBody) {
+        enviarCorreo(toEmail, asunto, htmlBody, null, null);
+    }
+
+    private void enviarCorreo(String toEmail, String asunto, String htmlBody, String adjuntoNombre, String adjuntoBase64) {
         if (toEmail == null || toEmail.isBlank()) {
             log.warn("Mail '{}' sin destinatario: no se envía", asunto);
             return;
         }
         String clave = ClaveIdempotencia.actual();
         if (usarSmtp()) {
-            enviarPorSmtp(toEmail, asunto, htmlBody, clave);
+            enviarPorSmtp(toEmail, asunto, htmlBody, clave, adjuntoNombre, adjuntoBase64);
             return;
         }
         if (apiKey == null || apiKey.trim().isEmpty() || !apiKey.startsWith("re_")) {
@@ -672,6 +704,9 @@ public class ResendEmailService {
             payloadMap.put("to", List.of(toEmail));
             payloadMap.put("subject", asunto);
             payloadMap.put("html", htmlBody);
+            if (adjuntoNombre != null && adjuntoBase64 != null) {
+                payloadMap.put("attachments", List.of(Map.of("filename", adjuntoNombre, "content", adjuntoBase64)));
+            }
 
             HttpRequest.Builder request = HttpRequest.newBuilder()
                     .uri(URI.create("https://api.resend.com/emails"))
@@ -706,18 +741,24 @@ public class ResendEmailService {
         return "smtp".equalsIgnoreCase(transport);
     }
 
-    private void enviarPorSmtp(String toEmail, String asunto, String htmlBody, String clave) {
+    private void enviarPorSmtp(String toEmail, String asunto, String htmlBody, String clave, String adjuntoNombre,
+                               String adjuntoBase64) {
         JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
         if (mailSender == null) {
             throw new EnvioMailException("mail.transport=smtp pero no hay spring.mail.host configurado");
         }
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
+            boolean conAdjunto = adjuntoNombre != null && adjuntoBase64 != null;
+            MimeMessageHelper helper = new MimeMessageHelper(message, conAdjunto, "UTF-8");
             helper.setFrom(String.format("Tranqui App <%s>", fromEmail));
             helper.setTo(toEmail);
             helper.setSubject(asunto);
             helper.setText(htmlBody, true);
+            if (conAdjunto) {
+                helper.addAttachment(adjuntoNombre, new org.springframework.core.io.ByteArrayResource(
+                        java.util.Base64.getDecoder().decode(adjuntoBase64)));
+            }
             if (clave != null) {
                 // Para rastrear en Mailpit de qué evento salió cada mail.
                 message.setHeader("X-Tranqui-Idempotency-Key", clave);

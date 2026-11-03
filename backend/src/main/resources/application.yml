@@ -159,6 +159,14 @@ profesionales:
   externo: ${PROFESIONALES_EXTERNO:false}
   resincronizacion-minutos: ${PROFESIONALES_RESINCRONIZACION_MINUTOS:15}
 
+# Fase 6: con true, los turnos los administra el servicio de turnos (reservas, agenda, cancelación,
+# reprogramación, asistencia, documentos, el vencimiento del bloqueo y los recordatorios). El monolito guarda
+# una copia de turno (estadísticas, historia clínica, recetas) que se actualiza con turnos.turno.actualizado
+# y una resincronización cada resincronizacion-minutos.
+turnos:
+  externo: ${TURNOS_EXTERNO:false}
+  resincronizacion-minutos: ${TURNOS_RESINCRONIZACION_MINUTOS:15}
+
 tranqui:
   jwt:
     # JWT de servicio (sección 4.2) para las rutas /internal/** que consultan otros servicios.

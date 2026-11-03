@@ -174,6 +174,21 @@ class ContratoEventosTest {
     }
 
     @Test
+    void roundtrip_turnoActualizadoData() throws Exception {
+        TurnoActualizadoData data = new TurnoActualizadoData(7L, 1L, 2L, LocalDate.of(2026, 10, 30),
+                java.time.LocalTime.of(10, 0), java.time.LocalTime.of(10, 45), "PARTICULAR", "ONLINE", "CONFIRMADO",
+                "ESPERANDO", new BigDecimal("60000"), null, "particular", true, null, "https://meet.test/x", "g1",
+                null, false, false, java.time.LocalDateTime.of(2026, 10, 25, 9, 30), false, false,
+                "mp-1", "APROBADO", new BigDecimal("60000"), java.time.LocalDateTime.of(2026, 10, 25, 9, 32));
+        probarRoundtrip(data, TurnoActualizadoData.class);
+    }
+
+    @Test
+    void roundtrip_recetaEmitidaData() throws Exception {
+        probarRoundtrip(new RecetaEmitidaData(2L, 1L), RecetaEmitidaData.class);
+    }
+
+    @Test
     void roundtrip_tarifasProfesionalData() throws Exception {
         TarifasProfesionalData data = new TarifasProfesionalData(10L, List.of(
                 new TarifasProfesionalData.Tarifa("particular", "Consulta particular", new BigDecimal("60000"), true,
