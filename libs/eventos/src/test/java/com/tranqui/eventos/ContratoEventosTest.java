@@ -146,6 +146,42 @@ class ContratoEventosTest {
     }
 
     @Test
+    void roundtrip_profesionalActualizadoData_conPerfil() throws Exception {
+        PerfilProfesionalData perfil = new PerfilProfesionalData("contacto@test.com", "Av. Siempre Viva 742", -34.6, -58.4,
+                null, "3", "B", "Palermo", "12345", "MN", "CABA", 12345, "Psiquiatría", null, null, null,
+                "Médica", "Psiquiatría", "20-12345678-9", new BigDecimal("60000"), "#E8F5EE", true, false,
+                "[{\"lugar\":\"Hospital\"}]", null, null, null, null, null, "123456789012", "Dra. Maria Gomez",
+                null, null, "Ansiedad,Estrés", "Descripción", "UBA", 10, "Adultos", 45, 10);
+        ProfesionalActualizadoData data = new ProfesionalActualizadoData(10L, "Maria", "Gomez", "Psiquiatría", null,
+                List.of("ONLINE"), 45, 10, perfil);
+        probarRoundtrip(data, ProfesionalActualizadoData.class);
+    }
+
+    @Test
+    void profesionalActualizadoData_deUnProductorViejo_dejaElPerfilEnNull() throws Exception {
+        String json = "{\"profesionalId\":10,\"nombre\":\"Maria\",\"modalidades\":[\"ONLINE\"],\"duracionTurnoMinutos\":45}";
+        ProfesionalActualizadoData data = mapper.readValue(json, ProfesionalActualizadoData.class);
+        assertThat(data.perfil()).isNull();
+        assertThat(data.intervaloEntreTurnosMinutos()).isNull();
+    }
+
+    @Test
+    void roundtrip_disponibilidadProfesionalData() throws Exception {
+        DisponibilidadProfesionalData data = new DisponibilidadProfesionalData(10L, List.of(
+                new DisponibilidadProfesionalData.Franja(1, "09:00", "12:00", "ONLINE"),
+                new DisponibilidadProfesionalData.Franja(2, "14:00", "17:00", null)));
+        probarRoundtrip(data, DisponibilidadProfesionalData.class);
+    }
+
+    @Test
+    void roundtrip_tarifasProfesionalData() throws Exception {
+        TarifasProfesionalData data = new TarifasProfesionalData(10L, List.of(
+                new TarifasProfesionalData.Tarifa("particular", "Consulta particular", new BigDecimal("60000"), true,
+                        false, null, null, new BigDecimal("70000"), true, false)));
+        probarRoundtrip(data, TarifasProfesionalData.class);
+    }
+
+    @Test
     void roundtrip_turnoReservadoData() throws Exception {
         TurnoReservadoData data = new TurnoReservadoData(
                 100L, 20L, 10L, LocalDate.of(2026, 11, 1), "14:00",

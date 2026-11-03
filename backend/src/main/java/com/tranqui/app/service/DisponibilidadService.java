@@ -11,6 +11,7 @@ import com.tranqui.eventos.Topicos;
 import com.tranqui.eventos.data.DisponibilidadActualizadaData;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,10 +34,22 @@ public class DisponibilidadService {
     @Autowired
     private OutboxPublisher outboxPublisher;
 
+    // Fase 5: con el flag, el perfil, la disponibilidad y las tarifas son del servicio de profesionales (el
+    // gateway le manda estas rutas). Si alguna llega igual al monolito, no se escribe la copia.
+    @Value("${profesionales.externo:false}")
+    private boolean profesionalesExterno;
+
+    private void exigirPerfilLocal() {
+        if (profesionalesExterno) {
+            throw new IllegalStateException("El perfil de los profesionales lo administra el servicio de profesionales.");
+        }
+    }
+
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     @Transactional
     public List<DisponibilidadDto> obtenerDisponibilidades(String email, Modalidad modalidad) {
+        exigirPerfilLocal();
         Usuario medico = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
@@ -63,6 +76,7 @@ public class DisponibilidadService {
 
     @Transactional
     public List<DisponibilidadDto> guardarDisponibilidades(String email, Modalidad modalidad, List<DisponibilidadDto> dtos) {
+        exigirPerfilLocal();
         Usuario medico = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 

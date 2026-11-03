@@ -481,6 +481,7 @@ public class AuthController {
     // from the "complete your profile" prompt shown on the main screen while
     // usuario.perfilCompleto is false — see GoogleAuthService.getOrCreateUsuario.
     @PostMapping("/complete-profile")
+    @Transactional
     public ResponseEntity<?> completeProfile(
             @RequestBody com.tranqui.app.model.dto.CompleteProfileDto dto,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -516,7 +517,22 @@ public class AuthController {
         usuario.setObraSocial(dto.getObraSocial());
         usuario.setNumAfiliado(dto.getNumAfiliado());
         usuario.setPerfilCompleto(true);
-        usuarioRepository.save(usuario);
+        usuarioRepository.saveAndFlush(usuario);
+        // Notificaciones (contactos) y, desde la Fase 5, el servicio de profesionales copian estos datos.
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new com.tranqui.eventos.data.UsuarioActualizadoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        usuario.getNombre(),
+                        usuario.getApellido(),
+                        usuario.getTelefono(),
+                        usuario.getRol() != null ? usuario.getRol().name() : null,
+                        usuario.isNotificacionesEmailHabilitadas()
+                )
+        );
 
         return ResponseEntity.ok(toUserResponseDto(usuario));
     }
