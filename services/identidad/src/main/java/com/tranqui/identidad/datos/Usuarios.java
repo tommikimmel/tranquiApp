@@ -141,7 +141,7 @@ public class Usuarios {
 
     public List<Usuario> buscarSuscriptores(int pagina, int tamanio) {
         int offset = Math.max(0, pagina) * tamanio;
-        return jdbc.query("SELECT " + COLUMNAS + " FROM usuario WHERE rol = 'PSIQUIATRA' ORDER BY id ASC LIMIT ? OFFSET ?",
+        return jdbc.query("SELECT " + COLUMNAS + " FROM usuario WHERE rol = 'PSIQUIATRA' OR (profession IS NOT NULL AND TRIM(profession) != '') ORDER BY id ASC LIMIT ? OFFSET ?",
                 mapeo, tamanio, offset);
     }
 
@@ -310,7 +310,7 @@ public class Usuarios {
      * Incrementa {@code version} en 1 y falla si la versión en la base difiere.
      */
     @Transactional
-    public void actualizar(Usuario u) {
+    public Usuario actualizar(Usuario u) {
         int filas = jdbc.update("""
                 UPDATE usuario SET
                     version = version + 1,
@@ -434,6 +434,9 @@ public class Usuarios {
             throw new OptimisticLockingFailureException(
                     "Conflicto de versión optimista al actualizar usuario id=" + u.id() + " con versión " + u.version());
         }
+        // Devuelve la fila como quedó: la versión ya subida. Los eventos usan esa versión + 1, igual que el monolito
+        // (que publica después de saveAndFlush), así las copias no descartan el primer evento después del corte.
+        return u.toBuilder().version((u.version() != null ? u.version() : 0) + 1).build();
     }
 
     public long cantidad() {

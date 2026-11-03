@@ -12,6 +12,7 @@ import com.tranqui.identidad.cuenta.ImageUtils;
 import com.tranqui.identidad.datos.PerfilesRegistro;
 import com.tranqui.identidad.datos.Usuario;
 import com.tranqui.identidad.datos.Usuarios;
+import com.tranqui.identidad.novedades.NovedadesService;
 import com.tranqui.identidad.seguridad.FiltroAutenticacionUsuario;
 import com.tranqui.identidad.seguridad.GoogleAuthService;
 import com.tranqui.identidad.web.dto.*;
@@ -44,6 +45,7 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final OutboxPublisher outboxPublisher;
     private final Environment env;
+    private final NovedadesService novedadesService;
     private final String clientId;
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -56,6 +58,7 @@ public class AuthController {
             PasswordEncoder passwordEncoder,
             OutboxPublisher outboxPublisher,
             Environment env,
+            NovedadesService novedadesService,
             @Value("${google.client-id:dummy-client-id}") String clientId) {
         this.usuarios = usuarios;
         this.perfilesRegistro = perfilesRegistro;
@@ -65,6 +68,7 @@ public class AuthController {
         this.passwordEncoder = passwordEncoder;
         this.outboxPublisher = outboxPublisher;
         this.env = env;
+        this.novedadesService = novedadesService;
         this.clientId = clientId;
     }
 
@@ -372,13 +376,13 @@ public class AuthController {
                 .codigoVerificacion(nuevoCodigo)
                 .codigoVerificacionExpiresAt(LocalDateTime.now().plusMinutes(15))
                 .build();
-        usuarios.actualizar(actualizado);
+        actualizado = usuarios.actualizar(actualizado);
 
         outboxPublisher.publicar(
                 Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
                 "usuario",
                 String.valueOf(usuario.id()),
-                usuario.aggregateVersion(),
+                actualizado.aggregateVersion(),
                 new CodigoVerificacionGeneradoData(
                         usuario.id(),
                         usuario.email(),
@@ -406,13 +410,13 @@ public class AuthController {
                 .resetPasswordCode(resetCode)
                 .resetPasswordExpiresAt(LocalDateTime.now().plusMinutes(15))
                 .build();
-        usuarios.actualizar(actualizado);
+        actualizado = usuarios.actualizar(actualizado);
 
         outboxPublisher.publicar(
                 Topicos.IDENTIDAD_CODIGO_VERIFICACION_GENERADO_V1,
                 "usuario",
                 String.valueOf(usuario.id()),
-                usuario.aggregateVersion(),
+                actualizado.aggregateVersion(),
                 new CodigoVerificacionGeneradoData(
                         usuario.id(),
                         usuario.email(),
@@ -531,13 +535,13 @@ public class AuthController {
                 .numAfiliado(dto.getNumAfiliado())
                 .perfilCompleto(true)
                 .build();
-        usuarios.actualizar(actualizado);
+        actualizado = usuarios.actualizar(actualizado);
 
         outboxPublisher.publicar(
                 Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1,
                 "usuario",
                 String.valueOf(usuario.id()),
-                usuario.aggregateVersion(),
+                actualizado.aggregateVersion(),
                 new com.tranqui.eventos.data.UsuarioActualizadoData(
                         usuario.id(),
                         usuario.email(),
@@ -601,6 +605,30 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         return ResponseEntity.ok(accountService.actualizarPreferenciasNotificacion(usuario.email(), dto.isEmailHabilitado()));
+    }
+
+    // Novedades (mail masivo al terminar un mantenimiento): la preferencia vive en usuario.recibir_novedades y, en
+    // producción, también en el contacto de Resend (ver NovedadesService). Mismo contrato que el monolito.
+    @GetMapping("/mi-cuenta/novedades")
+    public ResponseEntity<?> obtenerSuscripcionNovedades(HttpServletRequest request) {
+        Usuario usuario = usuarioAutenticado(request);
+        if (usuario == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(java.util.Map.of("recibir", novedadesService.recibeNovedades(usuario)));
+    }
+
+    @PutMapping("/mi-cuenta/novedades")
+    public ResponseEntity<?> actualizarSuscripcionNovedades(
+            @RequestBody java.util.Map<String, Boolean> body,
+            HttpServletRequest request) {
+        Usuario usuario = usuarioAutenticado(request);
+        if (usuario == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        boolean recibir = body != null && Boolean.TRUE.equals(body.get("recibir"));
+        novedadesService.cambiarSuscripcion(usuario, recibir);
+        return ResponseEntity.ok(java.util.Map.of("recibir", recibir));
     }
 
     @PostMapping("/mi-cuenta/password")

@@ -5,3 +5,16 @@ jwt:
 tranqui:
   jwt:
     service-secret: ${SERVICE_JWT_KEY:local-service-jwt-secret-key-32chars}
+
+# Novedades por Mailpit, como el monolito en local.
+spring:
+  mail:
+    host: ${SPRING_MAIL_HOST:mailpit}
+    port: ${SPRING_MAIL_PORT:1025}
+
+mail:
+  transport: smtp
+
+resend:
+  api-key: ""
+  from-email: soporte@tranqui.local
