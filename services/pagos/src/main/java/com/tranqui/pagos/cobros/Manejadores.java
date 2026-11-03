@@ -12,13 +12,15 @@ import com.tranqui.eventos.data.UsuarioEliminadoData;
 import com.tranqui.eventos.data.UsuarioRegistradoData;
 import com.tranqui.pagos.datos.CuentasMp;
 import com.tranqui.pagos.datos.Participantes;
+import com.tranqui.pagos.datos.Suscriptores;
+import com.tranqui.pagos.interno.Copias;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
  * Eventos que consume pagos. Los de turnos crean el checkout, lo vencen o reembolsan; los de usuarios
  * mantienen la copia de participantes (comparten el consumidor "participantes" para descartar eventos
- * viejos de la misma persona, sección 6.4).
+ * viejos de la misma persona, sección 6.4) y la copia de suscriptores con datos fiscales (Fase 8, S2a).
  */
 @Configuration
 public class Manejadores {
@@ -55,7 +57,7 @@ public class Manejadores {
                 e -> reembolsos.alCancelar(e.data()));
     }
 
-    // ------------------------------------------------------------------ usuarios
+    // ------------------------------------------------------------------ usuarios (participantes)
 
     @Bean
     ManejadorEvento<UsuarioRegistradoData> participanteRegistrado() {
@@ -88,5 +90,25 @@ public class Manejadores {
             cuentas.borrar(e.data().usuarioId());
             participantes.eliminar(e.data().usuarioId());
         });
+    }
+
+    // ------------------------------------------------------------------ suscriptores (copia, Fase 8)
+
+    @Bean
+    ManejadorEvento<UsuarioRegistradoData> suscriptorRegistrado(Copias copias) {
+        return ManejadorEvento.de("suscriptor-registrado", Topicos.IDENTIDAD_USUARIO_REGISTRADO_V1, UsuarioRegistradoData.class,
+                e -> copias.refrescarSuscriptor(e.data().usuarioId()));
+    }
+
+    @Bean
+    ManejadorEvento<UsuarioActualizadoData> suscriptorActualizado(Copias copias) {
+        return ManejadorEvento.de("suscriptor-actualizado", Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1, UsuarioActualizadoData.class,
+                e -> copias.refrescarSuscriptor(e.data().usuarioId()));
+    }
+
+    @Bean
+    ManejadorEvento<UsuarioEliminadoData> suscriptorEliminado(Suscriptores suscriptores) {
+        return ManejadorEvento.de("suscriptor-eliminado", Topicos.IDENTIDAD_USUARIO_ELIMINADO_V1, UsuarioEliminadoData.class,
+                e -> suscriptores.eliminar(e.data().usuarioId()));
     }
 }

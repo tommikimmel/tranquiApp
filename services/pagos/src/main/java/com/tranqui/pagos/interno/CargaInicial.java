@@ -5,8 +5,11 @@ import com.tranqui.pagos.datos.Cobros;
 import com.tranqui.pagos.datos.CuentasMp;
 import com.tranqui.pagos.datos.Pagos;
 import com.tranqui.pagos.datos.Participantes;
+import com.tranqui.pagos.datos.Suscriptores;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -18,7 +21,8 @@ import java.util.List;
 /**
  * Primer arranque de pagos (paso 1 de "Migración de datos en cada fase"): copia del monolito los
  * participantes, las cuentas de Mercado Pago vinculadas (tokens cifrados, sin descifrarlos: nadie vuelve a
- * vincular), los pagos registrados, los documentos de la API de conceptos y los turnos esperando el pago.
+ * vincular), los pagos registrados, los documentos de la API de conceptos y los turnos esperando el pago,
+ * y la copia de suscriptores (Fase 8, S2a) cuando su tabla está vacía.
  * Idempotente, reintenta con espera creciente si el monolito no está listo, y solo corre con la base vacía.
  *
  * <p>El consumo de eventos espera a que termine ({@link EsperaAntesDeConsumir}), como en el calendario: una
@@ -34,17 +38,29 @@ public class CargaInicial implements EsperaAntesDeConsumir {
     private final CuentasMp cuentas;
     private final Pagos pagos;
     private final Cobros cobros;
+    private final Suscriptores suscriptores;
+    private final Copias copias;
     private final ClienteInterno interno;
     private final TransactionTemplate tx;
     private final boolean habilitada;
     private volatile boolean terminada;
 
     public CargaInicial(Participantes participantes, CuentasMp cuentas, Pagos pagos, Cobros cobros, ClienteInterno interno,
-                        TransactionTemplate tx, @Value("${pagos.carga-inicial.habilitada:true}") boolean habilitada) {
+                        TransactionTemplate tx, boolean habilitada) {
+        this(participantes, cuentas, pagos, cobros, null, null, interno, tx, habilitada);
+    }
+
+    @Autowired
+    public CargaInicial(Participantes participantes, CuentasMp cuentas, Pagos pagos, Cobros cobros,
+                        ObjectProvider<Suscriptores> suscriptoresProvider, ObjectProvider<Copias> copiasProvider,
+                        ClienteInterno interno, TransactionTemplate tx,
+                        @Value("${pagos.carga-inicial.habilitada:true}") boolean habilitada) {
         this.participantes = participantes;
         this.cuentas = cuentas;
         this.pagos = pagos;
         this.cobros = cobros;
+        this.suscriptores = suscriptoresProvider != null ? suscriptoresProvider.getIfAvailable() : null;
+        this.copias = copiasProvider != null ? copiasProvider.getIfAvailable() : null;
         this.interno = interno;
         this.tx = tx;
         this.habilitada = habilitada;
@@ -70,19 +86,28 @@ public class CargaInicial implements EsperaAntesDeConsumir {
     void cargarConReintentos() {
         long esperaMs = 2_000;
         Boolean primerArranque = null;
+        Boolean primerArranqueSuscriptores = null;
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 if (primerArranque == null) {
                     primerArranque = participantes.cantidad() == 0 && cuentas.cantidad() == 0 && pagos.cantidad() == 0;
                 }
+                if (primerArranqueSuscriptores == null) {
+                    primerArranqueSuscriptores = suscriptores != null && copias != null && suscriptores.cantidad() == 0;
+                }
                 if (primerArranque) {
                     // Todo o nada: si se corta a la mitad, el próximo intento arranca de cero con la base vacía.
                     tx.executeWithoutResult(estado -> cargar());
+                    primerArranque = false;
+                }
+                if (primerArranqueSuscriptores) {
+                    tx.executeWithoutResult(estado -> copias.copiarSuscriptores());
+                    primerArranqueSuscriptores = false;
                 }
                 terminada = true;
                 return;
             } catch (RuntimeException e) {
-                log.warn("Carga inicial de pagos fallida; se reintenta en {} ms: {}", esperaMs, e.getMessage());
+                log.warn("Carga inicial de pagos/copias fallida; se reintenta en {} ms: {}", esperaMs, e.getMessage());
                 try {
                     Thread.sleep(esperaMs);
                 } catch (InterruptedException ie) {
