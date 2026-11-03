@@ -4,6 +4,7 @@ import com.tranqui.calendario.datos.CuentasGoogle;
 import com.tranqui.calendario.datos.EventosExternos;
 import com.tranqui.calendario.datos.Participantes;
 import com.tranqui.calendario.datos.TurnosAgendados;
+import com.tranqui.eventos.consumo.EsperaAntesDeConsumir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,9 +21,14 @@ import java.util.List;
  * que volver a autorizar), la caché de eventos externos y los turnos confirmados de hoy en adelante
  * con su evento y su Meet. Idempotente, reintenta con espera creciente si el monolito no está listo,
  * y solo corre con la base vacía.
+ *
+ * <p>El consumo de eventos espera a que termine ({@link EsperaAntesDeConsumir}): si el servicio vuelve
+ * después de una vuelta atrás, la cola trae confirmaciones que ya atendió el monolito, y procesarlas
+ * antes de copiar los turnos con su Meet crearía un Meet (o un evento de Google) nuevo para un turno
+ * que ya lo tenía. Con los turnos copiados, esas confirmaciones viejas no hacen nada.
  */
 @Component
-public class CargaInicial {
+public class CargaInicial implements EsperaAntesDeConsumir {
 
     private static final Logger log = LoggerFactory.getLogger(CargaInicial.class);
     private static final int PAGINA = 500;
@@ -33,6 +39,7 @@ public class CargaInicial {
     private final TurnosAgendados turnos;
     private final ClienteInterno interno;
     private final boolean habilitada;
+    private volatile boolean terminada;
 
     public CargaInicial(Participantes participantes, CuentasGoogle cuentas, EventosExternos externos, TurnosAgendados turnos,
                         ClienteInterno interno, @Value("${calendario.carga-inicial.habilitada:true}") boolean habilitada) {
@@ -42,6 +49,13 @@ public class CargaInicial {
         this.turnos = turnos;
         this.interno = interno;
         this.habilitada = habilitada;
+        // Sin carga inicial (tests) no hay nada que esperar.
+        this.terminada = !habilitada;
+    }
+
+    @Override
+    public boolean listo() {
+        return terminada;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -63,9 +77,11 @@ public class CargaInicial {
                     primerArranque = participantes.cantidad() == 0 && cuentas.cantidad() == 0;
                 }
                 if (!primerArranque) {
+                    terminada = true;
                     return;
                 }
                 cargar();
+                terminada = true;
                 return;
             } catch (RuntimeException e) {
                 log.warn("Carga inicial del calendario fallida; se reintenta en {} ms: {}", esperaMs, e.getMessage());

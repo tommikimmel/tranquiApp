@@ -98,22 +98,42 @@ public class EventosConsumoAutoConfiguration {
         @Bean
         ApplicationListener<ApplicationReadyEvent> iniciarConsumo(TopologiaConsumo topologia,
                                                                   ConsumidorEventos consumidor,
-                                                                  SimpleMessageListenerContainer contenedor) {
+                                                                  SimpleMessageListenerContainer contenedor,
+                                                                  org.springframework.beans.factory.ObjectProvider<EsperaAntesDeConsumir> esperas) {
             return evento -> {
-                Thread hilo = new Thread(() -> iniciarConReintentos(topologia, consumidor, contenedor),
+                Thread hilo = new Thread(() -> iniciarConReintentos(topologia, consumidor, contenedor, esperas.orderedStream().toList(), 1_000),
                         "inicio-consumo-eventos");
                 hilo.setDaemon(true);
                 hilo.start();
             };
         }
 
-        /** Sección 7: espera a RabbitMQ con espera creciente (hasta 30 s), sin tirar la aplicación. */
-        private static void iniciarConReintentos(TopologiaConsumo topologia, ConsumidorEventos consumidor,
-                                                 SimpleMessageListenerContainer contenedor) {
+        /**
+         * Sección 7: espera a RabbitMQ con espera creciente (hasta 30 s), sin tirar la aplicación. Con la
+         * topología declarada, espera además a los {@link EsperaAntesDeConsumir} (por ejemplo, la carga
+         * inicial) antes de empezar a consumir.
+         */
+        static void iniciarConReintentos(TopologiaConsumo topologia, ConsumidorEventos consumidor,
+                                         SimpleMessageListenerContainer contenedor,
+                                         java.util.List<EsperaAntesDeConsumir> esperas, long sondeoMs) {
             long esperaMs = 1_000;
+            boolean avisado = false;
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     topologia.declarar(consumidor.topicos());
+                    while (!esperas.stream().allMatch(EsperaAntesDeConsumir::listo)) {
+                        if (!avisado) {
+                            LoggerFactory.getLogger(EventosConsumoAutoConfiguration.class)
+                                    .info("Consumo de eventos en espera hasta que termine la preparación del servicio");
+                            avisado = true;
+                        }
+                        try {
+                            Thread.sleep(sondeoMs);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                    }
                     contenedor.start();
                     return;
                 } catch (RuntimeException e) {
