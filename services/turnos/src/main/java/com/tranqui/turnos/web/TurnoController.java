@@ -109,10 +109,11 @@ public class TurnoController {
     @PutMapping("/turnos/{turnoId}/asistencia")
     public ResponseEntity<Void> asistencia(@PathVariable("turnoId") Long turnoId, @RequestParam("asistencia") String asistencia,
                                            HttpServletRequest request) {
-        if (conRol(request, "PSIQUIATRA") == null) {
+        String email = conRol(request, "PSIQUIATRA");
+        if (email == null) {
             return prohibido();
         }
-        gestion.asistencia(turnoId, asistencia);
+        gestion.asistencia(turnoId, asistencia, email);
         return ResponseEntity.ok().build();
     }
 
@@ -131,10 +132,11 @@ public class TurnoController {
     @PutMapping("/turnos/{turnoId}/reprogramar")
     public ResponseEntity<Void> reprogramar(@PathVariable("turnoId") Long turnoId, @RequestParam("fecha") String fecha,
                                             @RequestParam("hora") String hora, HttpServletRequest request) {
-        if (conRol(request, "PSIQUIATRA") == null) {
+        String email = conRol(request, "PSIQUIATRA");
+        if (email == null) {
             return prohibido();
         }
-        gestion.reprogramar(turnoId, fecha, hora);
+        gestion.reprogramar(turnoId, fecha, hora, email);
         return ResponseEntity.ok().build();
     }
 

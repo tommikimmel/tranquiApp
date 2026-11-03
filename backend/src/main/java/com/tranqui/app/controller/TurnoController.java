@@ -67,7 +67,9 @@ public class TurnoController {
     public ResponseEntity<Void> cancelarTurno(
             @PathVariable Long turnoId,
             @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
-        turnoService.cancelarTurno(turnoId, userDetails != null ? userDetails.getUsername() : null);
+        String email = userDetails != null ? userDetails.getUsername() : null;
+        turnoService.exigirDuenio(turnoId, email, false);
+        turnoService.cancelarTurno(turnoId, email);
         return ResponseEntity.ok().build();
     }
 
@@ -93,7 +95,9 @@ public class TurnoController {
     @PreAuthorize("hasRole('PSIQUIATRA')")
     public ResponseEntity<Void> actualizarAsistencia(
             @PathVariable Long turnoId,
-            @RequestParam String asistencia) {
+            @RequestParam String asistencia,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
+        turnoService.exigirDuenio(turnoId, userDetails != null ? userDetails.getUsername() : null, true);
         turnoService.actualizarAsistencia(turnoId, asistencia);
         return ResponseEntity.ok().build();
     }
@@ -117,7 +121,9 @@ public class TurnoController {
     public ResponseEntity<Void> reprogramarTurno(
             @PathVariable Long turnoId,
             @RequestParam String fecha,
-            @RequestParam String hora) {
+            @RequestParam String hora,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails userDetails) {
+        turnoService.exigirDuenio(turnoId, userDetails != null ? userDetails.getUsername() : null, true);
         turnoService.reprogramarTurno(turnoId, fecha, hora);
         return ResponseEntity.ok().build();
     }

@@ -1,6 +1,7 @@
 package com.tranqui.turnos.web;
 
 import com.tranqui.turnos.turnos.NoEncontradoException;
+import com.tranqui.turnos.turnos.ProhibidoException;
 import com.tranqui.turnos.turnos.ServicioNoDisponibleException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,11 @@ public class Errores {
     @ExceptionHandler(NoEncontradoException.class)
     public ResponseEntity<String> noEncontrado(NoEncontradoException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
+
+    @ExceptionHandler(ProhibidoException.class)
+    public ResponseEntity<String> prohibido(ProhibidoException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
