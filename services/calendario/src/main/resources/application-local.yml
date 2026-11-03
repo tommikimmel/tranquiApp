@@ -1,0 +1,11 @@
+# Perfil local (docker-compose.local.yml): claves de desarrollo y Google simulado.
+jwt:
+  secret: ${JWT_SECRET:local-dev-encryption-key-32chars}
+
+tranqui:
+  jwt:
+    service-secret: ${SERVICE_JWT_KEY:local-service-jwt-secret-key-32chars}
+
+app:
+  # Como el monolito en local: sin Google real, "Conectar" simula la vinculación y el Meet es simulado.
+  local-simulations: true

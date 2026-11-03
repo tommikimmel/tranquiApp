@@ -1,0 +1,9 @@
+[ {
+  "id" : 1,
+  "version" : 0,
+  "creador_id" : 9,
+  "asunto" : "Problema de acceso",
+  "estado" : "PENDIENTE",
+  "fecha_creacion" : "2026-10-29T20:32:41.442978",
+  "fecha_actualizacion" : "2026-10-29T20:32:41.442978"
+} ]

@@ -1,31 +1,56 @@
 package com.tranqui.app.service;
 
 import com.tranqui.app.model.Usuario;
-import io.jsonwebtoken.Claims;
+import com.tranqui.eventos.jwt.UsuarioToken;
+import com.tranqui.eventos.jwt.VerificadorJwtUsuario;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 
 @Service
 public class JwtService {
 
-    @Value("${jwt.secret:defaultsecretkeymustbe32byteslongforhs256algorithm!}")
+    @Value("${jwt.secret:}")
     private String secretKey;
+
+    @Value("${jwt.public-key:}")
+    private String publicKey;
 
     @Value("${jwt.expiration:604800000}") // 7 days in ms
     private long jwtExpiration;
 
+    private VerificadorJwtUsuario verificador;
+
+    @PostConstruct
+    public void validateSecret() {
+        if (secretKey == null || secretKey.trim().isEmpty()) {
+            throw new IllegalStateException("JWT secret is not configured. Missing JWT_SECRET environment variable.");
+        }
+        if (secretKey.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("JWT secret must be at least 32 bytes (256 bits) long.");
+        }
+        this.verificador = new VerificadorJwtUsuario(publicKey, secretKey, true);
+    }
+
     private Key getSigningKey() {
-        byte[] keyBytes = secretKey.getBytes();
+        if (secretKey == null || secretKey.trim().isEmpty()) {
+            throw new IllegalStateException("JWT secret is not configured. Missing JWT_SECRET environment variable.");
+        }
+        byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT secret must be at least 32 bytes (256 bits) long.");
+        }
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
@@ -33,6 +58,9 @@ public class JwtService {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("rol", usuario.getRol().name());
         extraClaims.put("nombre", usuario.getNombre());
+        if (usuario.getId() != null) {
+            extraClaims.put("uid", usuario.getId());
+        }
         return generateToken(extraClaims, usuario.getEmail());
     }
 
@@ -47,37 +75,29 @@ public class JwtService {
     }
 
     public String extractEmail(String token) {
-        return extractClaim(token, Claims::getSubject);
+        if (token == null || token.isBlank() || verificador == null) {
+            return null;
+        }
+        return verificador.validar(token).map(UsuarioToken::email).orElse(null);
     }
 
-    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-        final Claims claims = extractAllClaims(token);
-        return claimsResolver.apply(claims);
-    }
-
-    private Claims extractAllClaims(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+    /** El uid del token (null en los tokens viejos que no lo traen, o si el token no es válido). */
+    public Long extractUid(String token) {
+        if (token == null || token.isBlank() || verificador == null) {
+            return null;
+        }
+        return verificador.validar(token).map(UsuarioToken::uid).orElse(null);
     }
 
     public boolean validateToken(String token) {
+        if (token == null || token.isBlank() || verificador == null) {
+            return false;
+        }
         try {
-            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token);
-            return !isTokenExpired(token);
+            return verificador.validar(token).isPresent();
         } catch (Exception e) {
             return false;
         }
-    }
-
-    private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
-    }
-
-    private Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
     }
 
     public String extractTokenFromCookies(HttpServletRequest request) {

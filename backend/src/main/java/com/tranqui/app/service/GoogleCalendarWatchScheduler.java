@@ -26,9 +26,12 @@ public class GoogleCalendarWatchScheduler {
     @Autowired
     private GoogleCalendarWatchService googleCalendarWatchService;
 
+    @org.springframework.beans.factory.annotation.Value("${calendario.externo:false}")
+    private boolean externo;
+
     @Scheduled(cron = "0 0 4 * * ?", zone = "America/Argentina/Cordoba")
     public void renovarCanalesPorVencer() {
-        if (!googleCalendarWatchService.isWatchEnabled()) {
+        if (!googleCalendarWatchService.isWatchEnabled() || externo) {
             return;
         }
         LocalDateTime limite = LocalDateTime.now().plusHours(48);

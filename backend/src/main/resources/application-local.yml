@@ -40,3 +40,13 @@ app:
   admin-initial-password: admin123
   demo-data: ${DEMO_DATA:true}
   local-simulations: true
+
+jwt:
+  secret: ${JWT_SECRET:local-dev-encryption-key-32chars}
+eventos:
+  relay:
+    enabled: true
+
+tranqui:
+  jwt:
+    service-secret: ${SERVICE_JWT_KEY:local-service-jwt-secret-key-32chars}

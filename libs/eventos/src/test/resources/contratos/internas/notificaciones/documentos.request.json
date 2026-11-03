@@ -1,0 +1,8 @@
+{
+  "email" : "pac@mail.com",
+  "pacienteNombre" : "Ana",
+  "medicoNombre" : "Dra. Paz",
+  "tipoDocumento" : "Certificado",
+  "archivoDataUri" : "data:application/pdf;base64,JVBERi0=",
+  "archivoNombre" : "certificado.pdf"
+}

@@ -61,6 +61,16 @@ public class MercadoPagoService {
     @Value("${mercadopago.admin.access-token:}")
     private String adminAccessToken;
 
+    /** Título del ítem de Mercado Pago de un turno; viaja en turnos.turno.reservado para el servicio de pagos. */
+    public static String tituloCobroTurno(Usuario medico) {
+        return "Consulta Psiquiátrica - " + medico.getNombre();
+    }
+
+    /** Título del ítem de un documento de la API de conceptos (profesionales.concepto.solicitado). */
+    public static String tituloCobroConcepto(com.tranqui.app.model.SolicitudDocumento solicitud) {
+        return solicitud.getTipoConcepto().toString() + " - " + solicitud.getMedico().getNombre();
+    }
+
     private String notificationUrl() {
         return appPublicUrl + "/api/payments/webhook";
     }
@@ -231,7 +241,7 @@ public class MercadoPagoService {
         PreferenceClient client = buildPreferenceClient();
 
         PreferenceItemRequest itemRequest = PreferenceItemRequest.builder()
-                .title("Consulta Psiquiátrica - " + medico.getNombre())
+                .title(tituloCobroTurno(medico))
                 .categoryId("health")
                 .quantity(1)
                 .currencyId("ARS")
@@ -281,7 +291,7 @@ public class MercadoPagoService {
         PreferenceClient client = buildPreferenceClient();
 
         PreferenceItemRequest itemRequest = PreferenceItemRequest.builder()
-                .title(solicitud.getTipoConcepto().toString() + " - " + medico.getNombre())
+                .title(tituloCobroConcepto(solicitud))
                 .categoryId("health")
                 .quantity(1)
                 .currencyId("ARS")

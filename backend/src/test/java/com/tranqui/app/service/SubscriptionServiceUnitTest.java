@@ -1,5 +1,6 @@
 package com.tranqui.app.service;
 
+import com.tranqui.app.service.AvisoSuscripcionPublisher;
 import com.tranqui.app.model.*;
 import com.tranqui.app.repository.*;
 import jakarta.persistence.EntityNotFoundException;
@@ -17,10 +18,14 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
+import com.tranqui.app.eventos.OutboxPublisher;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SubscriptionServiceUnitTest {
+
+    @Mock
+    private OutboxPublisher outboxPublisher;
 
     @Mock
     private SubscriptionRepository subscriptionRepository;
@@ -51,6 +56,9 @@ class SubscriptionServiceUnitTest {
 
     @Mock
     private com.tranqui.app.service.arca.ArcaConfig arcaConfig;
+
+    @Mock
+    private AvisoSuscripcionPublisher avisoSuscripcionPublisher;
 
     @InjectMocks
     private SubscriptionService subscriptionService;

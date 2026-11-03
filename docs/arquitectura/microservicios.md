@@ -117,7 +117,7 @@ Toda llamada sincrónica de un servicio a otro pasa por el gateway, con este esq
 
 - **Ruta interna:** `http://gateway:8080/internal/<servicio>/...` (ejemplo:
   `/internal/profesionales/medicos/7/resumen`). El gateway la reescribe y la deriva al servicio.
-- **Nunca expuesta afuera:** Traefik solo enruta `/api/**` y `/ws-tranqui/**` al gateway. Además, el
+- **Nunca expuesta afuera:** Traefik solo enruta `/api/**`, `/ws-tranqui/**` y `/ws-notificaciones/**` al gateway. Además, el
   gateway rechaza con 404 cualquier `/internal/**` que llegue con encabezados de Traefik
   (`X-Forwarded-*`).
 - **Autenticación de servicio:** cada servicio firma un JWT corto (5 minutos) con su nombre como
@@ -298,12 +298,15 @@ CREATE INDEX outbox_pendientes ON outbox (id) WHERE published_at IS NULL;
   falla, no hay evento; si se confirma, el evento existe sí o sí.
 - **Relay** (dentro de cada servicio):
   - Un trigger hace `pg_notify('outbox', …)` al insertar. El relay escucha (`LISTEN`) y publica
-    **al instante**, sin esperar.
+    **al instante**, sin esperar. La escucha se realiza con una conexión JDBC dedicada fuera del
+    pool de Hikari (vía PGSimpleDataSource/DriverManager), evitando agotar o retener conexiones del pool.
   - Como respaldo (por ejemplo, si el relay se reconectó y perdió un aviso), barre los pendientes
     cada 30 segundos.
   - Publica en orden de `id`, en lotes de hasta 100, con *publisher confirms*. Marca `published_at`
-    solo con la confirmación del broker. Si falla, suma `attempts`, guarda el error y reintenta con
-    espera creciente.
+    solo con la confirmación del broker. Si un mensaje no tiene cola enlazada (`getReturned()` no nulo
+    ante `mandatory=true`), se marca como publicado igualmente para no bloquear la outbox, se emite un
+    WARN y se incrementa el contador Micrometer `outbox.eventos.sin_ruta` con tag `topico`. Si falla la
+    confirmación o el broker cae, suma `attempts`, guarda el error y reintenta con espera creciente.
   - Las filas publicadas se borran a los 7 días.
 - **Garantía resultante:** entrega *al menos una vez* (un evento puede llegar dos veces, nunca
   cero). Lo duplicado lo resuelve la idempotencia del consumidor.
@@ -413,7 +416,7 @@ vacía, la reconstruye con una carga inicial desde la ruta interna del dueño.
 ## 8. Estructura del repositorio
 
 ```
-backend/                    # el monolito, hasta la fase 8
+backend/                    # el monolito, hasta la fase 9
 services/
   identidad/  profesionales/  turnos/  pagos/  suscripciones/  notificaciones/  chat/  calendario/
 gateway/
@@ -439,22 +442,30 @@ monolito (controller, service, repository, model).
 | PostgreSQL (una instancia, 9 bases incluida la del monolito durante la migración) | 512 MB |
 | RabbitMQ (`vm_memory_high_watermark` 0.6 del límite) | 256 MB |
 | Gateway | 288 MB |
-| 8 servicios × 224 MB | ~1,8 GB |
+| 8 servicios × 288 MB (224 en el plan original; ver 9.2) | ~2,3 GB |
 | Redis, Consul | ~120 MB |
 | VictoriaMetrics, node-exporter, cAdvisor | ~200 MB |
 | Frontend (nginx) y Traefik | ~60 MB |
 | Bot de WhatsApp (actual) | ~70 MB |
 | Monolito (mientras dure la migración, decrece fase a fase) | 512 MB → 0 |
-| **Total en el peor momento (fase 0, monolito completo)** | **~4,8 GB** |
-| **Total al terminar** | **~4,3 GB** |
+| **Total en el peor momento (fase 0, monolito completo)** | **~5,3 GB** |
+| **Total al terminar** | **~4,8 GB** |
 
-Margen de ~3 GB para picos y para la cache de disco de Postgres.
+Margen de ~2,7 GB para picos y para la cache de disco de Postgres. (Con 224 MB por servicio eran
+~4,8 y ~4,3 GB; se subió a 288 MB al medir los servicios en la Fase 2.)
 
 ### 9.2 Ajustes de la JVM y de Spring Boot
 
 - `-XX:+UseSerialGC`: el recolector más liviano; ideal para heaps chicos y 2 núcleos.
-- `-XX:MaxRAMPercentage=65` con `mem_limit` del contenedor (heap de ~145 MB en 224 MB).
+- `-XX:MaxRAMPercentage=65` con `mem_limit` del contenedor en el monolito y el gateway.
 - `-Xss256k`, `-XX:ReservedCodeCacheSize=48m`, `-XX:MaxMetaspaceSize=96m`.
+- **Servicios (medido en la Fase 2):** 288 MB por servicio, heap al 30 %
+  (`-XX:MinRAMPercentage=30 -XX:MaxRAMPercentage=30`, ~86 MB), `-XX:MaxMetaspaceSize=128m` y
+  `-XX:ReservedCodeCacheSize=32m`. Un servicio Spring Boot con JPA, AMQP y Consul tiene ~165-175 MB
+  fijos fuera del heap (clases ~94, símbolos ~23, código ~15, CDS ~10); con 224 MB no entraba y con
+  96 MB de metaspace (usa ~92) quedaba al borde de un OOM. Con menos de ~250 MB la JVM usa
+  `MinRAMPercentage` (50 %) e ignora `MaxRAMPercentage`: hay que fijar los dos. CDS de Spring
+  (abajo) es lo que más podría bajar ese piso.
 - `-XX:TieredStopAtLevel=1` en los servicios chicos (notificaciones, chat, calendario): arranque
   más rápido y menos CPU, a cambio de algo de rendimiento máximo.
 - **CDS** (Class Data Sharing de Spring Boot 3.3+, `-XX:SharedArchiveFile`): arranque ~30 % más
@@ -530,7 +541,8 @@ fase el sistema completo funciona en producción.
 
 ### Fase 5: profesionales
 
-- **Qué:** perfiles, buscador, tarifas, disponibilidad, historia clínica y recetas.
+- **Qué:** perfiles, buscador, tarifas y disponibilidad (la historia clínica y las recetas pasaron a la
+  Fase 7, ver abajo).
 - **Datos:** la parte profesional de `usuario`, `tarifa_medico`, `disponibilidad`, historia clínica
   y recetas.
 
@@ -541,17 +553,44 @@ fase el sistema completo funciona en producción.
 - **Riesgo:** es el corazón de la app. Se migra con una ventana de mantenimiento corta para mover
   los datos.
 
-### Fase 7: suscripciones
+### Fase 7: historia clínica y recetas
+
+- **Por qué después de turnos (decidido en la Fase 5):** quién puede ver la historia de quién sale de
+  los turnos del profesional; antes de la Fase 6 habría que copiar los turnos y repetir la regla de
+  acceso a datos de salud en dos lugares.
+- **Qué:** seguimientos diarios, informes, pacientes atendidos, recetas (QBI2) y los documentos de la
+  API de conceptos.
+- **Datos:** historia clínica (`seguimiento_diario`, `informe_clinico`), `receta` y `solicitud_documento`.
+- **Nota:** en la Fase 5 se separó de profesionales; las fases que seguían se corrieron un número.
+
+### Fase 8: suscripciones
 
 - **Qué:** planes, suscripciones, débitos, reconciliación, facturación.
 - **Datos:** `plans`, `features`, `subscriptions` y las tablas de facturación.
 
-### Fase 8: identidad y retiro del monolito
+### Fase 9: identidad y retiro del monolito
 
 - **Qué:** registro, login, Mi Cuenta, tickets. El gateway pasa a validar el JWT con la clave
   pública de identidad.
 - **Datos:** credenciales y datos personales de `usuario`.
-- **Salida:** ninguna ruta va al monolito; se apaga y se archiva su base.
+- **Salida:** ninguna ruta va al monolito, pero **no se apaga** (decidido en la Fase 9): primero van las Fases 10
+  y 11.
+
+### Fase 10: tests y validación de datos
+
+- **Qué:** tests unitarios, de integración y de punta a punta de todo el sistema (incluidas las verificaciones
+  postergadas de las Fases 5 a 9), y validación propia de todo lo que un servicio recibe de otro: eventos,
+  respuestas de rutas internas y encabezados. Nunca se confía en lo que manda otro servicio.
+
+### Fase 11: comparación con `main`
+
+- **Qué:** recorrer el frontend y el backend de `main` contra la migración, para que ninguna funcionalidad quede
+  afuera, sin código o deje de existir.
+
+### Fase posterior: apagado del monolito
+
+- **Qué:** apagar el monolito, borrar el código de vuelta atrás y archivar su base, con su propia spec, cuando todo
+  lleve un tiempo estable en producción.
 
 ### Migración de datos en cada fase
 

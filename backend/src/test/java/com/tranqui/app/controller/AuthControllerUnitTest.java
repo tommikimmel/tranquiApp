@@ -45,6 +45,7 @@ class AuthControllerUnitTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private ResendEmailService resendEmailService;
     @Mock private com.tranqui.app.service.AccountService accountService;
+    @Mock private com.tranqui.app.eventos.OutboxPublisher outboxPublisher;
 
     @InjectMocks
     private AuthController authController;
@@ -63,7 +64,7 @@ class AuthControllerUnitTest {
         // UnnecessaryStubbingException before this fix.
         when(usuarioRepository.findByEmail("ya@existe.com")).thenReturn(Optional.of(Usuario.builder().build()));
 
-        RegisterRequestDto dto = RegisterRequestDto.builder().email("ya@existe.com").password("Secret123").build();
+        RegisterRequestDto dto = RegisterRequestDto.builder().email("ya@existe.com").password("Secret123").rol(Rol.PACIENTE).build();
         ResponseEntity<?> response = authController.register(dto);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());

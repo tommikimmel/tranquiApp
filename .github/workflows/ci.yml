@@ -16,14 +16,13 @@ permissions:
 
 jobs:
   backend:
-    name: Backend (tests)
+    name: Backend y librerías (tests)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -31,6 +30,12 @@ jobs:
           cache: maven
       - name: Tests
         run: ./mvnw -B -q test
+      # Fase 10: 90 % de las líneas de Java nuevas o tocadas por el PR (reportes de JaCoCo de cada módulo).
+      - name: Cobertura de los cambios
+        if: github.event_name == 'pull_request'
+        run: |
+          node --test scripts/ci/cobertura-cambios.test.mjs
+          node scripts/ci/cobertura-cambios.mjs "origin/${{ github.base_ref }}" 90
 
   frontend:
     name: Frontend (typecheck, tests y build)
@@ -41,6 +46,8 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -50,7 +57,11 @@ jobs:
       - name: Typecheck
         run: npx tsc -b
       - name: Tests
-        run: npm test
+        run: npx vitest run --coverage --coverage.reporter=lcov
+      # Fase 10, T4: 90 % de las líneas del frontend nuevas o tocadas por el PR, como el backend.
+      - name: Cobertura de los cambios
+        if: github.event_name == 'pull_request'
+        run: node ../scripts/ci/cobertura-cambios-frontend.mjs "origin/${{ github.base_ref }}" 90
       - name: Build
         run: npm run build
 
@@ -74,3 +85,185 @@ jobs:
         working-directory: frontend
       - name: Lint de los archivos modificados
         run: node scripts/ci/lint-cambios.mjs "origin/${{ github.base_ref }}"
+
+  imagen-gateway:
+    name: Imagen Gateway (build sin push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen del gateway
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./gateway/Dockerfile
+          push: false
+          cache-from: type=gha,scope=gateway
+          cache-to: type=gha,mode=max,scope=gateway
+
+  imagen-notificaciones:
+    name: Imagen Notificaciones (build sin push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen del servicio de notificaciones
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/notificaciones/Dockerfile
+          push: false
+          cache-from: type=gha,scope=notificaciones
+          cache-to: type=gha,mode=max,scope=notificaciones
+
+  imagen-chat:
+    name: Imagen Chat (build sin push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen del servicio de chat
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/chat/Dockerfile
+          push: false
+          cache-from: type=gha,scope=chat
+          cache-to: type=gha,mode=max,scope=chat
+
+  imagen-calendario:
+    name: Imagen Calendario (build sin push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen del servicio de calendario
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/calendario/Dockerfile
+          push: false
+          cache-from: type=gha,scope=calendario
+          cache-to: type=gha,mode=max,scope=calendario
+
+  imagen-pagos:
+    name: Imagen Pagos (build sin push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen del servicio de pagos
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/pagos/Dockerfile
+          push: false
+          cache-from: type=gha,scope=pagos
+          cache-to: type=gha,mode=max,scope=pagos
+
+  imagen-profesionales:
+    name: Imagen Profesionales (build sin push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen del servicio de profesionales
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/profesionales/Dockerfile
+          push: false
+          cache-from: type=gha,scope=profesionales
+          cache-to: type=gha,mode=max,scope=profesionales
+
+  imagen-turnos:
+    name: Imagen Turnos (build sin push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen del servicio de turnos
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/turnos/Dockerfile
+          push: false
+          cache-from: type=gha,scope=turnos
+          cache-to: type=gha,mode=max,scope=turnos
+
+  imagen-identidad:
+    name: Imagen Identidad (build sin push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen del servicio de identidad
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/identidad/Dockerfile
+          push: false
+          cache-from: type=gha,scope=identidad
+          cache-to: type=gha,mode=max,scope=identidad
+
+  # Fase 10, T3: el stack local completo (docker-compose.local.yml) y la suite de Playwright contra la migración,
+  # con las pruebas de resiliencia (apagan chat y notificaciones del stack del job).
+  punta-a-punta:
+    name: Punta a punta (stack local + Playwright)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      COMPOSE: docker compose -p tranqui-local --env-file /tmp/claves.env -f ${{ github.workspace }}/docker-compose.local.yml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # Claves RSA de usar y tirar, como en docs/entornos/local.md: nunca salen del runner.
+      - name: Claves del JWT
+        run: |
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/jwt.pem
+          echo "JWT_PRIVATE_KEY=$(openssl pkcs8 -topk8 -nocrypt -in /tmp/jwt.pem -outform DER | base64 -w0)" > /tmp/claves.env
+          echo "JWT_PUBLIC_KEY=$(openssl rsa -in /tmp/jwt.pem -pubout -outform DER | base64 -w0)" >> /tmp/claves.env
+          rm /tmp/jwt.pem
+      - name: Levantar el stack
+        run: $COMPOSE up -d --build
+      - name: Playwright
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          E2E_RESILIENCIA=1 E2E_COMPOSE="$COMPOSE" npx playwright test
+      - name: Logs del stack
+        if: failure()
+        run: $COMPOSE logs --no-color --tail=300 > stack.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: punta-a-punta
+          path: |
+            stack.log
+            frontend/playwright-report
+          retention-days: 7
+      - name: Bajar el stack
+        if: always()
+        run: $COMPOSE down -v

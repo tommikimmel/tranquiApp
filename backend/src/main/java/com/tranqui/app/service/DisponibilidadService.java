@@ -6,8 +6,12 @@ import com.tranqui.app.model.Usuario;
 import com.tranqui.app.model.dto.DisponibilidadDto;
 import com.tranqui.app.repository.DisponibilidadRepository;
 import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.DisponibilidadActualizadaData;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,10 +31,25 @@ public class DisponibilidadService {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
+    @Autowired
+    private OutboxPublisher outboxPublisher;
+
+    // Fase 5: con el flag, el perfil, la disponibilidad y las tarifas son del servicio de profesionales (el
+    // gateway le manda estas rutas). Si alguna llega igual al monolito, no se escribe la copia.
+    @Value("${profesionales.externo:false}")
+    private boolean profesionalesExterno;
+
+    private void exigirPerfilLocal() {
+        if (profesionalesExterno) {
+            throw new IllegalStateException("El perfil de los profesionales lo administra el servicio de profesionales.");
+        }
+    }
+
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     @Transactional
     public List<DisponibilidadDto> obtenerDisponibilidades(String email, Modalidad modalidad) {
+        exigirPerfilLocal();
         Usuario medico = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
@@ -41,7 +60,7 @@ public class DisponibilidadService {
 
         // Nothing for this modalidad yet (not even a legacy row). Only seed the default
         // schedule the very first time the médico has NO availability at all, and only into
-        // their prioritized modalidad — the other one starts empty so the UI can offer
+        // their prioritized modalidad � the other one starts empty so the UI can offer
         // "copiar de la otra agenda" instead of two default grids nobody asked for.
         boolean medicoTieneAlgunaDisponibilidad = !disponibilidadRepository.findByMedicoId(medico.getId()).isEmpty();
         if (medicoTieneAlgunaDisponibilidad) {
@@ -57,10 +76,11 @@ public class DisponibilidadService {
 
     @Transactional
     public List<DisponibilidadDto> guardarDisponibilidades(String email, Modalidad modalidad, List<DisponibilidadDto> dtos) {
+        exigirPerfilLocal();
         Usuario medico = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Médico no encontrado"));
 
-        // Consumes both rows already tagged with this modalidad AND legacy (null) rows —
+        // Consumes both rows already tagged with this modalidad AND legacy (null) rows �
         // saving either grid for the first time "claims" the legacy schedule for itself.
         List<Disponibilidad> existentes = disponibilidadRepository.findByMedicoIdAndModalidadOLegacy(medico.getId(), modalidad);
         disponibilidadRepository.deleteAll(existentes);
@@ -75,7 +95,8 @@ public class DisponibilidadService {
                         .build())
                 .collect(Collectors.toList());
 
-        disponibilidadRepository.saveAll(nuevas);
+        List<Disponibilidad> guardadas = disponibilidadRepository.saveAll(nuevas);
+        publicarDisponibilidades(medico.getId(), guardadas);
 
         return dtos;
     }
@@ -97,9 +118,29 @@ public class DisponibilidadService {
                         .modalidad(modalidad)
                         .build())
                 .collect(Collectors.toList());
-        disponibilidadRepository.saveAll(nuevas);
+        List<Disponibilidad> guardadas = disponibilidadRepository.saveAllAndFlush(nuevas);
+        publicarDisponibilidades(medico.getId(), guardadas);
 
         return defaults;
+    }
+
+    private void publicarDisponibilidades(Long medicoId, List<Disponibilidad> guardadas) {
+        if (guardadas != null) {
+            for (Disponibilidad d : guardadas) {
+                outboxPublisher.publicar(
+                        Topicos.PROFESIONALES_DISPONIBILIDAD_ACTUALIZADA_V1,
+                        String.valueOf(d.getId()),
+                        d.getAggregateVersion(),
+                        new DisponibilidadActualizadaData(
+                                medicoId,
+                                d.getDiaSemana(),
+                                d.getHoraInicio().format(TIME_FORMATTER),
+                                d.getHoraFin().format(TIME_FORMATTER),
+                                true
+                        )
+                );
+            }
+        }
     }
 
     private List<DisponibilidadDto> mapearADto(List<Disponibilidad> dispList) {

@@ -32,9 +32,16 @@ public class PlanService {
     @Autowired
     private PlanFeatureRepository planFeatureRepository;
 
+    @org.springframework.beans.factory.annotation.Value("${suscripciones.externo:false}")
+    private boolean suscripcionesExterno;
+
     @PostConstruct
     @Transactional
     public void initDefaultPlansAndFeatures() {
+        if (suscripcionesExterno) {
+            log.info("suscripciones.externo=true: no se inicializan planes ni features por defecto en el monolito.");
+            return;
+        }
         seedFeatures();
         seedPlans();
         retirarFeature("bot_whatsapp"); // notificaciones por WhatsApp (Twilio) — no se ofrecen por ahora

@@ -30,10 +30,62 @@ services:
       - "127.0.0.1:8025:8025"   # bandeja web
       - "127.0.0.1:1025:1025"   # SMTP
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: tranqui
+      RABBITMQ_DEFAULT_PASS: tranqui-local
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "127.0.0.1:15672:15672"   # UI de administración
+      - "127.0.0.1:5672:5672"     # AMQP
+    volumes:
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./infra/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    mem_limit: 256m
+
+  consul:
+    image: hashicorp/consul:1.19
+    command: ["agent", "-dev", "-client=0.0.0.0", "-config-dir=/consul/config"]
+    ports:
+      - "127.0.0.1:8500:8500"     # UI y API de catálogo
+    volumes:
+      - ./infra/consul:/consul/config
+    healthcheck:
+      test: ["CMD", "consul", "info"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      # Arranca lento cuando se levanta todo junto: con 5 s de gracia se marcaba unhealthy antes de
+      # terminar de iniciar y frenaba al gateway y a los servicios.
+      start_period: 30s
+    # Con 64m se quedaba sin memoria (60 de 64 MB, CPU al 375 % y sin responder) al registrar
+    # el gateway y el servicio de notificaciones (Fase 1).
+    mem_limit: 128m
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    mem_limit: 64m
+
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       SPRING_PROFILES_ACTIVE: local
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/tranqui_local
@@ -43,11 +95,52 @@ services:
       SPRING_MAIL_PORT: "1025"
       # Clave de cifrado solo para datos locales (32 caracteres). Nunca se usa en producción.
       ENCRYPTION_KEY: local-dev-encryption-key-32chars
+      # Clave JWT compartida con el gateway para el entorno local.
+      JWT_SECRET: local-dev-encryption-key-32chars
       APP_PUBLIC_URL: http://localhost:8081
       FRONTEND_URL: http://localhost:5173
       DEMO_DATA: "true"
       # Token del endpoint interno de novedades (solo para probar en local).
       NOVEDADES_TOKEN: local-novedades-token
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: tranqui
+      SPRING_RABBITMQ_PASSWORD: tranqui-local
+      SPRING_RABBITMQ_VIRTUAL_HOST: /
+      # Fase 1: los mails y avisos con evento los manda el servicio de notificaciones.
+      # "true" vuelve al envío directo desde el monolito (vuelta atrás).
+      NOTIFICACIONES_ENVIO_DIRECTO: "false"
+      SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
+      # Fase 2: el resumen de chat de la lista de pacientes se pide al servicio por el gateway.
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Fase 3: Google Calendar lo maneja el servicio de calendario; el monolito guarda el Meet que
+      # le avisa (primer evento que consume). "false" vuelve al calendario del monolito (vuelta atrás).
+      CALENDARIO_EXTERNO: "true"
+      # Fase 4: Mercado Pago (checkout, webhooks, reembolsos y cuentas) lo maneja el servicio de pagos.
+      # "false" vuelve los pagos al monolito (vuelta atrás).
+      PAGOS_EXTERNO: "true"
+      # Fase 5: el perfil, la disponibilidad, las tarifas y el buscador los maneja el servicio de profesionales;
+      # el monolito guarda una copia para turnos. "false" vuelve el perfil al monolito (vuelta atrás).
+      PROFESIONALES_EXTERNO: "true"
+      # Fase 6: los turnos los maneja el servicio de turnos; el monolito guarda una copia (estadísticas,
+      # historia clínica, recetas). "false" vuelve los turnos al monolito (vuelta atrás).
+      TURNOS_EXTERNO: "true"
+      # Fase 7: la historia clínica, las recetas y los conceptos los administra el servicio de profesionales.
+      # "false" vuelve la clínica al monolito (vuelta atrás).
+      CLINICA_EXTERNO: "true"
+      # Fase 8: las suscripciones las administra el servicio de pagos.
+      # "false" vuelve las suscripciones al monolito (vuelta atrás).
+      SUSCRIPCIONES_EXTERNO: "true"
+      # Fase 9: autenticación, registro, perfil, soporte y usuarios en el servicio de identidad.
+      # "false" vuelve la identidad al monolito (vuelta atrás).
+      IDENTIDAD_EXTERNO: "true"
+      # Fase 9: clave pública RSA de identidad leída del .env local (opcional en local si no se define).
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      # Fase 9: aceptar tokens HS256 además de RS256 en la transición.
+      JWT_HS256_ACEPTADO: "true"
+      # Fase 9: login simulado con Google en local.
+      GOOGLE_SIMULADO: "true"
+      EVENTOS_CONSUMO_SERVICIO: monolito
     ports:
       - "127.0.0.1:8081:8080"
     depends_on:
@@ -55,6 +148,448 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
+
+  # Crea la base y el usuario de cada servicio en la misma instancia de PostgreSQL. Corre una vez
+  # en cada arranque y termina; es idempotente (sirve también con un volumen que ya existía).
+  db-servicios:
+    image: postgres:15-alpine
+    entrypoint: ["sh", "/infra/crear-bases-servicios.sh"]
+    environment:
+      PGHOST: db
+      PGUSER: tranqui
+      PGPASSWORD: tranqui-local
+      PGDATABASE: tranqui_local
+      SERVICIOS: notificaciones chat calendario pagos profesionales turnos identidad
+      DB_PASSWORD_NOTIFICACIONES: notificaciones-local
+      DB_PASSWORD_CHAT: chat-local
+      DB_PASSWORD_CALENDARIO: calendario-local
+      DB_PASSWORD_PAGOS: pagos-local
+      DB_PASSWORD_PROFESIONALES: profesionales-local
+      DB_PASSWORD_TURNOS: turnos-local
+      DB_PASSWORD_IDENTIDAD: identidad-local
+    volumes:
+      - ./infra/postgres:/infra:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  # Fase 1: mails y notificaciones dentro de la app a partir de eventos.
+  notificaciones:
+    build:
+      context: .
+      dockerfile: services/notificaciones/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/notificaciones
+      SPRING_DATASOURCE_USERNAME: notificaciones
+      SPRING_DATASOURCE_PASSWORD: notificaciones-local
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: tranqui
+      SPRING_RABBITMQ_PASSWORD: tranqui-local
+      SPRING_RABBITMQ_VIRTUAL_HOST: /
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: "1025"
+      JWT_SECRET: local-dev-encryption-key-32chars
+      # Fase 9: clave pública RSA de identidad leída del .env local y transición HS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: "true"
+      SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+      FRONTEND_URL: http://localhost:5173
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    depends_on:
+      db-servicios:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    mem_limit: 288m
+
+  # Fase 2: chat en tiempo real (STOMP en /ws-tranqui) y su historial.
+  chat:
+    build:
+      context: .
+      dockerfile: services/chat/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/chat
+      SPRING_DATASOURCE_USERNAME: chat
+      SPRING_DATASOURCE_PASSWORD: chat-local
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: tranqui
+      SPRING_RABBITMQ_PASSWORD: tranqui-local
+      SPRING_RABBITMQ_VIRTUAL_HOST: /
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      JWT_SECRET: local-dev-encryption-key-32chars
+      # Fase 9: clave pública RSA de identidad leída del .env local y transición HS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: "true"
+      SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    depends_on:
+      db-servicios:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    mem_limit: 288m
+
+  # Fase 3: Google Calendar y Meet (en local, simulados como en el monolito).
+  calendario:
+    build:
+      context: .
+      dockerfile: services/calendario/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/calendario
+      SPRING_DATASOURCE_USERNAME: calendario
+      SPRING_DATASOURCE_PASSWORD: calendario-local
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: tranqui
+      SPRING_RABBITMQ_PASSWORD: tranqui-local
+      SPRING_RABBITMQ_VIRTUAL_HOST: /
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      JWT_SECRET: local-dev-encryption-key-32chars
+      # Fase 9: clave pública RSA de identidad leída del .env local y transición HS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: "true"
+      SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
+      # La misma clave que el monolito: los tokens de Google se leen en los dos.
+      ENCRYPTION_KEY: local-dev-encryption-key-32chars
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+      # El callback del OAuth y el webhook de Google entran por el gateway.
+      APP_PUBLIC_URL: http://localhost:8080
+      FRONTEND_URL: http://localhost:5173
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    depends_on:
+      db-servicios:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    mem_limit: 288m
+
+  pagos:
+    build:
+      context: .
+      dockerfile: services/pagos/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/pagos
+      SPRING_DATASOURCE_USERNAME: pagos
+      SPRING_DATASOURCE_PASSWORD: pagos-local
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: tranqui
+      SPRING_RABBITMQ_PASSWORD: tranqui-local
+      SPRING_RABBITMQ_VIRTUAL_HOST: /
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      JWT_SECRET: local-dev-encryption-key-32chars
+      # Fase 9: clave pública RSA de identidad leída del .env local y transición HS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: "true"
+      SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
+      # La misma clave que el monolito: los tokens de Mercado Pago se leen en los dos.
+      ENCRYPTION_KEY: local-dev-encryption-key-32chars
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Como el monolito en local: Mercado Pago simulado (perfil local) y el webhook entra por el gateway.
+      APP_PUBLIC_URL: http://localhost:8080
+      FRONTEND_URL: http://localhost:5173
+      # Fase 8: suscripciones habilitadas en local.
+      PAGOS_SUSCRIPCIONES: "true"
+      # Fase 9: fuente de identidad cortada al servicio identidad en local.
+      TRANQUI_FUENTE_IDENTIDAD: identidad
+      # Fase 8: Mercado Pago de plataforma y facturación ARCA (simulada/deshabilitada en local como en el monolito).
+      MP_ADMIN_ACCESS_TOKEN: ""
+      MP_ADMIN_PUBLIC_KEY: ""
+      ARCA_ENABLED: "false"
+      ARCA_ENVIRONMENT: homologacion
+      ARCA_CUIT_EMISOR: "20384910294"
+      ARCA_PUNTO_VENTA: "1"
+      ARCA_CERT_PATH: ""
+      ARCA_KEY_PATH: ""
+      ARCA_CERT_CONTENT: ""
+      ARCA_KEY_CONTENT: ""
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    depends_on:
+      db-servicios:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    mem_limit: 288m
+
+  profesionales:
+    build:
+      context: .
+      dockerfile: services/profesionales/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/profesionales
+      SPRING_DATASOURCE_USERNAME: profesionales
+      SPRING_DATASOURCE_PASSWORD: profesionales-local
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: tranqui
+      SPRING_RABBITMQ_PASSWORD: tranqui-local
+      SPRING_RABBITMQ_VIRTUAL_HOST: /
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      JWT_SECRET: local-dev-encryption-key-32chars
+      # Fase 9: clave pública RSA de identidad leída del .env local y transición HS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: "true"
+      SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Fase 7: historia clínica y recetas habilitadas en local.
+      PROFESIONALES_CLINICA: "true"
+      # Fase 9: fuente de identidad cortada al servicio identidad en local.
+      TRANQUI_FUENTE_IDENTIDAD: identidad
+      # Fase 7: QBI2 apagado / simulado en local, como en el monolito.
+      QBI2_RECIPE_ENABLED: "false"
+      QBI2_RECIPE_ENV: hml
+      QBI2_CLIENTE_APP_ID: ""
+      QBI2_RECIPE_TOKEN: ""
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    depends_on:
+      db-servicios:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    mem_limit: 288m
+
+  turnos:
+    build:
+      context: .
+      dockerfile: services/turnos/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/turnos
+      SPRING_DATASOURCE_USERNAME: turnos
+      SPRING_DATASOURCE_PASSWORD: turnos-local
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: tranqui
+      SPRING_RABBITMQ_PASSWORD: tranqui-local
+      SPRING_RABBITMQ_VIRTUAL_HOST: /
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      JWT_SECRET: local-dev-encryption-key-32chars
+      # Fase 9: clave pública RSA de identidad leída del .env local y transición HS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: "true"
+      SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Los links de los mails de asistencia entran por el gateway, como en el monolito local.
+      APP_PUBLIC_URL: http://localhost:8080
+      # Fase 9: fuente de identidad cortada al servicio identidad en local.
+      TRANQUI_FUENTE_IDENTIDAD: identidad
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    depends_on:
+      db-servicios:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    mem_limit: 288m
+
+  # Fase 9: el servicio de identidad (cuenta, sesión, soporte, administración de usuarios, portón y novedades).
+  # Las claves RSA no se versionan: se generan una vez y van en el .env local (ver docs/entornos/local.md).
+  identidad:
+    build:
+      context: .
+      dockerfile: services/identidad/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/identidad
+      SPRING_DATASOURCE_USERNAME: identidad
+      SPRING_DATASOURCE_PASSWORD: identidad-local
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: tranqui
+      SPRING_RABBITMQ_PASSWORD: tranqui-local
+      SPRING_RABBITMQ_VIRTUAL_HOST: /
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      JWT_SECRET: local-dev-encryption-key-32chars
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?Falta JWT_PRIVATE_KEY en .env (ver docs/entornos/local.md)}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?Falta JWT_PUBLIC_KEY en .env (ver docs/entornos/local.md)}
+      JWT_HS256_ACEPTADO: "true"
+      SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Fase 9: en local todo cortado: la carga inicial copia del monolito con las tablas vacías.
+      IDENTIDAD_CARGA: "true"
+      # Login simulado con Google (tokens mock-), solo en local.
+      IDENTIDAD_GOOGLE_SIMULADO: "true"
+      SEED_TEST_ACCOUNTS: ${SEED_TEST_ACCOUNTS:-true}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-}
+      SITE_ACCESS_PASSWORD: ${SITE_ACCESS_PASSWORD:-}
+      NOVEDADES_TOKEN: ${NOVEDADES_TOKEN:-local-novedades-token}
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: "1025"
+      FRONTEND_URL: http://localhost:5173
+    ports:
+      # Solo para el script de novedades (scripts/mantenimiento.mjs), como en el VPS.
+      - "127.0.0.1:8084:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    depends_on:
+      db-servicios:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    mem_limit: 288m
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      TRANQUI_SERVICES_MONOLITO_URI: http://backend:8080
+      # Fase 1: /api/notificaciones y /ws-notificaciones al servicio (sin la variable, al monolito).
+      TRANQUI_SERVICES_NOTIFICACIONES_URI: lb://notificaciones
+      # Fase 2: /api/chat, /ws-tranqui y /internal/chat al servicio de chat (sin la variable, al monolito).
+      TRANQUI_SERVICES_CHAT_URI: lb://chat
+      TRANQUI_SERVICES_CALENDARIO_URI: lb://calendario
+      # Fase 4: /api/payments y /api/medicos/mercadopago al servicio de pagos.
+      TRANQUI_SERVICES_PAGOS_URI: lb://pagos
+      # Fase 5: el buscador, /api/medicos/perfil, la disponibilidad y /internal/profesionales al servicio.
+      TRANQUI_SERVICES_PROFESIONALES_URI: lb://profesionales
+      # Fase 6: /api/turnos, los horarios, "Mis turnos" y /internal/turnos al servicio de turnos.
+      TRANQUI_SERVICES_TURNOS_URI: lb://turnos
+      # Fase 7: /api/pacientes (menos /me/turnos), /api/recetas y /api/conceptos al servicio de profesionales.
+      TRANQUI_SERVICES_CLINICA_URI: lb://profesionales
+      # Fase 8: /api/subscriptions/** y /api/admin/subscriptions/** al servicio de pagos.
+      TRANQUI_SERVICES_SUSCRIPCIONES_URI: lb://pagos
+      # Fase 9: cuenta, soporte, administración de usuarios, portón y /internal/identidad al servicio de identidad,
+      # y el paywall consulta a pagos.
+      TRANQUI_SERVICES_IDENTIDAD_URI: lb://identidad
+      TRANQUI_SERVICES_IDENTIDAD_INTERNO_URI: lb://identidad
+      TRANQUI_PAYWALL_FUENTE: pagos
+      SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
+      JWT_SECRET: local-dev-encryption-key-32chars
+      # Fase 9: clave pública RSA de identidad leída del .env local y transición HS256.
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      JWT_HS256_ACEPTADO: "true"
+      VICTORIAMETRICS_URL: http://victoriametrics:8428
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+      victoriametrics:
+        condition: service_healthy
+    mem_limit: 288m
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.101.0
+    command:
+      - "-promscrape.config=/etc/victoriametrics/scrape.yml"
+      - "-retentionPeriod=15d"
+      - "-storageDataPath=/victoria-metrics-data"
+      - "-memory.allowedPercent=30"
+    ports:
+      - "127.0.0.1:8428:8428"
+    volumes:
+      - ./infra/victoriametrics/scrape.yml:/etc/victoriametrics/scrape.yml:ro
+      - tranqui-local-vm-data:/victoria-metrics-data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8428/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    # Con 96m lo mataba el OOM al sumar las metricas del backend (runtime de Go + caches).
+    mem_limit: 192m
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    profiles:
+      - monitoring
+      - full
+    ports:
+      - "127.0.0.1:9100:9100"
+    mem_limit: 32m
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    profiles:
+      - monitoring
+      - full
+    ports:
+      - "127.0.0.1:8083:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    mem_limit: 64m
 
   frontend:
     image: node:22-alpine
@@ -62,6 +597,7 @@ services:
     command: sh -c "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 5173 --strictPort"
     environment:
       VITE_GOOGLE_LOGIN: "false"
+      VITE_API_URL: "http://localhost:8080"
     ports:
       - "127.0.0.1:5173:5173"
     volumes:
@@ -69,8 +605,9 @@ services:
       # node_modules del contenedor separado del de la máquina (binarios de Linux).
       - tranqui-local-node-modules:/app/node_modules
     depends_on:
-      - backend
+      - gateway
 
 volumes:
   tranqui-local-db:
   tranqui-local-node-modules:
+  tranqui-local-vm-data:

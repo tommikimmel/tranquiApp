@@ -39,14 +39,14 @@ describe('apiFetch (via api.* methods)', () => {
     fetchSpy.mockResolvedValueOnce(jsonResponse([]))
     await api.getMedicos()
     const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe('http://localhost:8081/api/medicos')
+    expect(url).toBe('http://localhost:8080/api/medicos')
   })
 
   it('serializes an object body to JSON and sets Content-Type', async () => {
     fetchSpy.mockResolvedValueOnce(jsonResponse({ id: 1 }))
     await api.login({ email: 'a@b.com', password: 'x' })
     const [url, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe('http://localhost:8081/api/auth/login')
+    expect(url).toBe('http://localhost:8080/api/auth/login')
     expect(options.method).toBe('POST')
     expect(options.body).toBe(JSON.stringify({ email: 'a@b.com', password: 'x' }))
     expect((options.headers as any)['Content-Type']).toBe('application/json')
@@ -104,7 +104,7 @@ describe('apiFetch (via api.* methods)', () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse({ id: 1, rol: 'PACIENTE' }))
       const result = await api.login({ email: 'x@y.com', password: 'pw' })
       const [url, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      expect(url).toBe('http://localhost:8081/api/auth/login')
+      expect(url).toBe('http://localhost:8080/api/auth/login')
       expect(options.method).toBe('POST')
       expect(result).toEqual({ id: 1, rol: 'PACIENTE' })
     })
@@ -123,7 +123,7 @@ describe('apiFetch (via api.* methods)', () => {
       }
       const result = await api.reservarTurno(payload)
       const [url, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      expect(url).toBe('http://localhost:8081/api/turnos/reservar')
+      expect(url).toBe('http://localhost:8080/api/turnos/reservar')
       expect(options.method).toBe('POST')
       expect(JSON.parse(options.body as string)).toEqual(payload)
       expect(result).toEqual({ turnoId: 7, checkoutUrl: 'https://mp.example/x' })
@@ -139,7 +139,7 @@ describe('apiFetch (via api.* methods)', () => {
       }
       const result = await api.enviarReceta(payload)
       const [url, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      expect(url).toBe('http://localhost:8081/api/recetas/enviar')
+      expect(url).toBe('http://localhost:8080/api/recetas/enviar')
       expect(options.method).toBe('POST')
       expect(JSON.parse(options.body as string)).toEqual(payload)
       expect(result).toEqual({ id: 5 })
@@ -149,7 +149,7 @@ describe('apiFetch (via api.* methods)', () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse({ id: 9 }))
       const result = await api.getMe()
       const [url, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      expect(url).toBe('http://localhost:8081/api/auth/me')
+      expect(url).toBe('http://localhost:8080/api/auth/me')
       expect(options.method).toBeUndefined()
       expect(result).toEqual({ id: 9 })
     })
@@ -158,7 +158,7 @@ describe('apiFetch (via api.* methods)', () => {
       fetchSpy.mockResolvedValueOnce(jsonResponse({}))
       await api.logout()
       const [url, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      expect(url).toBe('http://localhost:8081/api/auth/logout')
+      expect(url).toBe('http://localhost:8080/api/auth/logout')
       expect(options.method).toBe('POST')
     })
   })
@@ -263,6 +263,9 @@ describe('apiFetch (via api.* methods)', () => {
       ['getSubscriptionEvents', () => api.getSubscriptionEvents()],
       ['getSubscriptionEvents (con subId)', () => api.getSubscriptionEvents(5)],
       ['updateSubscriptionStatus', () => api.updateSubscriptionStatus(1, 'ACTIVE')],
+      ['obtenerCheckout', () => api.obtenerCheckout(63)],
+      ['getAdminSalud', () => api.getAdminSalud()],
+      ['getAdminObservabilidad', () => api.getAdminObservabilidad('eventos', '1h')],
     ]
 
     it.each(invocations)('%s', async (_name, invoke) => {

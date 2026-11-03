@@ -1,10 +1,19 @@
-// Same http(s)://host[:8081] derivation the WebSocket connections (App.tsx, useChat.ts) also
+// Same http(s)://host[:8080] derivation the WebSocket connections (App.tsx, useChat.ts) also
 // need — kept in one place instead of copy-pasted per call site so the two can't drift.
 export function getBackendOrigin(): string {
+  if (import.meta.env?.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
   return window.location.protocol === 'https:'
     ? `https://${window.location.host}`
-    : `http://${window.location.hostname}:8081`;
+    : `http://${window.location.hostname}:8080`;
 }
+
+// Avisos en vivo (/topic/notificaciones/{id}). Desde la Fase 1 de microservicios llegan por dos
+// endpoints: las notificaciones guardadas (turnos, tickets, documentos) por /ws-notificaciones,
+// del servicio de notificaciones, y los avisos de "nuevo mensaje" del chat y de pagos de concepto
+// por /ws-tranqui, que sigue siendo del monolito (y en la Fase 2, del servicio de chat).
+export const ENDPOINTS_AVISOS_EN_VIVO = ['/ws-tranqui', '/ws-notificaciones'] as const;
 
 const API_BASE = `${getBackendOrigin()}/api`;
 
@@ -114,6 +123,11 @@ export const api = {
     emailPaciente: string
     telefonoPaciente: string
   }) => apiFetch('/turnos/reservar', { method: 'POST', body: data as any }),
+
+  // Fase 4: con el servicio de pagos la reserva responde sin link (checkoutPendiente) y el link del
+  // checkout se pide aparte hasta que esté LISTO (o ERROR si no se pudo crear).
+  obtenerCheckout: (referencia: string | number): Promise<{ estado: 'PENDIENTE' | 'LISTO' | 'ERROR' | 'PAGADO' | 'VENCIDO'; checkoutUrl?: string; error?: string }> =>
+    apiFetch(`/payments/checkout/${encodeURIComponent(String(referencia))}`),
 
   // Public catalog of obras sociales/financiadores from QBI2 — used at checkout when the
   // médico marked a service as "Requiere Obra Social" (see Honorarios y Servicios).
@@ -355,4 +369,9 @@ export const api = {
   updateSubscriptionPlan: (planId: number | string, data: any) => apiFetch(`/admin/subscriptions/plans/${planId}`, { method: 'PUT', body: data }),
   getSubscriptionEvents: (subId?: number | string) => apiFetch(subId ? `/admin/subscriptions/${subId}/events` : '/admin/subscriptions/events'),
   updateSubscriptionStatus: (subId: number | string, status: string) => apiFetch(`/admin/subscriptions/${subId}/status`, { method: 'PATCH', body: { status } as any }),
+
+  // ── Observabilidad (§11) ─────────────────────────────────────────
+  getAdminSalud: () => apiFetch('/admin/salud'),
+  getAdminObservabilidad: (categoria: 'recursos' | 'trafico' | 'latencia' | 'eventos', rango: '1h' | '24h' | '7d' = '24h') =>
+    apiFetch(`/admin/observabilidad/${categoria}?rango=${rango}`),
 };

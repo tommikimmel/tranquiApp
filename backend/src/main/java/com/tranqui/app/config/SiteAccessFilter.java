@@ -37,6 +37,9 @@ public class SiteAccessFilter extends OncePerRequestFilter {
     private static final List<String> BYPASS_PREFIXES = List.of(
             "/api/site-access/",
             "/api/health",
+            "/actuator/",
+            // Rutas internas entre servicios (las protege FiltroServicioInterno).
+            "/internal/",
             "/api/payments/webhook",
             "/api/medicos/google-calendar/webhook",
             "/error"

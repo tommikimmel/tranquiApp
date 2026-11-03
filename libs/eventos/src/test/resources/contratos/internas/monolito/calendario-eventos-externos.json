@@ -1,0 +1,12 @@
+[
+  {
+    "id" : 1,
+    "profesionalId" : 17,
+    "googleEventId" : "ext-42429827382300",
+    "titulo" : "Dentista",
+    "inicio" : "2026-10-30T20:32:41.864528",
+    "fin" : "2026-10-30T21:32:41.864528",
+    "todoElDia" : false,
+    "estado" : "texto-estado"
+  }
+]

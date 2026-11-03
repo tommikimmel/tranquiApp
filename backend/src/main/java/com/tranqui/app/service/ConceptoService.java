@@ -1,5 +1,9 @@
 package com.tranqui.app.service;
 
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.ConceptoSolicitadoData;
+import org.springframework.beans.factory.annotation.Value;
 import com.tranqui.app.model.EstadoPago;
 import com.tranqui.app.model.SolicitudDocumento;
 import com.tranqui.app.model.Usuario;
@@ -28,6 +32,13 @@ public class ConceptoService {
     @Autowired
     private MercadoPagoService mercadoPagoService;
 
+    @Autowired
+    private OutboxPublisher outboxPublisher;
+
+    // Fase 4: con true la preferencia la crea el servicio de pagos (profesionales.concepto.solicitado).
+    @Value("${pagos.externo:false}")
+    private boolean pagosExterno;
+
     @Transactional
     public SolicitudDocumento crearSolicitud(SolicitarConceptoDto dto, String pacienteEmail) {
         Usuario paciente = usuarioRepository.findByEmail(pacienteEmail)
@@ -44,10 +55,29 @@ public class ConceptoService {
                 .estado(EstadoPago.PENDIENTE)
                 .build();
 
-        return solicitudRepository.save(solicitud);
+        solicitud = solicitudRepository.save(solicitud);
+        if (pagosExterno) {
+            outboxPublisher.publicar(
+                    Topicos.PROFESIONALES_CONCEPTO_SOLICITADO_V1,
+                    "solicitud",
+                    String.valueOf(solicitud.getId()),
+                    1,
+                    new ConceptoSolicitadoData(
+                            solicitud.getId(),
+                            paciente.getId(),
+                            medico.getId(),
+                            solicitud.getTipoConcepto() != null ? solicitud.getTipoConcepto().toString() : null,
+                            solicitud.getPrecio(),
+                            MercadoPagoService.tituloCobroConcepto(solicitud)));
+        }
+        return solicitud;
     }
 
     public String generarCheckoutUrl(SolicitudDocumento solicitud) {
+        if (pagosExterno) {
+            // El link llega por pagos.checkout.creado y se pide a GET /api/payments/checkout/doc-{id}.
+            return "";
+        }
         try {
             return mercadoPagoService.crearPreferenciaDocumento(solicitud);
         } catch (IllegalStateException e) {

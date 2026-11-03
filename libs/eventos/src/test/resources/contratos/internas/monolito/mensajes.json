@@ -1,0 +1,8 @@
+[ {
+  "id" : 1,
+  "remitenteId" : 15,
+  "destinatarioId" : 16,
+  "contenido" : "hola doc",
+  "leido" : false,
+  "fechaEnvio" : "2026-10-29T20:32:41.760194"
+} ]

@@ -1,0 +1,2 @@
+com.tranqui.eventos.consumo.EventosConsumoAutoConfiguration
+com.tranqui.eventos.outbox.EventosOutboxAutoConfiguration

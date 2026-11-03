@@ -1,0 +1,17 @@
+[
+  {
+    "id" : 1,
+    "pacienteId" : 6,
+    "medicoId" : 5,
+    "fecha" : "2026-10-26",
+    "tipoInforme" : "Evaluativo",
+    "planTrabajo" : "Plan inicial",
+    "contenido" : "Contenido confidencial",
+    "nombreArchivo" : "informe.pdf",
+    "fechaCreacion" : "2026-10-29T20:32:41.268354",
+    "estado" : "VIGENTE",
+    "informeOriginalId" : 12345678,
+    "motivo" : "texto-motivo",
+    "hashIntegridad" : "hash-inf-456"
+  }
+]

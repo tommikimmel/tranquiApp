@@ -2,15 +2,23 @@ package com.tranqui.app.controller;
 
 import com.tranqui.app.model.Rol;
 import com.tranqui.app.model.Usuario;
+import com.tranqui.app.model.dto.UsuarioAdminDto;
+import com.tranqui.eventos.data.PasswordTemporalGeneradaData;
 import com.tranqui.app.model.dto.CambiarEstadoTicketDto;
 import com.tranqui.app.repository.UsuarioRepository;
 import com.tranqui.app.service.ResendEmailService;
 import com.tranqui.app.service.TicketService;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.ProfesionalVisibilidadCambiadaData;
+import com.tranqui.eventos.data.VerificacionResueltaData;
+import com.tranqui.eventos.data.UsuarioActualizadoData;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -24,6 +32,9 @@ import java.util.Map;
 public class AdminController {
 
     @Autowired
+    private OutboxPublisher outboxPublisher;
+
+    @Autowired
     private UsuarioRepository usuarioRepository;
 
     @Autowired
@@ -35,12 +46,17 @@ public class AdminController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @org.springframework.beans.factory.annotation.Value("${suscripciones.externo:false}")
+    private boolean suscripcionesExterno;
+
     @GetMapping("/users")
-    public ResponseEntity<List<Usuario>> getUsers() {
-        return ResponseEntity.ok(usuarioRepository.findAll());
+    public ResponseEntity<List<UsuarioAdminDto>> getUsers() {
+        return ResponseEntity.ok(usuarioRepository.findAll().stream().map(UsuarioAdminDto::desde).toList());
     }
 
+
     @PutMapping("/users/{id}/rol")
+    @Transactional
     public ResponseEntity<?> updateRol(@PathVariable Long id, @RequestBody Map<String, String> body) {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Usuario no encontrado"));
@@ -52,11 +68,30 @@ public class AdminController {
             if (rol == Rol.PSIQUIATRA) {
                 usuario.setVerificadoAdmin(true);
             }
-            usuarioRepository.save(usuario);
-            return ResponseEntity.ok(usuario);
+            usuarioRepository.saveAndFlush(usuario);
+            publicarContactoActualizado(usuario);
+            return ResponseEntity.ok(UsuarioAdminDto.desde(usuario));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body("Rol inválido");
         }
+    }
+
+    // El rol decide quién recibe los avisos de administrador en notificaciones (copia de contactos).
+    private void publicarContactoActualizado(Usuario usuario) {
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new UsuarioActualizadoData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        usuario.getNombre(),
+                        usuario.getApellido(),
+                        usuario.getTelefono(),
+                        usuario.getRol() != null ? usuario.getRol().name() : null,
+                        usuario.isNotificacionesEmailHabilitadas()
+                )
+        );
     }
 
     @Autowired
@@ -70,6 +105,7 @@ public class AdminController {
         return verifyProfessional(id, null);
     }
 
+    @Transactional
     public ResponseEntity<?> verifyProfessional(Long id, org.springframework.security.core.Authentication auth) {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Usuario no encontrado"));
@@ -78,22 +114,37 @@ public class AdminController {
         usuario.setVerificadoAdmin(true);
         usuario.setLicenseVerifiedAt(java.time.LocalDateTime.now());
         usuario.setLicenseVerifiedBy(auth != null ? auth.getName() : "admin");
-        usuarioRepository.save(usuario);
+        usuarioRepository.saveAndFlush(usuario);
+        publicarContactoActualizado(usuario);
 
-        // Actualizar estado en la máquina de estados de suscripción (§6)
-        if (subscriptionRepository != null) {
+        outboxPublisher.publicar(
+                Topicos.PROFESIONALES_PROFESIONAL_VISIBILIDAD_CAMBIADA_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new ProfesionalVisibilidadCambiadaData(usuario.getId(), true, "Verificado por admin")
+        );
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_PROFESIONAL_VERIFICACION_RESUELTA_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new VerificacionResueltaData(usuario.getId(), "VERIFICADO")
+        );
+
+        // Actualizar estado en la m�quina de estados de suscripci�n (�6)
+        if (!suscripcionesExterno && subscriptionRepository != null) {
             subscriptionRepository.findByProfessionalId(usuario.getId()).ifPresent(sub -> {
                 if (sub.getStatus() == com.tranqui.app.model.SubscriptionStatus.PENDING_VERIFICATION || sub.getStatus() == com.tranqui.app.model.SubscriptionStatus.REGISTERED) {
+                    com.tranqui.app.model.SubscriptionStatus oldStatus = sub.getStatus();
                     sub.setStatus(com.tranqui.app.model.SubscriptionStatus.VERIFIED);
                     subscriptionRepository.save(sub);
                     if (subscriptionService != null) {
-                        subscriptionService.logEvent(sub.getId(), "PROFESSIONAL_VERIFIED", "ADMIN", auth != null ? auth.getName() : "admin", "Matrícula verificada por admin.");
+                        subscriptionService.logEvent(sub.getId(), "PROFESSIONAL_VERIFIED", oldStatus.name(), com.tranqui.app.model.SubscriptionStatus.VERIFIED.name(), "ADMIN", auth != null ? auth.getName() : "admin", "Matr�cula verificada por admin.");
                     }
                 }
             });
         }
 
-        return ResponseEntity.ok(usuario);
+        return ResponseEntity.ok(UsuarioAdminDto.desde(usuario));
     }
 
     @PostMapping("/users/{id}/reject")
@@ -101,31 +152,46 @@ public class AdminController {
         return rejectProfessional(id, null);
     }
 
+    @Transactional
     public ResponseEntity<?> rejectProfessional(Long id, org.springframework.security.core.Authentication auth) {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Usuario no encontrado"));
 
         usuario.setVerificadoAdmin(false);
-        usuarioRepository.save(usuario);
+        usuarioRepository.saveAndFlush(usuario);
+            outboxPublisher.publicar(
+                    Topicos.PROFESIONALES_PROFESIONAL_VISIBILIDAD_CAMBIADA_V1,
+                    String.valueOf(usuario.getId()),
+                    usuario.getAggregateVersion(),
+                    new ProfesionalVisibilidadCambiadaData(usuario.getId(), false, "Verificaci�n rechazada por admin")
+            );
+            outboxPublisher.publicar(
+                    Topicos.IDENTIDAD_PROFESIONAL_VERIFICACION_RESUELTA_V1,
+                    String.valueOf(usuario.getId()),
+                    usuario.getAggregateVersion(),
+                    new VerificacionResueltaData(usuario.getId(), "RECHAZADO")
+            );
 
-        if (subscriptionRepository != null) {
+        if (!suscripcionesExterno && subscriptionRepository != null) {
             subscriptionRepository.findByProfessionalId(usuario.getId()).ifPresent(sub -> {
+                com.tranqui.app.model.SubscriptionStatus oldStatus = sub.getStatus();
                 sub.setStatus(com.tranqui.app.model.SubscriptionStatus.REJECTED);
                 subscriptionRepository.save(sub);
                 if (subscriptionService != null) {
-                    subscriptionService.logEvent(sub.getId(), "PROFESSIONAL_REJECTED", "ADMIN", auth != null ? auth.getName() : "admin", "Verificación rechazada.");
+                    subscriptionService.logEvent(sub.getId(), "PROFESSIONAL_REJECTED", oldStatus.name(), com.tranqui.app.model.SubscriptionStatus.REJECTED.name(), "ADMIN", auth != null ? auth.getName() : "admin", "Verificaci�n rechazada.");
                 }
             });
         }
 
-        return ResponseEntity.ok(usuario);
+        return ResponseEntity.ok(UsuarioAdminDto.desde(usuario));
     }
 
     // Genera una contraseña temporal segura, la guarda hasheada, marca mustChangePassword para
     // que el frontend fuerce el formulario de cambio en el próximo login (ver
     // AuthController#setNewPassword), y se la manda por mail al usuario. No queda persistida en
-    // texto plano en ningún lado — se la devolvemos al admin acá para que la tenga como respaldo
+    // texto plano en ningún lado � se la devolvemos al admin acá para que la tenga como respaldo
     // (por si el mail tarda o se pierde), pero solo en esta única respuesta.
+    @Transactional
     @PostMapping("/users/{id}/reset-password")
     public ResponseEntity<?> resetPassword(@PathVariable Long id) {
         Usuario usuario = usuarioRepository.findById(id)
@@ -138,7 +204,19 @@ public class AdminController {
         String passwordTemporal = generarPasswordTemporal();
         usuario.setPassword(passwordEncoder.encode(passwordTemporal));
         usuario.setMustChangePassword(true);
-        usuarioRepository.save(usuario);
+        usuarioRepository.saveAndFlush(usuario);
+
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_PASSWORD_TEMPORAL_GENERADA_V1,
+                String.valueOf(usuario.getId()),
+                usuario.getAggregateVersion(),
+                new PasswordTemporalGeneradaData(
+                        usuario.getId(),
+                        usuario.getEmail(),
+                        usuario.getNombre(),
+                        passwordTemporal
+                )
+        );
 
         resendEmailService.enviarPasswordTemporal(usuario.getEmail(), usuario.getNombre(), passwordTemporal);
 
@@ -168,9 +246,9 @@ public class AdminController {
         return sb.toString();
     }
 
-    // ── Tickets de soporte ──────────────────────────────────────────────────
+    // ���� Tickets de soporte ����������������������������������������������������������������������������������������������������
     // El detalle de un ticket puntual y la respuesta del admin se manejan en TicketController
-    // (mismo hilo que ve el paciente/profesional) — acá solo lo que es exclusivamente del admin:
+    // (mismo hilo que ve el paciente/profesional) � acá solo lo que es exclusivamente del admin:
     // ver todos los tickets de todos los usuarios, y cambiar su estado.
     @GetMapping("/tickets")
     public ResponseEntity<?> listarTickets() {

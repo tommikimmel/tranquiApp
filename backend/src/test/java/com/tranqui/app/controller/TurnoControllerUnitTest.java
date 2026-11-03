@@ -75,22 +75,25 @@ class TurnoControllerUnitTest {
         ResponseEntity<Void> response = controller.cancelarTurno(5L, medico);
 
         assertEquals(200, response.getStatusCodeValue());
+        verify(turnoService).exigirDuenio(5L, "dra@mail.com", false);
         verify(turnoService).cancelarTurno(5L, "dra@mail.com");
     }
 
     @Test
     void actualizarAsistencia_shouldDelegateToService() {
-        ResponseEntity<Void> response = controller.actualizarAsistencia(5L, "LLEGO");
+        ResponseEntity<Void> response = controller.actualizarAsistencia(5L, "LLEGO", medico);
 
         assertEquals(200, response.getStatusCodeValue());
+        verify(turnoService).exigirDuenio(5L, "dra@mail.com", true);
         verify(turnoService).actualizarAsistencia(5L, "LLEGO");
     }
 
     @Test
     void reprogramarTurno_shouldDelegateToService() {
-        ResponseEntity<Void> response = controller.reprogramarTurno(5L, "2026-01-01", "10:00");
+        ResponseEntity<Void> response = controller.reprogramarTurno(5L, "2026-01-01", "10:00", medico);
 
         assertEquals(200, response.getStatusCodeValue());
+        verify(turnoService).exigirDuenio(5L, "dra@mail.com", true);
         verify(turnoService).reprogramarTurno(5L, "2026-01-01", "10:00");
     }
 }

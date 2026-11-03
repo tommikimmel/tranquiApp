@@ -53,4 +53,17 @@ class ClinicalControllerTest {
                         .content("{\"tipoInforme\":\"Evaluativo\",\"planTrabajo\":\"Nuevo plan\",\"contenido\":\"Nuevo contenido\"}"))
                 .andExpect(status().isOk());
     }
+
+    // Fase 7: cargar en la historia de un paciente que no atiende responde 403.
+    @Test
+    @WithMockUser(username = "medico@test.com", roles = "PSIQUIATRA")
+    void crearInformeDeUnPacienteQueNoAtiende_responde403() throws Exception {
+        when(clinicalService.guardarInforme(eq("medico@test.com"), eq(2L), any(), any(), any(), any()))
+                .thenThrow(new org.springframework.security.access.AccessDeniedException("El paciente no está entre los que atendés."));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/pacientes/2/informes")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"tipoInforme\":\"Evaluativo\",\"contenido\":\"x\"}"))
+                .andExpect(status().isForbidden());
+    }
 }

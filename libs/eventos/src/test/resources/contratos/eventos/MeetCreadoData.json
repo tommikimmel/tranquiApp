@@ -1,0 +1,10 @@
+{
+  "turnoId" : 1,
+  "meetUrl" : "texto",
+  "googleEventId" : "texto",
+  "pacienteId" : 1,
+  "profesionalId" : 1,
+  "fecha" : "2026-11-03",
+  "horaInicio" : "texto",
+  "linkNuevo" : false
+}

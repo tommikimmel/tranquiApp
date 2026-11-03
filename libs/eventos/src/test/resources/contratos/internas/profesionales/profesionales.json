@@ -1,0 +1,70 @@
+[
+  {
+    "profesionalId" : 1,
+    "version" : 10,
+    "perfil" : {
+      "emailContacto" : "contacto@mail.com",
+      "domicilioAtencion" : "texto",
+      "domicilioLat" : 1,
+      "domicilioLng" : 1,
+      "domicilioAtencionTorre" : "texto",
+      "domicilioAtencionPiso" : "texto",
+      "domicilioAtencionDepto" : "texto",
+      "domicilioAtencionBarrio" : "texto",
+      "matricula" : "1234",
+      "matriculaTipo" : "MN",
+      "matriculaProvincia" : "CABA",
+      "matriculaNumero" : 1234,
+      "matriculaEspecialidad" : "texto",
+      "matriculaAsocTipo" : "texto",
+      "matriculaAsocProvincia" : "texto",
+      "matriculaAsocNumero" : 1,
+      "titulo" : "Médica",
+      "especialidad" : "Psiquiatría",
+      "cuit" : "20-12345678-9",
+      "precio" : 1,
+      "color" : "texto",
+      "ofreceOnline" : true,
+      "ofrecePresencial" : false,
+      "experiencia" : "[{\"lugar\":\"Hospital\"}]",
+      "publicaciones" : "texto",
+      "instagramUrl" : "texto",
+      "facebookUrl" : "texto",
+      "linkedinUrl" : "texto",
+      "sitioWebUrl" : "texto",
+      "codigoRefeps" : "texto",
+      "selloLinea1" : "texto",
+      "selloLinea2" : "texto",
+      "selloLinea3" : "texto",
+      "tags" : "Ansiedad,Estrés",
+      "descripcionPerfil" : "Descripción",
+      "institucionFormacion" : "UBA",
+      "aniosExperiencia" : 10,
+      "pacientesAtiende" : "Adultos",
+      "duracionTurnoMinutos" : 1,
+      "intervaloEntreTurnosMinutos" : 1
+    },
+    "disponibilidad" : [
+      {
+        "diaSemana" : 1,
+        "horaInicio" : "09:00",
+        "horaFin" : "10:00",
+        "modalidad" : "ONLINE"
+      }
+    ],
+    "tarifas" : [
+      {
+        "servicioId" : "particular",
+        "label" : "Consulta particular",
+        "precio" : 60000,
+        "habilitado" : true,
+        "requiereObraSocial" : false,
+        "obraSocial" : "OSDE",
+        "precioOnline" : 30000,
+        "precioPresencial" : 35000,
+        "requiereAgenda" : true,
+        "esReceta" : false
+      }
+    ]
+  }
+]

@@ -7,6 +7,11 @@ import com.tranqui.app.model.dto.TicketResumenDto;
 import com.tranqui.app.repository.TicketMensajeRepository;
 import com.tranqui.app.repository.TicketRepository;
 import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.app.eventos.OutboxPublisher;
+import com.tranqui.eventos.Topicos;
+import com.tranqui.eventos.data.TicketCreadoData;
+import com.tranqui.eventos.data.TicketMensajeRecibidoData;
+import com.tranqui.eventos.data.TicketRespondidoData;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
@@ -39,6 +44,9 @@ public class TicketService {
     @Autowired
     private ResendEmailService resendEmailService;
 
+    @Autowired
+    private OutboxPublisher outboxPublisher;
+
     @Transactional
     public TicketDetalleDto crearTicket(String creadorEmail, String asunto, String mensaje) {
         if (asunto == null || asunto.trim().isEmpty()) {
@@ -66,6 +74,13 @@ public class TicketService {
         ticketMensajeRepository.save(primerMensaje);
 
         String nombreCreador = nombreCompleto(creador);
+        outboxPublisher.publicar(
+                Topicos.IDENTIDAD_TICKET_CREADO_V1,
+                "ticket",
+                String.valueOf(ticket.getId()),
+                ticket.getAggregateVersion(),
+                new TicketCreadoData(ticket.getId(), creador.getId(), nombreCreador, ticket.getAsunto())
+        );
         for (Usuario admin : usuarioRepository.findByRol(Rol.ADMIN)) {
             notificacionService.crearNotificacion(admin, "Nuevo ticket de soporte",
                     nombreCreador + " abrió un ticket: " + ticket.getAsunto(), "TICKET_NUEVO");
@@ -159,7 +174,10 @@ public class TicketService {
             // automáticamente, eso solo lo hace el cambio de estado explícito del admin.
             ticket.setEstado(TicketEstado.ACTIVO);
             ticket.setFechaActualizacion(java.time.LocalDateTime.now());
-            ticketRepository.save(ticket);
+            Ticket ticketGuardado = ticketRepository.saveAndFlush(ticket);
+            if (ticketGuardado != null) {
+                ticket = ticketGuardado;
+            }
 
             notificacionService.crearNotificacion(ticket.getCreador(), "Respondieron tu ticket",
                     "Soporte respondió: \"" + ticket.getAsunto() + "\"", "TICKET_RESPUESTA");
@@ -171,6 +189,20 @@ public class TicketService {
                         ticket.getAsunto(),
                         contenido.trim());
             }
+
+            outboxPublisher.publicar(
+                    Topicos.IDENTIDAD_TICKET_RESPONDIDO_V1,
+                    "ticket",
+                    String.valueOf(ticket.getId()),
+                    ticket.getAggregateVersion(),
+                    new TicketRespondidoData(
+                            ticket.getId(),
+                            ticket.getCreador().getId(),
+                            ticket.getCreador().getEmail(),
+                            ticket.getAsunto(),
+                            contenido.trim()
+                    )
+            );
         } else {
             // El creador escribió — si el ticket ya estaba resuelto, un mensaje nuevo significa
             // que necesita atención de nuevo.
@@ -178,9 +210,19 @@ public class TicketService {
                 ticket.setEstado(TicketEstado.PENDIENTE);
             }
             ticket.setFechaActualizacion(java.time.LocalDateTime.now());
-            ticketRepository.save(ticket);
+            Ticket ticketGuardado = ticketRepository.saveAndFlush(ticket);
+            if (ticketGuardado != null) {
+                ticket = ticketGuardado;
+            }
 
             String nombreCreador = nombreCompleto(autor);
+            outboxPublisher.publicar(
+                    Topicos.IDENTIDAD_TICKET_MENSAJE_RECIBIDO_V1,
+                    "ticket",
+                    String.valueOf(ticket.getId()),
+                    ticket.getAggregateVersion(),
+                    new TicketMensajeRecibidoData(ticket.getId(), autor.getId(), nombreCreador, ticket.getAsunto())
+            );
             for (Usuario admin : usuarioRepository.findByRol(Rol.ADMIN)) {
                 notificacionService.crearNotificacion(admin, "Nueva respuesta en un ticket",
                         nombreCreador + " respondió: \"" + ticket.getAsunto() + "\"", "TICKET_RESPUESTA");

@@ -7,6 +7,7 @@ import com.tranqui.app.model.SubscriptionStatus;
 import com.tranqui.app.repository.InvoiceRepository;
 import com.tranqui.app.repository.SubscriptionPaymentRepository;
 import com.tranqui.app.repository.SubscriptionRepository;
+import com.tranqui.eventos.data.SuscripcionAvisoData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,7 +44,13 @@ public class SubscriptionReconciliationScheduler {
     private ResendEmailService resendEmailService;
 
     @Autowired
+    private AvisoSuscripcionPublisher avisoSuscripcionPublisher;
+
+    @Autowired
     private com.tranqui.app.repository.UsuarioRepository usuarioRepository;
+
+    @org.springframework.beans.factory.annotation.Value("${suscripciones.externo:false}")
+    private boolean suscripcionesExterno;
 
     // Las alertas que requieren acción humana no pueden quedar solo en el log (nadie lo mira
     // todos los días): se mandan por mail a todos los administradores.
@@ -71,6 +78,10 @@ public class SubscriptionReconciliationScheduler {
      */
     @Scheduled(cron = "0 0 4 * * ?")
     public void runDailyReconciliation() {
+        if (suscripcionesExterno) {
+            log.info("suscripciones.externo=true: no se ejecuta la reconciliación diaria en el monolito.");
+            return;
+        }
         log.info("Iniciando job diario de reconciliación de suscripciones y facturación...");
 
         checkUpcomingRenewals();
@@ -92,6 +103,10 @@ public class SubscriptionReconciliationScheduler {
     @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
     @Transactional
     public void runHourlyAlertsCheck() {
+        if (suscripcionesExterno) {
+            log.info("suscripciones.externo=true: no se ejecuta la verificación horaria de alertas en el monolito.");
+            return;
+        }
         try {
             log.info("Ejecutando verificación de preavisos de renovación y cancelaciones diferidas...");
             checkUpcomingRenewals();
@@ -115,6 +130,9 @@ public class SubscriptionReconciliationScheduler {
         for (Subscription sub : upcoming) {
             try {
                 if (sub.getProfessional() != null && sub.getProfessional().getEmail() != null) {
+                    avisoSuscripcionPublisher.publicar(sub, SuscripcionAvisoData.PREAVISO_RENOVACION, sub.getAmountArs(),
+                            sub.getNextBillingDate() != null ? sub.getNextBillingDate() : sub.getCurrentPeriodEnd(),
+                            null, sub.getBillingCycle(), null, null);
                     resendEmailService.enviarPreavisoRenovacionSuscripcion(
                             sub.getProfessional().getEmail(),
                             sub.getProfessional().getNombre(),
@@ -161,6 +179,7 @@ public class SubscriptionReconciliationScheduler {
                         "Período pagado finalizado tras cancelación previa. Cuenta bloqueada.");
 
                 if (sub.getProfessional() != null && sub.getProfessional().getEmail() != null) {
+                    avisoSuscripcionPublisher.publicar(sub, SuscripcionAvisoData.SUSPENSION, null, null, null, null, null, null);
                     resendEmailService.enviarAvisoSuspensionSuscripcion(
                             profEmail,
                             profNombre,
@@ -225,6 +244,7 @@ public class SubscriptionReconciliationScheduler {
                         "Suscripción suspendida tras vencer la ventana de gracia.");
 
                 if (sub.getProfessional() != null && sub.getProfessional().getEmail() != null) {
+                    avisoSuscripcionPublisher.publicar(sub, SuscripcionAvisoData.SUSPENSION, null, null, null, null, null, null);
                     resendEmailService.enviarAvisoSuspensionSuscripcion(
                             profEmail,
                             profNombre,
@@ -256,6 +276,8 @@ public class SubscriptionReconciliationScheduler {
                     // Un aviso a 7, 3 y 1 día del vencimiento. Este check corre una vez por día, así que
                     // cada umbral matchea un solo día (con <= 1 el último aviso salía dos veces).
                     if (dias == 7 || dias == 3 || dias == 1) {
+                        avisoSuscripcionPublisher.publicar(sub, SuscripcionAvisoData.VENCIMIENTO_MANUAL, null,
+                                sub.getCurrentPeriodEnd(), null, null, null, (int) dias);
                         resendEmailService.enviarAvisoVencimientoManualSuscripcion(
                                 profEmail,
                                 profNombre,

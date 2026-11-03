@@ -61,6 +61,9 @@ class WebhookControllerTest {
     @MockBean
     private TurnoRepository turnoRepository;
 
+    @Autowired
+    private WebhookController webhookController;
+
     // ── /api/payments/webhook ────────────────────────────────────────────────
 
     @Test
@@ -312,5 +315,23 @@ class WebhookControllerTest {
                 .andExpect(status().isConflict());
 
         verifyNoInteractions(pagoWebhookHandler);
+    }
+
+    // ── Fase 4: notificaciones de suscripciones reenviadas por el servicio de pagos ──
+
+    @Test
+    void reenvioDeSuscripcion_procesaLaSuscripcion() {
+        webhookController.procesarNotificacion(
+                "{\"type\":\"subscription_preapproval\",\"data\":{\"id\":\"preap-2\"},\"status\":\"authorized\"}", null, true);
+
+        verify(subscriptionService).processMercadoPagoPreapprovalWebhook("preap-2", "authorized");
+    }
+
+    @Test
+    void reenvioDeSuscripcion_ignoraLosPagosDeTurnos() {
+        webhookController.procesarNotificacion("{\"external_reference\":\"55\",\"transaction_id\":\"mock-1\"}", null, true);
+        webhookController.procesarNotificacion("{\"type\":\"payment\",\"data\":{\"id\":\"77\"},\"user_id\":\"mp-1\"}", null, true);
+
+        verifyNoInteractions(pagoWebhookHandler, usuarioRepository);
     }
 }

@@ -65,6 +65,9 @@ class MedicoAndAdminControllersUnitTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
+    private com.tranqui.app.eventos.OutboxPublisher outboxPublisher;
+
+    @Mock
     private UserDetails userDetails;
 
     @Mock

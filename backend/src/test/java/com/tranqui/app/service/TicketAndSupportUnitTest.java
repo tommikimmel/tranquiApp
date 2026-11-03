@@ -7,6 +7,7 @@ import com.tranqui.app.model.dto.*;
 import com.tranqui.app.repository.TicketMensajeRepository;
 import com.tranqui.app.repository.TicketRepository;
 import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.app.eventos.OutboxPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,6 +44,9 @@ class TicketAndSupportUnitTest {
 
     @Mock
     private ResendEmailService resendEmailService;
+
+    @Mock
+    private OutboxPublisher outboxPublisher;
 
     @Mock
     private UserDetails userDetails;

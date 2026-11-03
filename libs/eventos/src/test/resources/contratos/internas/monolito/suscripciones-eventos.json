@@ -1,0 +1,11 @@
+[ {
+  "id" : 1,
+  "subscriptionId" : 1,
+  "eventType" : "STATUS_CHANGE",
+  "previousStatus" : "INACTIVE",
+  "newStatus" : "ACTIVE",
+  "actorType" : "SYSTEM",
+  "actorId" : "1",
+  "payloadJson" : "{\"reason\":\"verified\"}",
+  "createdAt" : "2026-10-29T20:32:42.94951"
+} ]
