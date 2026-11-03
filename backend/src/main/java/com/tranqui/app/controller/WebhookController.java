@@ -59,6 +59,9 @@ public class WebhookController {
     @Autowired
     private com.tranqui.app.service.MercadoPagoService mercadoPagoService;
 
+    @org.springframework.beans.factory.annotation.Value("${suscripciones.externo:false}")
+    private boolean suscripcionesExterno;
+
     @PostMapping("/webhook")
     public ResponseEntity<?> receiveWebhook(
             @RequestHeader(value = "x-signature", required = false) String signature,
@@ -96,6 +99,9 @@ public class WebhookController {
             String action = node.has("action") ? node.get("action").asText() : "";
 
             if ("subscription_preapproval".equals(topic) || action.startsWith("subscription_preapproval")) {
+                if (suscripcionesExterno) {
+                    throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT, "Las suscripciones las administra el servicio de pagos.");
+                }
                 String preapprovalId = node.has("data") && node.get("data").has("id") ? node.get("data").get("id").asText() : dataId;
                 String subStatus = node.has("status") ? node.get("status").asText() : null;
 
@@ -118,6 +124,9 @@ public class WebhookController {
             }
 
             if ("subscription_authorized_payment".equals(topic) || action.startsWith("subscription_authorized_payment")) {
+                if (suscripcionesExterno) {
+                    throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT, "Las suscripciones las administra el servicio de pagos.");
+                }
                 String subPaymentId = node.has("data") && node.get("data").has("id") ? node.get("data").get("id").asText() : dataId;
                 String preapprovalId = node.has("preapproval_id") ? node.get("preapproval_id").asText() : null;
                 java.math.BigDecimal amount = node.has("transaction_amount") ? new java.math.BigDecimal(node.get("transaction_amount").asText()) : null;
@@ -184,6 +193,9 @@ public class WebhookController {
                 }
                 if (pagoSuscripcion != null && pagoSuscripcion.getExternalReference() != null
                         && pagoSuscripcion.getExternalReference().startsWith("sub-")) {
+                    if (suscripcionesExterno) {
+                        throw new org.springframework.web.server.ResponseStatusException(HttpStatus.CONFLICT, "Las suscripciones las administra el servicio de pagos.");
+                    }
                     log.info("Webhook 'payment' identificado como cobro de suscripción. Ref: {}, Status: {}",
                             pagoSuscripcion.getExternalReference(), pagoSuscripcion.getStatus());
                     subscriptionService.processMercadoPagoPaymentByExternalReference(
@@ -249,6 +261,8 @@ public class WebhookController {
                     }
                 }
             }
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error al procesar el webhook de pago", e);
         }

@@ -1,5 +1,7 @@
 package com.tranqui.app.controller;
 
+import com.tranqui.app.service.AccesoSuscripciones;
+
 import com.tranqui.app.model.EstadoTurno;
 import com.tranqui.app.model.Turno;
 import com.tranqui.app.model.Usuario;
@@ -46,6 +48,7 @@ public class InternoMonolitoController {
     private final NotificacionRepository notificacionRepository;
     private final com.tranqui.app.repository.MensajeRepository mensajeRepository;
     private final com.tranqui.app.service.SubscriptionService subscriptionService;
+    private final AccesoSuscripciones accesoSuscripciones;
     private final com.tranqui.app.repository.GoogleCalendarEventoExternoRepository eventoExternoRepository;
     private final String publicUrl;
 
@@ -53,6 +56,7 @@ public class InternoMonolitoController {
                                      NotificacionRepository notificacionRepository,
                                      com.tranqui.app.repository.MensajeRepository mensajeRepository,
                                      com.tranqui.app.service.SubscriptionService subscriptionService,
+                                     AccesoSuscripciones accesoSuscripciones,
                                      com.tranqui.app.repository.GoogleCalendarEventoExternoRepository eventoExternoRepository,
                                      @Value("${app.public-url:http://localhost:8081}") String publicUrl) {
         this.usuarioRepository = usuarioRepository;
@@ -60,6 +64,7 @@ public class InternoMonolitoController {
         this.notificacionRepository = notificacionRepository;
         this.mensajeRepository = mensajeRepository;
         this.subscriptionService = subscriptionService;
+        this.accesoSuscripciones = accesoSuscripciones;
         this.eventoExternoRepository = eventoExternoRepository;
         this.publicUrl = publicUrl;
     }
@@ -195,7 +200,7 @@ public class InternoMonolitoController {
     @GetMapping("/suscripciones/acceso")
     public AccesoDto accesoSuscripcion(@RequestParam(name = "email") String email) {
         return usuarioRepository.findByEmail(email)
-                .map(u -> new AccesoDto(subscriptionService.isAccessAllowed(u.getId())))
+                .map(u -> new AccesoDto(accesoSuscripciones.acceso(u.getId())))
                 .orElse(new AccesoDto(true));
     }
 }

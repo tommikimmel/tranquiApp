@@ -21,6 +21,7 @@ class EventosCatalogoTest {
             Map.entry(Topicos.IDENTIDAD_TICKET_RESPONDIDO_V1, List.of("TicketService#agregarMensaje")),
             Map.entry(Topicos.IDENTIDAD_TICKET_CREADO_V1, List.of("TicketService#crearTicket")),
             Map.entry(Topicos.IDENTIDAD_TICKET_MENSAJE_RECIBIDO_V1, List.of("TicketService#agregarMensaje")),
+            Map.entry(Topicos.IDENTIDAD_PROFESIONAL_VERIFICACION_RESUELTA_V1, List.of("AdminController#verifyProfessional", "AdminController#rejectProfessional")),
             Map.entry(Topicos.PROFESIONALES_PROFESIONAL_ACTUALIZADO_V1, List.of("MedicoService#actualizarPerfil", "MedicoService#actualizarConfigAgenda", "servicio de profesionales (Fase 5)")),
             Map.entry(Topicos.PROFESIONALES_PROFESIONAL_VISIBILIDAD_CAMBIADA_V1, List.of("AdminController#verifyProfessional", "AdminController#rejectProfessional")),
             Map.entry(Topicos.PROFESIONALES_TARIFA_ACTUALIZADA_V1, List.of("MedicoService#actualizarPerfil")),
@@ -48,7 +49,8 @@ class EventosCatalogoTest {
             Map.entry(Topicos.PROFESIONALES_TARIFA_ACTUALIZADA_V2, List.of("servicio de profesionales (Fase 5)")),
             Map.entry(Topicos.PROFESIONALES_RECETA_EMITIDA_V1, List.of("RecetaService#emitirReceta")),
             Map.entry(Topicos.TURNOS_TURNO_ACTUALIZADO_V1, List.of("servicio de turnos (Fase 6)")),
-            Map.entry(Topicos.SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1, List.of("SubscriptionService#logEvent")),
+            Map.entry(Topicos.SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1, List.of("SubscriptionService#logEvent (deprecado)")),
+            Map.entry(Topicos.SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V2, List.of("SubscriptionService#logEvent", "servicio de pagos (Fase 8)")),
             Map.entry(Topicos.SUSCRIPCIONES_AVISO_PROGRAMADO_V1, List.of("SubscriptionService#registerManualPayment", "SubscriptionService#activarPagoSuscripcion", "SubscriptionService#processMercadoPagoPreapprovalWebhook", "SubscriptionService#cancelarSuscripcionPorProfesional", "SubscriptionReconciliationScheduler", "AdminSubscriptionController#updateSubscriptionStatus")),
             Map.entry(Topicos.CALENDARIO_MEET_CREADO_V1, List.of("PagoWebhookHandler#procesarAprobacionTurno", "TurnoService#confirmarTurnoOsde", "GoogleCalendarSyncService#exportarTurnosPendientesAGoogleCalendar")),
             Map.entry(Topicos.CALENDARIO_HORARIO_BLOQUEADO_V1, List.of("GoogleCalendarSyncService#aplicarCambio")),
@@ -60,7 +62,7 @@ class EventosCatalogoTest {
     void todosLosTopicosTienenProductorAsignado() {
         List<String> todosLosTopicos = Topicos.TODOS_LOS_TOPICOS;
         assertThat(todosLosTopicos).isNotEmpty();
-        assertThat(todosLosTopicos).hasSize(39);
+        assertThat(todosLosTopicos).hasSize(41);
 
         for (String topico : todosLosTopicos) {
             assertThat(Topicos.esValido(topico))

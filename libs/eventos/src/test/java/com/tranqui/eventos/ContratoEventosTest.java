@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -287,6 +288,21 @@ class ContratoEventosTest {
                 80L, 10L, "PENDIENTE", "ACTIVA", LocalDate.of(2026, 12, 1)
         );
         probarRoundtrip(data, SuscripcionCambioEstadoData.class);
+    }
+
+    @Test
+    void roundtrip_suscripcionCambioEstadoV2Data() throws Exception {
+        SuscripcionCambioEstadoV2Data data = new SuscripcionCambioEstadoV2Data(
+                80L, 10L, "PENDIENTE", "ACTIVA", LocalDate.of(2026, 12, 1),
+                "profesional-plus", true, true, LocalDateTime.of(2026, 12, 1, 23, 59, 59), LocalDateTime.of(2026, 12, 15, 23, 59, 59)
+        );
+        probarRoundtrip(data, SuscripcionCambioEstadoV2Data.class);
+    }
+
+    @Test
+    void roundtrip_verificacionResueltaData() throws Exception {
+        VerificacionResueltaData data = new VerificacionResueltaData(10L, "VERIFICADO");
+        probarRoundtrip(data, VerificacionResueltaData.class);
     }
 
     @Test
