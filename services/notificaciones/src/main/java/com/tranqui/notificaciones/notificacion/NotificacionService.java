@@ -56,6 +56,24 @@ public class NotificacionService {
         return notificacion;
     }
 
+    /**
+     * Aviso en vivo que no se guarda (no aparece en la campanita): el frontend solo refresca. Como
+     * los demás, sale recién cuando se confirma la transacción del evento.
+     */
+    public void empujarSinGuardar(Long usuarioId, Map<String, Object> payload) {
+        String destino = "/topic/notificaciones/" + usuarioId;
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    empujar(destino, payload);
+                }
+            });
+        } else {
+            empujar(destino, payload);
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<Notificacion> ultimas24Horas(Long usuarioId) {
         return repositorio.findByUsuarioIdAndFechaCreacionAfterOrderByFechaCreacionDesc(

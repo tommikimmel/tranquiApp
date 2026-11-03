@@ -90,6 +90,51 @@ class InternoMonolitoControllerTest {
                 .contains("\"leido\":true").doesNotContain("vieja-" + marca);
     }
 
+    @Autowired private com.tranqui.app.repository.MensajeRepository mensajeRepository;
+
+    @Test
+    void mensajesYResumenDeChat_paraLaFase2() {
+        Usuario paciente = usuarioRepository.save(Usuario.builder().nombre("Pía")
+                .email("chat.pac." + System.nanoTime() + "@mail.com").rol(Rol.PACIENTE).build());
+        Usuario medico = usuarioRepository.save(Usuario.builder().nombre("Dra")
+                .email("chat.med." + System.nanoTime() + "@mail.com").rol(Rol.PSIQUIATRA).build());
+        com.tranqui.app.model.Mensaje m = mensajeRepository.save(com.tranqui.app.model.Mensaje.builder()
+                .remitente(paciente).destinatario(medico).contenido("hola doc").build());
+
+        ResponseEntity<String> mensajes = get("/internal/monolito/mensajes?desdeId=" + (m.getId() - 1) + "&tamanio=5",
+                tokenServicio());
+        assertThat(mensajes.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(mensajes.getBody()).contains("\"id\":" + m.getId()).contains("\"remitenteId\":" + paciente.getId())
+                .contains("\"contenido\":\"hola doc\"").contains("\"leido\":false");
+
+        ResponseEntity<String> resumen = get("/internal/chat/profesionales/" + medico.getId() + "/resumen", tokenServicio());
+        assertThat(resumen.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resumen.getBody()).contains("\"pacientesConChat\":[" + paciente.getId() + "]")
+                .contains("\"" + paciente.getId() + "\":1");
+        assertThat(get("/internal/chat/profesionales/" + medico.getId() + "/resumen", null).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void turnosConfirmados_soloLosDeHoyEnAdelante() {
+        Usuario paciente = usuarioRepository.save(Usuario.builder().nombre("Pía")
+                .email("tc.pac." + System.nanoTime() + "@mail.com").rol(Rol.PACIENTE).build());
+        Usuario medico = usuarioRepository.save(Usuario.builder().nombre("Dra")
+                .email("tc.med." + System.nanoTime() + "@mail.com").rol(Rol.PSIQUIATRA).build());
+        Turno futuro = turnoRepository.save(Turno.builder().paciente(paciente).medico(medico)
+                .fecha(LocalDate.now().plusDays(2)).horaInicio(LocalTime.of(11, 0)).horaFin(LocalTime.of(11, 45))
+                .estado(EstadoTurno.CONFIRMADO).tipo(com.tranqui.app.model.TipoTurno.PARTICULAR).build());
+        Turno pasado = turnoRepository.save(Turno.builder().paciente(paciente).medico(medico)
+                .fecha(LocalDate.now().minusDays(2)).horaInicio(LocalTime.of(11, 0)).horaFin(LocalTime.of(11, 45))
+                .estado(EstadoTurno.CONFIRMADO).tipo(com.tranqui.app.model.TipoTurno.PARTICULAR).build());
+
+        ResponseEntity<String> respuesta = get("/internal/monolito/turnos-confirmados", tokenServicio());
+
+        assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(respuesta.getBody()).contains("\"turnoId\":" + futuro.getId()).contains("\"horaInicio\":\"11:00\"")
+                .doesNotContain("\"turnoId\":" + pasado.getId() + ",");
+    }
+
     @Test
     void enlacesDeAsistencia_soloSiElTurnoTieneToken() {
         Usuario paciente = usuarioRepository.save(Usuario.builder().nombre("Lía")

@@ -49,6 +49,7 @@ public final class Topicos {
     public static final String PAGOS_REEMBOLSO_REALIZADO_V1 = "pagos.reembolso.realizado.v1";
     public static final String PAGOS_CUENTA_MP_VINCULADA_V1 = "pagos.cuenta-mp.vinculada.v1";
     public static final String PAGOS_CUENTA_MP_DESVINCULADA_V1 = "pagos.cuenta-mp.desvinculada.v1";
+    public static final String PAGOS_CONCEPTO_APROBADO_V1 = "pagos.concepto.aprobado.v1";
 
     // ==================== Suscripciones ====================
     public static final String SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1 = "suscripciones.suscripcion.cambio-estado.v1";
@@ -62,7 +63,7 @@ public final class Topicos {
     public static final String CHAT_MENSAJE_ENVIADO_V1 = "chat.mensaje.enviado.v1";
 
     /**
-     * Lista inmutable de todos los tópicos del catálogo de la sección 5.4, más los agregados en la Fase 1 (notificaciones).
+     * Lista inmutable de todos los tópicos del catálogo de la sección 5.4, más los agregados en las Fases 1 (notificaciones) y 2 (chat).
      */
     public static final List<String> TODOS_LOS_TOPICOS = List.of(
         IDENTIDAD_USUARIO_REGISTRADO_V1,
@@ -91,6 +92,7 @@ public final class Topicos {
         PAGOS_REEMBOLSO_REALIZADO_V1,
         PAGOS_CUENTA_MP_VINCULADA_V1,
         PAGOS_CUENTA_MP_DESVINCULADA_V1,
+        PAGOS_CONCEPTO_APROBADO_V1,
         SUSCRIPCIONES_SUSCRIPCION_CAMBIO_ESTADO_V1,
         SUSCRIPCIONES_AVISO_PROGRAMADO_V1,
         CALENDARIO_MEET_CREADO_V1,

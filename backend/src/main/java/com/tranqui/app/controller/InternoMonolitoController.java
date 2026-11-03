@@ -1,5 +1,6 @@
 package com.tranqui.app.controller;
 
+import com.tranqui.app.model.EstadoTurno;
 import com.tranqui.app.model.Turno;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.repository.NotificacionRepository;
@@ -41,14 +42,17 @@ public class InternoMonolitoController {
     private final UsuarioRepository usuarioRepository;
     private final TurnoRepository turnoRepository;
     private final NotificacionRepository notificacionRepository;
+    private final com.tranqui.app.repository.MensajeRepository mensajeRepository;
     private final String publicUrl;
 
     public InternoMonolitoController(UsuarioRepository usuarioRepository, TurnoRepository turnoRepository,
                                      NotificacionRepository notificacionRepository,
+                                     com.tranqui.app.repository.MensajeRepository mensajeRepository,
                                      @Value("${app.public-url:http://localhost:8081}") String publicUrl) {
         this.usuarioRepository = usuarioRepository;
         this.turnoRepository = turnoRepository;
         this.notificacionRepository = notificacionRepository;
+        this.mensajeRepository = mensajeRepository;
         this.publicUrl = publicUrl;
     }
 
@@ -91,6 +95,38 @@ public class InternoMonolitoController {
                 .filter(n -> n.getUsuario() != null)
                 .map(n -> new NotificacionDto(n.getUsuario().getId(), n.getTitulo(), n.getMensaje(),
                         Boolean.TRUE.equals(n.getLeido()), n.getTipo(), n.getFechaCreacion()))
+                .toList();
+    }
+
+    public record MensajeDto(Long id, Long remitenteId, Long destinatarioId, String contenido, boolean leido,
+                             LocalDateTime fechaEnvio) {}
+
+    public record TurnoConfirmadoDto(Long turnoId, Long pacienteId, Long profesionalId, java.time.LocalDate fecha,
+                                     String horaInicio) {}
+
+    /** Fase 2: carga inicial de los mensajes del servicio de chat, por id y conservando los ids. */
+    @GetMapping("/mensajes")
+    @Transactional(readOnly = true)
+    public List<MensajeDto> mensajes(@RequestParam(defaultValue = "0") long desdeId,
+                                     @RequestParam(defaultValue = "500") int tamanio) {
+        int tamanioSeguro = Math.max(1, Math.min(tamanio, TAMANIO_MAXIMO));
+        return mensajeRepository.findByIdGreaterThanOrderByIdAsc(desdeId, PageRequest.of(0, tamanioSeguro)).stream()
+                .map(m -> new MensajeDto(m.getId(), m.getRemitente().getId(), m.getDestinatario().getId(),
+                        m.getContenido(), Boolean.TRUE.equals(m.getLeido()), m.getFechaEnvio()))
+                .toList();
+    }
+
+    /**
+     * Fase 2: turnos confirmados de hoy en adelante, para la copia del servicio de chat (la prioridad
+     * de los canales del profesional depende de los turnos de los próximos días).
+     */
+    @GetMapping("/turnos-confirmados")
+    @Transactional(readOnly = true)
+    public List<TurnoConfirmadoDto> turnosConfirmados() {
+        return turnoRepository.findByEstadoAndFechaGreaterThanEqualOrderByIdAsc(EstadoTurno.CONFIRMADO,
+                        java.time.LocalDate.now()).stream()
+                .map(t -> new TurnoConfirmadoDto(t.getId(), t.getPaciente().getId(), t.getMedico().getId(), t.getFecha(),
+                        t.getHoraInicio() != null ? t.getHoraInicio().toString() : null))
                 .toList();
     }
 

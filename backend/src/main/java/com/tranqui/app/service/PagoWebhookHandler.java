@@ -8,6 +8,7 @@ import com.tranqui.app.repository.TurnoRepository;
 import com.tranqui.app.eventos.OutboxPublisher;
 import com.tranqui.eventos.Topicos;
 import com.tranqui.eventos.data.DocumentoSolicitadoData;
+import com.tranqui.eventos.data.ConceptoAprobadoData;
 import com.tranqui.eventos.data.MeetCreadoData;
 import com.tranqui.eventos.data.PagoAprobadoData;
 import com.tranqui.eventos.data.PagoRechazadoData;
@@ -67,6 +68,21 @@ public class PagoWebhookHandler {
         solicitud.setEstado(EstadoPago.APROBADO);
         solicitud.setTransactionId(transactionId);
         solicitudRepository.save(solicitud);
+
+        // Fase 2: /ws-tranqui pasa al servicio de chat; el aviso en vivo al profesional lo manda el
+        // servicio de notificaciones a partir de este evento. El push de abajo queda para la vuelta atrás.
+        outboxPublisher.publicar(
+                Topicos.PAGOS_CONCEPTO_APROBADO_V1,
+                "solicitud",
+                String.valueOf(solicitud.getId()),
+                1,
+                new ConceptoAprobadoData(
+                        solicitud.getId(),
+                        solicitud.getMedico().getId(),
+                        solicitud.getPaciente().getId(),
+                        solicitud.getTipoConcepto() != null ? solicitud.getTipoConcepto().toString() : null
+                )
+        );
 
         log.info("Aprobación de concepto procesada para solicitud ID: {}. Enviando notificación WebSocket...", solicitudId);
 

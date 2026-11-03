@@ -145,3 +145,6 @@ tranqui:
   jwt:
     # JWT de servicio (sección 4.2) para las rutas /internal/** que consultan otros servicios.
     service-secret: ${SERVICE_JWT_KEY:}
+  gateway:
+    # Fase 2: consultas internas a otros servicios (resumen de chat). Vacío: usa las tablas propias.
+    url: ${TRANQUI_GATEWAY_URL:}

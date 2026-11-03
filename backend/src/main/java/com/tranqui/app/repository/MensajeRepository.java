@@ -17,6 +17,9 @@ import java.util.List;
 @Repository
 public interface MensajeRepository extends JpaRepository<Mensaje, Long> {
 
+    // Fase 2: carga inicial de mensajes del servicio de chat, en orden de id.
+    List<Mensaje> findByIdGreaterThanOrderByIdAsc(Long desdeId, Pageable pagina);
+
     @Modifying
     @Query("UPDATE Mensaje m SET m.leido = true WHERE m.remitente.id = :remitenteId AND m.destinatario.id = :destinatarioId AND m.leido = false")
     void markAsRead(@Param("remitenteId") Long remitenteId, @Param("destinatarioId") Long destinatarioId);

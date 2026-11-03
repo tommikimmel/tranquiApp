@@ -31,6 +31,9 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
 
     List<Turno> findByMedicoIdAndEstado(Long medicoId, EstadoTurno estado);
 
+    // Fase 2: carga inicial de la copia de turnos confirmados del servicio de chat.
+    List<Turno> findByEstadoAndFechaGreaterThanEqualOrderByIdAsc(EstadoTurno estado, LocalDate desde);
+
     // Date-bounded counterparts used by MedicoService#obtenerStats — the dashboard only ever
     // needs the current + previous comparison windows (a few weeks/months at most), not a
     // médico's entire turno history, which used to be loaded in full on every dashboard refresh.
