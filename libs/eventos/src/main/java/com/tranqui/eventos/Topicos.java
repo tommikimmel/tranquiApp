@@ -26,6 +26,10 @@ public final class Topicos {
     public static final String IDENTIDAD_TICKET_MENSAJE_RECIBIDO_V1 = "identidad.ticket.mensaje-recibido.v1";
     /** Fase 8: el admin resolvió la verificación de matrícula de un profesional (VERIFICADO o RECHAZADO). */
     public static final String IDENTIDAD_PROFESIONAL_VERIFICACION_RESUELTA_V1 = "identidad.profesional.verificacion-resuelta.v1";
+    /** Fase 9: el admin generó una contraseña temporal para un usuario. */
+    public static final String IDENTIDAD_PASSWORD_TEMPORAL_GENERADA_V1 = "identidad.password-temporal.generada.v1";
+    /** Fase 9: el usuario solicitó una copia de sus datos personales. */
+    public static final String IDENTIDAD_SOPORTE_SOLICITUD_DATOS_V1 = "identidad.soporte.solicitud-datos.v1";
 
     // ==================== Profesionales ====================
     public static final String PROFESIONALES_PROFESIONAL_ACTUALIZADO_V1 = "profesionales.profesional.actualizado.v1";
@@ -96,6 +100,8 @@ public final class Topicos {
         IDENTIDAD_TICKET_CREADO_V1,
         IDENTIDAD_TICKET_MENSAJE_RECIBIDO_V1,
         IDENTIDAD_PROFESIONAL_VERIFICACION_RESUELTA_V1,
+        IDENTIDAD_PASSWORD_TEMPORAL_GENERADA_V1,
+        IDENTIDAD_SOPORTE_SOLICITUD_DATOS_V1,
         PROFESIONALES_PROFESIONAL_ACTUALIZADO_V1,
         PROFESIONALES_PROFESIONAL_VISIBILIDAD_CAMBIADA_V1,
         PROFESIONALES_TARIFA_ACTUALIZADA_V1,

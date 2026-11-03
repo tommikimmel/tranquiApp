@@ -58,6 +58,9 @@ public class LocalDemoSeeder implements CommandLineRunner {
     private final EncryptionUtil encryptionUtil;
 
     private final Random random = new Random(42);
+    @org.springframework.beans.factory.annotation.Value("${identidad.externo:false}")
+    private boolean identidadExterno;
+
     private String passwordHash;
 
     public LocalDemoSeeder(UsuarioRepository usuarioRepository, DisponibilidadRepository disponibilidadRepository,
@@ -85,6 +88,10 @@ public class LocalDemoSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) throws Exception {
+        if (identidadExterno) {
+            log.info("identidad.externo=true: no se siembran datos de demo de identidad en el monolito.");
+            return;
+        }
         if (usuarioRepository.findByEmail(MARCADOR).isPresent()) {
             log.info("Datos de demo ya sembrados ({} existe): no se vuelven a crear.", MARCADOR);
             return;

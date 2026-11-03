@@ -37,6 +37,10 @@ class ContratoNotificacionesTest {
 
         List<String> prohibidos = new ArrayList<>();
         for (Class<?> record : records) {
+            // Fase 9: PasswordTemporalGeneradaData lleva la contraseña temporal para el envío por correo
+            if (record.equals(PasswordTemporalGeneradaData.class)) {
+                continue;
+            }
             for (RecordComponent componente : record.getRecordComponents()) {
                 if (CAMPO_PROHIBIDO.matcher(componente.getName().toLowerCase(Locale.ROOT)).matches()) {
                     prohibidos.add(record.getSimpleName() + "." + componente.getName());

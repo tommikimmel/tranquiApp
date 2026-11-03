@@ -57,9 +57,10 @@ class ResendEmailServiceSmtpTest {
         service.enviarTurnoCanceladoProfesional("dra@test.com", "Dra", "Pedro", java.time.LocalDate.now(), java.time.LocalTime.NOON);
         verify(mailSender, org.mockito.Mockito.never()).send(any(MimeMessage.class));
 
-        // La contraseña temporal no tiene evento: sigue saliendo del monolito.
+        // Los correos con evento (código de verificación, turno cancelado, contraseña temporal)
+        // no salen de acá cuando envioDirecto=false; son despachados por el microservicio de notificaciones.
         service.enviarPasswordTemporal("paciente@test.com", "Pedro", "Temporal123");
-        verify(mailSender).send(any(MimeMessage.class));
+        verify(mailSender, org.mockito.Mockito.never()).send(any(MimeMessage.class));
     }
 
     @Test

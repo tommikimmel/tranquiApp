@@ -30,6 +30,9 @@ public class GoogleAuthService {
     @Value("${google.client-id:dummy-client-id}")
     private String clientId;
 
+    @Value("${google.simulado:false}")
+    private boolean googleSimulado;
+
     private GoogleIdTokenVerifier verifier;
 
     private GoogleIdTokenVerifier getVerifier() {
@@ -42,7 +45,7 @@ public class GoogleAuthService {
     }
 
     public GoogleIdToken.Payload verifyGoogleToken(String tokenString) {
-        if ("mock-token".equals(tokenString) || (tokenString != null && tokenString.startsWith("mock-"))) {
+        if (googleSimulado && ("mock-token".equals(tokenString) || (tokenString != null && tokenString.startsWith("mock-")))) {
             GoogleIdToken.Payload mockPayload = new GoogleIdToken.Payload();
             String email = "paula@tranqui.com";
             String name = "Lic. María Paula Rossi";

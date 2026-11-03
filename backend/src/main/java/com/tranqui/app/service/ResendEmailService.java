@@ -230,6 +230,7 @@ public class ResendEmailService {
     }
 
     public void enviarSolicitudCopiaDatos(String nombreUsuario, String emailUsuario, String rolUsuario) {
+        if (salteaPorServicioDeNotificaciones("enviarSolicitudCopiaDatos")) return;
         String asuntoFinal = "[Ley 25.326 - Acceso a datos] Solicitud de " + rolUsuario;
         String cuerpo = "<p><strong>De:</strong> " + nombreOUsuario(nombreUsuario) + " (" + emailUsuario + ")</p>" +
                 "<p><strong>Rol:</strong> " + rolUsuario + "</p>" +
@@ -256,6 +257,7 @@ public class ResendEmailService {
     // Sent from AdminController#resetPassword — the only place this plaintext password exists
     // outside the admin's one-time response is this email, since it's stored hashed immediately.
     public void enviarPasswordTemporal(String toEmail, String nombreUsuario, String passwordTemporal) {
+        if (salteaPorServicioDeNotificaciones("enviarPasswordTemporal")) return;
         String asunto = "Tu nueva contraseña temporal - Tranqui App";
         String cuerpo = "<p>Un administrador reseteó tu contraseña en <strong>Tranqui App</strong>. Tu contraseña temporal es:</p>" +
                 cajaDestacada(passwordTemporal) +

@@ -92,6 +92,11 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El formato del email es inválido.");
         }
 
+        Rol rolRegistro = registerRequestDto.getRol();
+        if (rolRegistro != Rol.PACIENTE && rolRegistro != Rol.PSIQUIATRA) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El rol debe ser PACIENTE o PSIQUIATRA.");
+        }
+
         String rawPass = registerRequestDto.getPassword();
         if (rawPass == null || rawPass.length() < 8 || !rawPass.matches(".*[A-Z].*") || !rawPass.matches(".*[a-z].*") || !rawPass.matches(".*[0-9].*")) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La contraseña debe tener al menos 8 caracteres, incluir al menos una letra mayúscula, una minúscula y un número.");

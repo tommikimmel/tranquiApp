@@ -127,7 +127,7 @@ class SecurityRbacTest {
     void whenAccessMedicoEndpointWithExpiredToken_thenForbidden() throws Exception {
         // Force an already-expired token by making JwtService issue it with a negative TTL,
         // then restore the real expiration so it doesn't leak into other tests.
-        ReflectionTestUtils.setField(jwtService, "jwtExpiration", -1000L);
+        ReflectionTestUtils.setField(jwtService, "jwtExpiration", -120000L);
         String expiredToken = jwtService.generateToken(psiquiatra);
         ReflectionTestUtils.setField(jwtService, "jwtExpiration", 604800000L);
 
