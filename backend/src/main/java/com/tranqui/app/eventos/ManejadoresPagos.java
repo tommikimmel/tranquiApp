@@ -90,9 +90,13 @@ public class ManejadoresPagos {
     }
 
     @Bean
-    ManejadorEvento<ConceptoAprobadoData> conceptoPagado(PagoWebhookHandler pagos) {
+    ManejadorEvento<ConceptoAprobadoData> conceptoPagado(PagoWebhookHandler pagos, @org.springframework.beans.factory.annotation.Value("${clinica.externo:false}") boolean clinicaExterno) {
         return ManejadorEvento.de("concepto-pagado", Topicos.PAGOS_CONCEPTO_APROBADO_V1, ConceptoAprobadoData.class,
-                e -> pagos.aplicarConceptoAprobado(e.data()));
+                e -> {
+                    if (!clinicaExterno) {
+                        pagos.aplicarConceptoAprobado(e.data());
+                    }
+                });
     }
 
     @Bean

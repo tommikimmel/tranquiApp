@@ -58,7 +58,7 @@ class InternoTurnosControllerTest {
         Usuario medico = usuarioRepository.save(Usuario.builder().nombre("Dra").email("dra.t." + System.nanoTime() + "@mail.com")
                 .rol(Rol.PSIQUIATRA).build());
         Usuario paciente = usuarioRepository.save(Usuario.builder().nombre("Pac").email("pac.t." + System.nanoTime() + "@mail.com")
-                .rol(Rol.PACIENTE).dni("30111222").obraSocial("OSDE").fechaNacimiento(LocalDate.of(1990, 3, 7)).build());
+                .rol(Rol.PACIENTE).dni("30111222").obraSocial("OSDE").fechaNacimiento(LocalDate.of(1990, 3, 7)).domicilioCalle("Av. Santa Fe").domicilioLocalidad("CABA").build());
         return turnoRepository.save(Turno.builder().medico(medico).paciente(paciente).fecha(LocalDate.now().plusDays(4))
                 .horaInicio(LocalTime.of(9, 0)).horaFin(LocalTime.of(9, 45)).tipo(TipoTurno.PARTICULAR).modalidad(Modalidad.ONLINE)
                 .estado(EstadoTurno.CONFIRMADO).precio(new BigDecimal("60000")).tokenReserva("reserva-123")
@@ -69,6 +69,7 @@ class InternoTurnosControllerTest {
     void sinTokenDeServicio_401() {
         assertThat(llamar(HttpMethod.GET, "/internal/monolito/turnos", null, false).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(llamar(HttpMethod.POST, "/internal/monolito/pacientes", "{}", false).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(llamar(HttpMethod.PUT, "/internal/monolito/pacientes/1", "{}", false).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
@@ -127,5 +128,58 @@ class InternoTurnosControllerTest {
 
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody()).contains("\"enviado\":true");
+    }
+
+    @Test
+    void recetaEmitida_conLaUrlDelServicioDeNotificaciones() {
+        ResponseEntity<String> r = llamar(HttpMethod.POST, "/internal/notificaciones/recetas",
+                "{\"email\":\"pac@mail.com\",\"pacienteNombre\":\"Ana\",\"medicoNombre\":\"Dra. Paz\",\"matricula\":\"MN 12345\","
+                        + "\"pdfUrl\":\"https://s3.tranqui/r.pdf\",\"nroRecetario\":\"REC-1\"}", true);
+
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(r.getBody()).contains("\"enviado\":true");
+
+        ResponseEntity<String> sinEmail = llamar(HttpMethod.POST, "/internal/notificaciones/recetas",
+                "{\"email\":\"\",\"pacienteNombre\":\"Ana\"}", true);
+        assertThat(sinEmail.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void actualizarPaciente_guardaYPublicaIdentidadUsuarioActualizado() {
+        Usuario p = usuarioRepository.save(Usuario.builder().nombre("Carlos").email("carlos." + System.nanoTime() + "@mail.com")
+                .rol(Rol.PACIENTE).build());
+        long antes = outboxRepository.count();
+
+        String body = "{\"nombre\":\"Carlos Modificado\",\"apellido\":\"Perez\",\"telefono\":\"11 4444 5555\","
+                + "\"dni\":\"28111222\",\"tipoDocumento\":\"DNI\",\"numeroDocumento\":28111222,"
+                + "\"fechaNacimiento\":\"1985-04-12\","
+                + "\"domicilio\":{\"calle\":\"Corrientes\",\"numero\":\"500\",\"localidad\":\"CABA\",\"provincia\":\"Buenos Aires\"}}";
+
+        ResponseEntity<String> r = llamar(HttpMethod.PUT, "/internal/monolito/pacientes/" + p.getId(), body, true);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(r.getBody()).contains("\"nombre\":\"Carlos Modificado\"")
+                .contains("\"apellido\":\"Perez\"")
+                .contains("\"telefono\":\"+54 11 4444 5555\"")
+                .contains("\"domicilioCalle\":\"Corrientes\"")
+                .contains("\"domicilioLocalidad\":\"CABA\"");
+
+        Usuario actualizado = usuarioRepository.findById(p.getId()).orElseThrow();
+        assertThat(actualizado.getNombre()).isEqualTo("Carlos Modificado");
+        assertThat(actualizado.getTelefono()).isEqualTo("+54 11 4444 5555");
+        assertThat(actualizado.getDomicilioCalle()).isEqualTo("Corrientes");
+
+        assertThat(outboxRepository.count()).isGreaterThan(antes);
+        assertThat(outboxRepository.findAll()).anyMatch(o -> Topicos.IDENTIDAD_USUARIO_ACTUALIZADO_V1.equals(o.getTopic())
+                && String.valueOf(p.getId()).equals(o.getAggregateId()));
+    }
+
+    @Test
+    void actualizarPaciente_datosInvalidos_responde400() {
+        Usuario p = usuarioRepository.save(Usuario.builder().nombre("Elena").email("elena." + System.nanoTime() + "@mail.com")
+                .rol(Rol.PACIENTE).build());
+
+        String body = "{\"nombre\":\"   \"}";
+        ResponseEntity<String> r = llamar(HttpMethod.PUT, "/internal/monolito/pacientes/" + p.getId(), body, true);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 }

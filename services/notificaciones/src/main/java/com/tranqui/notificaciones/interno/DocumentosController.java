@@ -25,6 +25,9 @@ public class DocumentosController {
     public record DocumentoAdjunto(String email, String pacienteNombre, String medicoNombre, String tipoDocumento,
                                    String archivoDataUri, String archivoNombre) {}
 
+    public record RecetaEmitida(String email, String pacienteNombre, String medicoNombre,
+                                String matricula, String pdfUrl, String nroRecetario) {}
+
     public record Resultado(boolean enviado) {}
 
     private final ResendEmailService mails;
@@ -47,6 +50,27 @@ public class DocumentosController {
             return ResponseEntity.badRequest().body(new Resultado(false));
         } catch (EnvioMailException e) {
             log.error("No se pudo mandar el documento adjunto: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new Resultado(false));
+        }
+    }
+
+    /**
+     * Fase 7: mail con el link a la receta oficial de Innovamed/QBI2.
+     * No se guarda nada (el link es un dato de salud). Tampoco se loguea el link.
+     */
+    @PostMapping("/recetas")
+    public ResponseEntity<Resultado> enviarReceta(@RequestBody RecetaEmitida r) {
+        if (r.email() == null || r.email().isBlank()) {
+            return ResponseEntity.badRequest().body(new Resultado(false));
+        }
+        try {
+            mails.enviarRecetaEmitidaPaciente(r.email(), r.pacienteNombre(), r.medicoNombre(),
+                    r.matricula(), r.pdfUrl(), r.nroRecetario());
+            return ResponseEntity.ok(new Resultado(true));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new Resultado(false));
+        } catch (EnvioMailException e) {
+            log.error("No se pudo mandar el mail de la receta a {}: {}", r.email(), e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new Resultado(false));
         }
     }

@@ -5,9 +5,11 @@ import com.tranqui.app.model.Turno;
 import com.tranqui.app.model.Usuario;
 import com.tranqui.app.repository.TurnoRepository;
 import com.tranqui.app.repository.UsuarioRepository;
+import com.tranqui.app.service.PagoWebhookHandler;
 import com.tranqui.app.service.ReembolsoService;
 import com.tranqui.eventos.EventEnvelope;
 import com.tranqui.eventos.data.CheckoutCreadoData;
+import com.tranqui.eventos.data.ConceptoAprobadoData;
 import com.tranqui.eventos.data.CuentaMpDesvinculadaData;
 import com.tranqui.eventos.data.CuentaMpVinculadaData;
 import org.junit.jupiter.api.Test;
@@ -81,5 +83,18 @@ class ManejadoresPagosTest {
         assertThat(ReembolsoService.correspondeReembolso(enUnaSemana, false)).isTrue();
         assertThat(ReembolsoService.correspondeReembolso(manana, false)).isFalse();
         assertThat(ReembolsoService.correspondeReembolso(manana, true)).isTrue();
+    }
+
+    @Test
+    void conceptoPagado_conClinicaExternoTrue_noAplicaPago() {
+        PagoWebhookHandler pagos = mock(PagoWebhookHandler.class);
+        ManejadoresPagos manejadores = new ManejadoresPagos();
+        ConceptoAprobadoData data = new ConceptoAprobadoData(1L, 2L, 3L, "RECETA", "MP-1");
+
+        manejadores.conceptoPagado(pagos, true).manejar(evento(data));
+        verify(pagos, never()).aplicarConceptoAprobado(any());
+
+        manejadores.conceptoPagado(pagos, false).manejar(evento(data));
+        verify(pagos).aplicarConceptoAprobado(data);
     }
 }

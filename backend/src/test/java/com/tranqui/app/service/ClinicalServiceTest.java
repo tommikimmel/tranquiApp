@@ -49,6 +49,8 @@ class ClinicalServiceTest {
     void resumenDeChatLocal() {
         org.springframework.test.util.ReflectionTestUtils.setField(clinicalService, "resumenChatCliente",
                 new ResumenChatCliente(mensajeRepository, "", ""));
+        org.springframework.test.util.ReflectionTestUtils.setField(clinicalService, "fichaPaciente",
+                new FichaPaciente(usuarioRepository, outboxPublisher));
     }
 
     private Usuario medico(String email) {
@@ -405,6 +407,7 @@ class ClinicalServiceTest {
         assertThrows(AccessDeniedException.class,
                 () -> clinicalService.actualizarPaciente(5L, "dra@mail.com", PacienteDto.builder().nombre("Ana").build()));
         verify(usuarioRepository, never()).save(any());
+        verify(usuarioRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -427,7 +430,7 @@ class ClinicalServiceTest {
         when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico("dra@mail.com")));
         Usuario paciente = paciente(5L, "Ana");
         when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
-        when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PacienteDto dto = PacienteDto.builder()
                 .nombre("Ana Actualizada")
@@ -449,7 +452,7 @@ class ClinicalServiceTest {
         when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico("dra@mail.com")));
         Usuario paciente = paciente(5L, "Ana");
         when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
-        when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PacienteDto dto = PacienteDto.builder().nombre("Ana").fechaNacimiento("   ").build();
         clinicalService.actualizarPaciente(5L, "dra@mail.com", dto);
@@ -462,7 +465,7 @@ class ClinicalServiceTest {
         when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico("dra@mail.com")));
         Usuario paciente = paciente(5L, "Ana");
         when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
-        when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PacienteDto.CredencialInfoDto cred = PacienteDto.CredencialInfoDto.builder()
                 .codEntidad(1).pan("PAN123456").plan("210").token("TOK").build();
@@ -483,7 +486,7 @@ class ClinicalServiceTest {
         when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico("dra@mail.com")));
         Usuario paciente = paciente(5L, "Ana");
         when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
-        when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PacienteDto.CredencialInfoDto cred = PacienteDto.CredencialInfoDto.builder()
                 .codEntidad(1).pan("PAN123456").plan("  ").build();
@@ -501,7 +504,7 @@ class ClinicalServiceTest {
         paciente.setCredencialCodEntidad(9);
         paciente.setObraSocial("Algo");
         when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente));
-        when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PacienteDto dto = PacienteDto.builder().nombre("Ana").build();
         clinicalService.actualizarPaciente(5L, "dra@mail.com", dto);

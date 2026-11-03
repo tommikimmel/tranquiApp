@@ -667,6 +667,27 @@ public class ResendEmailService {
         enviarCorreo(toEmail, asunto, html, nombre, base64);
     }
 
+    // ================================================================================
+    // RECETA EMITIDA (Fase 7) — el mail con el link a la receta oficial de Innovamed/QBI2.
+    // Lo pide el servicio de profesionales en el momento (DocumentosController); el link no se guarda.
+    // ================================================================================
+
+    public void enviarRecetaEmitidaPaciente(String toEmail, String nombrePaciente, String nombreProfesional,
+                                            String matricula, String pdfUrl, String nroRecetario) {
+        String asunto = "Tu receta electrónica de " + nombreProfesional;
+        String cuerpo = "<p>" + nombreProfesional + " emitió una receta electrónica oficial para vos. Podés presentarla en cualquier farmacia adherida a Innovamed/QBI2.</p>" +
+                panelInfo(
+                        "Profesional", nombreProfesional,
+                        "Matrícula", matricula,
+                        "N° de recetario", nroRecetario
+                );
+        boolean tienePdf = pdfUrl != null && !pdfUrl.isBlank();
+        String html = plantilla("Receta emitida", TONO_INFO,
+                "Tu receta está lista, " + nombreOUsuario(nombrePaciente), cuerpo,
+                tienePdf ? "Descargar receta" : "Ver en Tranqui App", tienePdf ? pdfUrl : frontendUrl);
+        enviarCorreo(toEmail, asunto, html);
+    }
+
     private static String extraerBase64(String dataUri) {
         if (dataUri == null) return null;
         int coma = dataUri.indexOf(',');

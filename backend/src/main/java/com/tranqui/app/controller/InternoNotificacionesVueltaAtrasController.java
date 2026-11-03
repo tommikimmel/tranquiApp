@@ -20,6 +20,9 @@ public class InternoNotificacionesVueltaAtrasController {
     public record DocumentoAdjunto(String email, String pacienteNombre, String medicoNombre, String tipoDocumento,
                                    String archivoDataUri, String archivoNombre) {}
 
+    public record RecetaEmitida(String email, String pacienteNombre, String medicoNombre,
+                                String matricula, String pdfUrl, String nroRecetario) {}
+
     public record Resultado(boolean enviado) {}
 
     private final ResendEmailService mails;
@@ -35,6 +38,19 @@ public class InternoNotificacionesVueltaAtrasController {
         }
         boolean enviado = mails.enviarDocumentoAdjunto(d.email(), d.pacienteNombre(), d.medicoNombre(), d.tipoDocumento(),
                 d.archivoDataUri(), d.archivoNombre());
+        return ResponseEntity.status(enviado ? HttpStatus.OK : HttpStatus.BAD_GATEWAY).body(new Resultado(enviado));
+    }
+
+    /**
+     * Fase 7: vuelta atrás del mail de recetas del servicio de notificaciones.
+     */
+    @PostMapping("/recetas")
+    public ResponseEntity<Resultado> enviarReceta(@RequestBody RecetaEmitida r) {
+        if (r.email() == null || r.email().isBlank()) {
+            return ResponseEntity.badRequest().body(new Resultado(false));
+        }
+        boolean enviado = mails.enviarRecetaEmitidaPaciente(r.email(), r.pacienteNombre(), r.medicoNombre(),
+                r.matricula(), r.pdfUrl(), r.nroRecetario());
         return ResponseEntity.status(enviado ? HttpStatus.OK : HttpStatus.BAD_GATEWAY).body(new Resultado(enviado));
     }
 }
