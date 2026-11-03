@@ -103,6 +103,7 @@ class CalendarioIntegracionTest {
     @Autowired EventosExternos externos;
     @Autowired CargaInicial carga;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.tranqui.calendario.datos.TurnosAgendados agendados;
     @Autowired TestRestTemplate http;
     @Autowired RabbitTemplate rabbit;
 
@@ -305,5 +306,17 @@ class CalendarioIntegracionTest {
 
         esperar(() -> cuentas.buscar(2L).isEmpty() && participantes.porId(2L).isEmpty());
         assertThat(externos.deProfesional(2L)).isEmpty();
+    }
+
+    @Test
+    void limpiezaNocturna_conservaLosTurnosPasadosConEventoEnGoogle() {
+        java.time.LocalDate ayer = java.time.LocalDate.now().minusDays(1);
+        agendados.guardar(9001L, 61L, 62L, ayer, java.time.LocalTime.of(10, 0), java.time.LocalTime.of(10, 50), "ONLINE", "ev-app", null);
+        agendados.guardar(9002L, 61L, 62L, ayer, java.time.LocalTime.of(11, 0), java.time.LocalTime.of(11, 50), "ONLINE", null, null);
+
+        agendados.borrarPasados();
+
+        assertThat(agendados.esEventoDeLaApp(61L, "ev-app")).isTrue();
+        assertThat(agendados.buscar(9002L)).isEmpty();
     }
 }

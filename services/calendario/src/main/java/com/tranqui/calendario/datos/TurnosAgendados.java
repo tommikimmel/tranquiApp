@@ -105,7 +105,9 @@ public class TurnosAgendados {
     /** Los turnos que ya pasaron no cambian nada: se borran una vez por día. */
     @Transactional
     public int borrarPasados() {
-        return jdbc.update("DELETE FROM turno_agendado WHERE fecha < ?", LocalDate.now());
+        // Los que tienen evento en Google se quedan: así la sincronización no los trae como "externos" y desvincular
+        // los borra de su calendario, como main (que guardaba toda la historia de turnos).
+        return jdbc.update("DELETE FROM turno_agendado WHERE fecha < ? AND google_event_id IS NULL", LocalDate.now());
     }
 
     private static String vacioANulo(String valor) {
