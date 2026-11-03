@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-22
 - **Tipo:** feature
 - **Sprint:** sprint-02
-- **Estado:** aprobada (2026-10-25)
+- **Estado:** aprobada (2026-10-25); T1 a T4 implementadas (#55 a #58), T5 postergada (sin builds ni stack)
 - **Rama / PR:** una rama y un PR a `develop` por tarea, encadenadas sobre la Fase 5
 - **Plan:** [microservicios.md, Fase 6](../arquitectura/microservicios.md#fase-6-turnos)
 - **Forma de trabajo (pedido del usuario, 2026-10-22):** solo cambiar la arquitectura. Sin buildear imágenes
@@ -139,6 +139,10 @@ Lo que encontré y el plan no resolvía:
   `mantenimiento off`. Se estima en pocos minutos.
 - Script de vuelta atrás (turnos creados o cambiados en el servicio, al monolito, con la versión por encima) y
   de conciliación (cantidades por estado y por profesional, y campo por campo de una muestra).
+
+- **Hecho en T4:** el corte queda escrito en `produccion.md` (mantenimiento, esperar los 5 minutos de los
+  bloqueos, flag y ruta, conciliar, sacar el mantenimiento). Los scripts devuelven también el pago del turno, los
+  tokens de los mails, la versión y la secuencia de `turno` del monolito.
 
 ### T5 — Verificación de punta a punta (postergada)
 Queda escrita para cuando se pueda levantar el stack: reservar y pagar, cancelar con y sin reembolso,

@@ -47,6 +47,11 @@ terminal interactiva, aborta y lista los puertos ocupados.
 A partir de la Fase 0 ([Plan de migración a microservicios](../arquitectura/microservicios.md)), el
 entorno local incluye la infraestructura de soporte para la arquitectura distribuida:
 
+- **Servicio de turnos (`turnos`, Fase 6):** reservas, agenda, cancelación, asistencia y documentos. Su base
+  `turnos` la crea `db-servicios` y en el primer arranque copia del monolito los usuarios, la agenda y los
+  turnos. Para volver al monolito: sacar `TRANQUI_SERVICES_TURNOS_URI` del gateway, poner `TURNOS_EXTERNO: "false"`
+  en el backend, frenar `turnos` y correr `node scripts/fase6-devolver-turnos.mjs`.
+  `node scripts/fase6-conciliar-turnos.mjs` compara las dos bases.
 - **Servicio de profesionales (`profesionales`, Fase 5):** el buscador, "Mi perfil" y la agenda. Su base
   `profesionales` la crea `db-servicios` y en el primer arranque copia los profesionales del monolito. Para
   volver al monolito: sacar `TRANQUI_SERVICES_PROFESIONALES_URI` del gateway, poner
