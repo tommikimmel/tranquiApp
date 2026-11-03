@@ -47,6 +47,11 @@ terminal interactiva, aborta y lista los puertos ocupados.
 A partir de la Fase 0 ([Plan de migración a microservicios](../arquitectura/microservicios.md)), el
 entorno local incluye la infraestructura de soporte para la arquitectura distribuida:
 
+- **Servicio de calendario (`calendario`, Fase 3):** Google Calendar y Meet, simulados como en el monolito
+  ("Conectar" vincula sin Google y los turnos online reciben un Meet simulado, que llega en un segundo
+  mail). Su base `calendario` la crea `db-servicios`. Para volver al calendario del monolito: sacar
+  `TRANQUI_SERVICES_CALENDARIO_URI` del gateway, poner `CALENDARIO_EXTERNO: "false"` en el backend,
+  frenar `calendario` y correr `node scripts/fase3-devolver-calendario.mjs`.
 - **Servicio de chat (`chat`, Fase 2):** el chat en vivo (`/ws-tranqui`) y su historial, por el gateway.
   Su base `chat` la crea `db-servicios`; en el primer arranque copia los mensajes del monolito. Para
   volver el chat al monolito: sacar `TRANQUI_SERVICES_CHAT_URI` del gateway, frenar `chat` y correr

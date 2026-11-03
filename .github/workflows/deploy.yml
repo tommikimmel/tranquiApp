@@ -54,6 +54,9 @@ jobs:
           - servicio: chat
             context: .
             file: ./services/chat/Dockerfile
+          - servicio: calendario
+            context: .
+            file: ./services/calendario/Dockerfile
           - servicio: backend
             context: .
             file: ./backend/Dockerfile
