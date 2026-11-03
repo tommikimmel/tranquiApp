@@ -75,7 +75,7 @@ management:
       percentiles:
         http.server.requests: 0.5, 0.95, 0.99
 
-# Eventos (libs/eventos): consume profesionales.eventos (identidad y la verificación del administrador) y
+# Eventos (libs/eventos): consume profesionales.eventos (identidad, la verificación del administrador y turnos) y
 # publica por su outbox profesional.actualizado, disponibilidad.actualizada.v2 y tarifa.actualizada.v2.
 eventos:
   consumo:
@@ -93,6 +93,11 @@ profesionales:
     habilitada: true
   # Identidad, verificación, suscripción y Mercado Pago son del monolito: el servicio los copia cada tanto.
   sincronizacion-segundos: ${PROFESIONALES_SINCRONIZACION_SEGUNDOS:60}
+  clinica:
+    # Se prende en el corte, en la ventana de mantenimiento, junto con CLINICA_EXTERNO del monolito;
+    # antes de eso el monolito sigue escribiendo y no hay que copiar.
+    habilitada: ${PROFESIONALES_CLINICA:false}
+    resincronizacion-turnos-minutos: ${PROFESIONALES_RESINCRONIZACION_TURNOS_MINUTOS:15}
 
 jwt:
   # Misma clave que identidad (hoy el monolito) usa para firmar los JWT de usuario. Sin default.
