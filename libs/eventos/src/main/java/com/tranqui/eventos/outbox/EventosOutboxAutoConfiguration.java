@@ -19,7 +19,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 /**
  * Outbox de {@code libs/eventos} para los servicios que publican eventos. Se activa con
- * {@code eventos.outbox.habilitada=true}; el monolito no la usa (tiene la suya hasta la Fase 8).
+ * {@code eventos.outbox.habilitada=true}; el monolito no la usa (tiene la suya hasta la Fase 9).
  *
  * <ul>
  *   <li>{@link OutboxPublisher}: siempre que está habilitada.</li>

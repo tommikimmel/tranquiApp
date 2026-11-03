@@ -416,7 +416,7 @@ vacía, la reconstruye con una carga inicial desde la ruta interna del dueño.
 ## 8. Estructura del repositorio
 
 ```
-backend/                    # el monolito, hasta la fase 8
+backend/                    # el monolito, hasta la fase 9
 services/
   identidad/  profesionales/  turnos/  pagos/  suscripciones/  notificaciones/  chat/  calendario/
 gateway/
@@ -541,7 +541,8 @@ fase el sistema completo funciona en producción.
 
 ### Fase 5: profesionales
 
-- **Qué:** perfiles, buscador, tarifas, disponibilidad, historia clínica y recetas.
+- **Qué:** perfiles, buscador, tarifas y disponibilidad (la historia clínica y las recetas pasaron a la
+  Fase 7, ver abajo).
 - **Datos:** la parte profesional de `usuario`, `tarifa_medico`, `disponibilidad`, historia clínica
   y recetas.
 
@@ -552,12 +553,22 @@ fase el sistema completo funciona en producción.
 - **Riesgo:** es el corazón de la app. Se migra con una ventana de mantenimiento corta para mover
   los datos.
 
-### Fase 7: suscripciones
+### Fase 7: historia clínica y recetas
+
+- **Por qué después de turnos (decidido en la Fase 5):** quién puede ver la historia de quién sale de
+  los turnos del profesional; antes de la Fase 6 habría que copiar los turnos y repetir la regla de
+  acceso a datos de salud en dos lugares.
+- **Qué:** seguimientos diarios, informes, pacientes atendidos, recetas (QBI2) y los documentos de la
+  API de conceptos.
+- **Datos:** historia clínica (`seguimiento_diario`, `informe_clinico`), `receta` y `solicitud_documento`.
+- **Nota:** en la Fase 5 se separó de profesionales; las fases que seguían se corrieron un número.
+
+### Fase 8: suscripciones
 
 - **Qué:** planes, suscripciones, débitos, reconciliación, facturación.
 - **Datos:** `plans`, `features`, `subscriptions` y las tablas de facturación.
 
-### Fase 8: identidad y retiro del monolito
+### Fase 9: identidad y retiro del monolito
 
 - **Qué:** registro, login, Mi Cuenta, tickets. El gateway pasa a validar el JWT con la clave
   pública de identidad.

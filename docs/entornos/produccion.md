@@ -202,7 +202,7 @@ Mercado Pago de los turnos y de los documentos pagos vive en el contenedor `pago
 OAuth), en las mismas URLs públicas. Crea la preferencia a partir de la reserva (la reserva responde sin
 link y el frontend lo pide aparte), confirma por `pagos.pago.aprobado` y reembolsa a partir de la
 cancelación (el paciente recibe el mail de cancelación y otro cuando Mercado Pago confirma el reembolso).
-Las **suscripciones siguen en el monolito** (Fase 7): Mercado Pago avisa todo a la misma URL y el servicio
+Las **suscripciones siguen en el monolito** (Fase 8): Mercado Pago avisa todo a la misma URL y el servicio
 le reenvía al monolito, por `/internal/monolito/pagos/notificacion-suscripcion`, lo que es de
 suscripciones. En el panel de Mercado Pago no cambia nada.
 

@@ -82,7 +82,7 @@ public class WebhookController {
      * Procesa una notificación de Mercado Pago ya autenticada. Fase 4: con el servicio de pagos el
      * webhook llega allá, que valida la firma y le reenvía al monolito (por
      * {@code /internal/monolito/pagos/notificacion-suscripcion}) las de suscripciones, que siguen acá
-     * hasta la Fase 7. Con {@code soloSuscripciones} se ignoran los pagos de turnos y documentos.
+     * hasta la Fase 8. Con {@code soloSuscripciones} se ignoran los pagos de turnos y documentos.
      */
     public void procesarNotificacion(String body, String dataId, boolean soloSuscripciones) {
         try {
