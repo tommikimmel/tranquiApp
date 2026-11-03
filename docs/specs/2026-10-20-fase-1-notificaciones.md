@@ -3,7 +3,7 @@
 - **Fecha:** 2026-10-20
 - **Tipo:** feature
 - **Sprint:** sprint-02
-- **Estado:** aprobada (2026-10-20)
+- **Estado:** implementada y verificada en local (2026-10-20); sin deploy
 - **Rama / PR:** una rama y un PR a `develop` por tarea (N1 a N7)
 - **Plan:** [microservicios.md, Fase 1](../arquitectura/microservicios.md#fase-1-notificaciones)
 
@@ -189,3 +189,38 @@ Desvíos respecto de la spec, encontrados al cablear cada punto del monolito:
   últimas 24 h por la ruta interna; no hace falta correr un script a mano. La comparación de
   cantidades es `scripts/fase1-comparar-notificaciones.mjs` (solo lee).
 - `docker-compose.yml` queda preparado; no se desplegó nada.
+
+### N7 — verificación de punta a punta en local (2026-10-20)
+Stack completo (`docker compose -p tranqui-local`), frontend en :5173 por el gateway en :8080.
+
+| Prueba | Resultado |
+|---|---|
+| Arranque | El servicio arranca en ~22 s, declara su cola con 17 tópicos, carga 27 contactos por la ruta interna y queda `passing` en Consul |
+| Reserva y pago simulado | Un mail al profesional y uno al paciente, mandados por el servicio (clave `eventId:consumidor`); el monolito no mandó ninguno. Aviso en la campanita de los dos |
+| Servicio caído | Reprogramación y cancelación con el servicio apagado: 2 eventos esperan en `notificaciones.eventos`, ningún mail. Al prenderlo, cada mail sale una sola vez |
+| En vivo | Con el panel de la profesional abierto, la reserva llega por `/ws-notificaciones` sin recargar: se abre la alerta de nuevo paciente y la campanita lo muestra |
+| Ticket | Aviso a los dos administradores desde el servicio; el monolito no creó notificaciones |
+| Registro | Un solo mail con el código de verificación; el usuario nuevo entra a la copia de contactos |
+| Evento mal formado | Directo a `notificaciones.dlq` con el error y 0 intentos; el panel de Observabilidad la muestra |
+| Vuelta atrás | Con `NOTIFICACIONES_ENVIO_DIRECTO=true` y la ruta al monolito, los mails vuelven a salir del monolito |
+
+**Problemas encontrados y corregidos en N7:**
+- **Consul se quedaba sin memoria** (60 de 64 MB, CPU al 375 %, sin responder) al registrar el gateway
+  y el servicio, y su healthcheck lo marcaba `unhealthy` antes de terminar de arrancar: 128 MB y 30 s
+  de gracia en los dos compose.
+- **La DLQ no se veía en el panel** (bug de la Fase 0): el plugin de Prometheus de RabbitMQ sumaba
+  todas las colas en una serie sin la etiqueta `queue`. Se activa
+  `prometheus.return_per_object_metrics` en `infra/rabbitmq/rabbitmq.conf`.
+- **La vuelta atrás duplicaba mails** si el servicio seguía prendido: el procedimiento ahora incluye
+  frenarlo y, al volver al servicio, vaciar la cola con los eventos que ya atendió el monolito.
+- **El script de comparación contaba mal las notificaciones**: las fechas se guardan en hora de
+  Argentina sin zona y `now()` de la base es UTC.
+
+**No probado en vivo:** el mail de confirmación de asistencia (lo dispara el scheduler de las 9);
+están probados por separado el handler, los textos y la ruta interna de enlaces.
+
+**Memoria medida en local (a observar antes de producción):** después de la prueba, el servicio usa
+~207 de sus 224 MB (sin reinicios ni OOM) y Consul ~93 de 128 MB. El servicio entra en el límite de
+la sección 9.1, pero con poco margen: si en producción se acerca más, las opciones son bajar
+`MaxRAMPercentage`, sumar CDS (sección 9.2) o subir el límite, que cambia el presupuesto de las 8
+fases.

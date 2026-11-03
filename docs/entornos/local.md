@@ -52,7 +52,8 @@ entorno local incluye la infraestructura de soporte para la arquitectura distrib
   (`/api/notificaciones`, `/ws-notificaciones`). Su base `notificaciones` la crea el contenedor
   `db-servicios` al levantar el entorno. Para comparar con el monolito:
   `node scripts/fase1-comparar-notificaciones.mjs`. Para volver al envío desde el monolito, poner
-  `NOTIFICACIONES_ENVIO_DIRECTO: "true"` en el backend y sacar `TRANQUI_SERVICES_NOTIFICACIONES_URI` del gateway.
+  `NOTIFICACIONES_ENVIO_DIRECTO: "true"` en el backend, sacar `TRANQUI_SERVICES_NOTIFICACIONES_URI` del gateway y
+  frenar `notificaciones` (si sigue prendido, los mails salen dos veces).
 - **RabbitMQ (`rabbitmq:3.13-management-alpine`):** broker de eventos asincrónicos por *push*.
   Configurado en `infra/rabbitmq/rabbitmq.conf` con `vm_memory_high_watermark.relative = 0.6`
   (límite de 256 MB de RAM), plugins `rabbitmq_management` y `rabbitmq_prometheus` habilitados,
