@@ -25,14 +25,16 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 | `tranqui-victoriametrics` | `victoriametrics` | VictoriaMetrics single-node (retención 15d de métricas Prometheus, cachés al 30%) | 192 MB | 0.5 |
 | `tranqui-cadvisor` | `cadvisor` | cAdvisor v0.49.1 (métricas de uso de CPU/RAM por contenedor) | 64 MB | 0.3 |
 | `tranqui-node-exporter` | `node-exporter` | Prometheus Node Exporter v1.8.2 (métricas del host VPS) | 32 MB | 0.2 |
+| `tranqui-notificaciones` | `notificaciones` | Servicio de notificaciones (Fase 1): mails y avisos en la app a partir de eventos, base propia `notificaciones` | 224 MB | 0.5 |
+| `tranqui-db-servicios` | `db-servicios` | Contenedor de una sola ejecución: crea la base y el usuario de cada servicio (`infra/postgres/crear-bases-servicios.sh`) y termina | 32 MB | 0.2 |
 | `tranqui-bot`, `tranqui-bot-worker`, `wsp-db`, `wsp-redis` | — | Bot de WhatsApp (proyecto aparte, fuera de este repositorio) | ~70 MB | — |
 
 ### Presupuesto de memoria (RAM)
 
-- **Total suma `mem_limit` Docker Compose (Fase 0):** `64 + 288 + 512 + 512 + 256 + 64 + 64 + 192 + 64 + 32 = 2.048 MB` (~2,05 GB).
+- **Total suma `mem_limit` Docker Compose (Fase 1):** `64 + 288 + 512 + 512 + 256 + 64 + 64 + 192 + 64 + 32 + 224 = 2.272 MB` (~2,27 GB; `db-servicios` corre unos segundos al arrancar y no suma).
 - **Traefik y bot de WhatsApp:** ~112 MB.
 - **Sistema operativo y buffers mínimos:** ~1 GB.
-- **Consumo proyectado total en VPS:** **~3,2 GB**, ampliamente dentro del techo presupuestado de **~4,8 GB**
+- **Consumo proyectado total en VPS:** **~3,4 GB**, ampliamente dentro del techo presupuestado de **~4,8 GB**
   de la sección 9.1 para la Fase 0, reservando ~3 GB de margen libre para picos y caché de disco de PostgreSQL.
 
 ### Afinación de JVM (backend y gateway)
@@ -127,6 +129,32 @@ define dependencias escalonadas con `condition: service_healthy`:
    docker compose -p app ps
    curl -fsS https://tranquisalud.com/api/health
    ```
+
+## Fase 1: servicio de notificaciones
+
+Los mails y las notificaciones de la app (la campanita) salen del contenedor `notificaciones`, a
+partir de los eventos que publica el monolito. El monolito solo manda directo los mails sin evento:
+contraseña temporal, copia de datos, documento adjunto, receta, alerta al admin y novedades.
+
+**Variables nuevas en `/srv/tranqui/.env`:**
+
+- `NOTIFICACIONES_DB_PASSWORD`: contraseña del usuario `notificaciones` de PostgreSQL. Generarla con
+  `openssl rand -hex 24`. El contenedor `db-servicios` crea la base y el usuario en cada arranque
+  (es idempotente, no toca `app_pgdata` más que para eso).
+- `RESEND_API_KEY` ahora también la usa el servicio (es la misma).
+
+**Primer arranque:** el servicio arranca después del gateway, copia los contactos y las
+notificaciones de las últimas 24 h del monolito por la ruta interna `/internal/monolito/**`, y
+empieza a consumir `notificaciones.eventos`. Para comparar las dos bases (solo lee):
+
+```bash
+node scripts/fase1-comparar-notificaciones.mjs --proyecto app --contenedor tranqui-db   --usuario <DB_USER> --base tranqui_app
+```
+
+**Vuelta atrás de la Fase 1** (sin tocar datos): en `/srv/tranqui/.env` poner
+`NOTIFICACIONES_ENVIO_DIRECTO=true` y `TRANQUI_SERVICES_NOTIFICACIONES_URI=http://tranqui-backend:8080`, y
+aplicar con `docker compose -p app up -d tranqui-backend gateway`. El monolito vuelve a mandar los
+mails y a crear las notificaciones; los eventos siguen acumulándose en la cola del servicio.
 
 ## VUELTA ATRÁS (Rollback a Monolito directo)
 

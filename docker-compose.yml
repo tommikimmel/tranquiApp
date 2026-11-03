@@ -215,6 +215,11 @@ services:
       ARCA_CERT_CONTENT: ${ARCA_CERT_CONTENT:-}
       ARCA_KEY_CONTENT: ${ARCA_KEY_CONTENT:-}
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: ${LOG_LEVEL_SECURITY:-INFO}
+      # Fase 1: los mails y avisos con evento los manda el servicio de notificaciones.
+      # "true" vuelve al envío directo desde el monolito (vuelta atrás, junto con la ruta del gateway).
+      NOTIFICACIONES_ENVIO_DIRECTO: ${NOTIFICACIONES_ENVIO_DIRECTO:-false}
+      # Rutas /internal/** que consultan otros servicios (sección 4.2).
+      SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || exit 1"]
       interval: 10s
@@ -249,6 +254,9 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
       TRANQUI_SERVICES_MONOLITO_URI: ${TRANQUI_SERVICES_MONOLITO_URI:-http://tranqui-backend:8080}
+      # Fase 1: /api/notificaciones y /ws-notificaciones al servicio. Vuelta atrás: en el .env,
+      # TRANQUI_SERVICES_NOTIFICACIONES_URI=http://tranqui-backend:8080 (y el envío directo en true).
+      TRANQUI_SERVICES_NOTIFICACIONES_URI: ${TRANQUI_SERVICES_NOTIFICACIONES_URI:-lb://notificaciones}
       SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
       VICTORIAMETRICS_URL: http://victoriametrics:8428
@@ -277,6 +285,84 @@ services:
       tranqui-network:
         aliases:
           - tranqui-gateway
+
+  # Crea la base y el usuario de cada servicio en la misma instancia de PostgreSQL (sección 3).
+  # Corre en cada arranque y termina; es idempotente, así sirve con el volumen app_pgdata existente.
+  db-servicios:
+    image: postgres:15-alpine
+    container_name: tranqui-db-servicios
+    entrypoint: ["sh", "/infra/crear-bases-servicios.sh"]
+    environment:
+      PGHOST: tranqui-db
+      PGUSER: ${DB_USER:-tomaskimmel}
+      PGPASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
+      PGDATABASE: ${DB_NAME:-tranqui_app}
+      SERVICIOS: notificaciones
+      DB_PASSWORD_NOTIFICACIONES: ${NOTIFICACIONES_DB_PASSWORD:?Falta NOTIFICACIONES_DB_PASSWORD en .env}
+    volumes:
+      - ./infra/postgres:/infra:ro
+    mem_limit: 32m
+    cpus: 0.2
+    restart: "no"
+    depends_on:
+      tranqui-db:
+        condition: service_healthy
+    networks:
+      - tranqui-network
+
+  # Fase 1: mails y notificaciones dentro de la app a partir de eventos. Sin puertos publicados
+  # ni labels de Traefik: el tráfico le llega por el gateway (sección 3).
+  notificaciones:
+    image: ghcr.io/tommikimmel/tranqui-notificaciones:${TRANQUI_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: services/notificaciones/Dockerfile
+    container_name: tranqui-notificaciones
+    restart: always
+    mem_limit: 224m
+    cpus: 0.5
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+      JAVA_TOOL_OPTIONS: "-XX:+UseSerialGC -XX:MaxRAMPercentage=65 -Xss256k -XX:ReservedCodeCacheSize=48m -XX:MaxMetaspaceSize=96m -XX:TieredStopAtLevel=1"
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://tranqui-db:5432/notificaciones
+      SPRING_DATASOURCE_USERNAME: notificaciones
+      SPRING_DATASOURCE_PASSWORD: ${NOTIFICACIONES_DB_PASSWORD:?Falta NOTIFICACIONES_DB_PASSWORD en .env}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: "5672"
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-tranqui}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD en .env}
+      SPRING_RABBITMQ_VIRTUAL_HOST: ${RABBITMQ_VHOST:-/}
+      CONSUL_HOST: consul
+      CONSUL_PORT: "8500"
+      JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      SERVICE_JWT_KEY: ${SERVICE_JWT_KEY:?Falta SERVICE_JWT_KEY en .env}
+      TRANQUI_GATEWAY_URL: http://gateway:8080
+      TRANQUI_VERSION: ${TRANQUI_VERSION:-latest}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-onboarding@resend.dev}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      MAIL_TRANSPORT: resend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    # Arranque escalonado (sección 9.3): después del gateway, así no compite por CPU con él.
+    depends_on:
+      db-servicios:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    networks:
+      tranqui-network:
+        aliases:
+          - tranqui-notificaciones
 
   tranqui-frontend:
     image: ghcr.io/tommikimmel/tranqui-frontend:${TRANQUI_VERSION:-latest}

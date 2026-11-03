@@ -47,6 +47,17 @@ public class Notificacion {
         this.tipo = tipo;
     }
 
+    /** Copia de una notificación vigente del monolito (carga inicial de la Fase 1). */
+    public static Notificacion copia(Long usuarioId, String titulo, String mensaje, boolean leido, String tipo,
+                                     LocalDateTime fechaCreacion) {
+        Notificacion n = new Notificacion(usuarioId, titulo, mensaje, tipo);
+        n.leido = leido;
+        if (fechaCreacion != null) {
+            n.fechaCreacion = fechaCreacion;
+        }
+        return n;
+    }
+
     public Long getId() { return id; }
     public Long getUsuarioId() { return usuarioId; }
     public String getTitulo() { return titulo; }
