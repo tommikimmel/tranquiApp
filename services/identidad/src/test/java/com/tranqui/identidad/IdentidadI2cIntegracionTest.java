@@ -526,6 +526,9 @@ class IdentidadI2cIntegracionTest {
         body.put("cuil", 123L);
         interna(HttpMethod.PUT, "/internal/identidad/profesionales/" + psi.id() + "/identidad", body, HttpStatus.BAD_REQUEST);
         interna(HttpMethod.PUT, "/internal/identidad/profesionales/999999/identidad", Map.of("nombre", "X"), HttpStatus.NOT_FOUND);
+        // El frontend guarda "PASAPORTE" en el registro: se acepta sin distinguir mayúsculas.
+        interna(HttpMethod.PUT, "/internal/identidad/profesionales/" + psi.id() + "/identidad",
+                Map.of("nombre", "Ana", "tipoDocumento", "PASAPORTE"), HttpStatus.OK);
         // El pedido del contrato, tal cual lo manda profesionales.
         interna(HttpMethod.PUT, "/internal/identidad/profesionales/" + psi.id() + "/identidad",
                 Contratos.fixture("internas/fuente-identidad/profesional-identidad.request.json"), HttpStatus.OK);

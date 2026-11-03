@@ -9,6 +9,7 @@ import com.tranqui.profesionales.interno.ClienteInterno;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
@@ -174,6 +175,9 @@ public class Perfiles {
             monolito = interno.guardarIdentidad(p.id(), new ClienteInterno.Identidad(dto.nombre(), dto.apellido(),
                     dto.telefono() != null ? dto.telefono().trim() : null, dto.sexo(), dto.fechaNacimiento(), dto.cuil(),
                     dto.tipoDocumento(), dto.numeroDocumento(), dto.fotoUrl()));
+        } catch (HttpClientErrorException.BadRequest e) {
+            // Un dato inválido no es una caída: el profesional tiene que ver qué corregir.
+            throw new IllegalArgumentException(e.getResponseBodyAsString());
         } catch (RestClientException e) {
             throw new ServicioNoDisponibleException("No se pudo guardar el perfil en este momento. Probá de nuevo en unos minutos.", e);
         }

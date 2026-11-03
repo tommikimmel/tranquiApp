@@ -90,6 +90,16 @@ class PerfilesValidacionTest {
     }
 
     @Test
+    void identidadRechazaUnDato_seMuestraSuMensajeYNoUnaCaida() {
+        org.mockito.Mockito.doThrow(org.springframework.web.client.HttpClientErrorException.create(
+                org.springframework.http.HttpStatus.BAD_REQUEST, "Bad Request", null,
+                "Datos del profesional inválidos: el nombre es obligatorio.".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                java.nio.charset.StandardCharsets.UTF_8)).when(interno).guardarIdentidad(anyLong(), any());
+        rechaza("el nombre es obligatorio");
+        verify(tx, never()).executeWithoutResult(any());
+    }
+
+    @Test
     void configAgenda_reglas() {
         assertThatThrownBy(() -> perfiles.actualizarConfigAgenda("lucia@mail.com", 0, null)).hasMessageContaining("mayor a 0");
         assertThatThrownBy(() -> perfiles.actualizarConfigAgenda("lucia@mail.com", 45, -1)).hasMessageContaining("negativo");
