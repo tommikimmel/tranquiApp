@@ -13,6 +13,8 @@ import java.time.LocalDate;
  * ocupa agenda o es un documento, la etiqueta del tipo de turno o de documento, la dirección del
  * consultorio (presencial), el link de Meet si ya existe y el origen de la confirmación (pago u
  * obra social), que cambia qué avisos salen.
+ *
+ * <p>Fase 3: {@code horaFin} (opcional), para que el calendario arme el evento de Google con su duración.
  */
 public record TurnoConfirmadoData(
     Long turnoId,
@@ -28,7 +30,8 @@ public record TurnoConfirmadoData(
     String tipoDocumentoLabel,
     String direccion,
     String meetUrl,
-    String origen
+    String origen,
+    String horaFin
 ) {
     /** El turno se confirmó por un pago aprobado. */
     public static final String ORIGEN_PAGO = "PAGO";
@@ -37,7 +40,15 @@ public record TurnoConfirmadoData(
 
     public TurnoConfirmadoData(Long turnoId, Long pacienteId, Long profesionalId, LocalDate fecha,
                                String horaInicio, String modalidad, BigDecimal precio) {
-        this(turnoId, pacienteId, profesionalId, fecha, horaInicio, modalidad, precio, null, null, null, null, null, null);
+        this(turnoId, pacienteId, profesionalId, fecha, horaInicio, modalidad, precio, null, null, null, null, null, null, null);
+    }
+
+    /** Sin {@code horaFin} (los productores anteriores a la Fase 3). */
+    public TurnoConfirmadoData(Long turnoId, Long pacienteId, Long profesionalId, LocalDate fecha, String horaInicio,
+                               String modalidad, BigDecimal precio, Boolean ocupaAgenda, String tipoLabel,
+                               String tipoDocumentoLabel, String direccion, String meetUrl, String origen) {
+        this(turnoId, pacienteId, profesionalId, fecha, horaInicio, modalidad, precio, ocupaAgenda, tipoLabel,
+                tipoDocumentoLabel, direccion, meetUrl, origen, null);
     }
 
     /** Un turno sin {@code ocupaAgenda} explícito es un turno real (el valor por defecto antes de la Fase 1). */

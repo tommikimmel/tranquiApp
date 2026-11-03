@@ -24,6 +24,9 @@ import static org.mockito.Mockito.*;
 class TurnoServiceMoreCoverageUnitTest {
 
     @Mock
+    private HorariosOcupadosCliente horariosOcupadosCliente;
+
+    @Mock
     private OutboxPublisher outboxPublisher;
 
     @Mock

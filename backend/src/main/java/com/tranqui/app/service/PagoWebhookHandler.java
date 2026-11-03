@@ -171,7 +171,8 @@ public class PagoWebhookHandler {
                         turno.isOcupaAgenda() ? null : resolverTipoDocumentoLabel(turno),
                         turno.getModalidad() == com.tranqui.app.model.Modalidad.ONLINE ? null : turno.getMedico().getDomicilioAtencion(),
                         turno.getTelemedicinaUrl(),
-                        TurnoConfirmadoData.ORIGEN_PAGO
+                        TurnoConfirmadoData.ORIGEN_PAGO,
+                        turno.getHoraFin() != null ? turno.getHoraFin().toString() : null
                 )
         );
 
