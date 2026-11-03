@@ -1,0 +1,99 @@
+spring:
+  application:
+    name: identidad
+  # Al apagarse termina lo que está procesando, hasta 20 s.
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://tranqui-db:5432/identidad}
+    username: ${SPRING_DATASOURCE_USERNAME:identidad}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    hikari:
+      maximum-pool-size: 5
+  flyway:
+    enabled: true
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:tranqui}
+    password: ${SPRING_RABBITMQ_PASSWORD:}
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      discovery:
+        enabled: ${CONSUL_DISCOVERY_ENABLED:true}
+        service-name: identidad
+        instance-id: ${spring.application.name}:${random.value}
+        health-check-critical-timeout: 1m
+        heartbeat:
+          enabled: true
+          ttl: 30s
+          reregister-service-on-failure: true
+        prefer-ip-address: true
+        tags: version=${TRANQUI_VERSION:dev}
+
+server:
+  port: 8080
+  tomcat:
+    threads:
+      max: 50
+  shutdown: graceful
+
+management:
+  server:
+    port: 8082
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+      group:
+        readiness:
+          include: readinessState,db,rabbit
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      servicio: identidad
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+
+# Eventos (libs/eventos): consume y publica por outbox
+eventos:
+  consumo:
+    servicio: identidad
+  outbox:
+    habilitada: true
+
+identidad:
+  carga:
+    # Carga inicial desde el monolito (Fase 9, I2a). Se prende en el corte, en la ventana de mantenimiento,
+    # junto con IDENTIDAD_EXTERNO del monolito.
+    habilitada: ${IDENTIDAD_CARGA:false}
+
+jwt:
+  secret: ${JWT_SECRET:}
+
+tranqui:
+  gateway:
+    # Las consultas internas (monolito) pasan por el gateway.
+    url: ${TRANQUI_GATEWAY_URL:http://gateway:8080}
+  jwt:
+    service-secret: ${SERVICE_JWT_KEY:}
+
+logging:
+  level:
+    root: INFO
