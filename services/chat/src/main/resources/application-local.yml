@@ -1,0 +1,7 @@
+# Perfil local (docker-compose.local.yml): claves de desarrollo.
+jwt:
+  secret: ${JWT_SECRET:local-dev-encryption-key-32chars}
+
+tranqui:
+  jwt:
+    service-secret: ${SERVICE_JWT_KEY:local-service-jwt-secret-key-32chars}

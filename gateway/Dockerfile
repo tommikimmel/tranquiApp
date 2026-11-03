@@ -9,6 +9,7 @@ COPY libs/eventos/pom.xml libs/eventos/
 COPY backend/pom.xml backend/
 COPY gateway/pom.xml gateway/
 COPY services/notificaciones/pom.xml services/notificaciones/
+COPY services/chat/pom.xml services/chat/
 
 
 # Copiar código fuente de librerías y del gateway
