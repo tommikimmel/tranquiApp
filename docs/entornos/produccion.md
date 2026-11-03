@@ -26,15 +26,16 @@ del plan de arquitectura de microservicios (`docs/arquitectura/microservicios.md
 | `tranqui-cadvisor` | `cadvisor` | cAdvisor v0.49.1 (métricas de uso de CPU/RAM por contenedor) | 64 MB | 0.3 |
 | `tranqui-node-exporter` | `node-exporter` | Prometheus Node Exporter v1.8.2 (métricas del host VPS) | 32 MB | 0.2 |
 | `tranqui-notificaciones` | `notificaciones` | Servicio de notificaciones (Fase 1): mails y avisos en la app a partir de eventos, base propia `notificaciones` | 224 MB | 0.5 |
+| `tranqui-chat` | `chat` | Servicio de chat (Fase 2): mensajería en vivo por `/ws-tranqui` e historial, base propia `chat` | 224 MB | 0.5 |
 | `tranqui-db-servicios` | `db-servicios` | Contenedor de una sola ejecución: crea la base y el usuario de cada servicio (`infra/postgres/crear-bases-servicios.sh`) y termina | 32 MB | 0.2 |
 | `tranqui-bot`, `tranqui-bot-worker`, `wsp-db`, `wsp-redis` | — | Bot de WhatsApp (proyecto aparte, fuera de este repositorio) | ~70 MB | — |
 
 ### Presupuesto de memoria (RAM)
 
-- **Total suma `mem_limit` Docker Compose (Fase 1):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 224 = 2.336 MB` (~2,34 GB; `db-servicios` corre unos segundos al arrancar y no suma).
+- **Total suma `mem_limit` Docker Compose (Fase 2):** `64 + 288 + 512 + 512 + 256 + 128 + 64 + 192 + 64 + 32 + 224 + 224 = 2.560 MB` (~2,56 GB; `db-servicios` corre unos segundos al arrancar y no suma).
 - **Traefik y bot de WhatsApp:** ~112 MB.
 - **Sistema operativo y buffers mínimos:** ~1 GB.
-- **Consumo proyectado total en VPS:** **~3,4 GB**, ampliamente dentro del techo presupuestado de **~4,8 GB**
+- **Consumo proyectado total en VPS:** **~3,7 GB**, ampliamente dentro del techo presupuestado de **~4,8 GB**
   de la sección 9.1 para la Fase 0, reservando ~3 GB de margen libre para picos y caché de disco de PostgreSQL.
 
 ### Afinación de JVM (backend y gateway)
@@ -129,6 +130,32 @@ define dependencias escalonadas con `condition: service_healthy`:
    docker compose -p app ps
    curl -fsS https://tranquisalud.com/api/health
    ```
+
+## Fase 2: servicio de chat
+
+El chat (`/api/chat`, el WebSocket `/ws-tranqui`) vive en el contenedor `chat`. La lista de pacientes del
+profesional (monolito) le pide los no leídos por `/internal/chat/...`; si el chat no responde, sale sin
+ellos.
+
+**Variable nueva en `/srv/tranqui/.env`:** `CHAT_DB_PASSWORD` (`openssl rand -hex 24`). `db-servicios`
+crea la base `chat` en el arranque.
+
+**Primer arranque:** el servicio copia del monolito los usuarios, los turnos confirmados y todos los
+mensajes, conservando los ids. Hasta que termina, los chats viejos pueden no aparecer.
+
+**Vuelta atrás de la Fase 2** (sin perder conversaciones):
+
+1. En `/srv/tranqui/.env`: `TRANQUI_SERVICES_CHAT_URI=http://tranqui-backend:8080`.
+2. `docker compose -p app stop chat` y `docker compose -p app up -d gateway`.
+3. Devolver al monolito los mensajes escritos en el servicio (idempotente; `--prueba` solo cuenta):
+   ```bash
+   node scripts/fase2-devolver-mensajes.mjs --proyecto app --contenedor tranqui-db --usuario <DB_USER> --base tranqui_app
+   ```
+
+**Volver al servicio después:** borrar la base del chat para que el primer arranque vuelva a copiar
+todo (incluidos los mensajes escritos en el monolito durante la vuelta atrás):
+`docker compose -p app exec tranqui-db psql -U <DB_USER> -d tranqui_app -c "DROP DATABASE chat"`, sacar la
+variable del `.env` y `docker compose -p app up -d`.
 
 ## Fase 1: servicio de notificaciones
 

@@ -106,3 +106,20 @@ jobs:
           cache-from: type=gha,scope=notificaciones
           cache-to: type=gha,mode=max,scope=notificaciones
 
+  imagen-chat:
+    name: Imagen Chat (build sin push)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen del servicio de chat
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./services/chat/Dockerfile
+          push: false
+          cache-from: type=gha,scope=chat
+          cache-to: type=gha,mode=max,scope=chat
+
