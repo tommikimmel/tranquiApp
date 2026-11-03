@@ -31,6 +31,11 @@ public class Errores {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
     }
 
+    @ExceptionHandler(com.tranqui.profesionales.recetas.RecetaElectronicaException.class)
+    public ResponseEntity<String> recetaElectronica(com.tranqui.profesionales.recetas.RecetaElectronicaException e) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(e.getMessage());
+    }
+
     @ExceptionHandler(ServicioNoDisponibleException.class)
     public ResponseEntity<String> noDisponible(ServicioNoDisponibleException e) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(e.getMessage());

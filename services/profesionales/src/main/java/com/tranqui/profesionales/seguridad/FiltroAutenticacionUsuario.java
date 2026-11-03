@@ -21,6 +21,7 @@ public class FiltroAutenticacionUsuario extends OncePerRequestFilter {
     public static final String ATRIBUTO_USUARIO = "tranqui.usuario";
 
     private static final String BUSCADOR = "/api/medicos";
+    private static final String FINANCIADORES = "/api/recetas/financiadores";
 
     private final UsuarioJwt usuarioJwt;
 
@@ -31,7 +32,8 @@ public class FiltroAutenticacionUsuario extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        return !uri.startsWith("/api/") || ("GET".equalsIgnoreCase(request.getMethod()) && BUSCADOR.equals(uri));
+        return !uri.startsWith("/api/")
+                || ("GET".equalsIgnoreCase(request.getMethod()) && (BUSCADOR.equals(uri) || FINANCIADORES.equals(uri)));
     }
 
     @Override
