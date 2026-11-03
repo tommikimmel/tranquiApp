@@ -139,6 +139,46 @@ public class Profesionales {
         return n > 0;
     }
 
+    /**
+     * Fase 9, con la fuente de identidad: pisa solo lo que es de identidad (y la verificación del administrador). Mercado
+     * Pago y la suscripción no se tocan: identidad los manda en null y llegan de pagos ({@link #guardarMercadoPago},
+     * {@link #guardarSuscripcion}). La foto, como en {@link #guardarDatosMonolito}.
+     */
+    @Transactional
+    public boolean guardarDatosIdentidad(DatosMonolito d) {
+        boolean conFoto = d.fotoUrl() != null || d.fotoHash() == null;
+        int n = jdbc.update("UPDATE profesional SET email = ?, rol = ?, profession = ?, nombre = ?, apellido = ?, "
+                        + "telefono = ?, sexo = ?, fecha_nacimiento = ?, cuil = ?, tipo_documento = ?, numero_documento = ?, "
+                        + (conFoto ? "foto_url = ?, foto_hash = ?, " : "")
+                        + "verificado_admin = ?, version = GREATEST(version, ?) WHERE id = ?",
+                conFoto
+                        ? new Object[]{d.email(), d.rol(), d.profession(), d.nombre(), d.apellido(), d.telefono(), d.sexo(),
+                        fecha(d.fechaNacimiento()), d.cuil(), d.tipoDocumento(), d.numeroDocumento(), d.fotoUrl(), d.fotoHash(),
+                        d.verificadoAdmin(), d.version(), d.id()}
+                        : new Object[]{d.email(), d.rol(), d.profession(), d.nombre(), d.apellido(), d.telefono(), d.sexo(),
+                        fecha(d.fechaNacimiento()), d.cuil(), d.tipoDocumento(), d.numeroDocumento(),
+                        d.verificadoAdmin(), d.version(), d.id()});
+        return n > 0;
+    }
+
+    /**
+     * Mercado Pago vinculado, de pagos (evento o resincronización). Solo si la versión que llega no es más vieja que
+     * la guardada: el evento y la resincronización pueden llegar en cualquier orden.
+     */
+    @Transactional
+    public boolean guardarMercadoPago(Long id, boolean vinculada, long version) {
+        return jdbc.update("UPDATE profesional SET mp_vinculada = ?, mp_version = ? WHERE id = ? AND mp_version <= ?",
+                vinculada, version, id, version) > 0;
+    }
+
+    /** El estado de la suscripción, de pagos (evento v2 o resincronización), con el mismo control de versión. */
+    @Transactional
+    public boolean guardarSuscripcion(Long id, String estado, LocalDateTime periodoHasta, boolean puedeRecetar, long version) {
+        return jdbc.update("UPDATE profesional SET suscripcion_estado = ?, suscripcion_periodo_hasta = ?, puede_recetar = ?, "
+                        + "suscripcion_version = ? WHERE id = ? AND suscripcion_version <= ?",
+                estado, momento(periodoHasta), puedeRecetar, version, id, version) > 0;
+    }
+
     /** Guarda el perfil y devuelve la versión nueva para {@code profesional.actualizado}. */
     @Transactional
     public int guardarPerfil(Long id, PerfilProfesionalData perfil) {

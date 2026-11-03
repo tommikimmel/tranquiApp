@@ -46,6 +46,9 @@ public class ResendEmailService {
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
 
+    @Value("${app.soporte-email:soporte@tranquisalud.com}")
+    private String soporteEmail;
+
     // "resend" (producción) o "smtp" (entorno local con Mailpit, ver application-local.yml).
     @Value("${mail.transport:resend}")
     private String transport;
@@ -188,6 +191,26 @@ public class ResendEmailService {
         String html = plantilla("Recuperación de contraseña", TONO_INFO,
                 "Recuperación de contraseña", cuerpo);
         enviarCorreo(toEmail, asunto, html);
+    }
+
+    public void enviarPasswordTemporal(String toEmail, String nombreUsuario, String passwordTemporal) {
+        String asunto = "Tu nueva contraseña temporal - Tranqui App";
+        String cuerpo = "<p>Un administrador reseteó tu contraseña en <strong>Tranqui App</strong>. Tu contraseña temporal es:</p>" +
+                cajaDestacada(passwordTemporal) +
+                "<p style=\"font-size:13px;color:" + COLOR_MUTED + ";margin-top:15px;\">Es temporal: al iniciar sesión con ella, te vamos a pedir que elijas una contraseña nueva antes de poder usar el resto de la aplicación. Si no solicitaste este cambio, contactate con nosotros.</p>";
+        String html = plantilla("Nueva contraseña temporal", TONO_ALERTA,
+                "¡Hola, " + nombreOUsuario(nombreUsuario) + "!", cuerpo);
+        enviarCorreo(toEmail, asunto, html);
+    }
+
+    public void enviarSolicitudCopiaDatos(String nombreUsuario, String emailUsuario, String rolUsuario) {
+        String asuntoFinal = "[Ley 25.326 - Acceso a datos] Solicitud de " + rolUsuario;
+        String cuerpo = "<p><strong>De:</strong> " + nombreOUsuario(nombreUsuario) + " (" + emailUsuario + ")</p>" +
+                "<p><strong>Rol:</strong> " + rolUsuario + "</p>" +
+                "<p>El usuario solicitó, desde \"Mi Cuenta\" &gt; \"Privacidad\", una copia de los datos personales que Tranqui App tiene registrados a su nombre.</p>";
+        String html = plantilla("Solicitud Ley 25.326", TONO_INFO,
+                "Solicitud de copia de datos personales", cuerpo);
+        enviarCorreo(soporteEmail, asuntoFinal, html, emailUsuario);
     }
 
     // Sent from TicketService#agregarMensaje whenever an admin replies to a support ticket —
@@ -695,23 +718,34 @@ public class ResendEmailService {
     }
 
     private void enviarCorreo(String toEmail, String asunto, String htmlBody) {
-        enviarCorreo(toEmail, asunto, htmlBody, null, null);
+        enviarCorreo(toEmail, asunto, htmlBody, null, null, null);
+    }
+
+    private void enviarCorreo(String toEmail, String asunto, String htmlBody, String replyTo) {
+        enviarCorreo(toEmail, asunto, htmlBody, replyTo, null, null);
     }
 
     private void enviarCorreo(String toEmail, String asunto, String htmlBody, String adjuntoNombre, String adjuntoBase64) {
+        enviarCorreo(toEmail, asunto, htmlBody, null, adjuntoNombre, adjuntoBase64);
+    }
+
+    private void enviarCorreo(String toEmail, String asunto, String htmlBody, String replyTo, String adjuntoNombre, String adjuntoBase64) {
         if (toEmail == null || toEmail.isBlank()) {
             log.warn("Mail '{}' sin destinatario: no se envía", asunto);
             return;
         }
         String clave = ClaveIdempotencia.actual();
         if (usarSmtp()) {
-            enviarPorSmtp(toEmail, asunto, htmlBody, clave, adjuntoNombre, adjuntoBase64);
+            enviarPorSmtp(toEmail, asunto, htmlBody, replyTo, clave, adjuntoNombre, adjuntoBase64);
             return;
         }
         if (apiKey == null || apiKey.trim().isEmpty() || !apiKey.startsWith("re_")) {
             log.info("==================================================================");
             log.info("[RESEND MOCK/DEV MODE] No hay API Key de Resend configurada.");
             log.info("Destinatario: {}", toEmail);
+            if (replyTo != null && !replyTo.isBlank()) {
+                log.info("Reply-To: {}", replyTo);
+            }
             log.info("Asunto: {}", asunto);
             log.info("Contenido enviado (Simulación). Colocá RESEND_API_KEY en tu .env para envíos reales.");
             log.info("==================================================================");
@@ -725,6 +759,9 @@ public class ResendEmailService {
             payloadMap.put("to", List.of(toEmail));
             payloadMap.put("subject", asunto);
             payloadMap.put("html", htmlBody);
+            if (replyTo != null && !replyTo.isBlank()) {
+                payloadMap.put("reply_to", List.of(replyTo));
+            }
             if (adjuntoNombre != null && adjuntoBase64 != null) {
                 payloadMap.put("attachments", List.of(Map.of("filename", adjuntoNombre, "content", adjuntoBase64)));
             }
@@ -762,7 +799,7 @@ public class ResendEmailService {
         return "smtp".equalsIgnoreCase(transport);
     }
 
-    private void enviarPorSmtp(String toEmail, String asunto, String htmlBody, String clave, String adjuntoNombre,
+    private void enviarPorSmtp(String toEmail, String asunto, String htmlBody, String replyTo, String clave, String adjuntoNombre,
                                String adjuntoBase64) {
         JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
         if (mailSender == null) {
@@ -774,6 +811,9 @@ public class ResendEmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, conAdjunto, "UTF-8");
             helper.setFrom(String.format("Tranqui App <%s>", fromEmail));
             helper.setTo(toEmail);
+            if (replyTo != null && !replyTo.isBlank()) {
+                helper.setReplyTo(replyTo);
+            }
             helper.setSubject(asunto);
             helper.setText(htmlBody, true);
             if (conAdjunto) {

@@ -39,4 +39,8 @@ public final class Dtos {
     public record CredencialInfoDto(Integer codEntidad, String pan, String plan, String token) {}
 
     public record MarcarDocumentoEnviadoRequest(String archivoData, String archivoNombre) {}
+
+    public record DashboardStatsDto(int sessionsToday, String sessionsTodayChange, BigDecimal earningsThisWeek,
+                                    String earningsThisWeekChange, int activePatients, String activePatientsChange,
+                                    int noShowsThisMonth, String noShowsChange) {}
 }

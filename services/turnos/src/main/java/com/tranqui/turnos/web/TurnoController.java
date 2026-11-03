@@ -3,6 +3,7 @@ package com.tranqui.turnos.web;
 import com.tranqui.turnos.agenda.Horarios;
 import com.tranqui.turnos.seguridad.FiltroAutenticacionUsuario;
 import com.tranqui.turnos.seguridad.UsuarioJwt;
+import com.tranqui.turnos.turnos.Estadisticas;
 import com.tranqui.turnos.turnos.Gestion;
 import com.tranqui.turnos.turnos.Listados;
 import com.tranqui.turnos.turnos.Reservas;
@@ -40,12 +41,25 @@ public class TurnoController {
     private final Reservas reservas;
     private final Gestion gestion;
     private final Listados listados;
+    private final Estadisticas estadisticas;
 
-    public TurnoController(Horarios horarios, Reservas reservas, Gestion gestion, Listados listados) {
+    public TurnoController(Horarios horarios, Reservas reservas, Gestion gestion, Listados listados, Estadisticas estadisticas) {
         this.horarios = horarios;
         this.reservas = reservas;
         this.gestion = gestion;
         this.listados = listados;
+        this.estadisticas = estadisticas;
+    }
+
+    @GetMapping("/medicos/stats")
+    public ResponseEntity<Dtos.DashboardStatsDto> stats(
+            HttpServletRequest request,
+            @RequestParam(name = "periodo", defaultValue = "MENSUAL") String periodo) {
+        String email = conRol(request, "PSIQUIATRA");
+        if (email == null) {
+            return prohibido();
+        }
+        return ResponseEntity.ok(estadisticas.obtenerStats(email, periodo));
     }
 
     @GetMapping("/medicos/{medicoId}/turnos-disponibles")

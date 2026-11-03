@@ -104,6 +104,8 @@ public class Dtos {
             Long version
     ) {}
 
+    public record AccesoDto(boolean permitido) {}
+
     public record InvoiceResponseDto(
             Long id,
             Long paymentId,

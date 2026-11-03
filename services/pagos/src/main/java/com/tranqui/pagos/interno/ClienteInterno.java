@@ -239,8 +239,13 @@ public class ClienteInterno {
     private final RestClient http;
     private final ServiceJwt serviceJwt;
 
+    // /internal/monolito o /internal/identidad (ver rutaIdentidad).
+    private final String baseIdentidad;
+
     public ClienteInterno(@Value("${tranqui.gateway.url}") String gatewayUrl,
-                          @Value("${tranqui.jwt.service-secret}") String claveServicio) {
+                          @Value("${tranqui.jwt.service-secret}") String claveServicio,
+                          @Value("${tranqui.fuente-identidad:monolito}") String fuenteIdentidad) {
+        this.baseIdentidad = rutaIdentidad(fuenteIdentidad);
         if (claveServicio == null || claveServicio.isBlank()) {
             throw new IllegalStateException("Falta SERVICE_JWT_KEY: el servicio no puede hacer consultas internas.");
         }
@@ -249,6 +254,25 @@ public class ClienteInterno {
         fabrica.setReadTimeout(30_000);
         this.http = RestClient.builder().baseUrl(gatewayUrl).requestFactory(fabrica).build();
         this.serviceJwt = new ServiceJwt(claveServicio);
+    }
+
+    /**
+     * De dónde se leen los datos de usuario (Fase 9): {@code monolito} (por defecto, hasta el corte) o
+     * {@code identidad}. Volver atrás es sacar la variable {@code TRANQUI_FUENTE_IDENTIDAD}.
+     */
+    static String rutaIdentidad(String fuente) {
+        String f = fuente == null ? "" : fuente.trim().toLowerCase();
+        return switch (f) {
+            case "", "monolito" -> "/internal/monolito";
+            case "identidad" -> "/internal/identidad";
+            default -> throw new IllegalStateException(
+                    "TRANQUI_FUENTE_IDENTIDAD tiene que ser 'monolito' o 'identidad', no '" + fuente + "'.");
+        };
+    }
+
+    /** Si los datos de usuario se leen del servicio de identidad (y lo que no es suyo, de su dueño). */
+    public boolean fuenteIdentidad() {
+        return "/internal/identidad".equals(baseIdentidad);
     }
 
     private <T> List<T> lista(String uri, ParameterizedTypeReference<List<T>> tipo, Object... variables) {
@@ -341,12 +365,12 @@ public class ClienteInterno {
     }
 
     public List<SuscriptorMonolito> suscriptores(int pagina, int tamanio) {
-        return lista("/internal/monolito/suscriptores?pagina={p}&tamanio={t}",
+        return lista(baseIdentidad + "/suscriptores?pagina={p}&tamanio={t}",
                 new ParameterizedTypeReference<>() {}, pagina, tamanio);
     }
 
     public SuscriptorMonolito suscriptor(Long id) {
-        return http.get().uri("/internal/monolito/suscriptores/{id}", id)
+        return http.get().uri(baseIdentidad + "/suscriptores/{id}", id)
                 .headers(h -> {
                     h.setBearerAuth(serviceJwt.emitirToken(SERVICIO));
                     h.set("X-Correlation-Id", CorrelationIdHolder.getOrGenerateCorrelationId());

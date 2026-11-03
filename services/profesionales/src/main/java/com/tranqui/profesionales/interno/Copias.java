@@ -68,8 +68,25 @@ public class Copias {
         }
     }
 
-    /** Todos los turnos, paginados (carga inicial y resincronización). */
+    /**
+     * Todos los turnos (carga inicial y resincronización): del monolito, paginados, o con la fuente de identidad
+     * (Fase 9) de su dueño, el servicio de turnos.
+     */
     public int copiarTurnos() {
+        if (interno.fuenteIdentidad()) {
+            int total = 0;
+            for (ClienteInterno.TurnoMonolito m : interno.turnosDelServicio()) {
+                TurnoActualizadoData d = m != null ? m.turno() : null;
+                // Nunca se confía en lo que manda otro servicio: un turno sin ids válidos se saltea.
+                if (d == null || d.turnoId() == null || d.turnoId() <= 0 || m.version() < 0) {
+                    log.warn("Resincronización de turnos: se saltea una fila inválida");
+                    continue;
+                }
+                turnosAtendidos.guardar(d.turnoId(), d.profesionalId(), d.pacienteId(), d.fecha(), d.estado(), m.version());
+                total++;
+            }
+            return total;
+        }
         int total = 0;
         for (int pagina = 0; ; pagina++) {
             List<ClienteInterno.TurnoMonolito> lote = interno.turnos(pagina, PAGINA);
