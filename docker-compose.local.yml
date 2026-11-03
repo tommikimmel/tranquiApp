@@ -125,6 +125,9 @@ services:
       # Fase 6: los turnos los maneja el servicio de turnos; el monolito guarda una copia (estadísticas,
       # historia clínica, recetas). "false" vuelve los turnos al monolito (vuelta atrás).
       TURNOS_EXTERNO: "true"
+      # Fase 7: la historia clínica, las recetas y los conceptos los administra el servicio de profesionales.
+      # "false" vuelve la clínica al monolito (vuelta atrás).
+      CLINICA_EXTERNO: "true"
       EVENTOS_CONSUMO_SERVICIO: monolito
     ports:
       - "127.0.0.1:8081:8080"
@@ -333,6 +336,13 @@ services:
       JWT_SECRET: local-dev-encryption-key-32chars
       SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
       TRANQUI_GATEWAY_URL: http://gateway:8080
+      # Fase 7: historia clínica y recetas habilitadas en local.
+      PROFESIONALES_CLINICA: "true"
+      # Fase 7: QBI2 apagado / simulado en local, como en el monolito.
+      QBI2_RECIPE_ENABLED: "false"
+      QBI2_RECIPE_ENV: hml
+      QBI2_CLIENTE_APP_ID: ""
+      QBI2_RECIPE_TOKEN: ""
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health/readiness || exit 1"]
       interval: 10s
@@ -406,6 +416,8 @@ services:
       TRANQUI_SERVICES_PROFESIONALES_URI: lb://profesionales
       # Fase 6: /api/turnos, los horarios, "Mis turnos" y /internal/turnos al servicio de turnos.
       TRANQUI_SERVICES_TURNOS_URI: lb://turnos
+      # Fase 7: /api/pacientes (menos /me/turnos), /api/recetas y /api/conceptos al servicio de profesionales.
+      TRANQUI_SERVICES_CLINICA_URI: lb://profesionales
       SERVICE_JWT_KEY: local-service-jwt-secret-key-32chars
       JWT_SECRET: local-dev-encryption-key-32chars
       VICTORIAMETRICS_URL: http://victoriametrics:8428
