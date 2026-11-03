@@ -139,6 +139,36 @@ public class Planes {
         return id;
     }
 
+    @Transactional
+    public void actualizar(Plan p) {
+        jdbc.update("""
+                UPDATE plans SET
+                    code = ?,
+                    name = ?,
+                    description = ?,
+                    price_ars = ?,
+                    price_usd_ref = ?,
+                    price_ars_anual = ?,
+                    billing_period = ?,
+                    min_seats = ?,
+                    mp_preapproval_plan_id = ?,
+                    requires_prescriber = ?,
+                    is_active = ?,
+                    effective_from = ?,
+                    effective_to = ?
+                WHERE id = ?
+                """,
+                p.code(), p.name(), p.description(), p.priceArs(), p.priceUsdRef(), p.priceArsAnual(),
+                p.billingPeriod() != null ? p.billingPeriod() : "monthly",
+                p.minSeats() != null ? p.minSeats() : 1,
+                p.mpPreapprovalPlanId(),
+                p.requiresPrescriber() != null ? p.requiresPrescriber() : false,
+                p.isActive() != null ? p.isActive() : true,
+                p.effectiveFrom() != null ? Timestamp.valueOf(p.effectiveFrom()) : null,
+                p.effectiveTo() != null ? Timestamp.valueOf(p.effectiveTo()) : null,
+                p.id());
+    }
+
     public long cantidad() {
         Long n = jdbc.queryForObject("SELECT count(*) FROM plans", Long.class);
         return n != null ? n : 0;

@@ -33,7 +33,7 @@ public class FiltroAutenticacionUsuario extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        return !uri.startsWith("/api/") || uri.startsWith("/api/payments/") || SIN_SESION.contains(uri);
+        return !uri.startsWith("/api/") || uri.startsWith("/api/payments/") || "/api/subscriptions/plans".equals(uri) || SIN_SESION.contains(uri);
     }
 
     @Override
