@@ -56,7 +56,7 @@ Con la Fase 7 el consumo proyectado es ~5,0 GB contra un techo de ~4,8 GB (ver
 se agranda el VPS o se juntan servicios. La Fase 8 no suma contenedores, pero la facturación agrega trabajo al
 servicio de pagos.
 
-### 8. Copias del estado de la suscripción
+### 8. Copias del estado de la suscripción (se resuelve en la Fase 9, I3)
 En la Fase 8, el portón del gateway y el servicio de profesionales siguen leyendo el estado de la suscripción del
 monolito (de una copia alimentada por eventos). En la Fase 9, al retirar el monolito, tienen que pasar a consumir
 `suscripciones.suscripcion.cambio-estado.v2` directo.
@@ -64,3 +64,19 @@ monolito (de una copia alimentada por eventos). En la Fase 9, al retirar el mono
 ### 9. Arreglos de la migración que conviene llevar a `main` antes
 - Solo el dueño del turno puede cancelarlo, marcar la asistencia o reprogramarlo (#59).
 - El profesional solo carga en la historia clínica, edita la ficha o receta si atiende al paciente (#61).
+
+## Identidad (anotados en la Fase 9)
+
+### 10. Sin revocación de tokens
+- **Qué pasa:** el JWT dura 7 días y los servicios confían en el rol del token: un cambio de rol o una cuenta
+  eliminada tardan hasta 7 días en notarse fuera de identidad.
+- **Cambio:** tokens cortos con refresh, o una lista de revocados que el gateway consulte.
+
+### 11. Turnos futuros de una cuenta eliminada
+- **Qué pasa:** turnos no consume `identidad.usuario.eliminado`; los turnos futuros quedan activos.
+- **Cambio:** consumirlo y cancelar (con su reembolso) los turnos futuros.
+
+### 12. Evento de cambio de mail
+- **Qué pasa:** la anonimización cambia el mail sin un evento propio, y las copias se enteran solo por
+  `usuario.actualizado` o `eliminado`.
+- **Cambio:** un evento `identidad.usuario.email-cambiado`.
