@@ -181,7 +181,7 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
-    mem_limit: 224m
+    mem_limit: 288m
 
   # Fase 2: chat en tiempo real (STOMP en /ws-tranqui) y su historial.
   chat:
@@ -216,7 +216,7 @@ services:
         condition: service_healthy
       consul:
         condition: service_healthy
-    mem_limit: 224m
+    mem_limit: 288m
 
   gateway:
     build:

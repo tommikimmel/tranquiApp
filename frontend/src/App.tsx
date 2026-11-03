@@ -287,9 +287,10 @@ export default function App() {
           // Mismo canal en los dos endpoints: ver ENDPOINTS_AVISOS_EN_VIVO.
           for (const endpoint of ENDPOINTS_AVISOS_EN_VIVO) {
           const socketUrl = `${getBackendOrigin()}${endpoint}`;
-          const socket = new SockJS(socketUrl, null, { withCredentials: true } as any)
           const client: Client = new Client({
-            webSocketFactory: () => socket,
+            // Un SockJS nuevo en cada intento: con el mismo objeto, la reconexión (reconnectDelay) reusaba
+            // un socket cerrado y nunca volvía a conectar (por ejemplo, al reiniciarse el servicio de chat).
+            webSocketFactory: () => new SockJS(socketUrl, null, { withCredentials: true } as any),
             reconnectDelay: 5000,
             onConnect: () => {
               console.log("WebSocket de Notificaciones conectado para ID:", perfil.id)
