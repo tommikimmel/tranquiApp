@@ -53,6 +53,9 @@ public class RecetaService {
     @Autowired
     private SubscriptionService subscriptionService;
 
+    @Autowired
+    private AccesoPacientes accesoPacientes;
+
     @Transactional
     public RecetaResponseDto emitirReceta(String medicoEmail, RecetaDto dto) {
         Usuario medico = usuarioRepository.findByEmail(medicoEmail)
@@ -63,6 +66,7 @@ public class RecetaService {
 
         Usuario paciente = usuarioRepository.findById(dto.getPacienteId())
                 .orElseThrow(() -> new EntityNotFoundException("Paciente no encontrado"));
+        accesoPacientes.exigirAtendido(medico.getId(), paciente.getId());
 
         // These used to silently fall back to hardcoded placeholder values (a fake DNI, a fake
         // birth date...) whenever the real data was missing, so a receta could go out to QBI2

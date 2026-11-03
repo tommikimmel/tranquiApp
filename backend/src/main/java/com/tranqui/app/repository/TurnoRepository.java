@@ -84,6 +84,8 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT t.paciente FROM Turno t WHERE t.medico.id = :medicoId AND t.estado IN ('CONFIRMADO', 'PENDIENTE_VALIDACION')")
     List<Usuario> findDistinctPacientesByMedicoId(@org.springframework.data.repository.query.Param("medicoId") Long medicoId);
 
+    boolean existsByMedicoIdAndPacienteIdAndEstadoIn(Long medicoId, Long pacienteId, java.util.Collection<EstadoTurno> estados);
+
     // JOIN FETCH t.medico: TurnoService.obtenerTurnosPaciente ("Mis turnos", patient-facing)
     // reads t.getMedico() fields for every row while mapping the DTO.
     @org.springframework.data.jpa.repository.Query("SELECT t FROM Turno t JOIN FETCH t.medico WHERE t.paciente.id = :pacienteId AND t.estado != :estado")

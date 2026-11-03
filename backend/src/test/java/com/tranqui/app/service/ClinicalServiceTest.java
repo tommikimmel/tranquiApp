@@ -36,6 +36,10 @@ class ClinicalServiceTest {
     @Mock
     private OutboxPublisher outboxPublisher;
 
+    // Por defecto atiende a todos (no hace nada); los tests de rechazo lo hacen tirar.
+    @Mock
+    private AccesoPacientes accesoPacientes;
+
     @InjectMocks
     private ClinicalService clinicalService;
 
@@ -225,7 +229,31 @@ class ClinicalServiceTest {
         assertEquals(fechaExplicita, saved.getFecha());
     }
 
+    @Test
+    void guardarSeguimiento_deUnPacienteQueNoAtiendeSeRechaza() {
+        when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico("dra@mail.com")));
+        when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente(5L, "Ana")));
+        doThrow(new AccessDeniedException("no")).when(accesoPacientes).exigirAtendido(1L, 5L);
+
+        assertThrows(AccessDeniedException.class,
+                () -> clinicalService.guardarSeguimiento(5L, "dra@mail.com", SeguimientoDiario.builder().build()));
+        verify(seguimientoDiarioRepository, never()).save(any());
+        verifyNoInteractions(outboxPublisher);
+    }
+
     // ── guardarInforme ───────────────────────────────────────────────
+
+    @Test
+    void guardarInforme_deUnPacienteQueNoAtiendeSeRechaza() {
+        when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico("dra@mail.com")));
+        when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente(5L, "Ana")));
+        doThrow(new AccessDeniedException("no")).when(accesoPacientes).exigirAtendido(1L, 5L);
+
+        assertThrows(AccessDeniedException.class,
+                () -> clinicalService.guardarInforme("dra@mail.com", 5L, "GENERAL", "plan", "contenido", null));
+        verify(informeClinicoRepository, never()).save(any());
+        verifyNoInteractions(outboxPublisher);
+    }
 
     @Test
     void guardarInforme_shouldThrowWhenMedicoNotFound() {
@@ -326,31 +354,28 @@ class ClinicalServiceTest {
                 () -> clinicalService.guardarSeguimientoPaciente("x@mail.com", SeguimientoDiario.builder().build()));
     }
 
+    // Fase 7: antes quedaba asignado a paula@tranqui.com, un resto de las pruebas.
     @Test
-    void guardarSeguimientoPaciente_shouldFallBackToDefaultMedicoWhenMissing() {
+    void guardarSeguimientoPaciente_sinProfesionalSeRechaza() {
         Usuario paciente = paciente(5L, "Ana");
-        Usuario medicoDefault = medico("paula@tranqui.com");
         when(usuarioRepository.findByEmail("ana@mail.com")).thenReturn(Optional.of(paciente));
-        when(usuarioRepository.findByEmail("paula@tranqui.com")).thenReturn(Optional.of(medicoDefault));
-        when(seguimientoDiarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        SeguimientoDiario entry = SeguimientoDiario.builder().build();
-        SeguimientoDiario saved = clinicalService.guardarSeguimientoPaciente("ana@mail.com", entry);
-
-        assertEquals(medicoDefault, saved.getMedico());
-        assertEquals(paciente, saved.getPaciente());
-        assertEquals(LocalDate.now(), saved.getFecha());
-        verify(notificacionService).crearNotificacion(eq(medicoDefault), anyString(), anyString(), eq("SEGUIMIENTO"));
+        assertThrows(IllegalArgumentException.class,
+                () -> clinicalService.guardarSeguimientoPaciente("ana@mail.com", SeguimientoDiario.builder().build()));
+        verify(usuarioRepository, never()).findByEmail("paula@tranqui.com");
+        verify(seguimientoDiarioRepository, never()).save(any());
     }
 
     @Test
-    void guardarSeguimientoPaciente_shouldThrowWhenDefaultMedicoMissing() {
+    void guardarSeguimientoPaciente_conUnProfesionalQueNoLoAtiendeSeRechaza() {
         Usuario paciente = paciente(5L, "Ana");
+        Usuario otro = medico("otra@mail.com");
         when(usuarioRepository.findByEmail("ana@mail.com")).thenReturn(Optional.of(paciente));
-        when(usuarioRepository.findByEmail("paula@tranqui.com")).thenReturn(Optional.empty());
+        doThrow(new AccessDeniedException("no")).when(accesoPacientes).exigirAtendido(1L, 5L);
 
-        assertThrows(EntityNotFoundException.class,
-                () -> clinicalService.guardarSeguimientoPaciente("ana@mail.com", SeguimientoDiario.builder().build()));
+        assertThrows(AccessDeniedException.class, () -> clinicalService.guardarSeguimientoPaciente("ana@mail.com",
+                SeguimientoDiario.builder().medico(otro).build()));
+        verify(seguimientoDiarioRepository, never()).save(any());
     }
 
     @Test
@@ -370,6 +395,17 @@ class ClinicalServiceTest {
     }
 
     // ── actualizarPaciente ───────────────────────────────────────────
+
+    @Test
+    void actualizarPaciente_deUnPacienteQueNoAtiendeSeRechaza() {
+        when(usuarioRepository.findByEmail("dra@mail.com")).thenReturn(Optional.of(medico("dra@mail.com")));
+        when(usuarioRepository.findById(5L)).thenReturn(Optional.of(paciente(5L, "Ana")));
+        doThrow(new AccessDeniedException("no")).when(accesoPacientes).exigirAtendido(1L, 5L);
+
+        assertThrows(AccessDeniedException.class,
+                () -> clinicalService.actualizarPaciente(5L, "dra@mail.com", PacienteDto.builder().nombre("Ana").build()));
+        verify(usuarioRepository, never()).save(any());
+    }
 
     @Test
     void actualizarPaciente_shouldThrowWhenMedicoNotFound() {
