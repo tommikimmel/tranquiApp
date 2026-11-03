@@ -18,7 +18,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Pregunta al monolito si un profesional tiene la suscripción al día
  * (/internal/monolito/suscripciones/acceso), con caché de 60 s por mail. Si el monolito no responde,
  * deja pasar: el paywall es comercial, no de seguridad, y un monolito caído no debe cortar los
- * servicios. En la Fase 8 la consulta pasa al servicio de suscripciones.
+ * servicios. En la Fase 8 la consulta se queda en el monolito (decisión 2: el monolito mantiene una
+ * copia del acceso con eventos) hasta la Fase 9.
  */
 @Component
 public class AccesoSuscripcionCliente {

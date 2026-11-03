@@ -78,6 +78,7 @@ public class AdminSaludTest {
                 .expectBody()
                 .jsonPath("$.servicios").isArray()
                 .jsonPath("$.servicios[?(@.nombre == 'gateway')]").exists()
+                .jsonPath("$.servicios[?(@.nombre == 'suscripciones')]").doesNotExist()
                 .jsonPath("$.timestamp").exists();
     }
 
