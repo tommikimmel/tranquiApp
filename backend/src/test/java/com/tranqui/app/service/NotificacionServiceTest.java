@@ -38,6 +38,22 @@ class NotificacionServiceTest {
         return Usuario.builder().id(1L).nombre("Ana").email("ana@mail.com").rol(Rol.PACIENTE).build();
     }
 
+    // Los tests de creación prueban el envío directo (vuelta atrás de la Fase 1).
+    @org.junit.jupiter.api.BeforeEach
+    void conEnvioDirecto() {
+        org.springframework.test.util.ReflectionTestUtils.setField(notificacionService, "envioDirecto", true);
+    }
+
+    @Test
+    void sinEnvioDirecto_noGuardaNiEmpuja_laCreaElServicioDeNotificaciones() {
+        org.springframework.test.util.ReflectionTestUtils.setField(notificacionService, "envioDirecto", false);
+
+        Notificacion result = notificacionService.crearNotificacion(usuario(), "Titulo", "Mensaje", "TIPO");
+
+        assertNull(result);
+        verifyNoInteractions(notificacionRepository, messagingTemplate);
+    }
+
     @Test
     void crearNotificacion_shouldSaveAndBroadcastViaWebSocket() {
         Usuario usuario = usuario();

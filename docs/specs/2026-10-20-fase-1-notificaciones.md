@@ -164,3 +164,13 @@ Desvíos respecto de la spec, encontrados al cablear cada punto del monolito:
   mantiene esa suscripción y suma `/ws-notificaciones` (N5).
 - El listado `GET /api/notificaciones` conserva los roles de hoy (paciente y profesional): los
   administradores reciben sus avisos de tickets solo en vivo, como en el monolito.
+
+### N4 — el monolito deja de mandar
+- El flag se chequea en un solo lugar: dentro de `ResendEmailService` (los 18 mails con evento) y en
+  `NotificacionService.crearNotificacion`. Los llamadores no cambian: con el flag en `false` la
+  llamada no hace nada y el evento, que ya se publica desde N2, lo toma el servicio.
+- Rutas internas nuevas del monolito: `/internal/monolito/contactos` y
+  `/internal/monolito/turnos/{id}/enlaces-asistencia`, con JWT de servicio (segunda barrera detrás
+  del gateway) y fuera del gate de contraseña del sitio.
+- **Vuelta atrás:** `NOTIFICACIONES_ENVIO_DIRECTO=true` en el monolito y la ruta del gateway de
+  vuelta al monolito (N5).

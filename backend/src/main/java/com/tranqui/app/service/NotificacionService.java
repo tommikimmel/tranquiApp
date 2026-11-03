@@ -29,8 +29,20 @@ public class NotificacionService {
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
+    // Fase 1: con false (por defecto) las notificaciones las crea y las empuja en vivo el servicio
+    // de notificaciones a partir de los eventos que el monolito ya publica; con true vuelve a
+    // hacerlo el monolito (vuelta atrás, junto con la ruta del gateway apuntando acá).
+    @org.springframework.beans.factory.annotation.Value("${notificaciones.envio-directo:false}")
+    private boolean envioDirecto;
+
+    /** @return la notificación creada, o null si la crea el servicio de notificaciones. */
     @Transactional
     public Notificacion crearNotificacion(Usuario usuario, String titulo, String mensaje, String tipo) {
+        if (!envioDirecto) {
+            log.debug("Notificación '{}' para usuario ID {}: la crea el servicio de notificaciones", titulo,
+                    usuario != null ? usuario.getId() : null);
+            return null;
+        }
         Notificacion notif = Notificacion.builder()
                 .usuario(usuario)
                 .titulo(titulo)

@@ -43,6 +43,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Actuator escucha en el puerto de management (8082), que no sale de la red interna.
                 .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
+                // Rutas internas entre servicios: las protege FiltroServicioInterno (JWT de servicio).
+                .requestMatchers("/internal/**").permitAll()
                 .requestMatchers("/api/site-access/**", "/api/auth/google", "/api/auth/register", "/api/auth/login", "/api/auth/verify-email", "/api/auth/resend-code", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/health", "/api/payments/webhook", "/api/payments/verificar", "/ws-tranqui/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/medicos", "/api/medicos/*/turnos-disponibles", "/api/medicos/turnos-disponibles-conteo", "/api/medicos/mercadopago/callback", "/api/medicos/google-calendar/callback", "/api/medicos/google-calendar/webhook", "/api/turnos/reservar", "/api/turnos/*/abandonar-pago", "/api/turnos/*/confirmar-asistencia", "/api/turnos/*/no-asistira", "/api/recetas/financiadores", "/api/subscriptions/plans", "/api/internal/novedades/**", "/error").permitAll()
                 .anyRequest().authenticated()
             )

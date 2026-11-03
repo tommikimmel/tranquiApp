@@ -135,3 +135,13 @@ resend:
 
 jwt:
   secret: ${JWT_SECRET:}
+
+# Fase 1: con false los mails y las notificaciones con evento los manda el servicio de
+# notificaciones; true vuelve al envío directo desde el monolito (vuelta atrás).
+notificaciones:
+  envio-directo: ${NOTIFICACIONES_ENVIO_DIRECTO:false}
+
+tranqui:
+  jwt:
+    # JWT de servicio (sección 4.2) para las rutas /internal/** que consultan otros servicios.
+    service-secret: ${SERVICE_JWT_KEY:}
