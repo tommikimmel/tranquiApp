@@ -3,14 +3,11 @@ package com.tranqui.gateway;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
+import com.tranqui.eventos.jwt.EmisorJwtUsuario;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -18,9 +15,11 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-import java.nio.charset.StandardCharsets;
-import java.security.Key;
-import java.util.Date;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPrivateKey;
+import java.time.Duration;
+import java.util.Base64;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 
@@ -30,12 +29,22 @@ import static com.github.tomakehurst.wiremock.client.WireMock.*;
 public class AdminObservabilidadTest {
 
     private static WireMockServer wireMockServer;
+    private static final KeyPair KEY_PAIR;
+    private static final EmisorJwtUsuario EMISOR;
+
+    static {
+        try {
+            KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+            kpg.initialize(2048);
+            KEY_PAIR = kpg.generateKeyPair();
+            EMISOR = new EmisorJwtUsuario((RSAPrivateKey) KEY_PAIR.getPrivate(), Duration.ofHours(1));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     @Autowired
     private WebTestClient webTestClient;
-
-    @Value("${jwt.secret}")
-    private String secret;
 
     @BeforeAll
     static void startWireMock() {
@@ -55,17 +64,11 @@ public class AdminObservabilidadTest {
     static void configureProperties(DynamicPropertyRegistry registry) {
         registry.add("tranqui.victoriametrics.url", () -> "http://localhost:" + wireMockServer.port());
         registry.add("tranqui.services.monolito.uri", () -> "http://localhost:" + wireMockServer.port());
+        registry.add("jwt.public-key", () -> Base64.getEncoder().encodeToString(KEY_PAIR.getPublic().getEncoded()));
     }
 
     private String crearToken(String rol) {
-        Key key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        return Jwts.builder()
-                .setSubject("admin@tranqui.com")
-                .claim("rol", rol)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 3600000))
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
+        return EMISOR.emitir("admin@tranqui.com", rol, "Admin", 1L);
     }
 
     private void stubVictoriaMetricsResponses() {

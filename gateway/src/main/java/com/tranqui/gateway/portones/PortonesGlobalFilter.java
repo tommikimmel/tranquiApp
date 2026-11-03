@@ -40,8 +40,13 @@ public class PortonesGlobalFilter implements GlobalFilter, Ordered {
     static final String COOKIE_SITIO = "SITE-ACCESS";
 
     // SiteAccessFilter.BYPASS_PREFIXES
+    // Rutas exentas del portón del sitio (mismas excepciones que en SiteAccessFilter del monolito).
+    // Con identidad en su propio servicio (Fase 9), /api/site-access/** y /api/health quedan exentas
+    // de la exigencia de la cookie SITE-ACCESS para permitir la verificación del portón
+    // y la comprobación de salud, mientras que /api/auth/** y el resto exigen la cookie si está configurada.
     private static final List<String> SIN_PORTON = List.of(
             "/api/site-access/",
+            "/api/site-access",
             "/api/health",
             "/actuator/",
             "/internal/",
@@ -51,10 +56,17 @@ public class PortonesGlobalFilter implements GlobalFilter, Ordered {
     );
 
     // SubscriptionAccessFilter.BYPASS_PREFIXES y BYPASS_EXACT
+    // Rutas exentas del paywall de suscripciones (mismas excepciones que en SubscriptionAccessFilter del monolito).
+    // Con identidad en su propio servicio (Fase 9), un psiquiatra sin suscripción activa puede acceder a
+    // autenticación (/api/auth/**), planes y checkout (/api/subscriptions/**), portón (/api/site-access/**),
+    // health (/api/health), webhooks y búsqueda pública de médicos (/api/medicos).
     private static final List<String> SIN_PAYWALL = List.of(
             "/api/auth/",
+            "/api/auth",
             "/api/subscriptions/",
+            "/api/subscriptions",
             "/api/site-access/",
+            "/api/site-access",
             "/api/health",
             "/api/payments/webhook",
             "/api/medicos/google-calendar/webhook",
@@ -98,8 +110,8 @@ public class PortonesGlobalFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
         return userJwtVerifier.verify(exchange)
-                .filter(claims -> "PSIQUIATRA".equals(claims.get("rol", String.class)) && claims.getSubject() != null)
-                .map(claims -> accesoSuscripcion.tieneAcceso(claims.getSubject())
+                .filter(usuario -> "PSIQUIATRA".equals(usuario.rol()) && usuario.email() != null)
+                .map(usuario -> accesoSuscripcion.tieneAcceso(usuario.email())
                         .flatMap(permitido -> permitido ? chain.filter(exchange) : responder(exchange, CUERPO_SUSCRIPCION)))
                 // Sin sesión válida o con otro rol: lo decide el servicio, como en el monolito.
                 .orElseGet(() -> chain.filter(exchange));

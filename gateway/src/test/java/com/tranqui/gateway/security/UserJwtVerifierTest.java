@@ -1,6 +1,7 @@
 package com.tranqui.gateway.security;
 
-import io.jsonwebtoken.Claims;
+import com.tranqui.eventos.jwt.EmisorJwtUsuario;
+import com.tranqui.eventos.jwt.UsuarioToken;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -13,8 +14,13 @@ import org.springframework.web.server.ServerWebExchange;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPrivateKey;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.Date;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,44 +28,46 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class UserJwtVerifierTest {
 
-    private static final String SECRET = "local-dev-encryption-key-32chars";
+    private static final String SECRET_HS256 = "local-dev-encryption-key-32chars";
+    private KeyPair keyPair;
+    private EmisorJwtUsuario emisor;
     private UserJwtVerifier verifier;
-    private Key signingKey;
+    private String publicKeyBase64;
 
     @BeforeEach
-    void setUp() {
-        verifier = new UserJwtVerifier(SECRET);
-        signingKey = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+    void setUp() throws Exception {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        keyPair = kpg.generateKeyPair();
+        emisor = new EmisorJwtUsuario((RSAPrivateKey) keyPair.getPrivate(), Duration.ofHours(1));
+        publicKeyBase64 = Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded());
+
+        verifier = new UserJwtVerifier(publicKeyBase64, SECRET_HS256, true);
     }
 
-    private String createToken(String subject, Map<String, Object> claims, long ttlMs) {
+    private String crearTokenHs256(String subject, String rol, long ttlMs) {
+        Key key = Keys.hmacShaKeyFor(SECRET_HS256.getBytes(StandardCharsets.UTF_8));
         return Jwts.builder()
-                .setClaims(claims)
                 .setSubject(subject)
+                .claim("rol", rol)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + ttlMs))
-                .signWith(signingKey, SignatureAlgorithm.HS256)
+                .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
 
     @Test
-    void testFailsStartupWhenSecretMissingOrTooShort() {
-        assertThatThrownBy(() -> new UserJwtVerifier(""))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Missing JWT_SECRET");
+    void testFailsStartupWhenNoKeysConfigured() {
+        assertThatThrownBy(() -> new UserJwtVerifier("", null, false))
+                .isInstanceOf(IllegalStateException.class);
 
-        assertThatThrownBy(() -> new UserJwtVerifier(null))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Missing JWT_SECRET");
-
-        assertThatThrownBy(() -> new UserJwtVerifier("short-key"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("at least 32 bytes");
+        assertThatThrownBy(() -> new UserJwtVerifier(null, "short-key", true))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
     void testVerifyFromCookie() {
-        String token = createToken("paciente@tranqui.com", Map.of("userId", "123", "rol", "PACIENTE"), 3600_000L);
+        String token = emisor.emitir("paciente@tranqui.com", "PACIENTE", "Paciente", 123L);
 
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/turnos")
@@ -67,17 +75,16 @@ class UserJwtVerifierTest {
                         .build()
         );
 
-        Optional<Claims> claimsOpt = verifier.verify(exchange);
-        assertThat(claimsOpt).isPresent();
-        assertThat(claimsOpt.get().getSubject()).isEqualTo("paciente@tranqui.com");
-
-        Optional<String> userIdOpt = verifier.extractUserIdentifier(claimsOpt.get());
-        assertThat(userIdOpt).contains("123");
+        Optional<UsuarioToken> usuarioOpt = verifier.verify(exchange);
+        assertThat(usuarioOpt).isPresent();
+        assertThat(usuarioOpt.get().email()).isEqualTo("paciente@tranqui.com");
+        assertThat(usuarioOpt.get().rol()).isEqualTo("PACIENTE");
+        assertThat(usuarioOpt.get().uid()).isEqualTo(123L);
     }
 
     @Test
     void testVerifyFromAuthorizationBearer() {
-        String token = createToken("doctor@tranqui.com", Map.of("id", "456", "rol", "PROFESIONAL"), 3600_000L);
+        String token = emisor.emitir("doctor@tranqui.com", "PSIQUIATRA", "Doctor", 456L);
 
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/turnos")
@@ -85,34 +92,16 @@ class UserJwtVerifierTest {
                         .build()
         );
 
-        Optional<Claims> claimsOpt = verifier.verify(exchange);
-        assertThat(claimsOpt).isPresent();
-        assertThat(claimsOpt.get().getSubject()).isEqualTo("doctor@tranqui.com");
-
-        Optional<String> userIdOpt = verifier.extractUserIdentifier(claimsOpt.get());
-        assertThat(userIdOpt).contains("456");
-    }
-
-    @Test
-    void testVerifySubjectFallbackWhenNoUserIdClaim() {
-        String token = createToken("admin@tranqui.com", Map.of("rol", "ADMIN"), 3600_000L);
-
-        ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/admin")
-                        .header("Authorization", "Bearer " + token)
-                        .build()
-        );
-
-        Optional<Claims> claimsOpt = verifier.verify(exchange);
-        assertThat(claimsOpt).isPresent();
-
-        Optional<String> userIdOpt = verifier.extractUserIdentifier(claimsOpt.get());
-        assertThat(userIdOpt).contains("admin@tranqui.com");
+        Optional<UsuarioToken> usuarioOpt = verifier.verify(exchange);
+        assertThat(usuarioOpt).isPresent();
+        assertThat(usuarioOpt.get().email()).isEqualTo("doctor@tranqui.com");
+        assertThat(usuarioOpt.get().rol()).isEqualTo("PSIQUIATRA");
+        assertThat(usuarioOpt.get().uid()).isEqualTo(456L);
     }
 
     @Test
     void testExpiredTokenReturnsEmpty() {
-        String token = createToken("paciente@tranqui.com", Map.of(), -10_000L);
+        String token = emisor.emitir("paciente@tranqui.com", "PACIENTE", "Paciente", 123L, Instant.now().minus(Duration.ofHours(2)));
 
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/turnos")
@@ -120,17 +109,13 @@ class UserJwtVerifierTest {
                         .build()
         );
 
-        Optional<Claims> claimsOpt = verifier.verify(exchange);
-        assertThat(claimsOpt).isEmpty();
+        Optional<UsuarioToken> usuarioOpt = verifier.verify(exchange);
+        assertThat(usuarioOpt).isEmpty();
     }
 
     @Test
     void testInvalidSignatureReturnsEmpty() {
-        Key otherKey = Keys.hmacShaKeyFor("different-secret-key-at-least-32-chars-long!".getBytes(StandardCharsets.UTF_8));
-        String forgedToken = Jwts.builder()
-                .setSubject("hacker@evil.com")
-                .signWith(otherKey, SignatureAlgorithm.HS256)
-                .compact();
+        String forgedToken = "header.payload.signatureInvalida";
 
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/turnos")
@@ -138,8 +123,8 @@ class UserJwtVerifierTest {
                         .build()
         );
 
-        Optional<Claims> claimsOpt = verifier.verify(exchange);
-        assertThat(claimsOpt).isEmpty();
+        Optional<UsuarioToken> usuarioOpt = verifier.verify(exchange);
+        assertThat(usuarioOpt).isEmpty();
     }
 
     @Test
@@ -148,7 +133,24 @@ class UserJwtVerifierTest {
                 MockServerHttpRequest.get("/api/turnos").build()
         );
 
-        Optional<Claims> claimsOpt = verifier.verify(exchange);
-        assertThat(claimsOpt).isEmpty();
+        Optional<UsuarioToken> usuarioOpt = verifier.verify(exchange);
+        assertThat(usuarioOpt).isEmpty();
+    }
+
+    @Test
+    void testTransicionHs256_aceptadoConTrue_rechazadoConFalse() {
+        String tokenHs256 = crearTokenHs256("usuario@tranqui.com", "PACIENTE", 3600_000L);
+
+        // 1. Con jwt.hs256-aceptado=true: aceptado
+        UserJwtVerifier verifierConHs256 = new UserJwtVerifier(publicKeyBase64, SECRET_HS256, true);
+        Optional<UsuarioToken> usuarioOpt = verifierConHs256.verifyToken(tokenHs256);
+        assertThat(usuarioOpt).isPresent();
+        assertThat(usuarioOpt.get().email()).isEqualTo("usuario@tranqui.com");
+        assertThat(usuarioOpt.get().rol()).isEqualTo("PACIENTE");
+
+        // 2. Con jwt.hs256-aceptado=false: rechazado (empty)
+        UserJwtVerifier verifierSinHs256 = new UserJwtVerifier(publicKeyBase64, SECRET_HS256, false);
+        Optional<UsuarioToken> rechazado = verifierSinHs256.verifyToken(tokenHs256);
+        assertThat(rechazado).isEmpty();
     }
 }

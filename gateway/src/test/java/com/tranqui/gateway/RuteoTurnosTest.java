@@ -86,7 +86,7 @@ class RuteoTurnosTest {
     void historiaClinicaEstadisticasYPerfil_siguenEnSusDuenios() {
         va("GET", "/api/pacientes/me/seguimientos", "monolito");
         va("GET", "/api/pacientes/7/informes", "monolito");
-        va("GET", "/api/medicos/stats", "monolito");
+        va("GET", "/api/medicos/stats", "turnos");
     }
 
     @Test

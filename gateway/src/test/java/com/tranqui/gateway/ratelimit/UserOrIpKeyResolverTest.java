@@ -1,10 +1,8 @@
 package com.tranqui.gateway.ratelimit;
 
+import com.tranqui.eventos.jwt.EmisorJwtUsuario;
 import com.tranqui.gateway.security.RealIpResolver;
 import com.tranqui.gateway.security.UserJwtVerifier;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpCookie;
@@ -14,38 +12,34 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.test.StepVerifier;
 
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
-import java.security.Key;
-import java.util.Date;
-import java.util.Map;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPrivateKey;
+import java.time.Duration;
+import java.util.Base64;
 
 class UserOrIpKeyResolverTest {
 
-    private static final String SECRET = "local-dev-encryption-key-32chars";
+    private KeyPair keyPair;
+    private EmisorJwtUsuario emisor;
     private UserOrIpKeyResolver keyResolver;
-    private Key signingKey;
 
     @BeforeEach
-    void setUp() {
-        UserJwtVerifier verifier = new UserJwtVerifier(SECRET);
+    void setUp() throws Exception {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        keyPair = kpg.generateKeyPair();
+        emisor = new EmisorJwtUsuario((RSAPrivateKey) keyPair.getPrivate(), Duration.ofHours(1));
+        String publicKeyBase64 = Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded());
+
+        UserJwtVerifier verifier = new UserJwtVerifier(publicKeyBase64, null, false);
         RealIpResolver ipResolver = new RealIpResolver();
         keyResolver = new UserOrIpKeyResolver(verifier, ipResolver);
-        signingKey = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private String createToken(String subject, Map<String, Object> claims) {
-        return Jwts.builder()
-                .setClaims(claims)
-                .setSubject(subject)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 3600_000L))
-                .signWith(signingKey, SignatureAlgorithm.HS256)
-                .compact();
     }
 
     @Test
     void testResolvesUserFromCookie() {
-        String token = createToken("paciente@tranqui.com", Map.of("userId", "user-123"));
+        String token = emisor.emitir("paciente@tranqui.com", "PACIENTE", "Paciente", 123L);
 
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/turnos")
@@ -55,13 +49,13 @@ class UserOrIpKeyResolverTest {
         );
 
         StepVerifier.create(keyResolver.resolve(exchange))
-                .expectNext("user:user-123")
+                .expectNext("user:paciente@tranqui.com")
                 .verifyComplete();
     }
 
     @Test
     void testResolvesUserFromAuthorizationHeader() {
-        String token = createToken("profesional@tranqui.com", Map.of("id", "doc-456"));
+        String token = emisor.emitir("profesional@tranqui.com", "PSIQUIATRA", "Doctor", 456L);
 
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/turnos")
@@ -71,7 +65,7 @@ class UserOrIpKeyResolverTest {
         );
 
         StepVerifier.create(keyResolver.resolve(exchange))
-                .expectNext("user:doc-456")
+                .expectNext("user:profesional@tranqui.com")
                 .verifyComplete();
     }
 

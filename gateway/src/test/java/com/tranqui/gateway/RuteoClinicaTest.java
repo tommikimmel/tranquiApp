@@ -92,7 +92,7 @@ public class RuteoClinicaTest {
     @Test
     void conVariableClinica_turnosYEstadisticas_noVanAClinica() {
         va("GET", "/api/pacientes/me/turnos", "turnos");
-        va("GET", "/api/medicos/stats", "monolito");
+        va("GET", "/api/medicos/stats", "turnos");
     }
 
     @Test

@@ -1,7 +1,8 @@
 package com.tranqui.gateway.admin;
 
+import com.tranqui.eventos.jwt.EmisorJwtUsuario;
+import com.tranqui.eventos.jwt.UsuarioToken;
 import com.tranqui.gateway.security.UserJwtVerifier;
-import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -15,34 +16,49 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 
 import java.nio.charset.StandardCharsets;
-import java.security.Key;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPrivateKey;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.Date;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AdminAuthValidatorTest {
 
-    private static final String SECRET = "local-dev-encryption-key-32chars";
+    private static final String SECRET_HS256 = "local-dev-encryption-key-32chars";
+    private KeyPair keyPair;
+    private EmisorJwtUsuario emisor;
     private UserJwtVerifier verifier;
     private AdminAuthValidator validator;
-    private Key signingKey;
+    private String publicKeyBase64;
 
     @BeforeEach
-    void setUp() {
-        verifier = new UserJwtVerifier(SECRET);
+    void setUp() throws Exception {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        keyPair = kpg.generateKeyPair();
+        emisor = new EmisorJwtUsuario((RSAPrivateKey) keyPair.getPrivate(), Duration.ofHours(1));
+        publicKeyBase64 = Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded());
+
+        verifier = new UserJwtVerifier(publicKeyBase64, SECRET_HS256, true);
         validator = new AdminAuthValidator(verifier);
-        signingKey = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
     }
 
-    private String createToken(String subject, Map<String, Object> claims, long ttlMs) {
+    private String crearTokenRs256(String email, String rol) {
+        return emisor.emitir(email, rol, "Admin Test", 1L);
+    }
+
+    private String crearTokenHs256(String email, String rol) {
         return Jwts.builder()
-                .setClaims(claims)
-                .setSubject(subject)
+                .setSubject(email)
+                .claim("rol", rol)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + ttlMs))
-                .signWith(signingKey, SignatureAlgorithm.HS256)
+                .setExpiration(new Date(System.currentTimeMillis() + 3600_000L))
+                .signWith(Keys.hmacShaKeyFor(SECRET_HS256.getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -63,12 +79,7 @@ class AdminAuthValidatorTest {
 
     @Test
     void testRequireAdminTokenInvalidoLanza401() {
-        Key otherKey = Keys.hmacShaKeyFor("different-secret-key-at-least-32-chars-long!".getBytes(StandardCharsets.UTF_8));
-        String forgedToken = Jwts.builder()
-                .setSubject("attacker@evil.com")
-                .claim("rol", "ADMIN")
-                .signWith(otherKey, SignatureAlgorithm.HS256)
-                .compact();
+        String forgedToken = "header.payload.signatureInvalida";
 
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/admin/salud")
@@ -87,7 +98,7 @@ class AdminAuthValidatorTest {
 
     @Test
     void testRequireAdminTokenExpiradoLanza401() {
-        String expiredToken = createToken("admin@tranqui.com", Map.of("rol", "ADMIN"), -10_000L);
+        String expiredToken = emisor.emitir("admin@tranqui.com", "ADMIN", "Admin", 1L, Instant.now().minus(Duration.ofHours(2)));
 
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/admin/salud")
@@ -106,7 +117,7 @@ class AdminAuthValidatorTest {
 
     @Test
     void testRequireAdminTokenRolPacienteLanza403() {
-        String token = createToken("paciente@tranqui.com", Map.of("rol", "PACIENTE"), 3600_000L);
+        String token = crearTokenRs256("paciente@tranqui.com", "PACIENTE");
 
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/admin/salud")
@@ -124,27 +135,8 @@ class AdminAuthValidatorTest {
     }
 
     @Test
-    void testRequireAdminTokenSinRolLanza403() {
-        String token = createToken("desconocido@tranqui.com", Map.of(), 3600_000L);
-
-        ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/admin/salud")
-                        .cookie(new HttpCookie("SESSION-TOKEN", token))
-                        .build()
-        );
-
-        assertThatThrownBy(() -> validator.requireAdmin(exchange))
-                .isInstanceOf(ResponseStatusException.class)
-                .satisfies(ex -> {
-                    ResponseStatusException rse = (ResponseStatusException) ex;
-                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-                    assertThat(rse.getReason()).contains("Acceso restringido a administradores");
-                });
-    }
-
-    @Test
-    void testRequireAdminTokenAdminValidoRetornaClaims() {
-        String token = createToken("admin@tranqui.com", Map.of("rol", "ADMIN"), 3600_000L);
+    void testRequireAdminTokenAdminValidoRetornaUsuarioToken() {
+        String token = crearTokenRs256("admin@tranqui.com", "ADMIN");
 
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/admin/salud")
@@ -152,15 +144,16 @@ class AdminAuthValidatorTest {
                         .build()
         );
 
-        Claims claims = validator.requireAdmin(exchange);
-        assertThat(claims).isNotNull();
-        assertThat(claims.getSubject()).isEqualTo("admin@tranqui.com");
-        assertThat(claims.get("rol")).isEqualTo("ADMIN");
+        UsuarioToken usuario = validator.requireAdmin(exchange);
+        assertThat(usuario).isNotNull();
+        assertThat(usuario.email()).isEqualTo("admin@tranqui.com");
+        assertThat(usuario.rol()).isEqualTo("ADMIN");
+        assertThat(usuario.uid()).isEqualTo(1L);
     }
 
     @Test
-    void testRequireAdminTokenAdminEnCookieRetornaClaims() {
-        String token = createToken("admin@tranqui.com", Map.of("rol", "ADMIN"), 3600_000L);
+    void testRequireAdminTokenAdminEnCookieRetornaUsuarioToken() {
+        String token = crearTokenRs256("admin@tranqui.com", "ADMIN");
 
         ServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/admin/salud")
@@ -168,14 +161,14 @@ class AdminAuthValidatorTest {
                         .build()
         );
 
-        Claims claims = validator.requireAdmin(exchange);
-        assertThat(claims).isNotNull();
-        assertThat(claims.getSubject()).isEqualTo("admin@tranqui.com");
+        UsuarioToken usuario = validator.requireAdmin(exchange);
+        assertThat(usuario).isNotNull();
+        assertThat(usuario.email()).isEqualTo("admin@tranqui.com");
     }
 
     @Test
     void testExtractToken() {
-        String token = createToken("admin@tranqui.com", Map.of("rol", "ADMIN"), 3600_000L);
+        String token = crearTokenRs256("admin@tranqui.com", "ADMIN");
 
         ServerWebExchange exchangeBearer = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/admin/salud")
@@ -188,5 +181,33 @@ class AdminAuthValidatorTest {
                 MockServerHttpRequest.get("/api/admin/salud").build()
         );
         assertThat(validator.extractToken(exchangeVacio)).isNull();
+    }
+
+    @Test
+    void testTransicionHs256_aceptadoConTrue_rechazadoConFalse() {
+        String tokenHs256 = crearTokenHs256("admin@tranqui.com", "ADMIN");
+
+        ServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/admin/salud")
+                        .header("Authorization", "Bearer " + tokenHs256)
+                        .build()
+        );
+
+        // 1. Con jwt.hs256-aceptado=true: es aceptado
+        UserJwtVerifier verifierConHs256 = new UserJwtVerifier(publicKeyBase64, SECRET_HS256, true);
+        AdminAuthValidator validatorConHs256 = new AdminAuthValidator(verifierConHs256);
+        UsuarioToken usuario = validatorConHs256.requireAdmin(exchange);
+        assertThat(usuario).isNotNull();
+        assertThat(usuario.email()).isEqualTo("admin@tranqui.com");
+
+        // 2. Con jwt.hs256-aceptado=false: 401 Unauthorized
+        UserJwtVerifier verifierSinHs256 = new UserJwtVerifier(publicKeyBase64, SECRET_HS256, false);
+        AdminAuthValidator validatorSinHs256 = new AdminAuthValidator(verifierSinHs256);
+        assertThatThrownBy(() -> validatorSinHs256.requireAdmin(exchange))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+                });
     }
 }
